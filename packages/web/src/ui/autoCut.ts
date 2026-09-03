@@ -6,6 +6,16 @@ export const IDLE_HANDBACK_MS = 20_000
 /** A hand on the camera: a pan, a zoom, a click, a key. */
 const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const
 
+/** The town's own chrome. A click on the paper or the signpost is a hand on the PAPER: taking
+ *  the camera away for it disabled the director on the very click that asks for a shot. */
+const CHROME = '.paper, .signpost'
+
+export function onChrome(target: EventTarget | null): boolean {
+  // Duck-typed, not `instanceof Element`: the director is asked this off a browser too.
+  const el = target as { closest?: (sel: string) => unknown } | null
+  return typeof el?.closest === 'function' && el.closest(CHROME) !== null
+}
+
 export type Director = {
   get: () => boolean
   subscribe: (cb: () => void) => () => void
@@ -30,8 +40,8 @@ export function director(target: EventTarget): Director {
     if (timer !== null) clearTimeout(timer)
     timer = null
   }
-  const hold = (): void => {
-    if (!armed) return
+  const hold = (e: Event): void => {
+    if (!armed || onChrome(e.target)) return
     publish(false)
     stopTimer()
     timer = setTimeout(() => {

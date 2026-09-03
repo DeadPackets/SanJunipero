@@ -19,6 +19,7 @@ import { makeSceneRelay } from './scenes.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
+import { makeMomentsReader } from './moments.js'
 import { mountConstructsApi } from './constructs.js'
 import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
@@ -121,11 +122,12 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   })
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
+  const moments = makeMomentsReader({ db, mirror, narratorDb })
   const closeConstructsApi = mountConstructsApi(router, { agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
-  const shareDeps = { mirror, narratorDb, getCodex }
+  const shareDeps = { mirror, narratorDb, getCodex, moments }
   mountShareCard(router, shareDeps)
   mountCrawlerRoutes(router, { mirror, narratorDb })
 

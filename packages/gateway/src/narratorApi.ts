@@ -9,13 +9,12 @@ import {
   MILESTONE_ICON,
   MILESTONE_TYPE,
   MINUTES_PER_DAY,
-  type Moment,
   agentName,
+  chronicleCast,
   chronicleIcon,
   chronicleLine,
   discoveryHeadline,
   kindWords,
-  placeWordsAt,
 } from '@sj/shared'
 // Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
 // The contract is declared once, in @sj/shared.
@@ -24,10 +23,13 @@ import {
   milestoneFromRow,
   type ChapterRow,
   type MilestoneRow,
-  type SceneRow,
 } from '@sj/shared/narratorSchema'
+// The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
+// SDK, which a free scripted stream may not import. This module's own imports are types only.
+import { footnoteSeqs, stripFootnotes } from '@sj/narrator/chronicle'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
+import { makeMomentsReader } from './moments.js'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -98,16 +100,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     }
   }
 
-  // R4: a scene is stored as the tile it happened on, and a viewer is never shown a pair of
-  // numbers. The nearest thing the town built answers for the tile, or nothing does; a place
-  // already written as words is already an answer.
-  const placeWords = (loc: string | null): string | null => {
-    if (loc === null) return null
-    const m = /^(\d+),(\d+)$/.exec(loc)
-    if (m === null) return loc
-    return placeWordsAt(Object.values(deps.mirror.state().structures), Number(m[1]), Number(m[2]))
-  }
-
   // A free key is a cache a stranger can miss on purpose. The clamped pair is also the memo key,
   // so every over-long window collapses onto the same entry.
   const windowOf = (url: URL): { fromTick: number; toTick: number } => {
@@ -132,25 +124,37 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
           payload: string
         }[]
       ).reverse()
+      const agents = deps.mirror.state().agents
+      const isAgent = (id: string): boolean => agents[id] !== undefined
       const entries: ChronicleEntry[] = []
       for (const r of rows) {
-        const label = chronicleLine(toEvent(r), look)
+        const ev = toEvent(r)
+        const label = chronicleLine(ev, look)
         if (label === null) continue // a weighted type the formatter has no words for yet
-        entries.push({ seq: r.seq, tick: r.tick, type: r.type, icon: chronicleIcon(r.type), label })
+        entries.push({
+          seq: r.seq,
+          tick: r.tick,
+          type: r.type,
+          icon: chronicleIcon(r.type),
+          label,
+          agentIds: chronicleCast(ev, isAgent),
+        })
       }
 
       // The narrator's firsts join the same stream: same shape, same ordering, one feed.
-      for (const m of readOrEmpty<{ label: string; event_seq: number; tick: number }>(
+      for (const row of readOrEmpty<MilestoneRow>(
         deps.narratorDb,
-        'SELECT label, event_seq, tick FROM milestones ORDER BY id',
+        `SELECT ${MILESTONE_SELECT} FROM milestones ORDER BY id`,
       )) {
+        const m = milestoneFromRow(row)
         if (m.tick < fromTick || m.tick > toTick) continue
         entries.push({
-          seq: Math.max(1, m.event_seq),
+          seq: Math.max(1, m.eventSeq),
           tick: m.tick,
           type: MILESTONE_TYPE,
           icon: MILESTONE_ICON,
           label: m.label,
+          agentIds: m.agentIds,
         })
       }
       entries.sort((a, b) => a.tick - b.tick || a.seq - b.seq)
@@ -168,13 +172,30 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
+  /** The `Seen:` footnotes are the narrator's own citation apparatus and a number leak to a
+   *  reader, so the prose is served without them — and the mapping they carry is served beside
+   *  it, paragraph by paragraph, so a replay can caption itself in the narrator's own voice
+   *  rather than paying an LLM per view. `seen[i]` belongs to paragraph `i` of `text`. */
+  const chapterRead = (c: ChapterRow): ChapterRow & { seen: number[][] } => {
+    const paras = c.text
+      .split(/\n{2,}/)
+      .map((p) => ({ text: stripFootnotes(p), seen: footnoteSeqs(p) }))
+      .filter((p) => p.text !== '')
+    return {
+      day: c.day,
+      title: c.title,
+      text: paras.map((p) => p.text).join('\n\n'),
+      seen: paras.map((p) => p.seen),
+    }
+  }
+
   router.route('GET', '/api/chapters', (_req, res) => {
     sendJson(
       res,
       readOrEmpty<ChapterRow>(
         deps.narratorDb,
         'SELECT day, title, text FROM chapters ORDER BY day',
-      ),
+      ).map(chapterRead),
     )
   })
 
@@ -240,27 +261,13 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     sendJson(res, rows.map(milestoneFromRow))
   })
 
-  // A recorded day, named by its chapter when C7 has written one and by its number when it
-  // has not — the day exists either way, and the list must not wait on the prose.
+  const momentsFromLog = makeMomentsReader(deps)
+
   router.route('GET', '/api/moments', (_req, res) => {
-    const rows = readOrEmpty<SceneRow & { id: number; title: string | null }>(
-      deps.narratorDb,
-      `
-      SELECT s.id, s.day, s.start_tick, s.end_tick, s."cast", s.location, c.title
-      FROM scenes s LEFT JOIN chapters c ON c.day = s.day
-      ORDER BY s.day, s.id
-    `,
+    sendPrebuilt(
+      res,
+      cache.json('moments', () => ({ moments: momentsFromLog() })),
     )
-    const moments: Moment[] = rows.map((r) => ({
-      id: r.id,
-      day: r.day,
-      startTick: r.start_tick,
-      endTick: r.end_tick,
-      title: r.title ?? `Day ${r.day}`,
-      cast: JSON.parse(r.cast) as string[],
-      location: placeWords(r.location),
-    }))
-    sendJson(res, { moments })
   })
 
   // The SOURCES, not the marks: the rule that turns them into marks lives in the viewer's

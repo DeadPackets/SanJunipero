@@ -9,6 +9,7 @@ import {
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
   MomentsResponseSchema,
+  momentTitle,
   type ChronicleEntry,
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
@@ -59,6 +60,44 @@ function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Databas
       if (tick === 40) emit('fire_ignited', { structureId: 's1', cause: 'hearth' })
       if (tick === 50) emit('agent_died', { agentId: 'cara', cause: 'hunger' })
       if (tick === 60) emit('mystery_event', { kind: 'far_bell' })
+      // Two rooms in one day, so the card for that day has to CHOOSE which one leads.
+      if (tick === 12) {
+        emit('scene_opened', {
+          id: 'sc_1',
+          kind: 'talk',
+          participants: ['alice', 'bob'],
+          topic: 'the well',
+          stakes: 3,
+        })
+      }
+      if (tick === 18)
+        emit('scene_closed', {
+          id: 'sc_1',
+          summary: 'They agreed to dig.',
+          deltas: [],
+          closeReason: 'ended',
+        })
+      if (tick === 44) {
+        emit('scene_opened', {
+          id: 'sc_2',
+          kind: 'quarrel',
+          participants: ['alice', 'cara'],
+          topic: null,
+          stakes: 8,
+        })
+      }
+      if (tick === 52)
+        emit('scene_closed', { id: 'sc_2', summary: '', deltas: [], closeReason: 'left' })
+      // ...and one still open when the log ends: it has a start and no close yet.
+      if (tick === 95) {
+        emit('scene_opened', {
+          id: 'sc_3',
+          kind: 'council',
+          participants: ['bob'],
+          topic: 'the fire',
+          stakes: 5,
+        })
+      }
       if (!withDiscoveries) return
       if (tick === 40) {
         emit('discovery_made', {
@@ -254,8 +293,8 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('reads the real chapters C7 wrote, prose and all', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([
-      { day: 0, title: 'The First Morning', text: 'They woke.' },
-      { day: 1, title: 'What the Fire Took', text: 'It burned.' },
+      { day: 0, title: 'The First Morning', text: 'They woke.', seen: [[]] },
+      { day: 1, title: 'What the Fire Took', text: 'It burned.', seen: [[]] },
     ])
   })
 
@@ -325,38 +364,56 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     ])
   })
 
-  it('turns C7’s recorded scenes into moments a viewer can open', async () => {
+  // ★ `/api/moments` used to serve the narrator's time-window segments — dozens a day, every one
+  // titled with the day's chapter title and no stakes on the wire. Thirty cards sharing one name
+  // cannot look significant however they are drawn. One SCENE is one card now.
+  it('★ builds a moment per scene off the world’s own log, with its own name and stakes', async () => {
     const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
-    expect(body.moments).toEqual([
-      {
-        id: 1,
-        day: 0,
-        startTick: 10,
-        endTick: 60,
-        title: 'The First Morning',
-        cast: ['alice', 'bob'],
-        location: 'the plaza',
-      },
-      {
-        id: 2,
-        day: 1,
-        startTick: 1440,
-        endTick: 1500,
-        title: 'What the Fire Took',
-        cast: ['cara'],
-        location: null,
-      },
-      // no chapter for day 2 — the day still exists, it just has no name yet
-      {
-        id: 3,
-        day: 2,
-        startTick: 2880,
-        endTick: 2900,
-        title: 'Day 2',
-        cast: [],
-        location: 'the riverbank',
-      },
-    ])
+    const byTopic = Object.fromEntries(body.moments.map((m) => [m.title, m]))
+
+    expect(byTopic['the well']).toMatchObject({
+      day: 0,
+      startTick: 12,
+      endTick: 18,
+      kind: 'talk',
+      stakes: 3,
+      cast: ['alice', 'bob'],
+      summary: 'They agreed to dig.',
+    })
+  })
+
+  it('★ never titles two scenes of a day the same: a room with no topic is named by its kind', () => {
+    expect(momentTitle('quarrel', null)).toBe('They fell out')
+    expect(momentTitle('quarrel', '   ')).toBe('They fell out')
+    expect(momentTitle('talk', 'the well')).toBe('the well')
+  })
+
+  it('★ leads each day with the scene that had most at stake', async () => {
+    const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
+    const dayZero = body.moments.filter((m) => m.day === 0)
+    expect(dayZero.length).toBeGreaterThan(1)
+    expect(dayZero[0]!.stakes).toBe(8) // the quarrel, not the talk that opened first
+    expect(dayZero.map((m) => m.stakes)).toEqual(
+      [...dayZero.map((m) => m.stakes)].sort((a, b) => b - a),
+    )
+  })
+
+  it('a room still talking has a start and no summary yet, and is a moment all the same', async () => {
+    const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
+    const open = body.moments.find((m) => m.title === 'the fire')
+    expect(open).toMatchObject({ startTick: 95, endTick: 95, summary: null, kind: 'council' })
+  })
+
+  it('says nothing rather than something empty where the room came to nothing', async () => {
+    const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
+    expect(body.moments.find((m) => m.title === 'They fell out')?.summary).toBeNull()
+  })
+
+  // The log records no room. The narrator's own scene rows are the only place a place is written
+  // down, and they are windows over the same events rather than these scenes.
+  it('answers for the place out of the narrator window the scene happened inside', async () => {
+    const body = MomentsResponseSchema.parse(await (await fetch(`${base}/api/moments`)).json())
+    expect(body.moments.find((m) => m.title === 'the well')?.location).toBe('the plaza')
   })
 
   // U14 — the timeline's marks used to come from a 400-entry ring that only holds what arrived
@@ -447,9 +504,18 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     expect(dispatches.status).toBe(200)
     for (const list of Object.values((await dispatches.json()) as Record<string, unknown>))
       expect(list).toEqual([])
-    const moments = await fetch(`${base}/api/moments`)
-    expect(moments.status).toBe(200)
-    expect(MomentsResponseSchema.parse(await moments.json()).moments).toEqual([])
+  })
+
+  // ★ The record used to be the narrator's to keep, so a town that had not been narrated yet had
+  // no moments at all. A scene is the WORLD's, and the town can be watched back before C7 has
+  // written a word about it — only the place is the narrator's, and that stays null until then.
+  it('★ keeps the record without the narrator: the scenes are the town’s own', async () => {
+    const res = await fetch(`${base}/api/moments`)
+    expect(res.status).toBe(200)
+    const { moments } = MomentsResponseSchema.parse(await res.json())
+    expect(moments.length).toBeGreaterThan(0)
+    expect(moments.map((m) => m.title)).toContain('the well')
+    for (const m of moments) expect(m.location, m.title).toBeNull()
   })
 
   it('answers the marks endpoint with 200 and typed empties, never a 500', async () => {

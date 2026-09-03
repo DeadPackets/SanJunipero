@@ -11,6 +11,9 @@ const moment = (over: Partial<Moment> = {}): Moment => ({
   title: 'What the Fire Took',
   cast: ['alice', 'bob'],
   location: 'the plaza',
+  kind: 'talk',
+  stakes: 4,
+  summary: null,
   ...over,
 })
 

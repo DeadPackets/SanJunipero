@@ -10,6 +10,8 @@ import {
   FAR_BANK_PHRASE,
   NOT_CHRONICLED,
   UNNAMED_CONSTRUCT_COPY,
+  CHRONICLE_CAST_MAX,
+  chronicleCast,
   chronicleIcon,
   chronicleLine,
   constructLine,
@@ -63,8 +65,10 @@ describe('ChronicleEntrySchema', () => {
     label: 'Rahel has died (hunger).',
   }
 
-  it('round-trips a well-formed entry', () => {
+  it('round-trips a well-formed entry, with or without a cast', () => {
     expect(ChronicleEntrySchema.parse(entry)).toEqual(entry)
+    const cast = { ...entry, agentIds: ['a1'] }
+    expect(ChronicleEntrySchema.parse(cast)).toEqual(cast)
     expect(ChronicleResponseSchema.parse({ entries: [entry] }).entries).toHaveLength(1)
   })
 
@@ -73,6 +77,38 @@ describe('ChronicleEntrySchema', () => {
     expect(ChronicleEntrySchema.safeParse({ ...entry, label: '' }).success).toBe(false)
     expect(ChronicleEntrySchema.safeParse({ ...entry, tick: -1 }).success).toBe(false)
     expect(ChronicleEntrySchema.safeParse({ ...entry, seq: 0 }).success).toBe(false)
+  })
+})
+
+// ★ /api/heat scores the LIVE tick, so a replayed chronicle line had nobody to frame and the
+// director round-robined one stranger's face per 60 ticks. The line has to say who it is about.
+describe('★ chronicleCast — who a chronicle line is about', () => {
+  const isAgent = (id: string): boolean => id in NAMES
+
+  it('★ takes the people out of a payload and leaves the things behind', () => {
+    expect(chronicleCast(ev('agent_tended', { agentId: 'a1', tenderId: 'a2' }), isAgent)).toEqual([
+      'a1',
+      'a2',
+    ])
+    expect(chronicleCast(ev('structure_completed', { id: 's1' }), isAgent)).toEqual([])
+    expect(
+      chronicleCast(ev('agent_born', { id: 'a1', name: 'Rahel', motherId: 'a2' }), isAgent),
+    ).toEqual(['a1', 'a2'])
+  })
+
+  it('names nobody twice, and never more than a shot can frame', () => {
+    expect(chronicleCast(ev('co_slept', { aId: 'a1', bId: 'a1' }), isAgent)).toEqual(['a1'])
+    const crowd = Object.fromEntries(
+      Array.from({ length: 9 }, (_, i) => [`k${i}`, `a${(i % 2) + 1}`]),
+    )
+    expect(chronicleCast(ev('gathering', crowd), isAgent).length).toBeLessThanOrEqual(
+      CHRONICLE_CAST_MAX,
+    )
+  })
+
+  it('answers empty for a line about the world rather than about anybody', () => {
+    expect(chronicleCast(ev('world_grown', {}), isAgent)).toEqual([])
+    expect(chronicleCast(ev('grave_placed', { name: 'Rahel' }), isAgent)).toEqual([])
   })
 })
 

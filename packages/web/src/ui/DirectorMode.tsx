@@ -26,6 +26,7 @@ export function directorZoom(width: number): typeof DIRECTOR_ZOOM | typeof DIREC
 /** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
  *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
 const NO_HEAT: HeatWindow[] = []
+const NO_CAST: readonly string[] = []
 
 /** Who is alive and has no body on the town map — indoors, where the exterior view draws
  *  nothing. `rendersOnMap` is the character layer's own answer, asked here rather than guessed. */
@@ -42,6 +43,8 @@ function indoorsIn(state: { agents: Record<string, AgentBody> } | null): Set<str
  *  the thing the town is doing — and the heat director only gets what is left. */
 export type CameraClaim =
   | { by: 'pinned'; agentId: string }
+  /** A replayed moment: it is ABOUT these people, and /api/heat scores the live tick only. */
+  | { by: 'moment'; cast: readonly string[] }
   | { by: 'scene'; cast: readonly string[] }
   | { by: 'cut'; agentId: string }
   /** A scene the map cannot show: the director still stands down, and the shot HOLDS. */
@@ -53,8 +56,15 @@ export function cameraClaim(
   stage: SceneStage | null,
   indoors: ReadonlySet<string>,
   cut: string | null,
+  moment: readonly string[] = [],
 ): CameraClaim {
   if (pinned !== null) return { by: 'pinned', agentId: pinned }
+  // A moment with a cast owns the shot outright, and one whose cast is all indoors HOLDS rather
+  // than handing the camera to a heat round that is scoring the live tick, not this one.
+  if (moment.length > 0) {
+    const played = sceneCast(moment, indoors)
+    return played.length === 0 ? { by: 'hold' } : { by: 'moment', cast: played }
+  }
   if (stage !== null) {
     const cast = sceneCast(stage.scene.participants, indoors)
     return cast.length === 0 ? { by: 'hold' } : { by: 'scene', cast }
@@ -70,6 +80,7 @@ export function DirectorMode({
   stage = null,
   autoCut,
   pinned = null,
+  moment = NO_CAST,
   onCue,
 }: {
   store: WorldStore
@@ -78,6 +89,8 @@ export function DirectorMode({
   stage?: SceneStage | null
   autoCut: boolean
   pinned?: string | null
+  /** the cast of the moment being replayed, which the shot is FOR */
+  moment?: readonly string[]
   onCue?: (text: string | null) => void
 }) {
   const [cut, setCut] = useState<string | null>(null)
@@ -89,7 +102,7 @@ export function DirectorMode({
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
 
   const feed = useEndpointFor<HeatWindow[]>(
-    autoCut && pinned === null ? '/api/heat' : null,
+    autoCut && pinned === null && moment.length === 0 ? '/api/heat' : null,
     undefined,
     HEAT_POLL_MS,
   )
@@ -100,9 +113,17 @@ export function DirectorMode({
 
   // `autoCut` is also the hands-off-the-camera signal: it drops for twenty seconds after a pan
   // or a zoom, and a scene must not take a camera the viewer has just steered either.
-  const claim = cameraClaim(pinned, autoCut ? stage : null, indoorsIn(state), autoCut ? cut : null)
+  // A replayed moment is not automation: the viewer asked for these people, so it is read
+  // whether or not the director has the camera.
+  const claim = cameraClaim(
+    pinned,
+    autoCut ? stage : null,
+    indoorsIn(state),
+    autoCut ? cut : null,
+    moment,
+  )
   const claimBy = claim.by
-  const castKey = claim.by === 'scene' ? claim.cast.join(' ') : ''
+  const castKey = claim.by === 'scene' || claim.by === 'moment' ? claim.cast.join(' ') : ''
   const followed = claim.by === 'pinned' || claim.by === 'cut' ? claim.agentId : null
 
   useEffect(() => {
@@ -111,7 +132,7 @@ export function DirectorMode({
       return
     }
     // A scene owns the shot while it runs, so the round waits rather than cutting away from it.
-    if (claimBy === 'scene' || claimBy === 'hold') return
+    if (claimBy === 'scene' || claimBy === 'moment' || claimBy === 'hold') return
     if (!heat.loaded) return
     // read here, never subscribed to — the town changing must not turn the round
     const living = Object.values(store.getState()?.agents ?? {}).filter((a) => a.alive)
@@ -138,7 +159,7 @@ export function DirectorMode({
     // A scene the exterior view cannot show takes nobody, and the shot HOLDS where it is: a
     // camera that cut away would be showing three closed doors while the room talks behind them.
     if (claimBy === 'hold') return
-    if (claimBy === 'scene') {
+    if (claimBy === 'scene' || claimBy === 'moment') {
       const cast = castKey.split(' ')
       const stageBox = { w: scene.app.screen.width, h: scene.app.screen.height }
       const where = (): ReturnType<typeof sceneShot> =>

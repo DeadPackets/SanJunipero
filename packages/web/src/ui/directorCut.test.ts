@@ -209,7 +209,9 @@ describe('★ the camera’s ladder of claims', () => {
 
   it('★ the round stands down while a scene holds the shot, and no cut lands', () => {
     // the cut chooser returns before it reads the heat, so `lastCutRef` never moves either
-    expect(SRC).toContain("if (claimBy === 'scene' || claimBy === 'hold') return")
+    expect(SRC).toContain(
+      "if (claimBy === 'scene' || claimBy === 'moment' || claimBy === 'hold') return",
+    )
     expect(SRC).toMatch(/\}, \[store, autoCut, claimBy, heat, beat\]\)/)
   })
 
@@ -224,5 +226,44 @@ describe('★ the camera’s ladder of claims', () => {
 
   it('★ a hand on the camera stands the scene down with the director, for the same 20s', () => {
     expect(SRC).toContain('autoCut ? stage : null')
+  })
+})
+
+// ★ /api/heat is anchored at the LIVE tick, so during a replay the past scores nothing and the
+// director round-robins one face per 60 ticks — anybody but the people the moment is about.
+describe('★ a replayed moment frames the people it is about', () => {
+  const SRC = readFileSync(new URL('./DirectorMode.tsx', import.meta.url), 'utf8')
+  const NOBODY = new Set<string>()
+  const open = (participants: string[]): SceneStage => ({
+    scene: { id: 'sc_1', kind: 'talk', participants, topic: 'the well', stakes: 4, open: true },
+    phase: 'open',
+  })
+
+  it('★ outranks the scene and the heat round, and sits under a viewer’s own pick', () => {
+    expect(cameraClaim(null, null, NOBODY, 'yusuf', ['amara', 'salma'])).toEqual({
+      by: 'moment',
+      cast: ['amara', 'salma'],
+    })
+    expect(cameraClaim(null, open(['omar']), NOBODY, null, ['amara'])).toEqual({
+      by: 'moment',
+      cast: ['amara'],
+    })
+    expect(cameraClaim('omar', null, NOBODY, null, ['amara'])).toEqual({
+      by: 'pinned',
+      agentId: 'omar',
+    })
+  })
+
+  it('★ a moment whose cast is all indoors HOLDS rather than handing back the heat round', () => {
+    expect(cameraClaim(null, null, new Set(['amara']), 'yusuf', ['amara'])).toEqual({ by: 'hold' })
+  })
+
+  it('a moment with nobody named leaves every other claim exactly as it was', () => {
+    expect(cameraClaim(null, null, NOBODY, 'yusuf', [])).toEqual({ by: 'cut', agentId: 'yusuf' })
+    expect(cameraClaim(null, null, NOBODY, null)).toEqual({ by: 'town' })
+  })
+
+  it('★ stops polling the heat it cannot use while a moment owns the shot', () => {
+    expect(SRC).toContain("autoCut && pinned === null && moment.length === 0 ? '/api/heat' : null")
   })
 })

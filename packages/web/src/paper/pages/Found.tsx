@@ -7,6 +7,7 @@ import {
 } from '@sj/shared'
 import { DISCOVERY_REFETCH_MS, leavesOf, recordSummary } from '../../ui/discoveryModel.js'
 import { itemCropDetail, thingKind } from '../../ui/interaction.js'
+import { pointPlay } from '../../ui/replayRun.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
@@ -25,7 +26,7 @@ export function FoundPage(props: PageProps) {
 
 /** The one place the agent's own words are printed: a chronicle line is agent-visible and this
  *  page is not. */
-function Things({ store, thing, onJump }: PageProps) {
+function Things({ store, thing, onPlay }: PageProps) {
   const assets = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -35,6 +36,7 @@ function Things({ store, thing, onJump }: PageProps) {
   const read = useFeed(record)
   const leaves = leavesOf(read.data ?? NO_RECORDS, assets)
   const viewTick = mode.live ? null : mode.tick
+  const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
 
   // A thing on the ground has no page of its own, so the record it came out of answers for it.
   const clicked = thing === null ? null : itemCropDetail(state, thing)
@@ -77,9 +79,9 @@ function Things({ store, thing, onJump }: PageProps) {
                 aria-current={
                   leaf.record.seq === madeBy || viewTick === leaf.record.tick ? 'true' : undefined
                 }
-                aria-label={`${leaf.headline}, ${leaf.when}. Go to this moment.`}
+                aria-label={`${leaf.headline}, ${leaf.when}. Watch this moment.`}
                 onClick={() => {
-                  onJump(leaf.record.tick)
+                  onPlay(pointPlay(leaf.record.tick, edge, leaf.headline, [leaf.record.byId]))
                 }}
               >
                 {leaf.assetId === null ? (

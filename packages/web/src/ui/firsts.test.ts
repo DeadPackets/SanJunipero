@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { CHRONICLE_FALLBACK_ICON, MILESTONE_ICON } from '@sj/shared'
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { FirstsView } from '../paper/pages/Chronicle.js'
+import { FIRST_GLYPH_FALLBACK, firstGlyph } from './firstPlate.js'
 import { firstsByTier } from './firsts.js'
 import { chronicleGlyph } from './importantFeed.js'
 import { EMPTY_COPY } from './townStats.js'
@@ -24,7 +24,9 @@ const first = (over: Partial<MilestoneRead> = {}): MilestoneRead => ({
 })
 
 const view = (read: Read<MilestoneRead[]>): string =>
-  renderToStaticMarkup(createElement(FirstsView, { read, viewTick: null, onJump: () => {} }))
+  renderToStaticMarkup(
+    createElement(FirstsView, { read, viewTick: null, edge: 9_000, onPlay: () => {} }),
+  )
 
 describe('the firsts ledger, grouped as the chronicle reads it', () => {
   it('★ puts what the town made itself at the top, and the engine’s own firsts last', () => {
@@ -80,14 +82,54 @@ describe('the Firsts tab', () => {
     expect(html).toContain('class="feed-head"')
   })
 
-  // The curated feed already draws a milestone with `MILESTONE_ICON`; a second glyph for the
-  // same thing would read as a second kind of thing.
-  it('★ draws a first with the glyph the record already gives one', () => {
-    expect(chronicleGlyph(MILESTONE_ICON).label).toBe('a first')
-    expect(MILESTONE_ICON).not.toBe(CHRONICLE_FALLBACK_ICON)
+  // ★ Every first used to wear the SAME `spark`, so a shelf of them read as one repeated thing.
+  // A plate now wears the shape of what it is about.
+  it('★ gives a first the glyph of the thing it is a first OF', () => {
+    expect(firstGlyph('first_fire')).toBe('flame')
+    expect(firstGlyph('first_death')).toBe('cross')
+    expect(firstGlyph('first_law')).toBe('quill')
+    // ordered rules: `first_fire_out` is still about fire, `first_grave` is still about a death
+    expect(firstGlyph('first_fire_out')).toBe('flame')
+    expect(firstGlyph('first_grave')).toBe('cross')
+    // and a kind nobody has written a rule for is still a first, not a blank plate
+    expect(firstGlyph('first_something_minted')).toBe(FIRST_GLYPH_FALLBACK)
     const html = view({ data: [first()], loaded: true, failed: false })
-    for (const [x, y] of chronicleGlyph(MILESTONE_ICON).pixels)
+    for (const [x, y] of chronicleGlyph('flame').pixels)
       expect(html, `${x},${y}`).toContain(`x="${x}" y="${y}"`)
+  })
+
+  it('★ prints NO tier number, and no count, bar, streak or badge anywhere', () => {
+    const html = view({
+      data: [first({ kind: 'first_fire', tier: 1 }), first({ kind: 'first_law', tier: 3 })],
+      loaded: true,
+      failed: false,
+    })
+    expect(html).not.toMatch(/tier/i)
+    expect(html).not.toMatch(/\b\d+\s*(of|\/)\s*\d+\b/)
+    for (const word of ['progress', 'streak', 'badge', 'points', 'leaderboard', 'unlocked'])
+      expect(html.toLowerCase(), word).not.toContain(word)
+    // the rarity is the material instead
+    expect(html).toContain('data-material="sand"')
+    expect(html).toContain('data-material="gilded"')
+  })
+
+  it('★ turns a corner down for a first reached while nobody was watching', () => {
+    const rows = [
+      first({ kind: 'first_fire', tick: 500 }),
+      first({ kind: 'first_law', tick: 9000 }),
+    ]
+    const seen = renderToStaticMarkup(
+      createElement(FirstsView, {
+        read: { data: rows, loaded: true, failed: false },
+        viewTick: null,
+        edge: 9_000,
+        lastVisit: 1000,
+        onPlay: () => {},
+      }),
+    )
+    expect(seen.match(/data-fresh="yes"/g)).toHaveLength(1)
+    // a first visit has no watermark, so nothing is new and nothing is dog-eared
+    expect(view({ data: rows, loaded: true, failed: false })).not.toContain('data-fresh')
   })
 
   it('★ makes every first a way back to the minute it happened in', () => {
@@ -95,11 +137,13 @@ describe('the Firsts tab', () => {
       createElement(FirstsView, {
         read: { data: [first({ tick: 1500 })], loaded: true, failed: false },
         viewTick: 1500,
-        onJump: () => {},
+        edge: 9_000,
+        onPlay: () => {},
       }),
     )
-    expect(html).toMatch(/class="feed-jump"[^>]*aria-current="true"/)
-    expect(html).toContain('Go to this moment.')
+    expect(html).toMatch(/data-current="yes"/)
+    expect(html).toContain('Watch this moment.')
+    expect(html).toContain('class="first-watch"')
   })
 
   // A name the town gave itself is printed with the words it came out of, verbatim.
@@ -117,8 +161,8 @@ describe('the Firsts tab', () => {
       },
     })
     const html = view({ data: [named, first()], loaded: true, failed: false })
-    expect(html).toContain('class="discovery-quote"')
+    expect(html).toContain('class="first-quote"')
     expect(html).toContain('we should call it Emberfall')
-    expect(html.match(/discovery-quote/g)).toHaveLength(1)
+    expect(html.match(/first-quote/g)).toHaveLength(1)
   })
 })

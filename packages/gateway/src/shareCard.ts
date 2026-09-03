@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import sharp from 'sharp'
-import { MINUTES_PER_DAY, momentToTick } from '@sj/shared'
+import { MINUTES_PER_DAY, type Moment, momentToTick } from '@sj/shared'
 // The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
 // SDK, which the scripted stream must never load (town/src/liveSeam.test.ts).
 import { renderShareCard } from '@sj/narrator/shareCard'
@@ -11,6 +11,7 @@ import type { Router } from './router.js'
 import { reportOnce } from './degraded.js'
 import { AGENT_ID } from './api.js'
 import { makeSpriteReader, renderAgentCard, type AgentRead } from './agentCard.js'
+import { CARD_CAST_MAX, momentAt, momentCardNames, renderMomentCard } from './momentCard.js'
 
 export const TOWN_NAME = 'San Junipero'
 
@@ -26,6 +27,8 @@ export type ShareCardDeps = {
   mirror: WorldMirror
   narratorDb: Database.Database | null
   getCodex: () => AssetCodex | null
+  /** the town's own scenes, so a shared minute's card is the room that was in it */
+  moments?: () => Moment[]
 }
 
 export type ShareMeta = {
@@ -247,6 +250,24 @@ function sendCard(
 export function mountShareCard(router: Router, deps: ShareCardDeps): void {
   const spriteFor = makeSpriteReader(deps.getCodex)
 
+  /** A REAL postcard for the minute somebody shared: the room that was running, its faces, its
+   *  place, on a plate the colour of that hour. The day's own title card is what answers when
+   *  the link points between rooms, or before the town has held a scene at all. */
+  const momentCard = async (day: number, tick: number): Promise<string> => {
+    const scene = momentAt(deps.moments?.() ?? [], tick, day)
+    if (scene === null) {
+      const read = readDay(deps, day)
+      return renderShareCard({
+        day: read.day,
+        title: read.title,
+        subtitle: read.subtitle,
+        heat: readHeat(deps, day),
+      })
+    }
+    const busts = await Promise.all(scene.cast.slice(0, CARD_CAST_MAX).map(spriteFor))
+    return renderMomentCard(scene, busts, momentCardNames(deps.mirror.state().agents))
+  }
+
   router.route('GET', '/card/moment/:day/:time', (_req, res, params) => {
     const asked = splitExt(params.time ?? '')
     const day = Number(/^(?:day)?(\d+)$/.exec(params.day ?? '')?.[1] ?? NaN)
@@ -258,16 +279,10 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
       failCard(res, 404, 'not found')
       return
     }
-    const read = readDay(deps, day)
     sendCard(
       res,
       asked.png,
-      renderShareCard({
-        day: read.day,
-        title: read.title,
-        subtitle: read.subtitle,
-        heat: readHeat(deps, day),
-      }),
+      momentCard(day, momentToTick(day, asked.name)),
       day < live ? CACHE_CLOSED : CACHE_LIVE,
     )
   })

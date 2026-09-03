@@ -9,6 +9,9 @@ const moment: Moment = {
   title: 'What the Fire Took',
   cast: ['alice', 'bob'],
   location: 'the plaza',
+  kind: 'talk',
+  stakes: 4,
+  summary: 'They agreed to dig.',
 }
 
 describe('MomentSchema', () => {

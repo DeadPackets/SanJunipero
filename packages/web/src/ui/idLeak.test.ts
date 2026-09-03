@@ -159,7 +159,18 @@ describe('no viewer-facing string prints a machine id', () => {
 
   it('a moment card names its cast and never a coordinate', () => {
     const label = thumbLabel(
-      { id: 1, day: 3, startTick: 0, endTick: 9, title: 'Day 3', cast: ['ghost'], location: null },
+      {
+        id: 1,
+        day: 3,
+        startTick: 0,
+        endTick: 9,
+        title: 'Day 3',
+        cast: ['ghost'],
+        location: null,
+        kind: 'talk',
+        stakes: 0,
+        summary: null,
+      },
       {},
     )
     clean(label.cast, 'thumbLabel cast')

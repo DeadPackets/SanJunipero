@@ -1,6 +1,7 @@
 import type { Scene } from '../../render/scene.js'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
+import type { MomentPlay } from '../../ui/replayRun.js'
 
 /** A thing on the ground the viewer clicked. A structure is a `Subject`; these are not. */
 export type Thing = { kind: 'item' | 'crop'; id: string }
@@ -23,8 +24,10 @@ export type PageProps = {
   gapTicks: number | null
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
-  /** Go to one minute of the town's history: the socket scrubs and the address bar follows. */
-  onJump: (tick: number) => void
+  /** Hold one minute of the town's history still. For dragging the filmstrip, and nothing else. */
+  onScrub: (tick: number) => void
+  /** WATCH a moment: the sheet closes, the bodies walk, and it stops where the moment does. */
+  onPlay: (play: MomentPlay) => void
   onLive: () => void
   /** The recorded day the filmstrip has open, so the address bar names it. */
   onMoment: (id: number | null) => void

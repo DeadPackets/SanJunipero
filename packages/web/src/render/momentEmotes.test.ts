@@ -12,6 +12,7 @@ import {
   MOMENT_EMOTE,
   MOMENT_EMOTE_ABOVE_PX,
   MOMENT_EMOTE_FADE_MS,
+  BODILESS_MOMENTS,
   MOMENT_EMOTE_MS,
   MOMENT_EMOTE_RISE_MS,
   MOMENT_EMOTE_RISE_PX,
@@ -56,8 +57,16 @@ describe('★ a pixel rises off the head of whoever it happened to', () => {
     expect(bodiesOf(ev('discovery_made', { byId: 'omar' }))).toEqual(['omar'])
   })
 
-  it('says something for every moment the cue slot prints, and the other way round', () => {
-    for (const type of CUE_TYPES) expect(momentEmote(type), type).not.toBe(null)
+  it('says something for every moment the cue slot prints ABOUT A PERSON', () => {
+    for (const type of CUE_TYPES) {
+      if (BODILESS_MOMENTS.has(type)) continue
+      expect(momentEmote(type), type).not.toBe(null)
+    }
+  })
+
+  it('★ and the exception is named, not silent: a finished building has nobody to rise off', () => {
+    expect([...BODILESS_MOMENTS]).toEqual(['structure_completed'])
+    for (const type of BODILESS_MOMENTS) expect(momentEmote(type), type).toBe(null)
   })
 })
 

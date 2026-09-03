@@ -1,5 +1,11 @@
 import { useMemo, useSyncExternalStore } from 'react'
-import { MILESTONE_ICON, tickToMoment, type ChronicleEntry } from '@sj/shared'
+import {
+  agentName,
+  tickToMoment,
+  type AssetRecord,
+  type ChronicleEntry,
+  type NameIndex,
+} from '@sj/shared'
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
@@ -7,6 +13,10 @@ import { editions, type Edition } from '../../ui/dispatches.js'
 import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { firstsByTier } from '../../ui/firsts.js'
+import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
+import { bustStyle } from '../../ui/bustStyle.js'
+import { lastVisitTick } from '../../ui/storage.js'
+import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
@@ -26,6 +36,10 @@ const GLYPH: Record<string, string> = {
 }
 
 const NO_ENTRIES: ChronicleEntry[] = []
+const NO_CAST: readonly string[] = []
+const NO_RECORDS: AssetRecord[] = []
+/** Head and shoulders at the plate's own size; the roster uses 48 and the stream frame 96. */
+const BUST_PX = 40
 const NO_EDITIONS: Edition[] = []
 
 type Chapter = { day: number; title: string; text: string }
@@ -55,23 +69,27 @@ function FeedJump({
   tick,
   label,
   icon,
+  cast,
   current,
-  onJump,
+  edge,
+  onPlay,
 }: {
   tick: number
   label: string
   icon: string
+  cast: readonly string[]
   current: boolean
-  onJump: (tick: number) => void
+  edge: number
+  onPlay: (play: MomentPlay) => void
 }) {
   return (
     <button
       type="button"
       className="feed-jump"
       aria-current={current ? 'true' : undefined}
-      aria-label={`${label} ${momentStamp(tick)}. Go to this moment.`}
+      aria-label={`${label} ${momentStamp(tick)}. Watch this moment.`}
       onClick={() => {
-        onJump(tick)
+        onPlay(pointPlay(tick, edge, label, cast))
       }}
     >
       <Glyph icon={icon} />
@@ -112,7 +130,7 @@ function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
   )
 }
 
-function Today({ store, gapTicks, onJump }: PageProps) {
+function Today({ store, gapTicks, onPlay }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
@@ -126,6 +144,7 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   const latest = days[0] ?? null
   const daysAway = gapTicks === null ? 0 : Math.floor(gapTicks / 1440)
   const viewTick = mode.live ? null : mode.tick
+  const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
 
   // A poll landing, a scrub, or the gap notice re-renders this page; the fold behind the feed
   // only changes when the events or the world do.
@@ -182,8 +201,10 @@ function Today({ store, gapTicks, onJump }: PageProps) {
                       tick={e.tick}
                       label={e.label}
                       icon={e.icon}
+                      cast={e.agentIds ?? NO_CAST}
                       current={viewTick === e.tick}
-                      onJump={onJump}
+                      edge={edge}
+                      onPlay={onPlay}
                     />
                   </li>
                 ))}
@@ -216,27 +237,82 @@ function Today({ store, gapTicks, onJump }: PageProps) {
   )
 }
 
-function FirstLine({
-  first,
+/** One first, as a plate: the emblem, the name of the thing in the town's title face, the day
+ *  it happened, whoever it happened to, the words it was named out of, and one verb. Nothing
+ *  counted, nothing ranked, no tier number anywhere — the material carries the rarity. */
+function FirstPlateView({
+  plate,
+  people,
+  records,
   current,
-  onJump,
+  edge,
+  onPlay,
 }: {
-  first: MilestoneRead
+  plate: FirstPlate
+  people: NameIndex | undefined
+  records: AssetRecord[]
   current: boolean
-  onJump: (tick: number) => void
+  edge: number
+  onPlay: (play: MomentPlay) => void
 }) {
-  const quote = first.nameProvenance?.quote ?? null
+  const named = plate.cast.map((id) => ({ id, name: agentName(people, id) }))
   return (
-    <li className="feed-line">
-      <FeedJump
-        tick={first.tick}
-        label={first.label}
-        icon={MILESTONE_ICON}
-        current={current}
-        onJump={onJump}
-      />
-      {quote !== null && <p className="discovery-quote">“{quote}”</p>}
+    <li
+      className="first-plate"
+      data-material={plate.material}
+      data-fresh={plate.fresh ? 'yes' : undefined}
+      data-current={current ? 'yes' : undefined}
+    >
+      <p className="first-emblem" aria-hidden="true">
+        <Glyph icon={plate.glyph} />
+      </p>
+      <h4 className="first-label">{plate.label}</h4>
+      <p className="first-when">{momentStamp(plate.tick)}</p>
+      {named.length > 0 && (
+        <ul className="first-cast">
+          {named.map((who) => (
+            <li key={who.id}>
+              <Bust records={records} agentId={who.id} name={who.name} />
+              <span className="first-cast-name">{who.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {plate.quote !== null && <p className="first-quote">“{plate.quote}”</p>}
+      <button
+        type="button"
+        className="first-watch"
+        aria-label={`${plate.label}, ${momentStamp(plate.tick)}. Watch this moment.`}
+        onClick={() => {
+          onPlay(pointPlay(plate.tick, edge, plate.label, plate.cast))
+        }}
+      >
+        Watch
+      </button>
     </li>
+  )
+}
+
+/** The head and shoulders off the town's own atlas, or the pixel token where a person has no
+ *  art yet. `alt=""` on purpose: the name is printed beside it. */
+function Bust({
+  records,
+  agentId,
+  name,
+}: {
+  records: AssetRecord[]
+  agentId: string
+  name: string
+}) {
+  const style = bustStyle(records, agentId, BUST_PX)
+  return (
+    <span
+      className="first-bust"
+      data-blank={style === null ? 'yes' : undefined}
+      style={style ?? undefined}
+      role="img"
+      aria-label={name}
+    />
   )
 }
 
@@ -245,11 +321,20 @@ function FirstLine({
 export function FirstsView({
   read,
   viewTick,
-  onJump,
+  edge,
+  lastVisit = null,
+  people,
+  records = NO_RECORDS,
+  onPlay,
 }: {
   read: Read<MilestoneRead[]>
   viewTick: number | null
-  onJump: (tick: number) => void
+  edge: number
+  /** the tick this browser had watched up to when the tab opened, for the dog-ear */
+  lastVisit?: number | null
+  people?: NameIndex | undefined
+  records?: AssetRecord[]
+  onPlay: (play: MomentPlay) => void
 }) {
   const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
 
@@ -263,13 +348,16 @@ export function FirstsView({
       {groups.map((g) => (
         <section key={g.tier} className="block">
           <h3 className="feed-head">{g.head}</h3>
-          <ol className="feed important">
+          <ol className="first-shelf">
             {g.rows.map((first) => (
-              <FirstLine
+              <FirstPlateView
                 key={first.kind}
-                first={first}
+                plate={firstPlate(first, lastVisit)}
+                people={people}
+                records={records}
                 current={viewTick === first.tick}
-                onJump={onJump}
+                edge={edge}
+                onPlay={onPlay}
               />
             ))}
           </ol>
@@ -279,10 +367,23 @@ export function FirstsView({
   )
 }
 
-function Firsts({ store, onJump }: PageProps) {
+function Firsts({ store, onPlay }: PageProps) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
+  const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const records = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
   const read = useFeed(milestonesFeed)
-  return <FirstsView read={read} viewTick={mode.live ? null : mode.tick} onJump={onJump} />
+  return (
+    <FirstsView
+      read={read}
+      viewTick={mode.live ? null : mode.tick}
+      edge={edge}
+      lastVisit={lastVisitTick()}
+      people={state?.agents}
+      records={records}
+      onPlay={onPlay}
+    />
+  )
 }
 
 function Chapters() {
