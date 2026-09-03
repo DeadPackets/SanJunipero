@@ -35,9 +35,19 @@ export type SceneVoice = {
   want?: () => string | null
 }
 
-// How far back a mind reads before answering. Six lines is three exchanges: long enough to see
-// the shape of the talk, short enough that the last thing said is still the loudest.
-const THREAD_LINES_SHOWN = 6
+// How far back a mind reads before answering. Six lines is three exchanges for a pair: long
+// enough to see the shape of the talk, short enough that the last thing said is still the
+// loudest. At twelve it is half a round, which reads as people talking past each other.
+export const THREAD_LINES_SHOWN = 6
+/** Twelve is where the window stops earning its tokens: past it the block outgrows the system
+ *  prompt the cache is keeping warm, and the last thing said stops being the loudest. */
+export const THREAD_LINES_MAX = 12
+
+/** A whole round of talk, floored at the pair's six lines and capped at twelve — the shape
+ *  `lineCapFor` has, over the same cast. */
+export function threadLinesFor(talkers: number): number {
+  return Math.min(THREAD_LINES_MAX, Math.max(THREAD_LINES_SHOWN, talkers))
+}
 
 // v1 measured: the median spoken line was 92 characters, which is 16 words. A persona carrying
 // no card of its own speaks at the town's median.
@@ -93,8 +103,9 @@ function renderThread(
   thread: readonly SceneLine[],
   nameOf: (id: string) => string,
   selfId: string,
+  lines: number,
 ): string {
-  const shown = thread.slice(-THREAD_LINES_SHOWN)
+  const shown = thread.slice(-lines)
   if (shown.length === 0) return ''
   const rows = shown.flatMap((l) => {
     const who = l.agentId === selfId ? 'You' : nameOf(l.agentId)
@@ -190,7 +201,7 @@ export function sceneBlock(
     castLaw(voice.livingCast()),
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
-    renderThread(ask.thread, nameOf, ask.agentId),
+    renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderLateness(ask.tick, ask.energy),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),

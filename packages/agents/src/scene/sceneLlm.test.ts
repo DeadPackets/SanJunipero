@@ -6,7 +6,13 @@ import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { fixtureBlocks, tamarIdentity } from '../testutil/fixtures.js'
 import type { Tie } from '../memory/ties.js'
-import { makeSceneLlm, sceneBlock, sceneWordCap, type SceneVoice } from './sceneLlm.js'
+import {
+  makeSceneLlm,
+  sceneBlock,
+  sceneWordCap,
+  threadLinesFor,
+  type SceneVoice,
+} from './sceneLlm.js'
 import { openScene, type SceneAsk, type SceneLine } from './scene.js'
 
 const ZERO_USAGE = {
@@ -235,12 +241,31 @@ describe('a join does not throw the cached prefix away', () => {
     )
   })
 
-  it('shows the last six lines only', () => {
+  it('shows the last six lines only, to a pair', () => {
     const thread = Array.from({ length: 9 }, (_, i) => line('yusuf', `line number ${i}`))
     const text = block(ask({ thread }))
     expect(text).not.toContain('line number 2')
     expect(text).toContain('line number 3')
     expect(text).toContain('line number 8')
+  })
+
+  // Six lines of twelve is half a round, and a mind answering half a round reads as talking
+  // past people. The window is a whole round, floored at the pair's six and capped at twelve.
+  it('shows a whole round however big the cast, and never more than twelve lines', () => {
+    expect(threadLinesFor(2)).toBe(6)
+    expect(threadLinesFor(6)).toBe(6)
+    expect(threadLinesFor(12)).toBe(12)
+    expect(threadLinesFor(20), 'and never more than twelve').toBe(12)
+    for (const n of [2, 6, 12]) expect(threadLinesFor(n)).toBeGreaterThanOrEqual(Math.min(n, 12))
+  })
+
+  it('reads a whole round back at twelve, where six lines saw half of one', () => {
+    const cast = Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, name: `Person${i}` }))
+    const thread = Array.from({ length: 20 }, (_, i) => line(`p${i % 12}`, `line number ${i}`))
+    const text = block(ask({ agentId: 'p0', cast, thread }))
+    expect(text).not.toContain('line number 7')
+    expect(text).toContain('line number 8')
+    expect(text).toContain('line number 19')
   })
 
   it('keeps this mind’s own asides and shows no others', () => {
