@@ -170,6 +170,7 @@ export function isExpressiveRow(parsed: unknown): parsed is ExpressiveRow {
 export function expressiveVerbFromRuling(name: string, ruling: ExpressiveRuling): VerbDef {
   return {
     kind: `${EXPRESSIVE_VERB_PREFIX}${name}`,
+    params: ExpressiveParams,
     validate(state, _config, agentId, params) {
       const p = ExpressiveParams.safeParse(params)
       if (!p.success) return `${name} takes nothing but a targetId`

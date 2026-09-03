@@ -1,4 +1,5 @@
 import { afterEach, describe, it, expect } from 'vitest'
+import { z } from 'zod'
 import {
   ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
@@ -12,13 +13,14 @@ import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { loneCandidateFor, markUnderAnotherKey } from './verbs/autofill.js'
-import { registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs/index.js'
+import { keysFor, registerVerb, unregisterVerb, VERBS, type VerbDef } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 let seq = 1
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: seq++, tick: 0, type, payload })
 
 const OPEN = ['........', '........', '........', '........', '........', '........']
+const WATERSIDE = ['.~......', '........', '........']
 
 function world(rows: string[] = OPEN): WorldState {
   return genesisState(
@@ -107,6 +109,15 @@ function withHouse(s: WorldState, id: string, x: number): WorldState {
 
 const fill = (s: WorldState, verb: string, params: Record<string, unknown> = {}) =>
   loneCandidateFor(s, DEFAULT_CONFIG, 'a1', verb, params)
+
+// One log folded onto one world. The seq is counted from the same place every time, so two
+// states can only be told apart by what the events said.
+function replay(s: WorldState, events: { type: string; payload: unknown }[]): WorldState {
+  let out = s
+  let n = 1
+  for (const e of events) out = fold(out, { seq: n++, tick: 0, type: e.type, payload: e.payload })
+  return out
+}
 
 describe('loneCandidateFor', () => {
   it('fills eat from the one edible thing in the satchel', () => {
@@ -485,5 +496,160 @@ describe('every registered verb across the closed-params seam', () => {
       (def) => def.validate(s, DEFAULT_CONFIG, 'a1', { ...NO_PARAMS, ...NAMED }) !== null,
     )
     expect(refused.length).toBeGreaterThan(20)
+  })
+})
+
+// ★ THE DEFECT THIS BLOCK IS THE REGRESSION TEST FOR. A mind answers with every key it can think
+// of — 94 of one rehearsal's 153 walks carried three or more — and each verb's params schema is
+// strict. So an act that had named its fire, its loaf, its axe, its door and its skin was refused
+// for the keys lying beside them, in words that blamed the name it had in fact written:
+// "stoking needs the fire named", said to a body standing at the fire it had just named.
+describe('an act named right and answered wide', () => {
+  // Keys none of these five verbs reads: two coordinates guessed for a thing that has an id.
+  const WIDE = { x: 51, y: 46, description: 'the fire in the long house', text: 'warmth' }
+
+  const CASES: { verb: string; named: Record<string, unknown>; at: () => WorldState }[] = [
+    {
+      verb: 'stoke',
+      named: { structureId: 'structure_fire_1' },
+      at: () =>
+        holding(
+          withFire(withAgent(world(), 1, 1), 'structure_fire_1', 1, 2),
+          'item_wood_1',
+          'wood',
+        ),
+    },
+    {
+      verb: 'eat',
+      named: { itemId: 'item_bread_1' },
+      at: () => holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread'),
+    },
+    {
+      verb: 'take',
+      named: { itemId: 'item_wood_1' },
+      at: () => onGround(withAgent(world(), 2, 2), 'item_wood_1', 'wood', 2, 3),
+    },
+    {
+      verb: 'enter',
+      named: { structureId: 'structure_house_1' },
+      at: () => withHouse(withAgent(world(), 2, 3), 'structure_house_1', 2),
+    },
+    {
+      verb: 'fill',
+      named: { itemId: 'item_skin_1' },
+      at: () => holding(withAgent(world(WATERSIDE), 1, 1), 'item_skin_1', 'waterskin', 0),
+    },
+  ]
+
+  const startedBy = (r: ReturnType<typeof submitIntent>): Record<string, unknown> => {
+    if (!r.ok) throw new Error(r.reason)
+    return r.events.find((e) => e.type === 'action_started')!.payload as Record<string, unknown>
+  }
+
+  it('starts on the thing it named, however many keys arrived beside it', () => {
+    for (const c of CASES) {
+      const r = submitIntent(c.at(), DEFAULT_CONFIG, 'a1', c.verb, { ...c.named, ...WIDE })
+      expect(r.ok ? null : r.reason, c.verb).toBeNull()
+      // And the log records the act rather than the answer: a key the verb never read was
+      // never part of what happened, and the state hash must not carry it.
+      expect(startedBy(r), c.verb).toMatchObject({ verb: c.verb })
+      expect(startedBy(r).params, c.verb).toEqual(c.named)
+    }
+  })
+
+  it('reads the wide answer exactly as the sparse one the world has always passed', () => {
+    for (const c of CASES) {
+      const s = c.at()
+      expect(
+        submitIntent(s, DEFAULT_CONFIG, 'a1', c.verb, { ...c.named, ...WIDE }),
+        c.verb,
+      ).toEqual(submitIntent(s, DEFAULT_CONFIG, 'a1', c.verb, c.named))
+      // Including the act that named nothing at all, which the world reads in for itself.
+      expect(submitIntent(s, DEFAULT_CONFIG, 'a1', c.verb, WIDE), c.verb).toEqual(
+        submitIntent(s, DEFAULT_CONFIG, 'a1', c.verb, {}),
+      )
+    }
+  })
+
+  it('still asks which one when the act named nothing and two things fit', () => {
+    let s = holding(withAgent(world(), 1, 1), 'item_bread_1', 'bread')
+    s = holding(s, 'item_fish_2', 'fish')
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', WIDE)).toEqual({
+      ok: false,
+      reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
+    })
+  })
+
+  // A second, hand-written list of each verb's keys is the drift this seam is built without: it
+  // could not know a word the town coined an hour ago. This one did not exist when the seam did.
+  it('takes every key set off the verb itself, so a word minted now is laundered too', () => {
+    const CastParams = z.object({ structureId: z.string() }).strict()
+    const cast: VerbDef = {
+      kind: 'cast',
+      params: CastParams,
+      validate: (_state, _config, _agentId, params) =>
+        CastParams.safeParse(params).success ? null : 'casting needs the stone named',
+      duration: () => 1,
+      onComplete: () => [],
+    }
+    registerVerb(cast)
+    try {
+      expect(keysFor(cast)).toEqual(['structureId'])
+      const r = submitIntent(withAgent(world(), 1, 1), DEFAULT_CONFIG, 'a1', 'cast', {
+        structureId: 'structure_1',
+        ...WIDE,
+      })
+      expect(startedBy(r).params).toEqual({ structureId: 'structure_1' })
+    } finally {
+      unregisterVerb('cast')
+    }
+    // And a charter verb, which brings no schema — only the closed keys its rulebook row reads.
+    const bless: VerbDef = {
+      kind: 'recipe:bless',
+      reads: ['structureId'],
+      validate: () => null,
+      duration: () => 1,
+      onComplete: () => [],
+    }
+    expect(keysFor(bless)).toEqual(['structureId'])
+  })
+
+  // What the log loses, the fold must never have needed. The walk is the one that proves it: its
+  // path is laid again from the recorded params, and nowhere else.
+  it('replays a log written from a wide answer to the state the live run left', () => {
+    const walked = () => withAgent(world(), 0, 0)
+    const runs: { name: string; at: () => WorldState; r: ReturnType<typeof submitIntent> }[] = [
+      ...CASES.map((c) => ({
+        name: c.verb,
+        at: c.at,
+        r: submitIntent(c.at(), DEFAULT_CONFIG, 'a1', c.verb, { ...c.named, ...WIDE }),
+      })),
+      {
+        name: 'walk',
+        at: walked,
+        r: submitIntent(walked(), DEFAULT_CONFIG, 'a1', 'walk', {
+          x: 3,
+          y: 0,
+          description: 'off to the mill',
+          recipe: 'bread',
+        }),
+      },
+    ]
+    for (const run of runs) {
+      if (!run.r.ok) throw new Error(`${run.name}: ${run.r.reason}`)
+      const log = JSON.parse(JSON.stringify(run.r.events)) as { type: string; payload: unknown }[]
+      expect(stateHash(replay(run.at(), log)), run.name).toBe(
+        stateHash(replay(run.at(), run.r.events)),
+      )
+    }
+  })
+
+  // R2. Hands with nothing that holds water in them, and the world knows it: sending the mind
+  // back for a word it could not have written refused one body's `fill` ten times in three days.
+  it('tells empty hands what is absent rather than asking for the vessel', () => {
+    const dry = withAgent(world(WATERSIDE), 1, 1)
+    const absent = { ok: false, reason: 'not holding that' }
+    expect(submitIntent(dry, DEFAULT_CONFIG, 'a1', 'fill', {})).toEqual(absent)
+    expect(submitIntent(dry, DEFAULT_CONFIG, 'a1', 'fill', WIDE)).toEqual(absent)
   })
 })
