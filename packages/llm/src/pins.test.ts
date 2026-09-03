@@ -23,7 +23,7 @@ import {
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
   expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
-  expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra'])
+  expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra', 'Inceptron'])
   // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
   expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
@@ -109,6 +109,14 @@ it('★ the fleet: which model and which back end answers for each caller', () =
   for (const [caller, [model, order]] of Object.entries(fleet)) {
     expect(modelFor(caller), caller).toBe(model)
     expect(callSettingsFor(caller).providerOrder, caller).toEqual(order)
+  }
+
+  // `allow_fallbacks:false` walks `order` and stops at its end, so a list of one name has
+  // nowhere to fall. Inceptron alone refused 67% of scene closes and the town lost its ties.
+  const DEPTH_EXEMPT = new Set(['arbiter', 'council', 'law.compile', 'preflight'])
+  for (const [caller, [, order]] of Object.entries(fleet)) {
+    if (DEPTH_EXEMPT.has(caller)) continue
+    expect(order.length, `${caller} has no second provider to fall to`).toBeGreaterThan(1)
   }
 })
 
