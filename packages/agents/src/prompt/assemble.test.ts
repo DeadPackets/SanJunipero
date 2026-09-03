@@ -1157,6 +1157,50 @@ describe('what the town has named', () => {
   })
 })
 
+// ★ WHAT STANDS WITHIN REACH. Rehearsals 4 through 7 produced 665 acts a day and not one
+// construct, and the reason was not the court: it was handed this list on every ruling, while a
+// mind was shown only what already works. Nobody proposes a thing they have never been told is
+// there, so nobody ever did — the one invention the court saw was a mind mistyping `wait`.
+describe('what stands within reach', () => {
+  const said = (frontier: string[]): string => assemblePrompt(fixtureBlocks({ frontier })).system
+
+  it('names the unearned rungs and invites a mind to be the first at one', () => {
+    const system = said(['A store held in common'])
+    expect(system).toContain('Nobody here has done any of these')
+    expect(system).toContain('a store held in common')
+    expect(system).toContain('Say what you mean to do in your own words and try it.')
+  })
+
+  it('reads as a sentence when there are several, and says nothing when there are none', () => {
+    expect(said(['A turn agreed for the fields', 'A store held in common'])).toContain(
+      'a turn agreed for the fields and a store held in common',
+    )
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+  })
+
+  // It changes only when a craft is codified, so it belongs with the roster and the customs in
+  // the half of the prompt the cache keeps, never in the half that turns over every tick.
+  it('sits with the other things the whole town knows, above one mind’s own name', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], frontier: ['A store held in common'] }),
+    ).system
+    expect(system.indexOf('The town has taken to')).toBeLessThan(
+      system.indexOf('Nobody here has done any of these'),
+    )
+    expect(system.indexOf('Nobody here has done any of these')).toBeLessThan(
+      system.indexOf('Name: Tamar'),
+    )
+  })
+
+  // The codex authors these names in the town's own words, but the line a mind reads is what
+  // gets scanned — an id slipping through would put `common_store` in front of a mind.
+  it('leaks no word from the plane that keeps the ladder', () => {
+    expect(
+      scanPromptForGlassLeak(said(['A store held in common', 'A turn agreed for the fields'])),
+    ).toEqual([])
+  })
+})
+
 // The prompt's bill, itemised: which block bought which tokens, and which of them the cache
 // can keep. Measurement only — nothing here changes a byte a mind reads.
 describe('blockTokens', () => {

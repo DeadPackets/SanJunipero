@@ -216,6 +216,9 @@ export type Arbiter = {
   roster(): RosterEntry[]
   // The names the town gave its own recurrences. Names only — see `namedCustoms`.
   customs(): string[]
+  // The rungs one step out, in the codex's own words. What the court has always been shown and
+  // no mind ever was, which is why no mind ever reached for one.
+  frontier(): string[]
   // A body began this minted act at this tick, so it is not for retiring yet.
   noteUsed(verb: string, tick: number): void
   // Retires every minted verb unused for RETIREMENT_DAYS; returns the words that went.
@@ -513,6 +516,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
     customs() {
       return namedCustoms(constructs.all())
+    },
+
+    frontier() {
+      return codex.frontierNames()
     },
 
     noteUsed(verb, tick) {

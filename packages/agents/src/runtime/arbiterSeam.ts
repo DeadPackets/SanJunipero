@@ -40,6 +40,8 @@ export type SeamArbiter = {
   roster?: () => RosterEntry[]
   /** Names the town spoke for its own habits. Names only: the recognizer's words never cross. */
   customs?: () => readonly string[]
+  /** What stands one step beyond what the town practices, in the codex's own words. */
+  frontier?: () => readonly string[]
 }
 
 // Values only, in sorted key order: this string is a precedent key, so anything varying per

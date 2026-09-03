@@ -124,6 +124,11 @@ describe('codex', () => {
     expect(store.frontier()).not.toContain('steel')
     expect(store.frontier()).not.toContain('charcoal')
     expect(store.frontier()).not.toContain('gunpowder')
+
+    // ★ The same rungs said the way a mind is told them. The court copies ids into a canon; a
+    // mind is told a thing is there to reach for, and an id is not a thing anybody reaches for.
+    expect(store.frontierNames()).toEqual(['Glazing', 'Iron smelting'])
+    for (const name of store.frontierNames()) expect(name).not.toMatch(/_/)
   })
 
   it('duplicate insert throws (PK)', () => {

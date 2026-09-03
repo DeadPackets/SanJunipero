@@ -37,6 +37,7 @@ export type PromptBlocks = {
   // What the town has named, on the same terms and beside it: shared by every mind, and rewritten
   // only on the day somebody gives a habit a word.
   customs?: readonly string[]
+  frontier?: readonly string[]
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
   journal: JournalEntry[] // the mind's own book — changes only when it writes in it
@@ -167,6 +168,20 @@ function renderScene(scene: PromptBlocks['scene']): string {
 }
 // A habit the town has words for, and only the words: what kind of thing it is belongs to the
 // recognizer, and a mind may never hear that.
+// The court has always been handed this list and no mind ever was, so a mind could only reach
+// past the verb list by guessing a name blind. Said as a thing somebody might do, not as a tree.
+function renderFrontier(names: readonly string[]): string {
+  if (names.length === 0) return ''
+  const said = names.map((n) => n.charAt(0).toLowerCase() + n.slice(1))
+  const head = said.slice(0, -1).join(', ')
+  const tail = said.slice(-1).join('')
+  return (
+    'Nobody here has done any of these, and each one rests on something the town already ' +
+    `practices, so somebody could be the first: ${head === '' ? tail : `${head} and ${tail}`}. ` +
+    'Say what you mean to do in your own words and try it.'
+  )
+}
+
 function renderCustoms(names: readonly string[]): string {
   if (names.length === 0) return ''
   const said = names.map((n) => `the ${n}`)
@@ -189,12 +204,14 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const shared = renderShared(blocks.rulesOfBeing)
   const roster = renderRoster(blocks.roster ?? [])
   const customs = renderCustoms(blocks.customs ?? [])
+  const frontier = renderFrontier(blocks.frontier ?? [])
   const identity = renderIdentity(blocks.identity)
   const personality = renderPersonality(blocks.personality)
   const system = [
     shared,
     ...(roster.length === 0 ? [] : [roster]),
     ...(customs.length === 0 ? [] : [customs]),
+    ...(frontier.length === 0 ? [] : [frontier]),
     identity,
     personality,
   ].join(BLOCK_DELIM)
@@ -218,6 +235,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     ['shared', shared],
     ['roster', roster],
     ['customs', customs],
+    ['frontier', frontier],
     ['identity', identity],
     ['personality', personality],
     ['journal', journal],
