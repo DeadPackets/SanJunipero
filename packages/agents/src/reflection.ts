@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import type { LlmClient, LlmMessage } from '@sj/llm'
+import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
-import { GIST_SYSTEM, gistMemories, type GistLlm } from './memory/gist.js'
+import { GIST_SYSTEM, gistMemories, type GistBatch, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
 import { TIE_KINDS, type TieDelta } from './scene/scene.js'
@@ -105,7 +105,10 @@ export async function runSleepReflection(deps: {
 
   // The first refused step ends the thinking; every later step reads this latch
   // rather than spending another call the guard will refuse anyway.
-  const degraded: { reason: string | null } = { reason: null }
+  const degraded: { reason: string | null; outOfBudget: boolean } = {
+    reason: null,
+    outOfBudget: false,
+  }
   async function step<T>(run: () => Promise<T>): Promise<T | null> {
     if (degraded.reason !== null) return null
     try {
@@ -114,6 +117,7 @@ export async function runSleepReflection(deps: {
       // Every step here is one provider call, and no failure of one may cost the mind its day:
       // throwing skips the day node below, and the caller has already marked the night done.
       degraded.reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      degraded.outOfBudget = err instanceof BudgetExceededError
       return null
     }
   }
@@ -205,9 +209,16 @@ export async function runSleepReflection(deps: {
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
 
-  // 8. Gists — the day's long rows plus what a refused night left behind. Last, because it is
-  //    the one step the night can lose without losing what it learned.
-  const gists = await step(() => gistMemories(mem, llm, dayMemories))
+  // 8. Gists — the day's long rows plus what a refused night left behind. Outside the latch on
+  //    purpose: a degraded night is the one that grows that backlog, and the batch self-limits.
+  let gists: GistBatch | null = null
+  if (!degraded.outOfBudget) {
+    try {
+      gists = await gistMemories(mem, llm, dayMemories)
+    } catch (err) {
+      degraded.reason ??= err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    }
+  }
   if (gists !== null && gists.written === 0 && gists.failed > 0) {
     alert?.('gist_batch_refused', `${gists.failed} of ${gists.eligible} long rows went ungisted`)
   }
