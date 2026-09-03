@@ -613,7 +613,7 @@ body {
 .moment-card:hover { background: var(--cream); border-left-color: var(--honey); }
 .moment-card:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the day you are watching — a rail as well as a fill, never colour alone */
-.moment-card.open { background: var(--cream); border-left-color: var(--ember); }
+.moment-card[data-open='yes'] { background: var(--cream); border-left-color: var(--ember); }
 @media (prefers-reduced-motion: no-preference) {
   .moment-card { transition: background-color var(--t-fast) var(--ease-enter), border-left-color var(--t-fast); }
 }
@@ -621,8 +621,8 @@ body {
 /* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by the
    band; the aria-label still says the whole postcard. */
 .thumb-body { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
-.thumb-day {
-  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink-quiet);
+.thumb-when {
+  font-family: var(--font-data); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 .thumb-title {
@@ -2101,3 +2101,131 @@ body {
   .transport { flex-wrap: wrap; justify-content: center; }
   .transport .player-track { order: 3; flex-basis: 100%; }
 }
+
+/* ── the firsts shelf: ceremony, not competition ─────────────────────────────────────────────
+   No count, no bar, no streak, no points, no badge, no leaderboard, and no tier number: the
+   catalogue has no denominator (2.5 is minted by the arbiter), so "23 of 61" would be a lie.
+   What a plate gives is the FEELING of an unlock with none of its arithmetic. */
+
+.first-shelf {
+  display: grid; gap: var(--s-5);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin: 0; padding: 0; list-style: none;
+}
+
+/* Rarity is carried by the ink, and the ink is THE SLAB'S OWN LEDGE — the sheet's signature
+   shape, cast in the material the plate is cut from. Not a coloured stripe down one edge, which
+   is decoration pretending to be meaning, and not a fill under any word: every plate keeps its
+   crisp 2px ink ring and the colour is the shadow it throws. */
+.first-plate {
+  position: relative;
+  display: grid; gap: var(--s-2);
+  padding: var(--s-5);
+  background: var(--parchment);
+  --plate-ink: var(--sand);
+  box-shadow: var(--frame-tight), 4px 4px 0 0 var(--plate-ink);
+}
+.first-plate[data-material='gilded'] { --plate-ink: var(--honey); background: var(--cream); }
+.first-plate[data-material='ember'] { --plate-ink: var(--ember); }
+.first-plate[data-material='sage'] { --plate-ink: var(--sage); }
+.first-plate[data-material='sand'] { --plate-ink: var(--sand); }
+.first-plate[data-current='yes'] { background: var(--cream); }
+
+/* A DOG-EAR, not a toast: the corner of the page is turned down on a first the town reached
+   while nobody was watching, and it lies flat again once this visit has caught up to it. */
+.first-plate[data-fresh='yes']::after {
+  content: ''; position: absolute; right: 0; top: 0;
+  border-width: 0 var(--s-6) var(--s-6) 0;
+  border-style: solid;
+  border-color: var(--plate-ink) var(--deep);
+}
+
+.first-emblem { margin: 0; line-height: 0; }
+.first-emblem .feed-glyph { display: block; }
+/* Fraunces: the plate is a label on a thing, and this is the face the sheet titles with. */
+.first-label {
+  margin: 0;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  text-wrap: balance; color: var(--ink);
+}
+.first-when {
+  margin: 0;
+  font-family: var(--font-data); font-size: var(--f-1); font-variant-numeric: tabular-nums;
+  color: var(--ink-quiet);
+}
+
+.first-cast {
+  display: flex; flex-wrap: wrap; gap: var(--s-4);
+  margin: var(--s-2) 0 0; padding: 0; list-style: none;
+}
+.first-cast li { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.first-bust {
+  flex: none; width: 40px; height: 40px;
+  background-repeat: no-repeat; background-color: var(--sand);
+  box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.first-bust[data-blank='yes'] { background-image: var(--grain); }
+.first-cast-name {
+  font-size: var(--f-2); font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The words the thing was named out of, verbatim — the one place a plate quotes the town. */
+.first-quote {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-title); font-size: var(--f-2); font-style: italic;
+  line-height: 1.4; text-wrap: pretty; color: var(--ink-quiet);
+}
+
+/* ONE verb. A plate offers the thing itself, never a second way to read about it. */
+.first-watch {
+  justify-self: start; margin-top: var(--s-3);
+  min-height: 44px; padding: 0 var(--s-6); cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .first-watch { transition: background-color var(--t-fast), translate var(--t-tap); }
+}
+.first-watch:hover { background: var(--deep); }
+.first-watch:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.first-watch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+@media (forced-colors: active) {
+  .first-plate, .first-bust { border: 2px solid CanvasText; }
+}
+
+/* ── the record, a day at a time ─────────────────────────────────────────────────────────────
+   One scene leads each day and the rest of that day wait behind one word. The old rail served
+   the narrator's segments — dozens a day, every one titled with the day's chapter title — and
+   thirty cards sharing one name cannot look significant however they are drawn. */
+
+.moment-run { display: grid; gap: var(--s-7); }
+.moment-day { display: grid; gap: var(--s-4); }
+
+/* The day's lead sits up: more room for the motif, and the room's own outcome under the title.
+   The others are the same card at its ordinary size, so the ladder is size and not colour. */
+.moment-card.lead { padding: var(--s-5); gap: var(--s-5); }
+.moment-card.lead .thumb-title { font-size: var(--f-5); }
+.thumb-summary {
+  font-family: var(--font-title); font-size: var(--f-2); font-style: italic;
+  line-height: 1.4; text-wrap: pretty; color: var(--ink-quiet);
+}
+
+/* Not a count of anything the town can win — only how much more of that day there is to look
+   at. It says the number in words and never over a total. */
+.moment-more {
+  justify-self: start;
+  min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  color: var(--ink); background: transparent;
+  border: 2px solid var(--ink); border-radius: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .moment-more { transition: background-color var(--t-fast) var(--ease-enter); }
+}
+.moment-more:hover { background: var(--cream); }
+.moment-more:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }

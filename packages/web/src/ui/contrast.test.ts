@@ -97,7 +97,7 @@ const QUIET_SITES = [
   '.bond-evidence',
   '.bond-dates dt',
   '.bond-history .stamp',
-  '.thumb-day',
+  '.thumb-when',
   '.thumb-cast',
   '.roster-gone',
   '.law-history',

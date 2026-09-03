@@ -125,6 +125,9 @@ describe('a recorded scene plays from its own opening to its own close', () => {
     title: 'The well runs dry',
     cast: ['a1', 'a2'],
     location: 'the fork',
+    kind: 'council' as const,
+    stakes: 7,
+    summary: null,
   }
 
   it('carries the scene’s own cast and title into the shot', () => {
