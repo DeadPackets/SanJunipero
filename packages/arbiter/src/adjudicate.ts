@@ -465,6 +465,12 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
         if (ruling.kind === 'attempt' && recipeSanityRefusal(ruling.recipe, vocab) !== null)
           continue
+        // A canon carrying an id that was on neither line is the format error the prompt already
+        // calls it — so it retries, the way every other answer off the dialect does. Run 5 lost
+        // five attempts here and the wording was hardened twice; the retry is what was missing,
+        // and every attempt rehearsals 6 to 8 ruled died on this check without one.
+        if (ruling.kind === 'attempt' && !spent && !codex.withinAdjacency(ruling.recipe.canon))
+          continue
         // An impossible whose own reason argues the other way — retry, never launder.
         if (impossibleSelfContradicts(ruling)) {
           contradicted = true
@@ -487,14 +493,21 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
       // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
       // corrected verdict is what gets recorded, so an exploit never becomes precedent.
-      const verdict: Verdict =
-        value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
-          ? {
-              kind: 'impossible',
-              reason: 'this would need a craft the town has not yet reached',
-              class: 'beyond_adjacency',
-            }
-          : value
+      let verdict: Verdict = value
+      if (value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)) {
+        // Every attempt rehearsals 6, 7 and 8 ruled died right here — all of them — and the
+        // canon went unrecorded, so nobody could say whether the court invented an id or the
+        // ladder simply has no rung for what was asked. The corrected verdict hides both.
+        deps.llm.alert(
+          'attempt_beyond_adjacency',
+          `canon [${value.recipe.canon.join(', ')}] for "${intent.slice(0, 90)}"`,
+        )
+        verdict = {
+          kind: 'impossible',
+          reason: 'this would need a craft the town has not yet reached',
+          class: 'beyond_adjacency',
+        }
+      }
 
       // Stage 4 — record the ruling as shared precedent.
       await rulings.record(intent, verdict, tick())

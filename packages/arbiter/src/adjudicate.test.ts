@@ -704,6 +704,51 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     expect(new CodexStore(db).withinAdjacency(['smoking_food'])).toBe(true)
   })
 
+  // ★ EVERY ATTEMPT RULED IN REHEARSALS 6, 7 AND 8 DIED HERE — all of them, silently rewritten
+  // to impossible, which is why four runs produced 665 acts a day and not one construct. Run 5
+  // had already lost five the same way and the prompt was hardened twice for it. Every other
+  // answer off the dialect retries; this one alone did not, and the wording could not make a
+  // court stop reaching for a word the ladder has no rung for.
+  it('★ retries a canon carrying an id that was on neither line, and takes the second answer', async () => {
+    const invented: Verdict = {
+      ...smokedFish,
+      recipe: { ...smokedFishRecipe, canon: ['fire_making'] },
+    }
+    let asked = 0
+    const llm = new ScriptedLlm(() => {
+      asked += 1
+      return asked === 1 ? invented : smokedFish
+    })
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(asked, 'the first canon was taken as a ruling instead of a format error').toBe(2)
+    expect(verdict.kind, JSON.stringify(verdict)).toBe('attempt')
+    if (verdict.kind === 'attempt') expect(verdict.recipe.canon).toEqual(['smoking_food'])
+    expect(new CodexStore(db).withinAdjacency(['fire_making'])).toBe(false)
+  })
+
+  // The retry is one ask, not a loop: a court that cannot find a rung twice still gets the
+  // corrected verdict, and now says out loud which ids it reached for.
+  it('★ records the canon it could not place when the retry is spent', async () => {
+    const invented: Verdict = {
+      ...smokedFish,
+      recipe: { ...smokedFishRecipe, canon: ['fire_making'] },
+    }
+    const llm = new ScriptedLlm(() => invented)
+    const { arbiter } = await makeSmokehouseRig(llm)
+
+    const verdict = await arbiter.adjudicate(ESEN_INTENT, esenCtx)
+
+    expect(verdict).toEqual(beyondAdjacency)
+    expect(llm.objectCalls, 'the retry was never spent').toBe(2)
+    const said = llm.alerts.find((a) => a.kind === 'attempt_beyond_adjacency')
+    expect(said, JSON.stringify(llm.alerts)).toBeDefined()
+    expect(said!.detail).toContain('fire_making')
+    expect(said!.detail).toContain(ESEN_INTENT.slice(0, 20))
+  })
+
   it('★ the ladder grows: a codified attempt earns its rung and the court is shown the next', async () => {
     const withNext: Verdict = {
       ...smokedFish,
