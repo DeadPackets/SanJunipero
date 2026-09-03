@@ -9,17 +9,12 @@ import {
   MILESTONE_ICON,
   MILESTONE_TYPE,
   MINUTES_PER_DAY,
-  type Moment,
-  SceneKind,
   agentName,
-  byDayThenStakes,
   chronicleCast,
   chronicleIcon,
   chronicleLine,
   discoveryHeadline,
   kindWords,
-  momentTitle,
-  placeWordsAt,
 } from '@sj/shared'
 // Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
 // The contract is declared once, in @sj/shared.
@@ -28,13 +23,13 @@ import {
   milestoneFromRow,
   type ChapterRow,
   type MilestoneRow,
-  type SceneRow,
 } from '@sj/shared/narratorSchema'
 // The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
 // SDK, which a free scripted stream may not import. This module's own imports are types only.
 import { footnoteSeqs, stripFootnotes } from '@sj/narrator/chronicle'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
+import { makeMomentsReader } from './moments.js'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -103,16 +98,6 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       structureKind: (id) => kindWords(state.structures[id]?.kind ?? 'building'),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
     }
-  }
-
-  // R4: a scene is stored as the tile it happened on, and a viewer is never shown a pair of
-  // numbers. The nearest thing the town built answers for the tile, or nothing does; a place
-  // already written as words is already an answer.
-  const placeWords = (loc: string | null): string | null => {
-    if (loc === null) return null
-    const m = /^(\d+),(\d+)$/.exec(loc)
-    if (m === null) return loc
-    return placeWordsAt(Object.values(deps.mirror.state().structures), Number(m[1]), Number(m[2]))
   }
 
   // A free key is a cache a stranger can miss on purpose. The clamped pair is also the memo key,
@@ -276,81 +261,12 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     sendJson(res, rows.map(milestoneFromRow))
   })
 
-  // ONE SCENE PER CARD, off the world's own log. This used to read the narrator's segments and
-  // title every one of them with the day's chapter title — thirty cards a day sharing one name,
-  // and no stakes on the wire to order them by. A scene carries its own topic, its own room and
-  // its own pressure, so a card has something to be about.
-  const selScenes = deps.db.prepare(
-    `SELECT seq, tick, type, payload FROM events WHERE type IN ('scene_opened', 'scene_closed')
-     ORDER BY tick, seq`,
-  )
-
-  /** The newest this many scenes. The list is polled by every open filmstrip and a long-lived
-   *  town has thousands. */
-  const MOMENT_MAX = 240
-
-  /** The log records no room. The narrator's own scene rows are the only place a place is ever
-   *  written down, and they are time WINDOWS over the same events rather than these scenes — so
-   *  there is no key to join on, and the window a scene happened inside answers for it. */
-  const placeAt = (): ((tick: number) => string | null) => {
-    const windows = readOrEmpty<Pick<SceneRow, 'start_tick' | 'end_tick' | 'location'>>(
-      deps.narratorDb,
-      'SELECT start_tick, end_tick, location FROM scenes ORDER BY start_tick',
-    )
-    return (tick) => {
-      const w = windows.find((row) => tick >= row.start_tick && tick <= row.end_tick)
-      return w === undefined ? null : placeWords(w.location)
-    }
-  }
-
-  const momentsFromLog = (): Moment[] =>
-    cache.value('moments', () => {
-      const where = placeAt()
-      const open = new Map<string, Moment>()
-      const out: Moment[] = []
-      for (const r of selScenes.all() as {
-        seq: number
-        tick: number
-        type: string
-        payload: string
-      }[]) {
-        const p = JSON.parse(r.payload) as Record<string, unknown>
-        const id = typeof p.id === 'string' ? p.id : null
-        if (id === null) continue
-        if (r.type === 'scene_opened') {
-          const kind = SceneKind.safeParse(p.kind)
-          if (!kind.success) continue
-          const moment: Moment = {
-            id: r.seq,
-            day: Math.floor(r.tick / MINUTES_PER_DAY),
-            startTick: r.tick,
-            endTick: r.tick,
-            title: momentTitle(kind.data, typeof p.topic === 'string' ? p.topic : null),
-            cast: Array.isArray(p.participants) ? (p.participants as string[]) : [],
-            location: where(r.tick),
-            kind: kind.data,
-            stakes: typeof p.stakes === 'number' ? p.stakes : 0,
-            summary: null,
-          }
-          open.set(id, moment)
-          out.push(moment)
-          continue
-        }
-        // A scene the log opened before this window began has nothing here to close.
-        const started = open.get(id)
-        if (started === undefined) continue
-        open.delete(id)
-        started.endTick = r.tick
-        const summary = typeof p.summary === 'string' ? p.summary.trim() : ''
-        started.summary = summary === '' ? null : summary
-      }
-      return out.sort(byDayThenStakes).slice(0, MOMENT_MAX)
-    })
+  const momentsFromLog = makeMomentsReader(deps)
 
   router.route('GET', '/api/moments', (_req, res) => {
     sendPrebuilt(
       res,
-      cache.json('moments:json', () => ({ moments: momentsFromLog() })),
+      cache.json('moments', () => ({ moments: momentsFromLog() })),
     )
   })
 

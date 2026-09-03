@@ -2229,3 +2229,13 @@ body {
 }
 .moment-more:hover { background: var(--cream); }
 .moment-more:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* The lead card carries the gateway's own postcard — the same picture a shared link opens with,
+   composed by `sharp` from the plate's hour, the busts and the place. The width and height are
+   on the tag so the row never reflows when it lands. */
+.thumb-card {
+  flex: none; display: block; width: 100%; max-width: 360px; height: auto;
+  background: var(--sand); box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.moment-card.lead { flex-direction: column; }

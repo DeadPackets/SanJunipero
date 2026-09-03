@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useSyncExternalStore } from 'react'
-import { MomentSchema, type Moment } from '@sj/shared'
+import { MomentSchema, tickToMoment, type Moment } from '@sj/shared'
 import type { PeopleIndex } from '../../ui/bondModel2.js'
 import {
   momentDays,
@@ -27,6 +27,15 @@ export const momentRows = (body: unknown): Moment[] | null => {
 }
 
 const MOTIF_PX = 8
+/** The gateway's card is 1080×565; the lead card draws it at a third and lets CSS cap it. */
+const CARD_W = 360
+const CARD_H = 188
+/** The postcard the gateway composes for this minute — the same picture a shared link opens
+ *  with, so the grid and the og card can never show two different things. */
+const postcard = (m: Moment): string => {
+  const at = tickToMoment(m.startTick)
+  return `/card/moment/${at.day}/${at.time}.png`
+}
 
 export function momentPlay(moment: Moment, edge: number): MomentPlay {
   return {
@@ -37,6 +46,8 @@ export function momentPlay(moment: Moment, edge: number): MomentPlay {
   }
 }
 
+/** The pixel motif, for a card the gateway has no picture for yet — and as the ground the
+ *  postcard loads over, so the row never reflows when it arrives. */
 function Motif({ moment }: { moment: Moment }) {
   return (
     <svg
@@ -82,7 +93,19 @@ const MomentCardView = memo(function MomentCardView({
           onOpen(moment)
         }}
       >
-        <Motif moment={moment} />
+        {lead ? (
+          <img
+            className="thumb-card"
+            src={postcard(moment)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            width={CARD_W}
+            height={CARD_H}
+          />
+        ) : (
+          <Motif moment={moment} />
+        )}
         <span className="thumb-body">
           <span className="thumb-when">{momentStamp(moment.startTick)}</span>
           <span className="thumb-title">{thumbTitle(moment)}</span>
