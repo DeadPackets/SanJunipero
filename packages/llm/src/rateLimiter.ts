@@ -177,9 +177,13 @@ export class AdaptiveLimiter {
     this.#setCap(this.#cap + 1)
   }
 
+  // Eight in flight that all come back 429 are one wall, not eight, and halving per refused call
+  // reaches single file in a breath; a lone call is not our concurrency either. Both still pace.
   #onRefusal(retryAfter: number | undefined): void {
-    this.#successRun = 0
-    this.#setCap(Math.max(1, Math.floor(this.#cap / 2)))
+    if (this.#inFlight > 1 && Date.now() >= this.#coolUntil) {
+      this.#successRun = 0
+      this.#setCap(Math.max(1, Math.floor(this.#cap / 2)))
+    }
     this.#coolUntil = Math.max(this.#coolUntil, Date.now() + (retryAfter ?? DEFAULT_COOLDOWN_MS))
   }
 

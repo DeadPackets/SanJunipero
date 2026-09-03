@@ -1473,11 +1473,21 @@ describe('the fleet meets the provider through one gate', () => {
     try {
       const db = openDb()
       const gate = limiterFor(PROVIDER_ORDER.join(','))
+      // The cap gives ground only to a refusal our own calls were part of, so one is held in
+      // flight while three are refused beside it: 8 -> 4 -> 2 -> 1.
+      let release!: () => void
+      const busy = new Promise<string>((res) => {
+        release = () => {
+          res('done')
+        }
+      })
+      void gate.run(() => busy, 60_000)
       for (let i = 0; i < 3; i++) {
-        await gate.run(() => Promise.reject(refused), 0).catch(() => null)
+        void gate.run(() => Promise.reject(refused), 0).catch(() => null)
         await vi.advanceTimersByTimeAsync(2_000)
       }
       expect(gate.state().cap).toBe(1)
+      release()
       await vi.advanceTimersByTimeAsync(60_000)
       for (let i = 0; i < 3; i++) {
         await new LlmClient({ model: mockModel([{ text: 'ok' }]), db, caller: 'turn' }).text({
