@@ -33,8 +33,12 @@ export class RateLimitWaitError extends Error {
   }
 }
 
-// Wafer's per-key concurrency is not published, so 4 is where the gate starts probing from.
-const DEFAULT_MAX_CONCURRENCY = 4
+// Measured 2026-09-03 on a 12-mind town: a mind call answers in 11.3 s, and the fleet asked for
+// 22.4 a minute. At four slots the gate serves 21.2 — under demand before a single refusal, and
+// AIMD then halves it to a third of demand and cannot climb back, because the callers that would
+// have earned the slots back are timing out in the queue instead. 1,147 dozes came from three
+// real refusals that way. Eight leaves one halving of headroom over demand.
+export const DEFAULT_MAX_CONCURRENCY = 8
 // The measured gap between a refused pair in the live ledger; used when the provider names none.
 const DEFAULT_COOLDOWN_MS = 2_000
 // Additive recovery: one clean run of this many answers buys back one slot.

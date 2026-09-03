@@ -18,7 +18,7 @@ import {
   retryBackoffMs,
   servedProvider,
 } from './client.js'
-import { limiterFor, resetLimiters } from './rateLimiter.js'
+import { DEFAULT_MAX_CONCURRENCY, limiterFor, resetLimiters } from './rateLimiter.js'
 import {
   FALLBACK_MODELS,
   MIND_MODEL,
@@ -30,6 +30,7 @@ import {
   callSettingsFor,
   modelFor,
   requestTimeoutMsFor,
+  PRICE_PER_M,
 } from './pins.js'
 
 type CallRow = {
@@ -282,8 +283,11 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    const expectedCost = ((1000 - 600) * 0.15 + 600 * 0.03 + 50 * 0.5) / 1e6
-    expect(expectedCost).toBeCloseTo(0.000103, 10)
+    const P = PRICE_PER_M
+    const expectedCost = ((1000 - 600) * P.input + 600 * P.cacheRead + 50 * P.output) / 1e6
+    // Worked by hand off the pinned row, so a formula derived from the same table cannot agree
+    // with itself and be wrong: (400 x 0.10 + 600 x 0.02 + 50 x 0.35) / 1e6.
+    expect(expectedCost).toBeCloseTo(0.0000695, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -325,7 +329,7 @@ describe('LlmClient.object', () => {
     expect(row.reasoning_tokens).toBe(6100)
     expect(row.output_tokens).toBe(6168)
     // reasoning bills as output: cost formula unchanged
-    const expectedCost = (500 * 0.15 + 6168 * 0.5) / 1e6
+    const expectedCost = (500 * PRICE_PER_M.input + 6168 * PRICE_PER_M.output) / 1e6
     expect(Math.abs(row.cost_usd - expectedCost)).toBeLessThan(1e-6)
     expect(usage.costUsd).toBe(row.cost_usd)
   })
@@ -595,7 +599,7 @@ describe('price reconciliation', () => {
 
   it('alerts when the table disagrees with what the provider charged', async () => {
     const db = openDb()
-    // Wafer's real price for these tokens is (1000*0.15 + 1000*0.5)/1e6 = $0.00065.
+    // The pinned price for these tokens, whatever the table currently says it is.
     const model = mockModel([
       {
         text: 'a',
@@ -627,7 +631,7 @@ describe('price reconciliation', () => {
         provider: 'Wafer',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: (1000 * 0.15 + 1000 * 0.5) / 1e6,
+        reportedCostUsd: (1000 * PRICE_PER_M.input + 1000 * PRICE_PER_M.output) / 1e6,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -637,7 +641,7 @@ describe('price reconciliation', () => {
 
   it('stays silent on sub-cent rounding rather than crying wolf', async () => {
     const db = openDb()
-    const exact = (10 * 0.15 + 2 * 0.5) / 1e6
+    const exact = (10 * PRICE_PER_M.input + 2 * PRICE_PER_M.output) / 1e6
     const model = mockModel([
       {
         text: 'a',
@@ -668,7 +672,9 @@ describe('price reconciliation', () => {
     const row = rows(db)[0]!
     expect(row.cost_usd).toBeCloseTo((1000 * 0.44 + 1000 * 1.32) / 1e6, 12)
     // Strictly more than the pinned route would have charged: it can only over-report.
-    expect(row.cost_usd).toBeGreaterThan((1000 * 0.15 + 1000 * 0.5) / 1e6)
+    expect(row.cost_usd).toBeGreaterThan(
+      (1000 * PRICE_PER_M.input + 1000 * PRICE_PER_M.output) / 1e6,
+    )
     expect(row.reported_cost_usd).toBeNull()
     const detail = (
       db.prepare("SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'").get() as {
@@ -1387,34 +1393,38 @@ describe('the fleet meets the provider through one gate', () => {
   it('never lets more minds at the back end at once than the cap allows', async () => {
     const db = openDb()
     const held = holding()
-    const asks = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
-      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+    // Two more than the gate allows, whatever the gate allows: the cap is a measured number and
+    // this test is about the queue, not about its value.
+    const over = DEFAULT_MAX_CONCURRENCY + 2
+    const asks = Array.from({ length: over }, (_, i) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: `a${i}` }).text({
         messages: [{ role: 'user', content: 'u' }],
       }),
     )
     await vi.waitFor(() => {
-      expect(held.live()).toBe(4)
+      expect(held.live()).toBe(DEFAULT_MAX_CONCURRENCY)
     })
-    expect(held.live(), 'two of the six are queued, not refused').toBe(4)
+    expect(held.live(), 'the excess is queued, not refused').toBe(DEFAULT_MAX_CONCURRENCY)
     held.open()
     await vi.waitFor(() => {
       expect(held.live()).toBe(2)
     })
     held.open()
     await Promise.all(asks)
-    expect(rows(db)).toHaveLength(6)
+    expect(rows(db)).toHaveLength(over)
   })
 
   it('gives up unsent rather than bill a wait it has no patience for', async () => {
     const db = openDb()
     const held = holding()
-    const blocking = ['a', 'b', 'c', 'd'].map((id) =>
-      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+    // Exactly enough to fill the gate, so the next one has nowhere to go.
+    const blocking = Array.from({ length: DEFAULT_MAX_CONCURRENCY }, (_, i) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: `a${i}` }).text({
         messages: [{ role: 'user', content: 'u' }],
       }),
     )
     await vi.waitFor(() => {
-      expect(held.live()).toBe(4)
+      expect(held.live()).toBe(DEFAULT_MAX_CONCURRENCY)
     })
     const late = new LlmClient({
       model: held.model,
@@ -1424,7 +1434,7 @@ describe('the fleet meets the provider through one gate', () => {
       maxQueueWaitMs: 20,
     }).text({ messages: [{ role: 'user', content: 'u' }] })
     await expect(late).rejects.toThrow('no slot on')
-    expect(rows(db), 'four sent, and the fifth never reached the provider').toHaveLength(0)
+    expect(rows(db), 'the gate is full, and the next never reached the provider').toHaveLength(0)
     expect(alertsOf(db, 'llm_call_failed')[0]).toContain('turn: 1 attempt(s)')
     held.open()
     await Promise.all(blocking)

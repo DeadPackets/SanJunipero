@@ -43,7 +43,9 @@ export type ModelPrices = { input: number; output: number; cacheRead: number }
 // not by the model alone — two back ends for this one model differ 3x.
 export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
   // Wafer's GLM tier, measured against its own bill: the $0.075 list tier refuses json_schema.
-  Wafer: { input: 0.15, output: 0.5, cacheRead: 0.03 },
+  // Re-reconciled 2026-09-03: reported/estimated ran 0.668 over 502 calls while DeepInfra ran
+  // 0.99, so the old row over-booked Wafer by half and raised 1,232 price-divergence alerts.
+  Wafer: { input: 0.1, output: 0.35, cacheRead: 0.02 },
   Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
   // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
   AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },

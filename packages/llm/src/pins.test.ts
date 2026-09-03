@@ -29,7 +29,7 @@ it('pins are concrete', () => {
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
   // glm-5.3-flash, only the bare id and a `:batch` variant, so there is no date to pin to.
   for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
-  expect(PRICE_PER_M).toEqual({ input: 0.15, output: 0.5, cacheRead: 0.03 })
+  expect(PRICE_PER_M).toEqual({ input: 0.1, output: 0.35, cacheRead: 0.02 })
 })
 
 it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
@@ -150,7 +150,7 @@ it('★ a scene line is bounded under the floor that will take it away', () => {
 // ceiling: an over-report is as wrong as an under-report once the fleet is mixed.
 it('★ both fleet models price by who served them, in the same ledger', () => {
   expect(pricesFor(MIND_MODEL, 'Wafer')).toEqual({
-    prices: { input: 0.15, output: 0.5, cacheRead: 0.03 },
+    prices: { input: 0.1, output: 0.35, cacheRead: 0.02 },
     source: 'provider',
   })
   expect(pricesFor(PROSE_MODEL, 'Inceptron')).toEqual({
