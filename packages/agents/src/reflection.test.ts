@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
+import { GIST_MIN_CHARS } from './memory/gist.js'
 import { TieStore } from './memory/ties.js'
 import Sqlite from 'better-sqlite3'
 import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } from '@sj/llm'
@@ -598,6 +599,71 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
       day: DAY,
     })
     expect(res.fallback).toBe(false)
+  })
+
+  const LONG_ROW = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(20)}`
+  const longDay = (mem: MemoryStore): Promise<MemoryRow[]> =>
+    seedDay(mem, DAY, [{ text: LONG_ROW, people: ['Omar'], importance: 6 }, ...SINGLE_PERSON_DAY])
+
+  // ★ Gisting is the last step, and the latch closed on the first refused call, so any one
+  // rate-limited night wrote no gist at all — and one mind of twelve never gisted once.
+  it('★ a night that degraded early still gists the day’s long rows', async () => {
+    const { mem, personality } = await makeStores()
+    await longDay(mem)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.summarizeScenes = async () => {
+      llm.calls.push('summarizeScenes')
+      throw noObject()
+    }
+    const sink = alertSink()
+
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
+
+    expect(res.fallback).toBe(true)
+    expect(llm.calls).toEqual(['extractFacts', 'summarizeScenes', 'gist'])
+    expect(res.gistsWritten).toBe(1)
+    expect(mem.memoriesOfDay(DAY)[0]!.gist).toBe(`gist: ${LONG_ROW.slice(0, 20).trim()}`)
+    expect(sink.alerts.map((a) => a.kind)).toEqual(['reflection_fallback'])
+  })
+
+  // ★ The same night with a dead endpoint: the loss is now named instead of read as "nothing
+  // wanted a gist", which is what an unrun batch and an empty day looked like from outside.
+  it('★ a degraded night whose gists all fail raises the refusal', async () => {
+    const { mem, personality } = await makeStores()
+    await longDay(mem)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.summarizeScenes = async () => {
+      llm.calls.push('summarizeScenes')
+      throw noObject()
+    }
+    llm.gist = async () => {
+      llm.calls.push('gist')
+      throw new Error('rate-limited upstream')
+    }
+    const sink = alertSink()
+
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
+
+    expect(res.gistsWritten).toBe(0)
+    expect(res.gistsEligible).toBe(1)
+    expect(sink.alerts.map((a) => a.kind)).toEqual(['gist_batch_refused', 'reflection_fallback'])
+  })
+
+  it('a night with no headroom left does not spend the last of it on gists', async () => {
+    const { mem, personality } = await makeStores()
+    const rows = await longDay(mem)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.extractFacts = async () => {
+      llm.calls.push('extractFacts')
+      throw new BudgetExceededError('no headroom')
+    }
+
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
+
+    expect(llm.calls).toEqual(['extractFacts'])
+    expect(res.gistsWritten).toBe(0)
+    // Still ungisted, so tomorrow's batch takes it off the backlog.
+    expect(mem.ungistedMemories(GIST_MIN_CHARS, 10).map((m) => m.id)).toEqual([rows[0]!.id])
   })
 })
 
