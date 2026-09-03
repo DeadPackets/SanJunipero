@@ -352,6 +352,7 @@ export class AgentRuntime {
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
+  #customs: (() => readonly string[]) | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -537,6 +538,7 @@ export class AgentRuntime {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
     this.#roster = arbiter.roster ?? null
+    this.#customs = arbiter.customs ?? null
   }
 
   stop(): void {
@@ -1068,6 +1070,7 @@ export class AgentRuntime {
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
       ...(this.#roster === null ? {} : { roster: this.#roster() }),
+      ...(this.#customs === null ? {} : { customs: this.#customs() }),
       identity: this.#identity,
       personality: {
         doc: this.#personality.current().doc,

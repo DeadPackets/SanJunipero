@@ -570,6 +570,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               adjudicate: (...args) => built.adjudicate(...args),
               codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
               roster: () => built.roster(),
+              customs: () => built.customs(),
             })
 
       // A child still owed its household comes up the way a live birth does — household

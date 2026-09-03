@@ -5,6 +5,7 @@ import {
   CONSTRUCT_TYPES,
   MINUTES_PER_DAY,
   assertQuotedName,
+  scanPromptForGlassLeak,
   type ConstructKind,
   type QuotedName,
   type SimConfig,
@@ -315,6 +316,22 @@ export async function classifyCandidates(
     if (allowed.has(type)) out.set(c.key, type)
   }
   return out
+}
+
+/** How many named things the town can hold in front of it at once. Oldest first, so a name
+ *  already on the page never moves and the block it sits in stays cached. */
+export const NAMED_CUSTOMS_SHOWN = 6
+
+/** The only thing about a construct a mind may ever be told: the name the town gave it, out of
+ *  its own mouth. A recurrence nobody named stays internal, and so does one whose name spells
+ *  an ops word — the glass is not widened to let a mind's own coincidence through. */
+export function namedCustoms(constructs: readonly Construct[]): string[] {
+  return constructs
+    .filter((c) => c.nameProvenance?.sourceKind === 'speech')
+    .sort((a, b) => a.firstTick - b.firstTick || (a.id < b.id ? -1 : 1))
+    .flatMap((c) => (c.name === null ? [] : [c.name]))
+    .filter((name) => scanPromptForGlassLeak(name).length === 0)
+    .slice(0, NAMED_CUSTOMS_SHOWN)
 }
 
 // The ops-plane read of the world's laws (G5): the recognizer is an entry point into

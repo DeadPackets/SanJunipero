@@ -121,6 +121,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   // The same function object the ordinary turn renders its roster from, so both prompts send
   // one prefix and share its cache.
   const roster = opts.arbiter?.roster
+  const customs = opts.arbiter?.customs
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
@@ -138,6 +139,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
             autobiography: mem.autobiography(),
           }),
           ...(roster === undefined ? {} : { roster }),
+          ...(customs === undefined ? {} : { customs }),
           livingCast,
         }),
         ties,

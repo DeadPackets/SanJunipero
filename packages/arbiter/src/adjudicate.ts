@@ -16,6 +16,8 @@ import {
 import { CANON } from './canon.js'
 import type { AttemptVerdict, VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
+import { namedCustoms } from './constructs.js'
+import { ConstructStore } from './constructStore.js'
 import { codify as codifyAttempt, verbFromCharter } from './codify.js'
 import {
   assembleExpressivePrompt,
@@ -212,6 +214,8 @@ export type Arbiter = {
   codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
   // Every active minted verb as a prompt lists it, in rulebook order.
   roster(): RosterEntry[]
+  // The names the town gave its own recurrences. Names only — see `namedCustoms`.
+  customs(): string[]
   // A body began this minted act at this tick, so it is not for retiring yet.
   noteUsed(verb: string, tick: number): void
   // Retires every minted verb unused for RETIREMENT_DAYS; returns the words that went.
@@ -226,6 +230,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const rulebook = new RulebookStore(deps.db)
   const review = new ReviewStore(deps.db)
   const codex = new CodexStore(deps.db)
+  const constructs = new ConstructStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
   const tick = deps.tick ?? (() => 0)
 
@@ -505,6 +510,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     roster,
+
+    customs() {
+      return namedCustoms(constructs.all())
+    },
 
     noteUsed(verb, tick) {
       rulebook.touch(verb, tick)

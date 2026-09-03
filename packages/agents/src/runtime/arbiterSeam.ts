@@ -32,12 +32,14 @@ export type Codifier = (
   credit: DiscoveryCredit,
 ) => { ruleId: number; verb: string }
 
-// The three things the runtime needs of the arbiter: rule on it, make it law, and say what
-// laws the town already has so every mind is told them.
+// The four things the runtime needs of the arbiter: rule on it, make it law, say what laws the
+// town already has, and say what the town has named for itself.
 export type SeamArbiter = {
   adjudicate: Adjudicator
   codify: Codifier
   roster?: () => RosterEntry[]
+  /** Names the town spoke for its own habits. Names only: the recognizer's words never cross. */
+  customs?: () => readonly string[]
 }
 
 // Values only, in sorted key order: this string is a precedent key, so anything varying per

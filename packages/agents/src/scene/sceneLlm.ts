@@ -27,6 +27,8 @@ export type SceneVoice = {
   identity: IdentityCore
   personality: () => { doc: PersonalityDoc; autobiography: string[] }
   roster?: () => readonly RosterEntry[]
+  /** The town's own names for its habits, from the same seam the ordinary turn reads. */
+  customs?: () => readonly string[]
   /** Everyone alive in the valley. A closed roll: the mind may name nobody else. */
   livingCast: () => readonly { id: string; name: string }[]
   /** The mind's strongest want, in its own words. Nothing at all until wants exist. */
@@ -208,6 +210,7 @@ function sceneSystem(voice: SceneVoice): string {
   return assemblePrompt({
     rulesOfBeing: RULES_OF_BEING,
     ...(voice.roster === undefined ? {} : { roster: voice.roster() }),
+    ...(voice.customs === undefined ? {} : { customs: voice.customs() }),
     identity: voice.identity,
     personality: voice.personality(),
     journal: [],

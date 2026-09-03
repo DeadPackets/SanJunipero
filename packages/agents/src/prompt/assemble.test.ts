@@ -1112,6 +1112,51 @@ describe('the refusal the next turn is actually told about', () => {
   })
 })
 
+// A town notices a habit when it has words for it. The words are the town's; what kind of thing
+// the recognizer decided it is stays behind the glass.
+describe('what the town has named', () => {
+  const said = (customs: string[]): string => assemblePrompt(fixtureBlocks({ customs })).system
+
+  it('says the names the town gave, and nothing when it gave none', () => {
+    expect(said(['Long Turning'])).toContain('The town has taken to the Long Turning.')
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+  })
+
+  it('reads as a sentence when there are several', () => {
+    expect(said(['Long Turning', 'Ash Walk', 'Quiet Hour'])).toContain(
+      'The town has taken to the Long Turning, the Ash Walk and the Quiet Hour.',
+    )
+  })
+
+  it('sits beside the roster, above anything one mind alone knows', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({
+        customs: ['Long Turning'],
+        roster: [
+          {
+            id: 'recipe:smoke_fish',
+            name: 'Smoke Fish Over Green Wood',
+            gloss: 'Hang the catch in green-wood smoke so it keeps',
+            reads: [],
+          },
+        ],
+      }),
+    ).system
+    expect(system.indexOf('Smoke Fish')).toBeLessThan(system.indexOf('The town has taken to'))
+    expect(system.indexOf('The town has taken to')).toBeLessThan(system.indexOf('Name: Tamar'))
+  })
+
+  // The line a mind reads is scanned, not the table behind it: this fails the day a type word
+  // reaches the render.
+  it('leaks no word the recognizer uses for what it recognized', () => {
+    const system = said(['Long Turning', 'Ash Walk'])
+    expect(scanPromptForGlassLeak(system)).toEqual([])
+    for (const leak of ['festival', 'faith', 'council', 'market', 'custom']) {
+      expect(scanPromptForGlassLeak(`The town has taken to the ${leak}.`), leak).toContain(leak)
+    }
+  })
+})
+
 // The prompt's bill, itemised: which block bought which tokens, and which of them the cache
 // can keep. Measurement only — nothing here changes a byte a mind reads.
 describe('blockTokens', () => {
@@ -1124,6 +1169,7 @@ describe('blockTokens', () => {
   const NAMED = [
     'shared',
     'roster',
+    'customs',
     'identity',
     'personality',
     'journal',
@@ -1153,6 +1199,7 @@ describe('blockTokens', () => {
             reads: [],
           },
         ],
+        customs: ['Long Turning'],
         journal: [{ day: 2, text: 'The weir held.' }],
         recalled: { query: 'my mother', memories: ['She kept bees.'] },
         lastOutcome: lastTurnLine('eat', 'the food must be in your hands'),
