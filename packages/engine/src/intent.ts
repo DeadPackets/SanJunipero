@@ -1,4 +1,5 @@
 import type { SimConfig } from '@sj/shared'
+import { WalkParams } from './events.def.js'
 import { effectiveConfig } from './laws.js'
 import type { WorldState } from './state.js'
 import { readAsPerson, soleObstacle } from './verbs/autofill.js'
@@ -16,6 +17,12 @@ export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; r
 // The road out of a collapse. World one closed every one of these: Amara died ten feet from a
 // neighbour's door having tried fifteen times to shout, and been refused each time.
 const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
+
+// A mind may answer a walk with keys the legs never read — a `description` of where it is going,
+// a `kind` for the direction. `WalkParams` is strict, so `duration` threw and took the tick down.
+const WALK_KEYS: ReadonlySet<string> = new Set(Object.keys(WalkParams.shape))
+const walkKeysOf = (params: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(params).filter(([key]) => WALK_KEYS.has(key)))
 
 // The same act, hung on the end of the one that makes it possible.
 const carrying = (go: IntentResult, verb: string, params: Record<string, unknown>): IntentResult =>
@@ -82,8 +89,9 @@ export function submitIntent(
   // the fold read the same two numbers; one it cannot settle is left for validate to refuse.
   let p = params
   if (verb === 'walk') {
-    const to = walkDestination(state, config, agentId, params)
-    if (!('refusal' in to)) p = { ...params, ...to }
+    const only = walkKeysOf(params)
+    const to = walkDestination(state, config, agentId, only)
+    if (!('refusal' in to)) p = { ...only, ...to }
   }
   const first = def.validate(state, config, agentId, p)
   if (first !== null) {
