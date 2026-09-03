@@ -45,44 +45,41 @@ const NO_CHAPTERS: Chapter[] = []
 function useNarratorCaption(store: WorldStore, play: MomentPlay | null): string | null {
   const chapters = usePolled<Chapter[]>(play === null ? null : '/api/chapters').data ?? NO_CHAPTERS
   const index = useMemo(() => chapterIndex(chapters), [chapters])
-  const [line, setLine] = useState<string | null>(null)
+  // Kept WITH the moment it belongs to, so leaving one clears its caption by derivation rather
+  // than by a second write — a setState in an effect body is a cascading render.
+  const [line, setLine] = useState<{ play: MomentPlay; text: string } | null>(null)
 
   useEffect(() => {
-    if (play === null) {
-      setLine(null)
-      return
-    }
+    if (play === null) return
     return store.onEvents((evts) => {
       const next = captionFor(index, evts)
-      if (next !== null) setLine(next)
+      if (next !== null) setLine({ play, text: next })
     })
   }, [store, play, index])
 
-  return play === null ? null : line
+  return line !== null && line.play === play ? line.text : null
 }
 
 /** Up for two seconds, and down the moment the town does anything — the card must never stand
  *  over the thing it announced. */
 function useTitleCard(store: WorldStore, play: MomentPlay | null): boolean {
-  const [up, setUp] = useState(false)
+  // WHICH moment the card has finished with, not whether one is up: a new moment is up by
+  // derivation, so nothing writes state from the effect body.
+  const [done, setDone] = useState<MomentPlay | null>(null)
   useEffect(() => {
-    if (play === null || play.title === '') {
-      setUp(false)
-      return
-    }
-    setUp(true)
+    if (play === null || play.title === '') return
     const timer = setTimeout(() => {
-      setUp(false)
+      setDone(play)
     }, TITLE_CARD_MS)
     const off = store.onEvents(() => {
-      setUp(false)
+      setDone(play)
     })
     return () => {
       clearTimeout(timer)
       off()
     }
   }, [store, play])
-  return up
+  return play !== null && play.title !== '' && done !== play
 }
 
 /** What the past looks like: a dip through black on the way in, a warm grade a tenth less
