@@ -230,14 +230,13 @@ describe('namedCustoms', () => {
     expect(namedCustoms([written])).toEqual([])
   })
 
-  it('drops a name that spells an ops word rather than widening the glass', () => {
+  it('keeps a name that collides with our taxonomy, because a town will say council', () => {
     const said = construct({
       id: 'construct_9_9',
       name: 'Council',
       nameProvenance: { ...construct().nameProvenance!, name: 'Council' },
     })
-    expect(namedCustoms([said])).toEqual([])
-    expect(namedCustoms([construct(), said])).toEqual(['Long Turning'])
+    expect(namedCustoms([said])).toEqual(['Council'])
   })
 
   it('holds the oldest names, so a name already on the page never moves', () => {
