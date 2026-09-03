@@ -79,6 +79,36 @@ function scriptedWorld(dbPath: string): Database.Database {
         })
       if (tick === 16) emit('agent_entered', { agentId: 'amara', structureId: 'house1' })
       if (tick === 17) emit('agent_entered', { agentId: 'yusuf', structureId: 'house1' })
+      // One room, inside house1 and after both are in it, so the day has exactly one moment.
+      if (tick === 18) {
+        emit('scene_opened', {
+          id: 'sc_house',
+          kind: 'talk',
+          participants: ['amara', 'yusuf'],
+          topic: 'whether the house is theirs together',
+          stakes: 6,
+        })
+        emit('scene_line', {
+          id: 'sc_house',
+          agentId: 'amara',
+          text: 'The roof is finished. Stay.',
+          move: 'press',
+        })
+      }
+      if (tick === 19) {
+        emit('scene_line', {
+          id: 'sc_house',
+          agentId: 'yusuf',
+          text: 'Then I will stay.',
+          move: 'give_way',
+        })
+        emit('scene_closed', {
+          id: 'sc_house',
+          summary: 'They agreed the house was theirs together.',
+          deltas: [],
+          closeReason: 'ended',
+        })
+      }
       if (tick === 20) emit('agent_slept', { agentId: 'amara' })
       if (tick === 24) emit('co_slept', { aId: 'amara', bId: 'yusuf', day: 0 })
       if (tick === 30) emit('agent_died', { agentId: 'nadia', cause: 'hunger' })
@@ -266,25 +296,33 @@ describe('GATE G10 — automated half, gateway side', () => {
       expect(body.asOfTick).toBeGreaterThan(0)
     })
 
-    it("turns the narrator's recorded scene into an openable moment", async () => {
+    it('turns the day’s one scene into an openable moment with its own name and stakes', async () => {
       const body = MomentsResponseSchema.parse(await get('/api/moments'))
       expect(body.moments).toHaveLength(1)
       expect(body.moments[0]).toMatchObject({
         day: 0,
-        startTick: 8,
-        endTick: 30,
+        startTick: 18,
+        endTick: 19,
+        title: 'whether the house is theirs together',
+        kind: 'talk',
+        stakes: 6,
+        summary: 'They agreed the house was theirs together.',
+        // the log records no room; the narrator's window over those ticks is what names one
         location: 'the house',
       })
       expect(body.moments[0]!.cast).toEqual(['amara', 'yusuf'])
     })
 
-    it('answers with typed empties when no day has been narrated', async () => {
-      expect(MomentsResponseSchema.parse(await get('/api/moments', bareBase)).moments).toEqual([])
+    it('answers with typed empties when no day has been narrated, but keeps the town’s own record', async () => {
       expect(await get('/api/chapters', bareBase)).toEqual([])
       expect(await get('/api/milestones', bareBase)).toEqual([])
-      // the chronicle is the town's own record, so it survives a missing narrator
+      // the chronicle and the scenes are the town's own record, so they survive a missing
+      // narrator — only the place is the narrator's, and it stays null until a day is written
       const { entries } = await get<{ entries: ChronicleEntry[] }>('/api/chronicle', bareBase)
       expect(entries.map((e) => e.type)).toEqual(['structure_completed', 'co_slept', 'agent_died'])
+      const bareMoments = MomentsResponseSchema.parse(await get('/api/moments', bareBase)).moments
+      expect(bareMoments).toHaveLength(1)
+      expect(bareMoments[0]).toMatchObject({ startTick: 18, stakes: 6, location: null })
     })
   })
 
