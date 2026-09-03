@@ -4,7 +4,14 @@
 export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
 // Two homes since the 2026-09-01 bake-off: DeepInfra cleared 60/60 acts under 8-way concurrency
 // with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
-export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
+// DeepInfra leads since the 2026-09-03 rehearsal, on price and on refusals both: over 2.96
+// sim-days it answered 610 calls at $0.0000857 each with no failure, while Wafer answered 502 at
+// $0.000350 — 4.1x — and refused 155 more upstream. A refusal is not only a retry: it dozes the
+// mind six ticks, and 21 of them landed on scene lines, which is a conversation stopping
+// mid-floor. Wafer's 51% cache read against DeepInfra's 13% does not close a 4x gap.
+// One order for every mind-facing caller on purpose: `limiterFor` keys on the joined order
+// string, so a second order would open a second admission gate against the same two backends.
+export const PROVIDER_ORDER: string[] = ['DeepInfra', 'Wafer']
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
@@ -49,8 +56,9 @@ export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
 // included, so an unpriced back end can only ever OVER-report.
 export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cacheRead: 0.114 }
 
-// The pinned route's real price. Kept as the name the rest of the tree imports.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER.Wafer!
+// The pinned route's real price. Kept as the name the rest of the tree imports, and derived
+// from the order rather than named, so a flip cannot leave the estimator quoting the old home.
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER[PROVIDER_ORDER[0]!]!
 
 // Keyed by the model where the model, not the back end, is what sets the price: a fallback that
 // answered, and the single-homed ruling model. An unlisted model books at the ceiling.
