@@ -22,6 +22,8 @@ import {
   type Subject,
 } from './stage/index.js'
 import { HelpButton } from './stage/HelpButton.js'
+import { ReplayScene } from './stage/ReplayScene.js'
+import { Transport } from './stage/Transport.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { DirectorMode } from './ui/DirectorMode.js'
@@ -325,6 +327,7 @@ export function App() {
       ref={appRef}
       data-broadcast={route.broadcast ? 'on' : undefined}
       data-paper={sheet === null ? undefined : 'on'}
+      data-replay={play === null || route.broadcast ? undefined : 'on'}
     >
       <h1 className="stage-sr">San Junipero</h1>
       <a className="skip" href="#signpost">
@@ -367,11 +370,12 @@ export function App() {
       )}
       {/* The stamp already names the minute and reads REPLAY; this is the one way back out of it.
           A stream frame has no hands, and its stamp says the same thing on its own. */}
-      {!mode.live && !route.broadcast && (
+      {!mode.live && !route.broadcast && play === null && (
         <button type="button" className="stage-live" onClick={onLive}>
           Return to now<span aria-hidden="true"> →</span>
         </button>
       )}
+      {!route.broadcast && <ReplayScene store={store} play={play} />}
       <SpeechLive store={store} />
       <Figures
         scene={scene}
@@ -396,6 +400,9 @@ export function App() {
         moment={play?.cast ?? NO_CAST}
         onCue={setCue}
       />
+      {!route.broadcast && (
+        <Transport store={store} play={play} handle={handle} onLive={onLive} onAt={address} />
+      )}
       <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
       <HelpButton
         open={keysOpen}

@@ -98,6 +98,10 @@
   --sky-w: 600px;
   --sky-h: 34px;
 
+  /* The transport strip's own height, named because the cue and the title card both step over
+     it and neither can measure a sibling: 44px of button in --s-3 of padding, plus a gap. */
+  --transport-h: calc(44px + 2 * var(--s-3) + var(--s-4));
+
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
 
@@ -1984,3 +1988,100 @@ body {
   color: var(--cream);
 }
 
+
+/* ── the director's cut: what the past looks like ───────────────────────────────────────────
+   No letterbox. The Signpost ruling is that all UI is a thing in the town, and the sheet
+   already takes 66% of it — two black bars on top of that is a picture inside a picture. */
+
+/* A tenth less saturation, a warm wash, and the corners taken down. NEVER sepia: the town has
+   to stay worth watching once it is old, and a brown wash is a photograph of a town.
+   `backdrop-filter` grades on the compositor, so the desaturation costs the 40ms/s tick budget
+   nothing — a Pixi ColorMatrixFilter would copy the whole stage inside the app's own frame. */
+.replay-grade {
+  position: absolute; inset: 0; z-index: 18;
+  pointer-events: none; visibility: hidden;
+  backdrop-filter: saturate(0.9);
+  -webkit-backdrop-filter: saturate(0.9);
+  /* the warm half, and the vignette, in one paint: honey at the middle, deep at the corners */
+  background:
+    radial-gradient(120% 90% at 50% 45%, rgba(242, 200, 121, 0.07) 0%, rgba(242, 200, 121, 0) 55%),
+    radial-gradient(96% 74% at 50% 50%, rgba(36, 31, 43, 0) 42%, rgba(36, 31, 43, 0.34) 100%);
+}
+.replay-grade[data-on='yes'] { visibility: visible; }
+
+/* The dip is written by rAF (stage/ReplayScene), so it carries no transition of its own: a
+   transition on top of a per-frame write fights it and lands the curtain late. */
+.replay-dip {
+  position: absolute; inset: 0; z-index: 27;
+  pointer-events: none; opacity: 0;
+  background: var(--deep);
+}
+
+/* The card stands in the cue's own slot, over the transport — and the two can never collide:
+   the card goes down on the first thing that happens, which is the only thing that brings the
+   cue up. The corners are all taken (help and thoughts bottom-left, the signpost bottom-right,
+   the stamp and the arc along the top), and a caption belongs on the centre line anyway. */
+.replay-card {
+  position: absolute; z-index: 24; left: 50%; translate: -50% 0;
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
+  max-width: min(38ch, calc(100% - 2 * var(--mark-inset)));
+  text-align: center;
+  margin: 0; padding: var(--s-4) var(--s-5);
+  pointer-events: none;
+  background: var(--deep); box-shadow: var(--frame);
+  opacity: 0;
+}
+.replay-card[data-up='yes'] { opacity: 1; }
+.replay-card-when {
+  margin: 0;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--honey);
+}
+/* Fraunces, because the card is a title and this is the one face the sheet titles with. */
+.replay-card-title {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  text-wrap: balance; color: var(--cream);
+}
+.replay-card-cast {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-body); font-size: var(--f-2); color: var(--cream-quiet);
+}
+
+/* The transport is a thing standing in the town, bottom-centre, as wide as its own controls. */
+.transport {
+  position: absolute; z-index: 25; left: 50%; translate: -50% 0;
+  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: var(--s-4);
+  width: min(560px, calc(100% - 2 * var(--mark-inset)));
+  padding: var(--s-3) var(--s-4);
+  background: var(--deep); box-shadow: var(--frame);
+}
+.transport .player-btn.live {
+  flex: none; padding: 0 var(--s-5);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.transport .player-btn:focus-visible, .transport .player-track:focus-visible {
+  outline: 2px solid var(--honey); outline-offset: 2px;
+}
+
+/* The cue and the card both step over the strip rather than under it: one number, so the two
+   can never disagree about how tall it is. */
+[data-replay='on'] .stage-cue {
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
+}
+
+/* The grade carries no transition: the curtain is fully black at the midpoint of the dip, so
+   the grade arrives behind it and there is nothing to ease. */
+@media (prefers-reduced-motion: no-preference) {
+  .replay-card { transition: opacity var(--t-slow) var(--ease-enter); }
+}
+
+@media (max-width: 640px) {
+  /* Under 640 the arms take the TOP edge, so the strip has the bottom to itself — but the
+     "Return to now" word and a 44px track cannot share 320px, and the word is the one that
+     wraps. It keeps its own row. */
+  .transport { flex-wrap: wrap; justify-content: center; }
+  .transport .player-track { order: 3; flex-basis: 100%; }
+}

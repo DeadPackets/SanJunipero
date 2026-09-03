@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
+import { tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { SCENE_OUT_MS, SCENE_TOTAL_MS, transitionAlpha } from './sceneTransition.js'
 
 /** A point event is watched from three sim-minutes before it to ten after: long enough for the
  *  bodies to arrive and the thing to land, short enough that day 3 of a nine-day town is not a
@@ -77,4 +79,34 @@ export function useMomentEnd(
     if (play === null) return
     return watchMomentEnd(store, play, onEnd)
   }, [store, play, onEnd])
+}
+
+/** The card names the moment and gets out of the way. It goes on the first thing that happens
+ *  in the town, so the words never stand over the thing they were announcing. */
+export const TITLE_CARD_MS = 2000
+
+/** The curtain over the town, off the SAME out-120/in-180 machine an interior uses: the town
+ *  leaves, the past arrives. Under reduced motion there is no dip at all — the sheet's rule is
+ *  a fade or nothing, and a hard step to black for 180 ms is neither. */
+export function dipAlpha(elapsedMs: number, reducedMotion = false): number {
+  if (reducedMotion) return 0
+  if (elapsedMs >= SCENE_TOTAL_MS || elapsedMs < 0) return 0
+  const a = transitionAlpha(elapsedMs)
+  return 1 - (elapsedMs < SCENE_OUT_MS ? a.out : a.in)
+}
+
+/** `Day 3 · 04:57` — the dateline of the minute the moment starts at. */
+export function momentDateline(tick: number): string {
+  const m = tickToMoment(tick)
+  return `Day ${m.day} · ${m.time}`
+}
+
+/** The cast as the card names them, in the town's own words. */
+export function castNames(
+  cast: readonly string[],
+  nameOf: (id: string) => string | undefined,
+): string {
+  const named = cast.map(nameOf).filter((n): n is string => n !== undefined && n !== '')
+  if (named.length <= 1) return named[0] ?? ''
+  return `${named.slice(0, -1).join(', ')} and ${named.at(-1)!}`
 }

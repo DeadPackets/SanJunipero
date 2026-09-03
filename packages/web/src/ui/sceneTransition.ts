@@ -2,7 +2,7 @@ import { MOTION, easeFn, type Motion } from './motion.js'
 
 /** OUT THEN IN, NEVER BOTH AT ONCE: a crossfade of two live scenes doubles the frame cost and reads
  *  as a smear at this pixel density, so the outgoing leaves before the incoming arrives. */
-export const SCENES = ['lens', 'interior', 'follow', 'daybreak', 'nightfall'] as const
+export const SCENES = ['lens', 'interior', 'follow', 'daybreak', 'nightfall', 'replay'] as const
 export type SceneName = (typeof SCENES)[number]
 type ScenePhase = 'idle' | 'out' | 'in'
 export type SceneState = {
@@ -81,6 +81,7 @@ const SCENE_BASE: Readonly<Record<SceneName, Motion>> = {
   follow: { ms: MOTION.move.ms, ease: MOTION.move.ease },
   daybreak: MOTION.ambient,
   nightfall: MOTION.ambient,
+  replay: { ms: SCENE_IN_MS, ease: MOTION.scene.ease },
 }
 
 export function sceneMotion(name: SceneName, grave: boolean): Motion {
