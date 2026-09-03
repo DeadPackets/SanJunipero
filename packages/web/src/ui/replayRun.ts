@@ -54,6 +54,20 @@ export function reachedEnd(play: MomentPlay, tick: number, replaying: boolean): 
 
 /** `ClientReplay` carries no end, so the end is watched here rather than grown into the protocol:
  *  the store is the playhead, and the still the moment finishes on is `scrub(until)`. */
+export function watchMomentEnd(
+  store: WorldStore,
+  play: MomentPlay,
+  onEnd: (until: number) => void,
+): () => void {
+  const check = (): void => {
+    const mode = store.getMode()
+    if (mode.live || !reachedEnd(play, mode.tick, mode.replaying)) return
+    onEnd(play.until)
+  }
+  check()
+  return store.subscribe(check)
+}
+
 export function useMomentEnd(
   store: WorldStore,
   play: MomentPlay | null,
@@ -61,12 +75,6 @@ export function useMomentEnd(
 ): void {
   useEffect(() => {
     if (play === null) return
-    const check = (): void => {
-      const mode = store.getMode()
-      if (mode.live || !reachedEnd(play, mode.tick, mode.replaying)) return
-      onEnd(play.until)
-    }
-    check()
-    return store.subscribe(check)
+    return watchMomentEnd(store, play, onEnd)
   }, [store, play, onEnd])
 }
