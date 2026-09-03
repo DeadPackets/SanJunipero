@@ -34,6 +34,9 @@ export type PromptBlocks = {
   // What the town has minted, identical for all agents; changes only when a verb is minted or
   // retired, so it sits after the static rules and before anything that is one mind's own.
   roster?: readonly RosterEntry[]
+  // What the town has named, on the same terms and beside it: shared by every mind, and rewritten
+  // only on the day somebody gives a habit a word.
+  customs?: readonly string[]
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
   journal: JournalEntry[] // the mind's own book — changes only when it writes in it
@@ -162,6 +165,16 @@ function renderScene(scene: PromptBlocks['scene']): string {
   if (parts.length === 0) return 'Nothing in particular comes back to you.'
   return parts.join('\n\n')
 }
+// A habit the town has words for, and only the words: what kind of thing it is belongs to the
+// recognizer, and a mind may never hear that.
+function renderCustoms(names: readonly string[]): string {
+  if (names.length === 0) return ''
+  const said = names.map((n) => `the ${n}`)
+  const head = said.slice(0, -1).join(', ')
+  const tail = said.slice(-1).join('')
+  return `The town has taken to ${head === '' ? tail : `${head} and ${tail}`}.`
+}
+
 // Rules of being + capabilities are static and identical for every agent, and the cache keeps
 // them as one unit: nothing per-mind may ever go in front of this.
 function renderShared(rulesOfBeing: string): string {
@@ -175,11 +188,16 @@ function estTokens(text: string): number {
 export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const shared = renderShared(blocks.rulesOfBeing)
   const roster = renderRoster(blocks.roster ?? [])
+  const customs = renderCustoms(blocks.customs ?? [])
   const identity = renderIdentity(blocks.identity)
   const personality = renderPersonality(blocks.personality)
-  const system = [shared, ...(roster.length === 0 ? [] : [roster]), identity, personality].join(
-    BLOCK_DELIM,
-  )
+  const system = [
+    shared,
+    ...(roster.length === 0 ? [] : [roster]),
+    ...(customs.length === 0 ? [] : [customs]),
+    identity,
+    personality,
+  ].join(BLOCK_DELIM)
   const journal = renderJournal(blocks.journal)
   const scene = renderScene(blocks.scene)
   const dayLog = blocks.dayLog.join('\n')
@@ -199,6 +217,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const named: [string, string][] = [
     ['shared', shared],
     ['roster', roster],
+    ['customs', customs],
     ['identity', identity],
     ['personality', personality],
     ['journal', journal],

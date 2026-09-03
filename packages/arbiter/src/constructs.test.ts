@@ -14,7 +14,10 @@ import {
   ConstructSchema,
   CONSTRUCT_TYPE_INSTRUCTION,
   detectCandidates,
+  namedCustoms,
+  NAMED_CUSTOMS_SHOWN,
   runConstructPass,
+  type Construct,
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { CANON } from './canon.js'
@@ -192,6 +195,62 @@ describe('the daily pass', () => {
     for (const t of CONSTRUCT_TYPES) expect(CONSTRUCT_TYPE_INSTRUCTION).toContain(t)
     const { rows } = await pass(threeNights(), llm)
     expect(rows[0]!.type).toBe('custom')
+  })
+})
+
+// The one thing that crosses the glass, and the whole of it: a name the town said out loud.
+describe('namedCustoms', () => {
+  const construct = (over: Partial<Construct> = {}): Construct => ({
+    id: 'construct_30_30',
+    type: 'festival',
+    name: 'Long Turning',
+    nameProvenance: {
+      name: 'Long Turning',
+      sourceKind: 'speech',
+      eventSeq: 9,
+      quote: 'We call it the Long Turning.',
+      byId: 'bex',
+    },
+    anchor: { x: 30, y: 30 },
+    participants: THREE,
+    firstTick: MINUTES_PER_DAY,
+    recurrences: [],
+    ...over,
+  })
+
+  it('renders a construct a mouth named, and never one that only recurred', () => {
+    expect(namedCustoms([construct()])).toEqual(['Long Turning'])
+    expect(namedCustoms([construct({ name: null, nameProvenance: null })])).toEqual([])
+  })
+
+  it('takes a name only from speech, never from a wall', () => {
+    const written = construct({
+      nameProvenance: { ...construct().nameProvenance!, sourceKind: 'inscription' },
+    })
+    expect(namedCustoms([written])).toEqual([])
+  })
+
+  it('keeps a name that collides with our taxonomy, because a town will say council', () => {
+    const said = construct({
+      id: 'construct_9_9',
+      name: 'Council',
+      nameProvenance: { ...construct().nameProvenance!, name: 'Council' },
+    })
+    expect(namedCustoms([said])).toEqual(['Council'])
+  })
+
+  it('holds the oldest names, so a name already on the page never moves', () => {
+    const many = Array.from({ length: NAMED_CUSTOMS_SHOWN + 2 }, (_, i) =>
+      construct({
+        id: `construct_${i}_0`,
+        name: `Naming ${i}`,
+        firstTick: (NAMED_CUSTOMS_SHOWN + 2 - i) * MINUTES_PER_DAY,
+        nameProvenance: { ...construct().nameProvenance!, name: `Naming ${i}` },
+      }),
+    )
+    const held = namedCustoms(many)
+    expect(held).toHaveLength(NAMED_CUSTOMS_SHOWN)
+    expect(held[0]).toBe(`Naming ${NAMED_CUSTOMS_SHOWN + 1}`)
   })
 })
 

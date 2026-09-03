@@ -144,6 +144,13 @@ export function tieActOf(kind: string, settled: boolean): TieAct | null {
   return null
 }
 
+/** What a tie that nobody ever settled is worth when its clock runs out. A promise left to lapse
+ *  IS a promise broken — the only producer of the strongest negative in the table. Anything else
+ *  weighs nothing: a grudge nobody fed is a grudge forgiven, which is the point of the clock. */
+export function tieActOfLetGo(kind: string): TieAct | null {
+  return kind === 'promise' ? 'promise_broken' : null
+}
+
 /** Silence costs warmth, which is what lets a level fall without anybody doing anything wrong.
  *  A tick is a sim-minute and MINUTES_PER_DAY is 1440, so this is two sim-days. */
 export const WARMTH_HALF_LIFE_TICKS = 2880

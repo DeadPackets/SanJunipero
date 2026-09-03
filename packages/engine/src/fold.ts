@@ -50,6 +50,7 @@ import {
   SceneOpened,
   SceneLineSaid,
   SceneClosed,
+  TieLetGo,
   AgentWoke,
   CoSlept,
   CropGrew,
@@ -286,6 +287,11 @@ export function fold(
     }
     case 'scene_closed': {
       SceneClosed.parse(event.payload)
+      return state
+    }
+    // A promise nobody kept, letting go of itself. The bond graph weighs it; the world does not.
+    case 'tie_let_go': {
+      TieLetGo.parse(event.payload)
       return state
     }
     case 'marked': {

@@ -3,6 +3,7 @@ import {
   bondId,
   foldBond,
   tieActOf,
+  tieActOfLetGo,
   type Bond,
   type BondFold,
   type BondKind,
@@ -34,6 +35,7 @@ export const BOND_TYPES: readonly string[] = [
   'co_slept',
   'agent_born',
   'scene_closed',
+  'tie_let_go',
 ]
 
 /** The graph folds the WHOLE bond history — 4.2 ms over 1,605 rows at tick 5,000, linear in the
@@ -108,6 +110,10 @@ export function buildBonds(
         const act = tieActOf(d.kind, d.settled === true)
         if (act !== null) between(d.agentId, d.personId)?.addTie(act, ev.tick)
       }
+    } else if (ev.type === 'tie_let_go') {
+      const p = ev.payload as { agentId: string; personId: string; kind: string }
+      const act = tieActOfLetGo(p.kind)
+      if (act !== null) between(p.agentId, p.personId)?.addTie(act, ev.tick)
     }
   }
 

@@ -14,6 +14,7 @@ import {
   foldBond,
   strongerBondKind,
   tieActOf,
+  tieActOfLetGo,
   type Bond,
   type BondAct,
 } from './bonds.js'
@@ -109,6 +110,12 @@ describe('what a tie is worth', () => {
     expect(tieActOf('kin', false)).toBe('kin')
     expect(tieActOf('secret', false)).toBeNull()
     expect(tieActOf('slight', true), 'a slight squared is not a slight taken').toBeNull()
+  })
+
+  it('reads a lapse: only a promise left to rot is a promise broken', () => {
+    expect(tieActOfLetGo('promise')).toBe('promise_broken')
+    for (const kind of ['grudge', 'slight', 'debt', 'attraction', 'secret', 'alliance', 'kin'])
+      expect(tieActOfLetGo(kind), `${kind} nobody fed is ${kind} forgiven`).toBeNull()
   })
 
   it('moves warmth without becoming an act, so the served window is what it was', () => {

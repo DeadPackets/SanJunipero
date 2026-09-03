@@ -54,7 +54,7 @@ import {
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
-import type { TieStore } from '../memory/ties.js'
+import { TIE_PHRASE, type TieStore } from '../memory/ties.js'
 import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '../memory/wants.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
@@ -130,6 +130,10 @@ const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [
 export type RuntimeTies = { store: TieStore; cast: () => readonly { id: string; name: string }[] }
 
 const LET_GO_IMPORTANCE = 4
+
+/** Two ties a person, on the turn that pays full price. What a pair holds past two is a scene's
+ *  to read, and the scene already shows all of it. */
+const TIES_SHOWN_PER_PERSON = 2
 
 // Rendered at prose time and never written back into a stored ruling. Only a skill deficit
 // earns it: a thing nobody can do teaches no one a false path.
@@ -352,6 +356,7 @@ export class AgentRuntime {
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
+  #customs: (() => readonly string[]) | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -537,6 +542,7 @@ export class AgentRuntime {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
     this.#roster = arbiter.roster ?? null
+    this.#customs = arbiter.customs ?? null
   }
 
   stop(): void {
@@ -1068,6 +1074,7 @@ export class AgentRuntime {
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
       ...(this.#roster === null ? {} : { roster: this.#roster() }),
+      ...(this.#customs === null ? {} : { customs: this.#customs() }),
       identity: this.#identity,
       personality: {
         doc: this.#personality.current().doc,
@@ -1308,6 +1315,13 @@ export class AgentRuntime {
     try {
       for (const t of ties.store.letGo(tick)) {
         const who = this.#bridge.agentFacts(t.personId)?.name ?? t.personId
+        // Witnessed, folded to nothing: the bond graph reads it off the log, and a promise
+        // nobody ever settled is the only producer `promise_broken` has.
+        this.#bridge.announce('tie_let_go', {
+          agentId: this.#agentId,
+          personId: t.personId,
+          kind: t.kind,
+        })
         await this.#mem!.insertMemory({
           tick,
           kind: 'reflection',
@@ -1363,11 +1377,32 @@ export class AgentRuntime {
     }
   }
 
+  /** What this mind holds about the people it can see, keyed by the name the ledger is keyed by.
+   *  It rides the "people here" line because that line changes when somebody arrives, not every
+   *  turn: a tie sits inside the prefix the cache keeps, above the memories that do change. */
+  #tiesByName(): Map<string, string> {
+    const ties = this.#ties
+    if (ties === null) return new Map()
+    const nameOf = new Map(ties.cast().map((p) => [p.id, p.name]))
+    const held = new Map<string, string[]>()
+    for (const t of ties.store.open()) {
+      const name = nameOf.get(t.personId)
+      if (name === undefined) continue
+      const rows = held.get(name) ?? []
+      if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]} — ${t.text}`)
+      held.set(name, rows)
+    }
+    return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join('; ')}.`]))
+  }
+
   #buildLedgers(people: string[]): { name: string; doc: string }[] {
+    const ties = this.#tiesByName()
     const out: { name: string; doc: string }[] = []
     for (const person of people) {
-      const ledger = this.#mem!.getLedger(person)
-      if (ledger) out.push({ name: person, doc: ledger.doc })
+      const doc = [this.#mem!.getLedger(person)?.doc ?? '', ties.get(person) ?? '']
+        .filter((p) => p.length > 0)
+        .join(' ')
+      if (doc.length > 0) out.push({ name: person, doc })
     }
     return out
   }

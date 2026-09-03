@@ -6,6 +6,19 @@ import type { TieDelta, TieKind } from '../scene/scene.js'
  *  that is the whole point of a tie having a clock. One tick is one sim-minute. */
 export const TIE_LET_GO_TICKS = 7 * MINUTES_PER_DAY
 
+/** The town's words for what one person holds about another. Here rather than in either prompt,
+ *  because a scene and an ordinary turn must name the same thing the same way. */
+export const TIE_PHRASE: Record<TieKind, string> = {
+  promise: 'a promise',
+  debt: 'a debt',
+  slight: 'a slight',
+  grudge: 'a grudge',
+  attraction: 'an attraction',
+  secret: 'a secret',
+  alliance: 'an alliance',
+  kin: 'kin',
+}
+
 export type Tie = {
   id: number
   personId: string

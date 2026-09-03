@@ -7,7 +7,7 @@ import type { CallBill, LlmClient } from '@sj/llm'
 import type { PersonalityDoc } from '../personality.js'
 import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import type { Tie } from '../memory/ties.js'
+import { TIE_PHRASE, type Tie } from '../memory/ties.js'
 import {
   SceneTurnSchema,
   TIE_KINDS,
@@ -18,7 +18,6 @@ import {
   type SceneLine,
   type SceneLlm,
   type TieDelta,
-  type TieKind,
 } from './scene.js'
 
 /** What one mind is, for the length of a scene. Read through functions because sleep rewrites
@@ -27,15 +26,27 @@ export type SceneVoice = {
   identity: IdentityCore
   personality: () => { doc: PersonalityDoc; autobiography: string[] }
   roster?: () => readonly RosterEntry[]
+  /** The town's own names for its habits, from the same seam the ordinary turn reads. */
+  customs?: () => readonly string[]
   /** Everyone alive in the valley. A closed roll: the mind may name nobody else. */
   livingCast: () => readonly { id: string; name: string }[]
   /** The mind's strongest want, in its own words. Nothing at all until wants exist. */
   want?: () => string | null
 }
 
-// How far back a mind reads before answering. Six lines is three exchanges: long enough to see
-// the shape of the talk, short enough that the last thing said is still the loudest.
-const THREAD_LINES_SHOWN = 6
+// How far back a mind reads before answering. Six lines is three exchanges for a pair: long
+// enough to see the shape of the talk, short enough that the last thing said is still the
+// loudest. At twelve it is half a round, which reads as people talking past each other.
+export const THREAD_LINES_SHOWN = 6
+/** Twelve is where the window stops earning its tokens: past it the block outgrows the system
+ *  prompt the cache is keeping warm, and the last thing said stops being the loudest. */
+export const THREAD_LINES_MAX = 12
+
+/** A whole round of talk, floored at the pair's six lines and capped at twelve — the shape
+ *  `lineCapFor` has, over the same cast. */
+export function threadLinesFor(talkers: number): number {
+  return Math.min(THREAD_LINES_MAX, Math.max(THREAD_LINES_SHOWN, talkers))
+}
 
 // v1 measured: the median spoken line was 92 characters, which is 16 words. A persona carrying
 // no card of its own speaks at the town's median.
@@ -52,17 +63,6 @@ export function sceneWordCap(voice: IdentityCore['voiceCard']): number {
 const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
 
 Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.`
-
-const TIE_PHRASE: Record<TieKind, string> = {
-  promise: 'a promise',
-  debt: 'a debt',
-  slight: 'a slight',
-  grudge: 'a grudge',
-  attraction: 'an attraction',
-  secret: 'a secret',
-  alliance: 'an alliance',
-  kin: 'kin',
-}
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what there was to say.',
@@ -91,8 +91,9 @@ function renderThread(
   thread: readonly SceneLine[],
   nameOf: (id: string) => string,
   selfId: string,
+  lines: number,
 ): string {
-  const shown = thread.slice(-THREAD_LINES_SHOWN)
+  const shown = thread.slice(-lines)
   if (shown.length === 0) return ''
   const rows = shown.flatMap((l) => {
     const who = l.agentId === selfId ? 'You' : nameOf(l.agentId)
@@ -188,7 +189,7 @@ export function sceneBlock(
     castLaw(voice.livingCast()),
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
-    renderThread(ask.thread, nameOf, ask.agentId),
+    renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderLateness(ask.tick, ask.energy),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),
@@ -208,6 +209,7 @@ function sceneSystem(voice: SceneVoice): string {
   return assemblePrompt({
     rulesOfBeing: RULES_OF_BEING,
     ...(voice.roster === undefined ? {} : { roster: voice.roster() }),
+    ...(voice.customs === undefined ? {} : { customs: voice.customs() }),
     identity: voice.identity,
     personality: voice.personality(),
     journal: [],

@@ -316,6 +316,25 @@ export const SceneClosed = z
   })
   .strict()
 
+// A tie nothing fed for seven days, quietly lapsing. The same class as a scene: witnessed by the
+// world, folded to nothing, and read off the log by whoever keeps the bond graph.
+export const TieLetGo = z
+  .object({
+    agentId: z.string().min(1),
+    personId: z.string().min(1),
+    kind: z.enum([
+      'promise',
+      'debt',
+      'slight',
+      'grudge',
+      'attraction',
+      'secret',
+      'alliance',
+      'kin',
+    ]),
+  })
+  .strict()
+
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 // `cause` stays a free string so every recorded log still parses; DEATH_CAUSES is the
 // vocabulary emitters are held to.
