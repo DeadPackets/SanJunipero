@@ -13,7 +13,7 @@ import {
   type TickHandler,
   type TileId,
 } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { SimConfigSchema, stateHash } from '@sj/shared'
 import { DREAM_PROMPT } from '../dream.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
@@ -140,7 +140,7 @@ function buildWorld(startTick = DUSK_DAY_0) {
   handler = bridge.wrapTickHandler(({ emit }) => {
     for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
   })
-  return { loop, bridge }
+  return { loop, bridge, store, config, terrain }
 }
 
 const SPEC: MindSpec = {
@@ -154,7 +154,7 @@ const SPEC: MindSpec = {
 async function bootOne(
   opts: { dreamBudgetUsd?: number; startTick?: number; minds?: readonly MindSpec[] } = {},
 ) {
-  const { loop, bridge } = buildWorld(opts.startTick)
+  const { loop, bridge, store, config, terrain } = buildWorld(opts.startTick)
   const opsDb = openAgentDb(':memory:')
   migrateLlmTables(opsDb)
   const mindDb = openAgentDb(':memory:')
@@ -185,7 +185,7 @@ async function bootOne(
       bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
     },
   })
-  return { loop, booted, opsDb, mindDb }
+  return { loop, booted, opsDb, mindDb, store, config, terrain }
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
@@ -297,5 +297,37 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
       ties.open().map((t) => t.kind),
       'today’s debt is not stale',
     ).toEqual(['debt'])
+  })
+
+  // A close can say a promise was kept; only this can say broken. The world witnesses it and
+  // folds it to nothing, so the log it lands in still replays to the state it always reached.
+  it('announces the lapse to the world, and the log still replays byte for byte', async () => {
+    const h = await bootOne({ startTick: DUSK_DAY_7 })
+    const ties = new TieStore(h.mindDb, AGENT)
+    ties.apply(
+      [
+        { agentId: AGENT, personId: 'nadia', kind: 'grudge', text: 'She took the last loaf.' },
+        { agentId: AGENT, personId: 'omar', kind: 'promise', text: 'A day on the well gate.' },
+      ],
+      0,
+    )
+    // An announcement rides the NEXT tick, so the log is what this waits on, not the memory row.
+    await stepUntil(h.loop, () => h.store.readTypeFrom(0, 'tie_let_go').length >= 2, 600)
+    h.booted.stop()
+
+    const log = h.store.readFrom(0)
+    const said = log
+      .filter((e) => e.type === 'tie_let_go')
+      .map((e) => e.payload as { agentId: string; personId: string; kind: string })
+    expect(said.map((p) => `${p.personId}:${p.kind}`).sort()).toEqual([
+      'nadia:grudge',
+      'omar:promise',
+    ])
+    expect(new Set(said.map((p) => p.agentId))).toEqual(new Set([AGENT]))
+
+    // The whole log, from genesis, through the fold that has to know the type.
+    const replayed = log.reduce((s, e) => fold(s, e, h.config), genesisState(h.config, h.terrain))
+    expect(replayed.tick).toBe(h.loop.state.tick)
+    expect(stateHash(replayed)).toBe(stateHash(h.loop.state))
   })
 })

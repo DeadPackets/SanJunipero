@@ -8,6 +8,7 @@ import {
   BOND_RECENT_ACTS,
   BondsResponseSchema,
   DEFAULT_CONFIG,
+  TIE_VALENCE,
   bondId,
   bondNote,
   type Bond,
@@ -340,6 +341,39 @@ describe('★ a tie a scene left behind is worth something to the pair', () => {
     const b = buildBonds([closed(1, 100, [delta('slight')])], 5, 100).bonds[0]!
     expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
     expect(b.id).toBe(bondId('a', 'b'))
+  })
+})
+
+/** A close can say a promise was kept; it has no way to say broken. The seven-day let-go is the
+ *  honest producer: a promise nobody ever settled, quietly lapsing, IS a promise broken. */
+describe('★ a promise nobody kept', () => {
+  const letGo = (kind: string, tick = 100): SimEvent => ({
+    seq: 1,
+    tick,
+    type: 'tie_let_go',
+    payload: { agentId: 'a', personId: 'b', kind },
+  })
+
+  it('weighs a lapsed promise as the strongest negative in the table', () => {
+    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
+    expect(b.warmth).toBe(TIE_VALENCE.promise_broken)
+    expect(b.warmth).toBe(-6)
+  })
+
+  it('weighs nothing at all when any other kind lets go', () => {
+    for (const kind of ['grudge', 'slight', 'debt', 'attraction', 'secret', 'alliance', 'kin']) {
+      expect(buildBonds([letGo(kind)], 5, 100).bonds, kind).toEqual([])
+    }
+  })
+
+  it('claims no act the world witnessed, the way every tie does not', () => {
+    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
+    expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
+    expect(b.id).toBe(bondId('a', 'b'))
+  })
+
+  it('is a type the graph actually reads off the log', () => {
+    expect(BOND_TYPES).toContain('tie_let_go')
   })
 })
 

@@ -1315,6 +1315,13 @@ export class AgentRuntime {
     try {
       for (const t of ties.store.letGo(tick)) {
         const who = this.#bridge.agentFacts(t.personId)?.name ?? t.personId
+        // Witnessed, folded to nothing: the bond graph reads it off the log, and a promise
+        // nobody ever settled is the only producer `promise_broken` has.
+        this.#bridge.announce('tie_let_go', {
+          agentId: this.#agentId,
+          personId: t.personId,
+          kind: t.kind,
+        })
         await this.#mem!.insertMemory({
           tick,
           kind: 'reflection',

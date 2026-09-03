@@ -96,6 +96,8 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'scene_opened',
   'scene_line',
   'scene_closed',
+  // The mind already remembers letting go; the feed does not need to watch it happen.
+  'tie_let_go',
   // Superseded by the mortality events above, which say the same things better.
   'agent_injured',
   'agent_infected',

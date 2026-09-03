@@ -275,6 +275,28 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     golden(event, 'b3e8ff6d1b3b92d0b6ee8d7af55e1bdfd56658f055932dba9b7f7ea9f4eb0f5f')
   })
 
+  // The bond graph reads this one off the log. The world only witnesses that a tie ran out,
+  // so a log carrying one replays to the byte the same state a log without it reaches.
+  it('witness: a tie letting go folds to nothing and moves no hash', () => {
+    const event = ev(5, 'tie_let_go', { agentId: 'a1', personId: 'a2', kind: 'promise' })
+    const before = town()
+    expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
+    expect(stateHash(fold(before, event, DEFAULT_CONFIG))).toBe(stateHash(before))
+  })
+
+  it('witness: a tie letting go is parsed, so a malformed one cannot reach a replay', () => {
+    expect(() =>
+      fold(town(), ev(5, 'tie_let_go', { agentId: 'a1', personId: 'a2' }), DEFAULT_CONFIG),
+    ).toThrow()
+    expect(() =>
+      fold(
+        town(),
+        ev(5, 'tie_let_go', { agentId: 'a1', personId: 'a2', kind: 'nonsense' }),
+        DEFAULT_CONFIG,
+      ),
+    ).toThrow()
+  })
+
   it('name_place: the building takes the name', () => {
     const event = ev(5, 'place_named', {
       structureId: 'structure_1',
