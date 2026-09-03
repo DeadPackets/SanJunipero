@@ -42,6 +42,9 @@ const MindClockZ = z
     // Optional values, because an unspent rung is absent rather than false.
     alarmArmed: z.record(z.string(), z.boolean().optional()),
     morningWokeDay: z.number().nullable(),
+    // Defaulted, not optional: a checkpoint written before the dusk rung existed still resumes,
+    // and the field the runtime reads back is still the clock's own `number | null`.
+    gatheringDay: z.number().nullable().default(null),
     wakeRetryAtTick: z.number(),
     prevVisibleIds: z.array(z.string()),
   })

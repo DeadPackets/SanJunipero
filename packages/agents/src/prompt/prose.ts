@@ -740,6 +740,28 @@ export function wantLine(want: WantKind | null): string {
   return want === null ? '' : `Today you most want ${want}; who could give you that?`
 }
 
+// What "at the fire" means, in the tiles its own glow lights.
+const GATHERING_RADIUS = 4
+
+/** The fed fire at dusk and who is standing at it. A cue and not a summons: an empty fire is
+ *  said too, because being the first one there is the answer a lonely mind is short of. */
+export function gatheringLine(packet: PerceptionPacket, tick: number): string {
+  if (dayPhaseFromTick(tick) !== 'dusk') return ''
+  const fire = packet.visible.structures.find((s) => s.kind === 'fire_pit' && s.hearth === 'lit')
+  if (fire === undefined) return ''
+  const there = packet.visible.agents
+    .filter(
+      (a) =>
+        !a.asleep && Math.max(Math.abs(a.x - fire.x), Math.abs(a.y - fire.y)) <= GATHERING_RADIUS,
+    )
+    .map((a) => a.name)
+  const said = `${opening(placeSaid(fire))} (${fire.id}) is lit against the dusk`
+  if (there.length === 0) return `${said}, and nobody is standing at it.`
+  if (there.length === 1) return `${said}; ${there[0]} is standing at it.`
+  const who = `${there.slice(0, -1).join(', ')} and ${there.at(-1)}`
+  return `${said}; ${who} are standing at it.`
+}
+
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
 export function roadLine(m: Makeables, packet: PerceptionPacket, world?: ProseWorld): string {
   return coldHearthLine(packet, world) || makeableRoadLine(m, packet, world)

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { PerceptionPacket } from './prompt/prose.js'
+import { openAgentDb } from './memory/schema.js'
+import { WantStore } from './memory/wants.js'
 import { quietMeadowPacket, conversationPacket } from './testutil/fixtures.js'
 import {
   decideWake,
@@ -37,6 +40,7 @@ function clk(overrides: Partial<MindClock> = {}): MindClock {
     dozeUntilTick: 0,
     alarmArmed: { hunger: true, energy: true, warmth: true },
     morningWokeDay: null,
+    gatheringDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
     ...overrides,
@@ -49,6 +53,7 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
 
 const HOLDS_FLOOR: FloorState = { inScene: true, holdsFloor: true }
 const LISTENS: FloorState = { inScene: true, holdsFloor: false }
+const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
 
 describe('decideWake — one case per reason', () => {
   // The sixth column is the reason that decides and always has; the seventh is every reason that
@@ -511,5 +516,107 @@ describe('★ fire and a blow reach a listener, as they reach a sleeper', () => 
 
   it('still holds a listener still for anything less than that', () => {
     expect(decideWake(cfg, rousing('someone_spoke'), clk(), 100, pln(), LISTENS)).toBeNull()
+  })
+})
+
+// ★ Phase 2 took `salient_perception` off the ambient rung and the town went a third as
+// sociable: 78 scenes opened before it, 26 after. This is the designed replacement — one rung,
+// above the idle gate, that reads the one want a scene answers.
+
+describe('★ the dusk gathering: the rung that reads a want', () => {
+  const DUSK = 19 * 60
+  const NOON = 12 * 60
+  const LONELY = cfg.gatheringWant + 1
+  const day = (n: number, minuteOfDay: number): number => n * MINUTES_PER_DAY + minuteOfDay
+
+  // A mind that has just taken a turn, which is the mind this rung exists for: everything below
+  // the idle gate is silent, so what the ladder answers here is the want and nothing else.
+  const woke = (
+    tick: number,
+    belonging: number,
+    over: Partial<MindClock> = {},
+  ): WakeReason | null =>
+    decideWake(
+      cfg,
+      pkt(),
+      clk({ lastTurnTick: tick - 1, ...over }),
+      tick,
+      pln(),
+      NO_SCENE,
+      belonging,
+    )
+
+  it('fires at dusk for a mind whose belonging is over the gate', () => {
+    expect(woke(DUSK, LONELY)).toBe('gathering')
+  })
+
+  it('never fires for a mind at or under the gate, however long the dusk', () => {
+    for (const level of [0, 30, cfg.gatheringWant]) {
+      expect(woke(DUSK, level), `${level}`).toBeNull()
+    }
+  })
+
+  it('is a dusk rung and nothing else: silent at noon and through the night', () => {
+    for (const t of [NOON, 6 * 60, 21 * 60, 3 * 60]) {
+      expect(woke(t, LONELY), `${t}`).toBeNull()
+    }
+  })
+
+  // The whole point of the rung: a mind that has just taken a turn is idle-gated into silence,
+  // and loneliness is exactly the thing that gate must not swallow.
+  it('reaches a mind the idle gate would otherwise hold', () => {
+    const justSpoke = clk({ lastTurnTick: DUSK - 1 })
+    expect(wakeReasons(cfg, pkt(), justSpoke, DUSK, pln(), NO_SCENE, LONELY)).toEqual(['gathering'])
+    expect(wakeReasons(cfg, pkt(), justSpoke, DUSK, pln(), NO_SCENE, 0)).toEqual([])
+  })
+
+  it('waits behind the body: a starving mind eats before it seeks company', () => {
+    const starving = withNeeds(5, 78, 71)
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(decideWake(cfg, starving, clock, DUSK, pln(), NO_SCENE, LONELY)).toBe('body_alarm')
+    expect(wakeReasons(cfg, starving, clock, DUSK, pln(), NO_SCENE, LONELY)).toEqual([
+      'body_alarm',
+      'gathering',
+    ])
+  })
+
+  it('fires once per dusk, not once per tick of it', () => {
+    for (const t of [DUSK, DUSK + 1, DUSK + 119]) {
+      expect(woke(t, LONELY, { gatheringDay: 0 }), `${t}`).toBeNull()
+    }
+    expect(woke(day(1, DUSK), LONELY, { gatheringDay: 0 })).toBe('gathering')
+  })
+
+  it('leaves a sleeper asleep — the gate it beats is the idle gap, not the night', () => {
+    const asleep = pkt({ self: { ...quietMeadowPacket.self, asleep: true } })
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(wakeReasons(cfg, asleep, clock, DUSK, pln(), NO_SCENE, LONELY)).not.toContain(
+      'gathering',
+    )
+  })
+
+  it('never fires on a mind already in company, whichever end of the talk it is', () => {
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(decideWake(cfg, pkt(), clock, DUSK, pln(), LISTENS, LONELY)).toBeNull()
+    expect(decideWake(cfg, pkt(), clock, DUSK, pln(), HOLDS_FLOOR, LONELY)).toBe('floor')
+  })
+
+  // What makes the rung affordable, said as arithmetic rather than as an intention: the want it
+  // reads is the one a scene zeroes, so company itself is what takes the mind off the ladder.
+  it('goes quiet for days after a scene, and comes back when the loneliness does', () => {
+    const db = openAgentDb(':memory:')
+    const wants = new WantStore(db, 'tamar')
+    wants.begin(0)
+    const at = (tick: number): WakeReason | null => woke(tick, wants.levelOf('belonging', tick))
+
+    expect(at(day(0, DUSK))).toBeNull() // 19.4 — nowhere near it
+    expect(at(day(1, DUSK))).toBeNull() // 43.9
+    expect(at(day(2, DUSK))).toBe('gathering') // 68.3, the first dusk that clears
+
+    wants.feed(['scene'], day(2, DUSK))
+    expect(at(day(3, DUSK))).toBeNull()
+    expect(at(day(4, DUSK))).toBeNull()
+    expect(at(day(5, DUSK))).toBe('gathering')
+    db.close()
   })
 })

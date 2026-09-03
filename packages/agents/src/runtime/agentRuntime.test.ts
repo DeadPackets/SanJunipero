@@ -2215,6 +2215,7 @@ describe('every turn row says what bought it', () => {
     'reconsider',
     'boredom',
     'morning',
+    'gathering',
   ]
 
   function bills(
