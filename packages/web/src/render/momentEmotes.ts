@@ -24,6 +24,10 @@ export const MOMENT_EMOTE_ABOVE_PX = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_
 /** Which pixel a moment wears. A heart for a bond gained, the crack for one lost, the lit bulb
  *  for anything the town worked out or wrote down, and the ember mark for a ruling it undid. */
 export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
+  // A death is mourned, not wounded; a birth is the family's; an arrival is a stranger's star.
+  agent_died: 'rain',
+  agent_born: 'heart',
+  agent_spawned: 'star',
   co_slept: 'heart',
   partnership_formed: 'heart',
   partnership_dissolved: 'anger',
@@ -33,6 +37,11 @@ export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
   law_broken: 'exclaim',
   law_repealed: 'exclaim',
 }
+
+/** A moment that happens to a BUILDING has nobody to rise off — `structure_completed` carries
+ *  the structure's id and no hand. Named here so the cue-and-pixel law stays total over every
+ *  moment that does happen to a person. */
+export const BODILESS_MOMENTS: ReadonlySet<string> = new Set(['structure_completed'])
 
 export function momentEmote(type: string): EmoteKind | null {
   return MOMENT_EMOTE[type] ?? null

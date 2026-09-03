@@ -29,20 +29,42 @@ const LAW_ICON: Readonly<Record<string, string>> = {
   law_repealed: 'quill',
 }
 
+/** A person appearing who was not born here. `chronicleLine` leaves `agent_spawned` out — the
+ *  founding is not news to the town — but a replay of the day somebody walked in is exactly that. */
+const ARRIVAL_TYPE = 'agent_spawned'
+
 /** Everything the stage says out loud. A custom is missing on purpose: the arbiter keeps customs
  *  as rows and emits no event for one, so nothing reaches this slot to print (see the report). */
 export const CUE_TYPES: readonly string[] = [
   'discovery_made',
+  // A death, a birth, a thing finished, a night kept, somebody arriving: the five a replay is
+  // most often OF. Every one of them already has a chronicle line, so this costs no new copy.
+  'agent_died',
+  'agent_born',
+  'structure_completed',
   'co_slept',
+  ARRIVAL_TYPE,
   ...Object.keys(LAW_LINES),
 ]
 
 export type StageCue = { text: string; icon: string; bodies: readonly string[] }
 
+/** The payload keys that always name a person. `id` is not one of them — on a finished
+ *  structure it names the building. */
+const PERSON_KEYS = ['agentId', 'byId', 'aId', 'bId', 'tenderId', 'motherId'] as const
+/** ...and the two events where `id` IS the person the moment is about. */
+const ID_IS_PERSON: ReadonlySet<string> = new Set(['agent_born', ARRIVAL_TYPE])
+
 /** Whose bodies this moment belongs to — the ones that bounce under it. */
 export function bodiesOf(ev: SimEvent): string[] {
-  const p = ev.payload as { agentId?: string; byId?: string; aId?: string; bId?: string }
-  return [p.agentId, p.byId, p.aId, p.bId].filter((v): v is string => typeof v === 'string')
+  const p = ev.payload as Record<string, unknown>
+  const keys = ID_IS_PERSON.has(ev.type) ? ['id', ...PERSON_KEYS] : PERSON_KEYS
+  const out: string[] = []
+  for (const k of keys) {
+    const v = p[k]
+    if (typeof v === 'string' && !out.includes(v)) out.push(v)
+  }
+  return out
 }
 
 export function cueFor(ev: SimEvent, state: Parameters<typeof chronicleLabel>[1]): StageCue | null {
@@ -53,6 +75,11 @@ export function cueFor(ev: SimEvent, state: Parameters<typeof chronicleLabel>[1]
     const p = ev.payload as Record<string, unknown>
     const who = agentName(state?.agents, bodies[0] ?? '')
     return { text: law(p, who), icon: LAW_ICON[ev.type] ?? 'quill', bodies }
+  }
+  if (ev.type === ARRIVAL_TYPE) {
+    const name = (ev.payload as { name?: unknown }).name
+    if (typeof name !== 'string' || name === '') return null
+    return { text: `${name} came to the town.`, icon: 'star', bodies }
   }
   const text = chronicleLabel(ev, state)
   return text === null ? null : { text, icon: chronicleIcon(ev.type), bodies }

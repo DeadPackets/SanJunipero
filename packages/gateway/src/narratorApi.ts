@@ -29,7 +29,7 @@ import {
 } from '@sj/shared/narratorSchema'
 // The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
 // SDK, which a free scripted stream may not import. This module's own imports are types only.
-import { stripFootnotes } from '@sj/narrator/chronicle'
+import { footnoteSeqs, stripFootnotes } from '@sj/narrator/chronicle'
 import { MYSTERY_BY_KIND } from '@sj/engine'
 import { readDiscoveries } from './discoveries.js'
 import type { Router } from './router.js'
@@ -184,15 +184,30 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     )
   })
 
-  // The `Seen:` footnotes are the narrator's own citation apparatus and a number leak to a
-  // reader. Stripped for display only — `footnoteSeqs` still reads them off the stored text.
+  /** The `Seen:` footnotes are the narrator's own citation apparatus and a number leak to a
+   *  reader, so the prose is served without them — and the mapping they carry is served beside
+   *  it, paragraph by paragraph, so a replay can caption itself in the narrator's own voice
+   *  rather than paying an LLM per view. `seen[i]` belongs to paragraph `i` of `text`. */
+  const chapterRead = (c: ChapterRow): ChapterRow & { seen: number[][] } => {
+    const paras = c.text
+      .split(/\n{2,}/)
+      .map((p) => ({ text: stripFootnotes(p), seen: footnoteSeqs(p) }))
+      .filter((p) => p.text !== '')
+    return {
+      day: c.day,
+      title: c.title,
+      text: paras.map((p) => p.text).join('\n\n'),
+      seen: paras.map((p) => p.seen),
+    }
+  }
+
   router.route('GET', '/api/chapters', (_req, res) => {
     sendJson(
       res,
       readOrEmpty<ChapterRow>(
         deps.narratorDb,
         'SELECT day, title, text FROM chapters ORDER BY day',
-      ).map((c) => ({ ...c, text: stripFootnotes(c.text) })),
+      ).map(chapterRead),
     )
   })
 

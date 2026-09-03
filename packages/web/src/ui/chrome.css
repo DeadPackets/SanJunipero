@@ -101,6 +101,9 @@
   /* The transport strip's own height, named because the cue and the title card both step over
      it and neither can measure a sibling: 44px of button in --s-3 of padding, plus a gap. */
   --transport-h: calc(44px + 2 * var(--s-3) + var(--s-4));
+  /* ...and the cue's own row above it, reserved so the narrator's plate never lands on the
+     town's own caption. Two lines of --f-1 at 1.4, plus the gap. */
+  --cue-h: calc(2 * 1.4 * var(--f-1) + var(--s-4));
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
@@ -2020,12 +2023,16 @@ body {
 /* The card stands in the cue's own slot, over the transport — and the two can never collide:
    the card goes down on the first thing that happens, which is the only thing that brings the
    cue up. The corners are all taken (help and thoughts bottom-left, the signpost bottom-right,
-   the stamp and the arc along the top), and a caption belongs on the centre line anyway. */
+   the stamp and the arc along the top), and a caption belongs on the centre line anyway.
+   Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
+   Ranged left, not centred: the plate carries a paragraph more often than a title. */
 .replay-card {
   position: absolute; z-index: 24; left: 50%; translate: -50% 0;
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
-  max-width: min(38ch, calc(100% - 2 * var(--mark-inset)));
-  text-align: center;
+  bottom: calc(
+    max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h) + var(--cue-h)
+  );
+  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  text-align: start;
   margin: 0; padding: var(--s-4) var(--s-5);
   pointer-events: none;
   background: var(--deep); box-shadow: var(--frame);
@@ -2046,6 +2053,15 @@ body {
 .replay-card-cast {
   margin: var(--s-2) 0 0;
   font-family: var(--font-body); font-size: var(--f-2); color: var(--cream-quiet);
+}
+/* The narrator's own paragraph, in the face the town's prose is set in — and ranged left,
+   because it is a paragraph and not a title. Three lines is the cap: past that the plate is
+   reading matter standing over the thing it is about. */
+.replay-card-prose {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-body); font-size: var(--f-2); line-height: 1.45;
+  text-align: start; text-wrap: pretty; color: var(--cream);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
 }
 
 /* The transport is a thing standing in the town, bottom-centre, as wide as its own controls. */

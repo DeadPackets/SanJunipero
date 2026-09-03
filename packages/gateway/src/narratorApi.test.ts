@@ -254,8 +254,8 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('reads the real chapters C7 wrote, prose and all', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([
-      { day: 0, title: 'The First Morning', text: 'They woke.' },
-      { day: 1, title: 'What the Fire Took', text: 'It burned.' },
+      { day: 0, title: 'The First Morning', text: 'They woke.', seen: [[]] },
+      { day: 1, title: 'What the Fire Took', text: 'It burned.', seen: [[]] },
     ])
   })
 
