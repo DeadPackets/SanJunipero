@@ -24,6 +24,7 @@ import {
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
   PROSE_MODEL,
+  PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
   RULING_MODEL,
   RULING_PROVIDER_ORDER,
@@ -955,7 +956,7 @@ describe('default OpenRouter path extraBody', () => {
     }
     expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
-    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: ['Inceptron'] })
+    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: PROSE_PROVIDER_ORDER })
     // The court is the one caller off the fleet's two models: what it writes is permanent.
     expect(body('arbiter')).toEqual({ models: [RULING_MODEL], order: RULING_PROVIDER_ORDER })
   })
