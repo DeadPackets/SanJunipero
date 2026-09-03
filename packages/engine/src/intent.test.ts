@@ -52,6 +52,26 @@ describe('submitIntent', () => {
     })
   })
 
+  // One tick of a 12-mind rehearsal died here: the seam spread the mind's whole answer into
+  // strict WalkParams, and `duration` threw before anything was recorded.
+  it('takes only the keys the legs read, however many the mind filled in', () => {
+    const s = makeWorld()
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', {
+      x: 3,
+      y: 0,
+      kind: 'north',
+      description: 'off to the mill',
+      recipe: 'bread',
+    })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.events[0]?.payload).toEqual({
+      agentId: 'a1',
+      verb: 'walk',
+      params: { x: 3, y: 0 },
+      duration: 1,
+    })
+  })
+
   it('debuffed duration is longer when hunger is 20', () => {
     let s = makeWorld()
     s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
