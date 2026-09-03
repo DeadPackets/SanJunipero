@@ -308,11 +308,12 @@ describe('verb: drop', () => {
       ok: false,
       reason: 'no such item',
     })
-    // One thing in the hands and no thing named is not a puzzle; empty hands still are.
+    // One thing in the hands and no thing named is not a puzzle. Empty hands are not one either:
+    // there is no word the mind could have written, so it is told what is missing, not to name it.
     expect(submitIntent(holding(), CFG, 'a1', 'drop', {}).ok).toBe(true)
     expect(submitIntent(makeWorld(), CFG, 'a1', 'drop', {})).toEqual({
       ok: false,
-      reason: 'setting a thing down needs the thing named',
+      reason: 'no such item',
     })
   })
 })

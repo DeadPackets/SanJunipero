@@ -1,7 +1,7 @@
 import type { SimConfig } from '@sj/shared'
 import type { Item, WorldState } from '../state.js'
 import { words } from './build.js'
-import { bodyAt, nearestWater, VERBS } from './index.js'
+import { asRead, bodyAt, nearestWater, VERBS } from './index.js'
 import { objectBindingFor } from './objectParam.js'
 
 function isBlank(raw: unknown): boolean {
@@ -30,7 +30,7 @@ export function markUnderAnotherKey(
   const { [from]: mark, ...rest } = params
   const fits = MARK_KEYS.filter((k) => k !== from)
     .map((k) => ({ ...rest, [k]: mark }))
-    .filter((p) => def.validate(state, config, agentId, p) === null)
+    .filter((p) => def.validate(state, config, agentId, asRead(def, p)) === null)
   return fits.length === 1 ? fits[0]! : null
 }
 
@@ -93,8 +93,13 @@ export function soleObstacle(
   const unknown = def.validate(state, config, agentId, { ...params, [spec.key]: NO_SUCH_MARK })
   // Naming anything at all left the same answer: this refusal was never about the missing name.
   if (unnamed === null || unnamed === unknown) return null
+  const marks = spec.candidates(state, agentId)
+  // Nothing the act could have named: what is absent is the answer, not a word to write. An act
+  // that parses as it stands was refused by the world — `drink` at a dry bank says so already.
+  const askedForTheName = def.params?.safeParse(params).success !== true
+  if (marks.length === 0) return askedForTheName ? unknown : null
   const standing = new Set<string>()
-  for (const id of spec.candidates(state, agentId)) {
+  for (const id of marks) {
     const why = def.validate(state, config, agentId, { ...params, [spec.key]: id })
     // Something fits: this act has a reading, and the readings above answer it, not this.
     if (why === null) return null
@@ -189,16 +194,20 @@ export function readAsPerson(
   verb: string,
   params: Record<string, unknown>,
 ): { params: Record<string, unknown> } | { refusal: string } | null {
+  const def = VERBS[verb]
   const p = withoutBlanks(params)
+  // A mark filed under a word this verb does not read is still a mark the mind named, so that
+  // one reading gets the whole answer; the rest are asked of the act as the verb reads it.
+  const only = def === undefined ? p : asRead(def, p)
   // What the mind named outranks what the world would have guessed: the id it gave is right
   // 152 times in 154, and only a mark that fits nowhere falls through to the readings below.
   const read =
     markUnderAnotherKey(state, config, agentId, verb, p) ??
-    kindNamedAsMark(state, config, agentId, verb, p) ??
-    waterNamedWrong(state, config, agentId, verb, p) ??
-    loneCandidateFor(state, config, agentId, verb, p)
+    kindNamedAsMark(state, config, agentId, verb, only) ??
+    waterNamedWrong(state, config, agentId, verb, only) ??
+    loneCandidateFor(state, config, agentId, verb, only)
   if (read !== null) return { params: read }
-  const asked = ambiguity(state, config, agentId, verb, p)
+  const asked = ambiguity(state, config, agentId, verb, only)
   if (asked !== null) return { refusal: asked }
   return Object.keys(p).length === Object.keys(params).length ? null : { params: p }
 }

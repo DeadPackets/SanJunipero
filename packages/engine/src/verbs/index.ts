@@ -173,10 +173,27 @@ export type VerbDef = {
    *  Every other property of an act lives on the act; this one used to live in a set of five
    *  names, which no verb the town invented could ever join. */
   needsLight?: boolean
+  /** The schema `validate` parses, kept on the verb so the intent seam can take an act down to
+   *  the keys this verb reads. Every one is strict, and a mind fills in more than it is asked. */
+  params?: z.ZodObject<z.ZodRawShape>
   /** The closed keys a minted verb's charter reads, carried so registration can bind its object
    *  the way the built-in rows do. Built-ins leave it absent: their rows are hand-tuned. */
   reads?: readonly ClosedKey[]
   rngStream?: string
+}
+
+/** The keys an act of this verb is read for, off the verb's own schema — or off a minted verb's
+ *  charter. Asked of the verb rather than written down, because a second list is one that drifts. */
+export function keysFor(def: VerbDef): readonly string[] | undefined {
+  return def.params === undefined ? def.reads : Object.keys(def.params.shape)
+}
+
+/** The act with the keys this verb never reads taken off. Every params schema is strict and a
+ *  mind answers wide, so the surplus refused acts in words that blamed the name they had written. */
+export function asRead(def: VerbDef, params: Record<string, unknown>): Record<string, unknown> {
+  const keys = keysFor(def)
+  if (keys === undefined) return params
+  return Object.fromEntries(Object.entries(params).filter(([key]) => keys.includes(key)))
 }
 
 // Every act says how long it takes, and says it in one of six words or works it out from the
@@ -601,6 +618,7 @@ export function approachFor(
 
 const walk: VerbDef = makeVerb({
   kind: 'walk',
+  params: WalkParams,
   validate(state, config, agentId, params) {
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
@@ -698,6 +716,7 @@ export const EnterParams = z.object({ structureId: z.string() }).strict()
 
 const enter: VerbDef = makeVerb({
   kind: 'enter',
+  params: EnterParams,
   takes: 'moment',
   validate(state, config, agentId, params) {
     const p = EnterParams.safeParse(params)
@@ -848,6 +867,7 @@ function swallowEvents(
 
 const eat: VerbDef = makeVerb({
   kind: 'eat',
+  params: EatParams,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
@@ -885,6 +905,7 @@ export const TendParams = z.object({ targetId: z.string(), itemId: z.string().op
 
 const tend: VerbDef = makeVerb({
   kind: 'tend',
+  params: TendParams,
   // An hour, not a scribble — which is what the three ticks here always meant to say.
   takes: 'hour',
   validate(state, config, agentId, params) {
@@ -960,6 +981,7 @@ export const DrinkParams = z.object({ itemId: z.string().optional() }).strict()
 
 const drink: VerbDef = makeVerb({
   kind: 'drink',
+  params: DrinkParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DrinkParams.safeParse(params)
@@ -994,6 +1016,7 @@ export const FillParams = z.object({ itemId: z.string() }).strict()
 
 const fill: VerbDef = makeVerb({
   kind: 'fill',
+  params: FillParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = FillParams.safeParse(params)
@@ -1024,6 +1047,7 @@ export function isWearable(config: SimConfig, kind: string): boolean {
 
 const wear: VerbDef = makeVerb({
   kind: 'wear',
+  params: WearParams,
   takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = WearParams.safeParse(params)
@@ -1102,6 +1126,7 @@ function heldLight(
 
 const kindle: VerbDef = makeVerb({
   kind: 'kindle',
+  params: KindleParams,
   takes: 'moment',
   validate(state, config, agentId, params) {
     const p = KindleParams.safeParse(params)
@@ -1127,6 +1152,7 @@ const kindle: VerbDef = makeVerb({
 
 const snuff: VerbDef = makeVerb({
   kind: 'snuff',
+  params: KindleParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = KindleParams.safeParse(params)
@@ -1167,6 +1193,7 @@ export function isRoofedFire(config: SimConfig, kind: string): boolean {
 
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
+  params: StokeParams,
   takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
@@ -1225,6 +1252,7 @@ export function skillLevel(
 
 const till: VerbDef = makeVerb({
   kind: 'till',
+  params: TileParams,
   needsLight: true,
   takes: 'half_hour',
   validate(state, _config, agentId, params) {
@@ -1262,6 +1290,7 @@ const till: VerbDef = makeVerb({
 // or from what has already been cut, which is why irrigation is a project and not a wish.
 const digChannel: VerbDef = makeVerb({
   kind: 'dig_channel',
+  params: TileParams,
   needsLight: true,
   // Slower than scratching a furrow: a spade's worth of effort against the till beside it.
   takes: 'hour',
@@ -1304,6 +1333,7 @@ const digChannel: VerbDef = makeVerb({
 
 const plant: VerbDef = makeVerb({
   kind: 'plant',
+  params: PlantParams,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = PlantParams.safeParse(params)
@@ -1331,6 +1361,7 @@ const plant: VerbDef = makeVerb({
 
 const harvest: VerbDef = makeVerb({
   kind: 'harvest',
+  params: HarvestParams,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = HarvestParams.safeParse(params)
@@ -1407,6 +1438,7 @@ export function fishCatchChance(
 
 const fish: VerbDef = makeVerb({
   kind: 'fish',
+  params: TileParams,
   takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
@@ -1482,6 +1514,7 @@ export function huntChance(
 
 const hunt: VerbDef = makeVerb({
   kind: 'hunt',
+  params: HuntParams,
   // The strike, not the stalk: this verb asks the animal to be at your side already, and fauna
   // flee every fauna.movePeriodTicks. Anything longer is a hunt no body could ever land.
   takes: 'moment',
@@ -1540,6 +1573,7 @@ export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
 
 const forage: VerbDef = makeVerb({
   kind: 'forage',
+  params: ForageParams,
   takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = ForageParams.safeParse(params)
@@ -1643,6 +1677,7 @@ export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
 const build: VerbDef = makeVerb({
   kind: 'build',
+  params: BuildParams,
   needsLight: true,
   validate(state, config, agentId, params) {
     const kind = (params as { kind?: unknown }).kind
@@ -1803,6 +1838,7 @@ function chosenRoute(
 
 const craft: VerbDef = makeVerb({
   kind: 'craft',
+  params: CraftParams,
   needsLight: true,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
@@ -1851,6 +1887,7 @@ const craft: VerbDef = makeVerb({
 
 const extinguish: VerbDef = makeVerb({
   kind: 'extinguish',
+  params: ExtinguishParams,
   takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ExtinguishParams.safeParse(params)
@@ -1873,6 +1910,7 @@ export const STONE_KIND = 'stone'
 // A road is not something the map has; it is something somebody carried stone for.
 const pave: VerbDef = makeVerb({
   kind: 'pave',
+  params: TileParams,
   needsLight: true,
   duration: (_state, config) => config.roads.paveDurationTicks,
   validate(state, config, agentId, params) {
@@ -1913,6 +1951,7 @@ export const TIMBER_PER_TREE = 2
 
 const chop: VerbDef = makeVerb({
   kind: 'chop',
+  params: TileParams,
   duration(state, _config, _agentId, params) {
     const p = TileParams.parse(params)
     return tileAt(state, p.x, p.y) === T_FOREST ? FELL_TICKS : CLEAR_TICKS
@@ -1970,6 +2009,7 @@ function heldBuckets(state: WorldState, agentId: string) {
 // bucket line is a thing the town has to organise for itself.
 const douse: VerbDef = makeVerb({
   kind: 'douse',
+  params: DouseParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DouseParams.safeParse(params)
@@ -2041,6 +2081,7 @@ const spoken = (
 
 const speak: VerbDef = makeVerb({
   kind: 'speak',
+  params: SpeakParams,
   takes: 'moment',
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
@@ -2061,6 +2102,7 @@ const speak: VerbDef = makeVerb({
 
 const give: VerbDef = makeVerb({
   kind: 'give',
+  params: GiveParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = GiveParams.safeParse(params)
@@ -2138,6 +2180,7 @@ function liftEvents(
 
 const take: VerbDef = makeVerb({
   kind: 'take',
+  params: TakeParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
@@ -2162,6 +2205,7 @@ const take: VerbDef = makeVerb({
 // untouched — setting a thing down is not parting with it.
 const drop: VerbDef = makeVerb({
   kind: 'drop',
+  params: DropParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DropParams.safeParse(params)
@@ -2191,6 +2235,7 @@ export const StowParams = z.object({ itemId: z.string(), structureId: z.string()
 
 const stow: VerbDef = makeVerb({
   kind: 'stow',
+  params: StowParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = StowParams.safeParse(params)
@@ -2234,6 +2279,7 @@ export const InscribeParams = z
 // Writing on something nobody can pocket, and carving is not scribbling.
 const inscribe: VerbDef = makeVerb({
   kind: 'inscribe',
+  params: InscribeParams,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     if (!config.inscription.enabled) return 'your hands find no way to mark this'
@@ -2262,6 +2308,7 @@ const inscribe: VerbDef = makeVerb({
 
 const write: VerbDef = makeVerb({
   kind: 'write',
+  params: WriteParams,
   takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = WriteParams.safeParse(params)
@@ -2299,6 +2346,7 @@ const write: VerbDef = makeVerb({
 
 const read: VerbDef = makeVerb({
   kind: 'read',
+  params: ReadParams,
   takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ReadParams.safeParse(params)
@@ -2320,6 +2368,7 @@ const read: VerbDef = makeVerb({
 
 const teach: VerbDef = makeVerb({
   kind: 'teach',
+  params: TeachParams,
   takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = TeachParams.safeParse(params)
@@ -2356,6 +2405,7 @@ const INJURY_SEVERITY: Readonly<Record<'minor' | 'serious' | 'grave', number>> =
 
 const attack: VerbDef = makeVerb({
   kind: 'attack',
+  params: AttackParams,
   takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = AttackParams.safeParse(params)
