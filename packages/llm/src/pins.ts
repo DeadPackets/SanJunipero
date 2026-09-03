@@ -16,9 +16,9 @@ export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
 // The fleet's second model. GLM only earns its premium where a mind must NAME what it acts on;
 // DeepSeek wrote the best prose of the three, and a text-only caller cannot emit a blank act.
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
-// Baidu lost the slot 2026-08-31: it tripled list price to parity and its shared-pool quota
-// 429'd 95% of structured calls at Beijing peak; Inceptron probed 84/84 answered, p95 1.75s.
-export const PROSE_PROVIDER_ORDER: string[] = ['Inceptron']
+// A list of one name has nowhere to fall, and Inceptron alone refused 67% of scene closes over
+// 3 sim-days. DeepInfra leads on the same model: $0.0882/M against $0.1402, 474 calls against 38.
+export const PROSE_PROVIDER_ORDER: string[] = ['DeepInfra', 'Inceptron']
 // A ruling is permanent, so the court buys the model that reads one best: over 12 of world two's
 // rulings it agreed 32/36, where GLM took 25/33 and DeepSeek v4-pro 26/36. No dated snapshot.
 export const RULING_MODEL = 'openai/gpt-5.6-luna' as const
@@ -35,7 +35,8 @@ export const RULING_CALLERS: readonly string[] = ['arbiter', 'council', 'law.com
 export const FALLBACK_MODELS: string[] = []
 // A gist emits no act and no schema, so the ban above does not reach it: on three live rows
 // DeepInfra kept 4/4 marks with none invented, at 0.08/0.18 against Inceptron's 0.13/0.28.
-export const GIST_PROVIDER_ORDER: string[] = ['DeepInfra']
+// Inceptron second for depth only — 63 gists were lost to a one-name list with nowhere to fall.
+export const GIST_PROVIDER_ORDER: string[] = ['DeepInfra', 'Inceptron']
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
