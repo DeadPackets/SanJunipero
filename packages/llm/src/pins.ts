@@ -18,7 +18,11 @@ export const PROVIDER_ORDER: string[] = ['Wafer', 'DeepInfra']
 export const PROSE_MODEL = 'deepseek/deepseek-v4-flash-0731' as const
 // A list of one name has nowhere to fall, and Inceptron alone refused 67% of scene closes over
 // 3 sim-days. DeepInfra leads on the same model: $0.0882/M against $0.1402, 474 calls against 38.
-export const PROSE_PROVIDER_ORDER: string[] = ['DeepInfra', 'Inceptron']
+// Two names were not depth enough either: on 2026-09-03 both were down at once — DeepInfra 0/6
+// and Inceptron 1/6 at a 7.5 s median, probed with a real json_schema call at concurrency 6 —
+// and the chronicle wrote nothing on either of two rehearsal days. Baidu and Morph took 6/6 and
+// 5/6 in the same probe and neither is on the act-emitting ban list above.
+export const PROSE_PROVIDER_ORDER: string[] = ['DeepInfra', 'Baidu', 'Morph', 'Inceptron']
 // A ruling is permanent, so the court buys the model that reads one best: over 12 of world two's
 // rulings it agreed 32/36, where GLM took 25/33 and DeepSeek v4-pro 26/36. No dated snapshot.
 export const RULING_MODEL = 'openai/gpt-5.6-luna' as const
@@ -36,24 +40,35 @@ export const FALLBACK_MODELS: string[] = []
 // A gist emits no act and no schema, so the ban above does not reach it: on three live rows
 // DeepInfra kept 4/4 marks with none invented, at 0.08/0.18 against Inceptron's 0.13/0.28.
 // Inceptron second for depth only — 63 gists were lost to a one-name list with nowhere to fall.
-export const GIST_PROVIDER_ORDER: string[] = ['DeepInfra', 'Inceptron']
+export const GIST_PROVIDER_ORDER: string[] = ['DeepInfra', 'Baidu', 'Morph', 'Inceptron']
 
 export type ModelPrices = { input: number; output: number; cacheRead: number }
 
-// $/M tokens. The price depends on WHO served the call, so the table is keyed by that and
-// not by the model alone — two back ends for this one model differ 3x.
-export const PRICE_PER_M_BY_PROVIDER: Record<string, ModelPrices> = {
+/** One route: the model AND the back end that served it. Both together, because a provider
+ *  charges a different price for each fleet model — DeepInfra is 0.075/0.25 on the mind model
+ *  and 0.080/0.180 on prose, and keying by the name alone booked prose at the mind's rate. */
+const route = (model: string, provider: string): string => `${model}@${provider}`
+
+// $/M tokens by route. Read from /api/v1/models/{slug}/endpoints on 2026-09-03 except where a
+// row names its own bill; a cacheRead nobody publishes is taken at the fleet's 0.2x of input,
+// which over-books rather than under-books.
+export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   // Wafer's GLM tier, measured against its own bill: the $0.075 list tier refuses json_schema.
   // Re-reconciled 2026-09-03: reported/estimated ran 0.668 over 502 calls while DeepInfra ran
   // 0.99, so the old row over-booked Wafer by half and raised 1,232 price-divergence alerts.
-  Wafer: { input: 0.1, output: 0.35, cacheRead: 0.02 },
-  Inceptron: { input: 0.13, output: 0.28, cacheRead: 0.03 },
-  // Off the allow-list since providers2 (2026-08-30); the row stays so old ledger rows price.
-  AtlasCloud: { input: 0.44, output: 1.32, cacheRead: 0.028 },
-  // Tripled overnight 2026-08-31 (was 0.04494/0.08988/0.008988); confirmed against a real bill.
-  Baidu: { input: 0.14, output: 0.28, cacheRead: 0.028 },
-  StreamLake: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
-  DeepInfra: { input: 0.075, output: 0.25, cacheRead: 0.016 },
+  [route(MIND_MODEL, 'Wafer')]: { input: 0.1, output: 0.35, cacheRead: 0.02 },
+  [route(MIND_MODEL, 'DeepInfra')]: { input: 0.075, output: 0.25, cacheRead: 0.016 },
+  [route(PROSE_MODEL, 'DeepInfra')]: { input: 0.08, output: 0.18, cacheRead: 0.016 },
+  [route(PROSE_MODEL, 'Inceptron')]: { input: 0.13, output: 0.28, cacheRead: 0.03 },
+  [route(PROSE_MODEL, 'Baidu')]: { input: 0.065, output: 0.1299, cacheRead: 0.013 },
+  // The same back end on the other fleet model, at more than twice the price. Dropped from the
+  // mind path, kept so old ledger rows still reconcile; it tripled overnight 2026-08-31 (was
+  // 0.04494/0.08988/0.008988) and that was confirmed against a real bill.
+  [route(MIND_MODEL, 'Baidu')]: { input: 0.14, output: 0.28, cacheRead: 0.028 },
+  [route(PROSE_MODEL, 'Morph')]: { input: 0.0987, output: 0.278, cacheRead: 0.0198 },
+  // Off the allow-list since providers2 (2026-08-30); the rows stay so old ledger rows price.
+  [route(PROSE_MODEL, 'AtlasCloud')]: { input: 0.44, output: 1.32, cacheRead: 0.028 },
+  [route(PROSE_MODEL, 'StreamLake')]: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
 }
 
 // The per-component maximum over every endpoint the ledger has ever routed to, peak legs
@@ -62,7 +77,7 @@ export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cac
 
 // The pinned route's real price. Kept as the name the rest of the tree imports, and derived
 // from the order rather than named, so a flip cannot leave the estimator quoting the old home.
-export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_PROVIDER[PROVIDER_ORDER[0]!]!
+export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_ROUTE[route(MIND_MODEL, PROVIDER_ORDER[0]!)]!
 
 // Keyed by the model where the model, not the back end, is what sets the price: a fallback that
 // answered, and the single-homed ruling model. An unlisted model books at the ceiling.
@@ -84,8 +99,8 @@ export function pricesFor(
   provider: string | null | undefined,
 ): PriceLookup {
   const servedPinnedModel = model === undefined || PINNED_MODELS.includes(model)
-  if (servedPinnedModel && provider != null) {
-    const row = PRICE_PER_M_BY_PROVIDER[provider]
+  if (servedPinnedModel && provider != null && model !== undefined) {
+    const row = PRICE_PER_M_BY_ROUTE[route(model, provider)]
     if (row !== undefined) return { prices: row, source: 'provider' }
   }
   if (model !== undefined) {

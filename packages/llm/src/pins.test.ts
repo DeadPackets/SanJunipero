@@ -7,7 +7,7 @@ import {
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
   PRICE_PER_M,
-  PRICE_PER_M_BY_PROVIDER,
+  PRICE_PER_M_BY_ROUTE,
   PROSE_MODEL,
   PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
@@ -23,22 +23,27 @@ import {
 it('pins are concrete', () => {
   expect(MIND_MODEL).toBe('z-ai/glm-5.3-flash')
   expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
-  expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra', 'Inceptron'])
-  // Dropped from the call path, kept in the price table: old ledger rows still reconcile against it.
-  expect(PRICE_PER_M_BY_PROVIDER.Baidu).toBeDefined()
+  expect(GIST_PROVIDER_ORDER).toEqual(['DeepInfra', 'Baidu', 'Morph', 'Inceptron'])
+  // Dropped from the MIND path, kept in the price table: old ledger rows still reconcile.
+  expect(PRICE_PER_M_BY_ROUTE[`${MIND_MODEL}@Baidu`]).toBeDefined()
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of
   // glm-5.3-flash, only the bare id and a `:batch` variant, so there is no date to pin to.
   for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
   expect(PRICE_PER_M).toEqual({ input: 0.1, output: 0.35, cacheRead: 0.02 })
 })
 
-it('every allowed provider is priced, and the first is what PRICE_PER_M reports', () => {
-  for (const name of PROVIDER_ORDER) expect(PRICE_PER_M_BY_PROVIDER[name], name).toBeDefined()
-  expect(PRICE_PER_M_BY_PROVIDER[PROVIDER_ORDER[0]!]).toEqual(PRICE_PER_M)
+// Priced ON THE MODEL IT SERVES: adding a name to an order without a row for that model is how
+// a prose call comes to be booked at the mind model's rate, or at the ceiling.
+it('every allowed provider is priced on the model it serves, and the first is PRICE_PER_M', () => {
+  for (const name of PROVIDER_ORDER)
+    expect(PRICE_PER_M_BY_ROUTE[`${MIND_MODEL}@${name}`], `${MIND_MODEL}@${name}`).toBeDefined()
+  for (const name of [...PROSE_PROVIDER_ORDER, ...GIST_PROVIDER_ORDER])
+    expect(PRICE_PER_M_BY_ROUTE[`${PROSE_MODEL}@${name}`], `${PROSE_MODEL}@${name}`).toBeDefined()
+  expect(PRICE_PER_M_BY_ROUTE[`${MIND_MODEL}@${PROVIDER_ORDER[0]!}`]).toEqual(PRICE_PER_M)
 })
 
 it('the ceiling is at least as expensive as every priced provider', () => {
-  for (const [name, p] of Object.entries(PRICE_PER_M_BY_PROVIDER)) {
+  for (const [name, p] of Object.entries(PRICE_PER_M_BY_ROUTE)) {
     expect(CEILING_PRICE_PER_M.input, name).toBeGreaterThanOrEqual(p.input)
     expect(CEILING_PRICE_PER_M.output, name).toBeGreaterThanOrEqual(p.output)
     expect(CEILING_PRICE_PER_M.cacheRead, name).toBeGreaterThanOrEqual(p.cacheRead)
@@ -47,17 +52,32 @@ it('the ceiling is at least as expensive as every priced provider', () => {
 
 it('prices the pinned model by who served it', () => {
   expect(pricesFor(MIND_MODEL, 'Wafer')).toEqual({
-    prices: PRICE_PER_M_BY_PROVIDER.Wafer,
+    prices: PRICE_PER_M_BY_ROUTE[`${MIND_MODEL}@Wafer`],
     source: 'provider',
   })
   expect(pricesFor(MIND_MODEL, 'Baidu')).toEqual({
-    prices: PRICE_PER_M_BY_PROVIDER.Baidu,
+    prices: PRICE_PER_M_BY_ROUTE[`${MIND_MODEL}@Baidu`],
     source: 'provider',
   })
   // Two back ends for one model at prices that differ 3x. A model-keyed table cannot say this.
-  expect(PRICE_PER_M_BY_PROVIDER.AtlasCloud!.input).toBeGreaterThan(
-    PRICE_PER_M_BY_PROVIDER.Inceptron!.input * 3,
+  expect(PRICE_PER_M_BY_ROUTE[`${PROSE_MODEL}@AtlasCloud`]!.input).toBeGreaterThan(
+    PRICE_PER_M_BY_ROUTE[`${PROSE_MODEL}@Inceptron`]!.input * 3,
   )
+})
+
+// ★ And the other half, which the provider-keyed table could not say either: ONE back end on
+// TWO models. DeepInfra charges 0.075/0.25 for a mind's turn and 0.080/0.180 for prose, so
+// every prose call it served was booked at the mind model's rate — output over, input under.
+it('★ prices one back end differently on each fleet model', () => {
+  const mind = pricesFor(MIND_MODEL, 'DeepInfra')
+  const prose = pricesFor(PROSE_MODEL, 'DeepInfra')
+  expect(mind.source).toBe('provider')
+  expect(prose.source).toBe('provider')
+  expect(mind.prices).toEqual({ input: 0.075, output: 0.25, cacheRead: 0.016 })
+  expect(prose.prices).toEqual({ input: 0.08, output: 0.18, cacheRead: 0.016 })
+  expect(mind.prices, 'a name alone cannot price a call').not.toEqual(prose.prices)
+  // A back end priced on one model says nothing about it on the other: the ceiling answers.
+  expect(pricesFor(MIND_MODEL, 'Morph').source).toBe('ceiling')
 })
 
 it('an unpriced or unattributed route books at the ceiling, never at the pinned rate', () => {
