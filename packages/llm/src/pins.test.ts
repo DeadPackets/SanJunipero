@@ -326,10 +326,14 @@ it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh'
   vi.resetModules()
   try {
     const luna = await import('./pins.js')
-    for (const caller of ['turn', 'scene', 'reflection.gist', 'narrator', 'nobody']) {
+    for (const caller of ['turn', 'scene', 'reflection', 'narrator', 'nobody']) {
       expect(luna.modelFor(caller)).toBe(RULING_MODEL)
       expect(luna.callSettingsFor(caller).providerOrder).toEqual(RULING_PROVIDER_ORDER)
       expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'xhigh' })
+    }
+    for (const caller of ['reflection.gist', 'scene.close', 'semantic']) {
+      expect(luna.modelFor(caller)).toBe(RULING_MODEL)
+      expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'minimal' })
     }
     expect(luna.callSettingsFor('arbiter').reasoning).toEqual({ effort: 'xhigh' })
     expect(luna.callSettingsFor('scene').maxOutputTokens).toBe(300 + 6000)

@@ -264,6 +264,16 @@ const LUNA_OUTPUT_ROOM = 6000
 // A ruling at max reasoning spent 9,000 tokens thinking and hit a 10,000 ceiling twice in r21.
 const LUNA_RULING_ROOM = 24_000
 const LUNA_RAIL_FACTOR = 15
+// Callers that only restate what they are handed: a gist reasoned for 2,100 tokens to write
+// 300 in r21 and was a third of the whole bill. Nothing here decides anything.
+const LUNA_NO_THOUGHT: readonly string[] = [
+  'reflection.gist',
+  'scene.close',
+  'semantic',
+  'constructs',
+  'naming',
+  'voice',
+]
 
 function onLuna(caller: string, pinned: CallSettings): CallSettings {
   const ruling = RULING_CALLERS.includes(caller)
@@ -271,7 +281,7 @@ function onLuna(caller: string, pinned: CallSettings): CallSettings {
     ...pinned,
     model: RULING_MODEL,
     providerOrder: RULING_PROVIDER_ORDER,
-    reasoning: { effort: 'xhigh' },
+    reasoning: { effort: LUNA_NO_THOUGHT.includes(caller) ? 'minimal' : 'xhigh' },
     maxOutputTokens:
       (pinned.maxOutputTokens ?? 2000) + (ruling ? LUNA_RULING_ROOM : LUNA_OUTPUT_ROOM),
     minTimeoutMs: Math.max(pinned.minTimeoutMs ?? 0, 90_000),
