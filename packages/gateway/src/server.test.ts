@@ -263,7 +263,7 @@ describe('what a stranger cannot do to the town', () => {
     })
     sock.write('GET //x:99999/ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n')
     expect(await reply).toContain('400')
-    expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
+    expect((await fetch(`http://127.0.0.1:${gw.port}/api/society`)).status).toBe(200)
   }, 20000)
 
   // Pre-fix this leaves an unhandled 'error' — the run fails on that, not on an expectation.
@@ -278,7 +278,7 @@ describe('what a stranger cannot do to the town', () => {
       refused.send('x'.repeat(8192)) // twice the 4 KB frame cap
     })
     await wait(300)
-    expect((await fetch(`http://127.0.0.1:${gw.port}/api/heat`)).status).toBe(200)
+    expect((await fetch(`http://127.0.0.1:${gw.port}/api/society`)).status).toBe(200)
   }, 20000)
 
   it('★ answers one `live` per scrub window, not one full snapshot per 40-byte frame', async () => {
@@ -291,5 +291,129 @@ describe('what a stranger cannot do to the town', () => {
     for (let i = 0; i < 20; i++) sock.send(JSON.stringify({ t: 'live' }))
     await wait(200)
     expect(frames.filter((f) => f.includes('"t":"snapshot"'))).toHaveLength(1)
+  }, 20000)
+})
+
+/** The camera's own frame, off the same groups the deltas ride. */
+describe('★ the director frame', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwdir-'))
+  const open: (WebSocket | Gateway)[] = []
+  afterAll(async () => {
+    for (const o of open) {
+      if (o instanceof WebSocket) o.close()
+      else await o.close()
+    }
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('broadcasts a cut when the answer moves, holds it while it does not, and greets with it', async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('director-test'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['yusuf', 'Yusuf'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 2) {
+          emit('scene_opened', {
+            id: 'scene_2_abcd1234',
+            kind: 'quarrel',
+            participants: ['nadia', 'yusuf'],
+            topic: 'Six planks.',
+            stakes: 8,
+          })
+        }
+      },
+    })
+    loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    // The town opens the scene after the gateway is watching, which is the live path.
+    loop.step()
+    loop.step()
+    gw.pump()
+    await wait(80)
+    const cuts = frames.map((f) => ServerMsg.parse(JSON.parse(f))).filter((m) => m.t === 'director')
+    expect(cuts).toHaveLength(1)
+    expect(cuts[0]!.cut?.sceneId).toBe('scene_2_abcd1234')
+    expect(cuts[0]!.cut?.agentIds).toEqual(['nadia', 'yusuf'])
+    expect(cuts[0]!.cut?.why).toBe('Nadia & Yusuf — falling out')
+
+    // Nothing has changed, so nothing is sent again.
+    frames.length = 0
+    gw.pump()
+    gw.pump()
+    await wait(80)
+    expect(frames.filter((f) => f.includes('"t":"director"'))).toEqual([])
+
+    // A late joiner is handed the shot the town is already on, right after its snapshot.
+    const late = await connect(gw.port)
+    open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(80)
+    const greeted = lateFrames
+      .map((f) => ServerMsg.parse(JSON.parse(f)))
+      .filter((m) => m.t === 'director')
+    expect(greeted).toHaveLength(1)
+    expect(greeted[0]!.cut?.sceneId).toBe('scene_2_abcd1234')
+  }, 20000)
+
+  it('sends no cut into a replay — a moment’s own cast owns that camera', async () => {
+    const dbPath = join(dir, 'replay.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('director-replay'),
+      snapshotEveryTicks: 5,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', { id: 'nadia', name: 'Nadia', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        if (tick === 2)
+          emit('scene_opened', {
+            id: 'scene_2_deadbeef',
+            kind: 'talk',
+            participants: ['nadia'],
+            topic: null,
+            stakes: 5,
+          })
+      },
+    })
+    for (let i = 0; i < 10; i++) loop.step()
+    const gw = await createGateway({
+      dbPath,
+      port: 0,
+      terrain: GRASS,
+      pollMs: 3_600_000,
+      db,
+      replayMsPerTick: 1,
+    })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    await hello(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    sock.send(JSON.stringify({ t: 'replay', from: 1, reqId: 1 }))
+    await wait(50)
+    for (let i = 0; i < 6; i++) gw.pump()
+    await wait(80)
+    expect(frames.filter((f) => f.includes('"t":"director"'))).toEqual([])
   }, 20000)
 })

@@ -11,6 +11,7 @@ import {
   PROSE_MODEL,
   PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
+  RAIL_FLOOR_USD,
   RULING_CALLERS,
   RULING_MODEL,
   RULING_PROVIDER_ORDER,
@@ -231,14 +232,17 @@ it('★ the turn ceiling clears a full twelve-step plan in the closed grammar', 
 // latency and 6x under DeepSeek's price.
 it('★ the three callers that write something permanent share one pin', () => {
   const court = callSettingsFor('arbiter')
-  expect(court).toEqual({
+  expect(court).toMatchObject({
     model: RULING_MODEL,
     providerOrder: RULING_PROVIDER_ORDER,
     reasoning: { effort: 'low' },
     maxOutputTokens: 4000,
   })
+  // The rails differ by what each of the three was measured spending; the route does not.
   for (const caller of RULING_CALLERS) {
-    expect(callSettingsFor(caller), caller).toEqual(court)
+    const { dailyUsd: _rail, ...route } = callSettingsFor(caller)
+    const { dailyUsd: _courtRail, ...courtRoute } = court
+    expect(route, caller).toEqual(courtRoute)
     expect(modelFor(caller), caller).toBe(RULING_MODEL)
   }
   expect([...RULING_CALLERS]).toEqual(['arbiter', 'council', 'law.compile'])
@@ -290,6 +294,7 @@ it('★ constructs answers without thinking, under a 500-token ceiling', () => {
     providerOrder: PROSE_PROVIDER_ORDER,
     reasoning: { enabled: false },
     maxOutputTokens: 500,
+    dailyUsd: RAIL_FLOOR_USD,
   })
 })
 

@@ -9,7 +9,6 @@ import Database from 'better-sqlite3'
 import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
-import { HEAT_HORIZON_TICKS, HEAT_WINDOW_TICKS } from './heat.js'
 import { mountDataApi, type Footprint } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 import type { RouteHandler } from './router.js'
@@ -129,10 +128,7 @@ describe('★ the read path holds answers, not the log', () => {
 
     const bodies = new Map<string, string>()
     const warm = (): void => {
-      for (const [key, url] of [
-        ['GET /api/society', '/api/society'],
-        ['GET /api/heat', '/api/heat'],
-      ] as [string, string][]) {
+      for (const [key, url] of [['GET /api/society', '/api/society']] as [string, string][]) {
         let body = ''
         routes.get(key)!(
           { url } as IncomingMessage,
@@ -172,26 +168,8 @@ describe('★ the read path holds answers, not the log', () => {
       nodes: unknown[]
       links: unknown[]
     }
-    const heat = JSON.parse(bodies.get('GET /api/heat')!) as { fromTick: number }[]
     expect(society.nodes).toHaveLength(AGENTS)
     expect(society.links.length, 'a town this loud has talk and give links').toBeGreaterThan(100)
-    expect(heat.length, 'and drama in most of its recent 60-tick windows').toBeGreaterThan(100)
-
-    // What is SENT is the last sim-day, so the body is bounded by the population and not by the
-    // town's age — and so is the map behind it, which `readFold` prunes to the same horizon.
-    const oldest = Math.min(...heat.map((w) => w.fromTick))
-    const live = mirror.state().tick
-    expect(oldest, 'nothing older than the horizon is sent').toBeGreaterThanOrEqual(
-      live - HEAT_HORIZON_TICKS - HEAT_WINDOW_TICKS,
-    )
-    expect(
-      heat.length,
-      'one window per agent per 60 ticks of the horizon, at most',
-    ).toBeLessThanOrEqual(Math.ceil(HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 1) * AGENTS)
-    expect(
-      f.heat,
-      '★ the MAP is pruned to the horizon it serves, not kept for the life of the process',
-    ).toBeLessThanOrEqual((HEAT_HORIZON_TICKS / HEAT_WINDOW_TICKS + 2) * AGENTS)
 
     // ── the property: what is retained counts ANSWERS, never events ────────────────────────
     expect(
@@ -200,9 +178,6 @@ describe('★ the read path holds answers, not the log', () => {
     ).toBeLessThan(4 * (20 + 2))
     expect(f.started, 'one entry per speaker per linking verb').toBeLessThanOrEqual(AGENTS * 3)
     expect(f.links, 'one entry per ordered pair per kind').toBeLessThanOrEqual(AGENTS * AGENTS * 4)
-    expect(f.heat, 'one entry per 60-tick window per agent in it').toBeLessThanOrEqual(
-      Math.ceil(mirror.state().tick / 60 + 1) * AGENTS,
-    )
 
     // ── and the heap agrees ────────────────────────────────────────────────────────────────
     expect(

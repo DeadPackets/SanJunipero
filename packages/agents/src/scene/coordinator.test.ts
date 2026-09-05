@@ -711,6 +711,72 @@ describe('the night is a time of day, not an ending', () => {
   })
 })
 
+describe('a talk that turns says so, once', () => {
+  const GRUDGE: TieDelta[] = [
+    { agentId: NADIA, personId: OMAR, kind: 'grudge', text: 'He never brought the planks.' },
+  ]
+
+  it('opens a quarrel at what a quarrel is worth, with the open tie counted', () => {
+    const h = harness({ ties: { [NADIA]: GRUDGE } })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(scene?.kind).toBe('quarrel')
+    // 7 for the kind, one more for the grudge standing between the two of them
+    expect(scene?.stakes).toBe(8)
+    h.loop.step()
+    const opened = sceneEvents(h.engineDb).find((e) => e.type === 'scene_opened')
+    expect((opened!.payload as { stakes: number }).stakes).toBe(8)
+    expect(sceneEvents(h.engineDb).filter((e) => e.type === 'scene_turned')).toHaveLength(0)
+  })
+
+  it('announces the turn when a talk becomes a council, and never twice for the same fact', async () => {
+    const PROPOSAL = 'From now on nobody takes planks without asking.'
+    const h = harness({
+      script: (id) => (_ask, nth) =>
+        fromCorpus(nth, { speech: id === OMAR && nth === 0 ? PROPOSAL : 'Mm.', leave: false }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'The planks again.', NOON)
+    await h.coordinator.takeFloor(OMAR, NOON)
+    await h.coordinator.takeFloor(NADIA, NOON + 1)
+    await h.coordinator.takeFloor(OMAR, NOON + 2)
+    h.loop.step()
+
+    const turns = sceneEvents(h.engineDb).filter((e) => e.type === 'scene_turned')
+    expect(turns.length, 'one turn, however many lines follow it').toBe(1)
+    expect(turns[0]!.payload).toMatchObject({ kind: 'council', stakes: 8 })
+    expect(h.coordinator.open()[0]?.stakes).toBe(8)
+  })
+
+  it('announces the turn when a third voice joins the talk', async () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: SALMA, name: 'Salma', x: 5 },
+      ],
+      script: (id) => (_ask, nth) =>
+        fromCorpus(nth, { to: id === OMAR && nth === 0 ? 'Salma' : null, leave: false }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(h.coordinator.open()[0]!.audience).toContain(SALMA)
+    await h.coordinator.takeFloor(OMAR, NOON)
+    h.loop.step()
+    const turns = sceneEvents(h.engineDb).filter((e) => e.type === 'scene_turned')
+    expect(turns.length).toBeGreaterThan(0)
+    expect((turns[turns.length - 1]!.payload as { participants: string[] }).participants).toContain(
+      SALMA,
+    )
+  })
+
+  it('carries the cast on the closing frame, so the paper knows who was in it', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON)
+    h.loop.step()
+    const closed = sceneEvents(h.engineDb).find((e) => e.type === 'scene_closed')
+    expect((closed!.payload as { participants: string[] }).participants).toEqual([NADIA, OMAR])
+  })
+})
+
 describe('a quarrel needs a tie', () => {
   const GRUDGE: TieDelta[] = [
     { agentId: NADIA, personId: OMAR, kind: 'grudge', text: 'He never brought the planks.' },

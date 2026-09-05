@@ -1,6 +1,7 @@
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M, modelFor } from './pins.js'
 export {
   migrateLlmTables,
+  alertsSince,
   insertAlert,
   insertLlmCall,
   insertTurnOutcome,

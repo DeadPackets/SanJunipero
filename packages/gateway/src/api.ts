@@ -3,15 +3,6 @@ import Database from 'better-sqlite3'
 import { agentName, type LawRow, type SimConfig, type SimEvent } from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
-import {
-  HEAT_HORIZON_TICKS,
-  HEAT_WINDOW_TICKS,
-  heatContext,
-  heatFromScores,
-  heatSince,
-  scoreEvent,
-  type HeatScores,
-} from './heat.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
@@ -21,31 +12,12 @@ export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot �
  *  separator only once routing is done. Refusing the shape — every id is a slug — beats sanitising. */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
-/** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`.
- *  `heat.ts` reads the seq gaps this filter leaves as the events they were. */
+/** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`. */
 export const FOLD_TYPES: readonly string[] = [
   'action_completed',
   'action_started',
-  'agent_collapsed',
-  'agent_died',
-  'agent_expressed',
-  'agent_injured',
   'agent_spoke',
-  'co_slept',
-  'crop_harvested',
-  'discovery_made',
-  'fire_ignited',
-  'fire_spread',
-  'invitation_accepted',
-  'invitation_refused',
-  'invited',
-  'item_moved',
   'law_broken',
-  'law_proposed',
-  'law_ratified',
-  'law_repealed',
-  'partnership_dissolved',
-  'partnership_formed',
   'structure_completed',
   'structure_planned',
 ]
@@ -60,10 +32,9 @@ export type DataApiDeps = {
 }
 
 /** What the read path keeps once an event has been folded. Every field is a count of ANSWERS —
- *  links, drama windows, deaths, buildings — and none of them is a count of events. */
+ *  links, talks, buildings — and none of them is a count of events. */
 export type Footprint = {
   provenance: number
-  heat: number
   links: number
   spokes: number
   started: number
@@ -102,7 +73,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   // How often each law was broken. Not folded state: the engine keeps a breach as a witness
   // record and nothing more, and only the page ever wants the total.
   const breaches = new Map<string, number>()
-  const heat: HeatScores = new Map()
   const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
@@ -115,13 +85,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     weights.set(key, (weights.get(key) ?? 0) + 1)
   }
 
-  // The drama scorer's one piece of world knowledge, and the read path already keeps it: a fire
-  // at a place is scored to the person who raised the place. See `heat.dramatis`.
-  const builderOf = (id: string): string | null => planned.get(id)?.builderId ?? null
-  const heatCtx = heatContext(builderOf)
-
   const foldOne = (ev: SimEvent): void => {
-    scoreEvent(heat, ev, heatCtx)
     switch (ev.type) {
       case 'agent_spoke': {
         const p = ev.payload as { agentId: string; x: number; y: number }
@@ -183,19 +147,12 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
       foldOne(toEvent(r))
       foldCursor = r.seq
     }
-    // Only the last sim-day is ever served, and nothing else drops a window: unpruned this is
-    // ~1k keys per sim-day, kept for the life of the process.
-    const floorW = Math.floor((deps.mirror.state().tick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
-    for (const key of heat.keys()) {
-      if (Number(key.slice(0, key.indexOf('\n'))) < floorW) heat.delete(key)
-    }
   }
   // On a resumed town this is the whole log, and it runs on the boot thread rather than on the
   // first stranger's GET — which would be the thread that ticks the town.
   readFold()
   deps.onFootprint?.(() => ({
     provenance: planned.size + completedTick.size,
-    heat: heat.size,
     links: weights.size,
     spokes: spokes.length,
     started: started.size,
@@ -348,16 +305,6 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   })
 
   // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
-
-  /** The last sim-day, bounded by population and not by the town's age — `readFold` has already
-   *  dropped every window older than that, so the map IS the answer's own horizon. */
-  router.route('GET', '/api/heat', (_req, res) => {
-    readFold()
-    sendPrebuilt(
-      res,
-      cache.json('heat', () => heatSince(heatFromScores(heat), deps.mirror.state().tick)),
-    )
-  })
 
   return () => {
     for (const mind of agentDbs.values()) mind.db.close()

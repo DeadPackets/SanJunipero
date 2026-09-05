@@ -10,7 +10,13 @@ import {
   mergeBlockTokens,
   migrateLlmTables,
   sumReserved,
+  type Reserved,
 } from './callLog.js'
+
+const idOf = (r: Reserved): number => {
+  if ('held' in r) throw new Error(`expected a reservation, got ${r.held}`)
+  return r.id
+}
 import {
   BudgetExceededError,
   LlmClient,
@@ -852,11 +858,11 @@ describe('pessimistic reservation (T21)', () => {
     const db = openDb()
     const mine = makeBudgetGuard(db, 'mine')
     const theirs = makeBudgetGuard(db, 'theirs')
-    const a = mine.reserve(0.005, 1)
-    theirs.reserve(0.005, 1)
+    const a = mine.reserve(0.005, 1, null)
+    theirs.reserve(0.005, 1, null)
     expect(mine.sumReserved()).toBeCloseTo(0.005, 10)
     expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
-    mine.release(a!)
+    mine.release(idOf(a))
     expect(mine.sumReserved()).toBe(0)
     expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
   })
@@ -864,11 +870,11 @@ describe('pessimistic reservation (T21)', () => {
   it('refuses the reservation that would cross the cap and admits it again once released', () => {
     const db = openDb()
     const guard = makeBudgetGuard(db, 'test')
-    const first = guard.reserve(0.005, 0.006)
-    expect(first).not.toBeNull()
-    expect(guard.reserve(0.005, 0.006)).toBeNull()
-    guard.release(first!)
-    expect(guard.reserve(0.005, 0.006)).not.toBeNull()
+    const first = guard.reserve(0.005, 0.006, null)
+    expect(first).not.toHaveProperty('held')
+    expect(guard.reserve(0.005, 0.006, null)).toEqual({ held: 'budget', spentUsd: 0 })
+    guard.release(idOf(first))
+    expect(guard.reserve(0.005, 0.006, null)).not.toHaveProperty('held')
   })
 })
 

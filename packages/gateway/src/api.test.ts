@@ -16,7 +16,7 @@ import Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createGateway, type Gateway } from './server.js'
 import type { RouteHandler } from './router.js'
-import { FOLD_TYPES, JOURNAL_MAX, mountDataApi } from './api.js'
+import { JOURNAL_MAX, mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 
 // @sj/agents is frozen this chunk and does not export openAgentDb; DDL below is copied
@@ -277,20 +277,6 @@ describe('observer data apis', () => {
   it('chapters is the C7 stub', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([])
   })
-
-  // bob is 12 for two lines, 6 for the house he PLANNED and the town completed at tick 40 —
-  // `structure_completed {id}` names no person, and the plan is where the town keeps one — and 8
-  // for standing three tiles from Alice while both of them spoke. Cara shouted from twenty tiles
-  // out, so her line is a line and not a scene.
-  it('heat: per-agent 60-tick windows from the stub scorer', async () => {
-    expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
-      { fromTick: 0, toTick: 59, agentId: 'alice', score: 20 },
-      { fromTick: 0, toTick: 59, agentId: 'bob', score: 20 },
-      { fromTick: 0, toTick: 59, agentId: 'cara', score: 6 },
-      { fromTick: 60, toTick: 119, agentId: 'bob', score: 6 },
-      { fromTick: 60, toTick: 119, agentId: 'dan', score: 20 },
-    ])
-  })
 })
 
 /** Three inspector tabs per viewer, 30 s of client cache and no rate limit: an open+close per GET
@@ -356,8 +342,7 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
   })
 })
 
-/** The SELECT is the whole gate: a type `FOLD_TYPES` does not name is a row the read path never
- *  fetches, so neither heat nor bonds could ever see it however it is weighted. */
+/** The bond graph reads the log directly, so the five acts reach it whatever `FOLD_TYPES` says. */
 describe('★ the five acts of a relationship reach the read path', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-gwrel-'))
   let gw: Gateway
@@ -402,23 +387,6 @@ describe('★ the five acts of a relationship reach the read path', () => {
   afterAll(async () => {
     await gw.close()
     rmSync(dir, { recursive: true, force: true })
-  })
-
-  it('names all five in FOLD_TYPES and scores every one of them through the SELECT', async () => {
-    for (const type of [
-      'invited',
-      'invitation_accepted',
-      'invitation_refused',
-      'partnership_formed',
-      'partnership_dissolved',
-    ])
-      expect(FOLD_TYPES, type).toContain(type)
-
-    expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
-      // the pair events pay one face; the invitation trio pays the one who was asked
-      { fromTick: 0, toTick: 59, agentId: 'alice', score: 12 + 14 },
-      { fromTick: 0, toTick: 59, agentId: 'bob', score: 6 + 10 + 6 + 8 },
-    ])
   })
 
   it('makes the partnership a bond and the public no a slight', async () => {

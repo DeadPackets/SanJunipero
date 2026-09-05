@@ -152,8 +152,15 @@ export function sumReserved(db: Database.Database, caller: string): number {
   return row.total
 }
 
+/** This caller's own ceiling for a rolling day, and where that day starts. */
+type CallerRail = { usd: number; sinceMs: number }
+
+/** A reservation, or the reason it was refused — the lifetime budget or this caller's own rail.
+ *  Two shapes and not one null, because a rail holds ONE caller and the budget stops the run. */
+export type Reserved = { id: number } | { held: 'budget' | 'rail'; spentUsd: number }
+
 export type BudgetGuard = {
-  reserve(expectedUsd: number, budgetUsd: number | null): number | null
+  reserve(expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved
   release(reservationId: number): void
   sumReserved(): number
 }
@@ -165,15 +172,22 @@ export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGu
     'INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)',
   )
   const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')
-  const reserve = db.transaction((expectedUsd: number, budgetUsd: number | null): number | null => {
-    if (
-      budgetUsd !== null &&
-      sumCostUsd(db, caller) + sumReserved(db, caller) + expectedUsd > budgetUsd
-    ) {
-      return null
-    }
-    return Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid)
-  })
+  const reserve = db.transaction(
+    (expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved => {
+      const held = sumReserved(db, caller)
+      const lifetime = sumCostUsd(db, caller)
+      if (budgetUsd !== null && lifetime + held + expectedUsd > budgetUsd) {
+        return { held: 'budget', spentUsd: lifetime }
+      }
+      // The rail joins the same transaction the budget is read in: a runaway caller must not be
+      // able to spend between one read of the ledger and the next.
+      if (rail !== null) {
+        const today = sumCostUsdSince(db, caller, rail.sinceMs)
+        if (today + held + expectedUsd > rail.usd) return { held: 'rail', spentUsd: today }
+      }
+      return { id: Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid) }
+    },
+  )
   return {
     reserve,
     release: (reservationId) => {
@@ -304,4 +318,38 @@ export function sumCostUsd(db: Database.Database, caller: string): number {
     .prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ?')
     .get(caller) as { total: number }
   return row.total
+}
+
+/** What this caller has spent inside a rolling window. `idx_llm_calls_caller` serves it. */
+function sumCostUsdSince(db: Database.Database, caller: string, sinceMs: number): number {
+  const row = db
+    .prepare(
+      'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ? AND ts >= ?',
+    )
+    .get(caller, sinceMs) as { total: number }
+  return row.total
+}
+
+/** When the oldest call still inside the window was billed — the moment the window rolls off it
+ *  and the caller has room again. Null when it has spent nothing in the window at all. */
+export function oldestCallTsSince(
+  db: Database.Database,
+  caller: string,
+  sinceMs: number,
+): number | null {
+  const row = db
+    .prepare('SELECT MIN(ts) AS ts FROM llm_calls WHERE caller = ? AND ts >= ?')
+    .get(caller, sinceMs) as { ts: number | null }
+  return row.ts
+}
+
+/** The operator's own line, newest first is not wanted here: the stream logs them in order. */
+export function alertsSince(
+  db: Database.Database,
+  afterId: number,
+  kind: string,
+): { id: number; detail: string }[] {
+  return db
+    .prepare('SELECT id, detail FROM alerts WHERE id > ? AND kind = ? ORDER BY id')
+    .all(afterId, kind) as { id: number; detail: string }[]
 }

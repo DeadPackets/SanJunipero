@@ -163,7 +163,6 @@ describe('★ the read API reads the tick, not the history', () => {
     const fresh = new Database(dbPath, { readonly: true })
     const freshMirror = new WorldMirror({ db: fresh, config: DEFAULT_CONFIG, terrain: GRASS })
     expect(bodyOf(apiDb, mirror, '/api/society')).toBe(bodyOf(fresh, freshMirror, '/api/society'))
-    expect(bodyOf(apiDb, mirror, '/api/heat')).toBe(bodyOf(fresh, freshMirror, '/api/heat'))
 
     fresh.close()
     apiDb.close()

@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { INVITATION_VERBS, stateHash, type InvitationVerb, type SceneKind } from '@sj/shared'
+import {
+  INVITATION_VERBS,
+  STAKES_BY_KIND,
+  stateHash,
+  type InvitationVerb,
+  type SceneKind,
+} from '@sj/shared'
 import type { LawPredicate } from '@sj/engine'
 import type { Tie } from '../memory/ties.js'
 
@@ -321,6 +327,25 @@ function namesAQuarrel(
     }
   }
   return false
+}
+
+/** An open slight or grudge standing between two people who are BOTH in this talk, whether or
+ *  not anybody has said so out loud. What makes a scene of the same kind worth one more. */
+export function openQuarrelTie(scene: Scene, tiesOf: (agentId: string) => readonly Tie[]): boolean {
+  for (const holder of scene.participants) {
+    for (const tie of tiesOf(holder)) {
+      if (tie.settledTick !== null) continue
+      if (!QUARREL_TIE_KINDS.includes(tie.kind)) continue
+      if (scene.participants.includes(tie.personId)) return true
+    }
+  }
+  return false
+}
+
+/** What this scene is worth to the people in it, 0-10. Never falls: a talk that became a
+ *  quarrel and cooled again is still a talk that had a quarrel in it. */
+export function stakesFor(current: number, kind: SceneKind, quarrelTie: boolean): number {
+  return Math.min(10, Math.max(current, STAKES_BY_KIND[kind]) + (quarrelTie ? 1 : 0))
 }
 
 /** The kind this scene has become, given the line just said. Evaluated on open and on every
