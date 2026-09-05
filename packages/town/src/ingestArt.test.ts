@@ -123,12 +123,23 @@ describe('ingestProductionArt', () => {
     db.close()
   }, 30_000)
 
-  it('names half a cell instead of quietly drawing a prism', () => {
+  it('names half a cell and skips it, instead of quietly drawing a prism or dropping the class', () => {
     const root = mkdtempSync(join(dir, 'half-'))
-    const one = listCommittedBuildings()[0]!
-    cpSync(join(BUILDINGS_CONTENT_DIR, one.dir), join(root, one.dir), { recursive: true })
-    rmSync(join(root, one.dir, 'cell.webp'))
-    expect(() => listCommittedBuildings(root)).toThrow(new RegExp(`${one.dir}.*cell\\.webp`))
+    const [one, two] = listCommittedBuildings()
+    for (const b of [one!, two!])
+      cpSync(join(BUILDINGS_CONTENT_DIR, b.dir), join(root, b.dir), { recursive: true })
+    rmSync(join(root, one!.dir, 'cell.webp'))
+    const warned: string[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation((m: unknown) => {
+      warned.push(String(m))
+    })
+    try {
+      const kept = listCommittedBuildings(root).map((b) => b.dir)
+      expect(kept).toEqual([two!.dir])
+      expect(warned.join('\n')).toMatch(new RegExp(`${one!.dir}.*cell\\.webp`))
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   // `structureArt.ts` cannot see `TOWN_STRUCTURES` in `founders.ts` — `@sj/forge` must not import

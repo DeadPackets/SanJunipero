@@ -225,11 +225,13 @@ describe('★ A SCENE OPENS IN THE SERVED WORLD', () => {
     expect(calls.map((c) => c.caller)).toContain('scene')
 
     const lines = eventsOf(dir, 'scene_line').filter((e) => e.payload.id === opened[0]!.payload.id)
-    // The opener's own word is the first line; everything after it was taken by the floor.
+    // The opener's own word is the first line. A word the other mind had already sent when the
+    // talk opened lands in the thread too; every line after those was taken by the floor.
     expect(lines.length).toBeGreaterThan(1)
     expect(lines[0]!.payload.text).toBe(OPENING_WORD)
-    expect(lines[1]!.payload.text).toBe(SCENE_LINE)
-    expect(lines[1]!.payload.agentId).not.toBe(lines[0]!.payload.agentId)
+    const taken = lines.filter((l) => l.payload.text === SCENE_LINE)
+    expect(taken.length).toBeGreaterThan(0)
+    expect(taken[0]!.payload.agentId).not.toBe(lines[0]!.payload.agentId)
     expect(new Set(lines.map((l) => l.payload.agentId))).toEqual(new Set(['amara', 'omar']))
   }, 120_000)
 
@@ -251,9 +253,10 @@ describe('★ A SCENE OPENS IN THE SERVED WORLD', () => {
     ).toEqual(expect.arrayContaining(['amara', 'omar']))
     // Nobody in the scene takes an ordinary turn while it runs — that is what makes hearing free.
     expect(during.filter((c) => c.caller === 'turn')).toEqual([])
-    // And every line but the opener's cost exactly one call, made by the mouth that said it.
+    // And every line the floor took cost exactly one call, made by the mouth that said it; a
+    // word sent before the talk opened was paid for as the ordinary turn it was.
     expect(during.filter((c) => c.caller === 'scene').map((c) => c.agentId)).toEqual(
-      lines.slice(1).map((l) => l.payload.agentId),
+      lines.filter((l) => l.payload.text === SCENE_LINE).map((l) => l.payload.agentId),
     )
   }, 120_000)
 })
