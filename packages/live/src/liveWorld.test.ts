@@ -15,7 +15,7 @@ import {
   PROVIDER_ORDER,
 } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS, type SimEvent } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -35,6 +35,7 @@ import {
   preflightCostUsd,
   restorableSnapshot,
   settle,
+  trimRecognizerWindow,
 } from './liveWorld.js'
 
 // What no puppet in `founders.ts` will ever say, because `founders.ts` cannot speak at all.
@@ -1379,6 +1380,27 @@ describe('★ the chronicle, written on the day boundary', () => {
     expect(narratorRows(dir, 'SELECT day FROM chapters')).toEqual([])
     expect(narratorRows(dir, 'SELECT day FROM publications')).toEqual([])
   }, 120_000)
+})
+
+// ★ Every tile a body crosses is a row, and the array held all of them since boot — the whole
+// log on a resumed town — inside a 1.5 GB container, re-walked whole at every day boundary.
+describe('★ the recognizer holds the window it reads, not the town’s whole life', () => {
+  const moved = (day: number): SimEvent =>
+    ({ seq: day, tick: day * MINUTES_PER_DAY, type: 'agent_moved', payload: {} }) as SimEvent
+
+  it('drops the days no gathering can still be joined to', () => {
+    const events = Array.from({ length: 30 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 29 * MINUTES_PER_DAY, 7)
+    expect(events.map((e) => e.tick / MINUTES_PER_DAY)).toEqual([
+      21, 22, 23, 24, 25, 26, 27, 28, 29,
+    ])
+  })
+
+  it('leaves a town younger than the window untouched', () => {
+    const events = Array.from({ length: 4 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 3 * MINUTES_PER_DAY, 7)
+    expect(events).toHaveLength(4)
+  })
 })
 
 describe('★ the liveliness dial', () => {

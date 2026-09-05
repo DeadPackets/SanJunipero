@@ -103,6 +103,16 @@ export function idleGapTicks(env: Record<string, string | undefined> = process.e
   const raw = Number(env.SJ_IDLE_GAP)
   return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_IDLE_GAP_TICKS
 }
+/** The detector never joins a gathering to one more than `windowDays` older, so an event past
+ *  that window can no longer make a candidate — held, it is the whole log in memory. One day of
+ *  margin, because the pass runs on the boundary of the day it is closing. */
+export function trimRecognizerWindow(events: SimEvent[], tick: number, windowDays: number): void {
+  const oldest = tick - (windowDays + 1) * MINUTES_PER_DAY
+  let drop = 0
+  while (drop < events.length && events[drop]!.tick < oldest) drop += 1
+  if (drop > 0) events.splice(0, drop)
+}
+
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
@@ -756,6 +766,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           // One at a time: the first pass on a resumed town is the whole log, and a spread
           // that wide overflows the argument stack.
           for (const ev of fresh) recognizerEvents.push(ev)
+          trimRecognizerWindow(recognizerEvents, tick, config.constructs.windowDays)
           void runConstructPass({
             events: recognizerEvents,
             baseConfig: config,
