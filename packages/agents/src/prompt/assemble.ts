@@ -127,12 +127,12 @@ function renderJournal(entries: JournalEntry[]): string {
     page.length <= JOURNAL_MAX_CHARS
       ? page
       : `${page.slice(0, page.lastIndexOf(' ', JOURNAL_MAX_CHARS))}…`
-  return `You turn back the pages of your own book:\n${bounded}`
+  return `What you have written in your own book:\n${bounded}`
 }
 
 // Nothing is said plainly: silence would read to the mind as never having asked.
 function renderRecall(recalled: Recalled): string {
-  const opening = `You cast your mind back to ${recalled.query}.`
+  const opening = `You think back to ${recalled.query}.`
   if (recalled.memories.length === 0) return `${opening} Nothing comes back.`
   return `${opening} What comes back:\n${recalled.memories.join('\n')}`
 }
@@ -142,8 +142,8 @@ function renderRecall(recalled: Recalled): string {
 function renderUnderway(u: Underway): string {
   const step = u.of > 1 ? ` (step ${u.step} of ${u.of})` : ''
   return (
-    `You are in the middle of: ${u.what}${step}. Your body carries it on by itself.\n` +
-    'Answer wait and it goes on. Name another act and you break off, and what was left of it is let go.'
+    `You are in the middle of: ${u.what}${step}. You keep at it without thinking about it.\n` +
+    'Answer wait and it carries on. Name another act and you stop, and whatever is left of it is dropped.'
   )
 }
 
@@ -180,16 +180,16 @@ function renderFrontier(names: readonly string[]): string {
   const head = said.slice(0, -1).join(', ')
   const tail = said.slice(-1).join('')
   return (
-    'Nobody here has done any of these, and each one rests on something the town already ' +
-    `practices, so somebody could be the first: ${head === '' ? tail : `${head} and ${tail}`}. ` +
-    'Say what you mean to do in your own words and try it.'
+    'Nobody here has done any of these, and each one builds on something the town already ' +
+    `does, so somebody could be the first: ${head === '' ? tail : `${head} and ${tail}`}. ` +
+    'Say what you want to do in your own words and try it.'
   )
 }
 
 function renderLaws(texts: readonly string[]): string {
   const said = texts.slice(-LAWS_SHOWN).map((t) => `"${t.slice(0, LAW_TEXT_MAX)}"`)
   if (said.length === 0) return ''
-  return ['The town has agreed these, and holds one another to them:', ...said].join('\n')
+  return ['The town has agreed on these and holds each other to them:', ...said].join('\n')
 }
 
 function renderCustoms(names: readonly string[]): string {
@@ -290,5 +290,5 @@ export function splitSentences(text: string): string[] {
 
 // The overflow path only: sleep is the real compaction.
 export function compactDayLog(dayLog: string[], summary: string): string[] {
-  return [`Your mind wanders back over the day: ${summary}`, ...dayLog.slice(-10)]
+  return [`Looking back over the day: ${summary}`, ...dayLog.slice(-10)]
 }

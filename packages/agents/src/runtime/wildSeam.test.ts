@@ -85,7 +85,7 @@ const proseFor = (bridge: EngineBridge): string =>
 describe('the wild seam — prose, intent, verb, the thing taken', () => {
   it('names the animal and the patch, each with the mark the verb asks for', () => {
     const said = proseFor(wild().bridge)
-    expect(said).toContain('A deer (fauna_1) is out at (9, 8).')
+    expect(said).toContain('A deer (fauna_1) is at (9, 8).')
     expect(said).toContain('You see berry bushes heavy with fruit (node_1) at (7, 8).')
   })
 
@@ -126,14 +126,14 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
   it('a dry throat is told where the water is, and the well counts as water', async () => {
     const { bridge, step, loop } = wild()
     loop.state.agents[AGENT]!.thirst = 10
-    expect(proseFor(bridge)).toContain('The nearest water you know of lies at (12, 8)')
+    expect(proseFor(bridge)).toContain('The nearest water you know of is at (12, 8)')
 
     const walking = bridge.submit(AGENT, { verb: 'walk', params: { x: 11, y: 8 } })
     step()
     expect(await walking).toEqual({ ok: true })
     for (let i = 0; i < 60 && loop.state.agents[AGENT]!.activity !== null; i++) step()
     loop.state.agents[AGENT]!.thirst = 10
-    expect(proseFor(bridge)).toContain('Water lies within reach of your hands')
+    expect(proseFor(bridge)).toContain('Water is within reach')
 
     const drinking = bridge.submit(AGENT, { verb: 'drink', params: {} })
     step()
@@ -146,7 +146,7 @@ describe('the wild seam — prose, intent, verb, the thing taken', () => {
     const { bridge, loop } = wild()
     loop.state.agents[AGENT]!.thirst = 45
     const early = proseFor(bridge)
-    expect(early).toContain('The nearest water you know of lies at (12, 8)')
+    expect(early).toContain('The nearest water you know of is at (12, 8)')
     expect(early).not.toContain('Your mouth is dry')
 
     loop.state.agents[AGENT]!.thirst = 55

@@ -97,7 +97,7 @@ export function peopleIn(fact: RelationshipFact): string[] {
 const ASKED_FOR: Record<InvitationVerb, string> = {
   court: 'to walk out together',
   propose: 'to be partners for good',
-  lie_with: 'to lie together, here under this roof',
+  lie_with: 'to sleep together, here under this roof',
 }
 
 /** What the invitee is told, in the words of the thing itself. */
@@ -134,7 +134,7 @@ export function tiesFor(
     if (fact.verb === 'propose') return pair(fact.agentId, fact.byId, 'kin', 'your partner')
     if (ctx.partnered === true) return []
     const where = ctx.roof === null || ctx.roof === undefined ? 'one roof' : `the ${ctx.roof}`
-    return pair(fact.agentId, fact.byId, 'secret', `what passed between you under ${where}`)
+    return pair(fact.agentId, fact.byId, 'secret', `what happened between you under ${where}`)
   }
   if (fact.type === 'invitation_refused') {
     if (fact.witnesses.length === 0) return []
@@ -143,7 +143,7 @@ export function tiesFor(
         agentId: fact.byId,
         personId: fact.agentId,
         kind: 'slight',
-        text: 'refused you before others',
+        text: 'turned you down in front of other people',
       },
     ]
   }
@@ -177,7 +177,7 @@ export function memoryLinesFor(
       ]
     case 'invitation_refused':
       return [
-        { agentId: fact.byId, text: `${nameOf(fact.agentId)} would not have you.`, importance: 7 },
+        { agentId: fact.byId, text: `${nameOf(fact.agentId)} turned you down.`, importance: 7 },
       ]
     case 'partnership_formed':
       return [fact.aId, fact.bId].map((id) => ({

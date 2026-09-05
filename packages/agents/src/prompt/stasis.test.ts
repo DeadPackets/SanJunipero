@@ -36,13 +36,13 @@ describe('★ the line an hour of standing still earns', () => {
 
   it('lands on the sixtieth tick and names the hour', () => {
     expect(stasisLine(stand({ sinceTick: 100 }), 160)).toBe(
-      'You have been in this same spot for an hour; nothing has come of it.',
+      'You have been in this same spot for an hour. Nothing has come of it.',
     )
   })
 
   it('names the words only when there were words', () => {
     expect(stasisLine(stand({ sinceTick: 100, spoke: true }), 160)).toBe(
-      'You have been in this same spot for an hour, saying much the same things; nothing has come of it.',
+      'You have been in this same spot for an hour, saying much the same things. Nothing has come of it.',
     )
   })
 

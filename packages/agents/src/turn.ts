@@ -27,11 +27,12 @@ export const IntentSchema = z
   })
   .strict()
 const FreeformSchema = z
-  .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
+  .object({ freeform: z.string().min(1).describe('What you are trying to do, in your own words.') })
   .strict()
 const ACT_NOW =
-  'One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.'
-const A_PLAN = 'Up to twelve acts your body carries out one after another while your mind rests.'
+  'One act you start now: its exact word as verb with what it asks as params, or freeform for a try at something new.'
+const A_PLAN =
+  'Up to twelve acts your body does one after another while you stop thinking about it.'
 // Every optional field takes null as well as absence, and not via `.transform()`, which
 // `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
 export const TurnSchema = z
@@ -40,35 +41,35 @@ export const TurnSchema = z
       .string()
       .min(1)
       .describe(
-        'What passes through your mind this moment. Yours alone; no one else ever hears it.',
+        'What is going through your head this moment. Yours alone; nobody else ever hears it.',
       ),
     speech: z
       .string()
       .min(1)
       .nullish()
-      .describe('Words you say aloud. Anyone within earshot hears them.'),
+      .describe('Words you say out loud. Anyone close enough hears them.'),
     action: z.union([IntentSchema, FreeformSchema]).nullish().describe(ACT_NOW),
     plan: z.array(IntentSchema).max(PLAN_MAX_STEPS).nullish().describe(A_PLAN),
     journal: z
       .string()
       .min(1)
       .nullish()
-      .describe('Words you set down in your own book. Writing takes part of the hour.'),
+      .describe('Words you write in your own book. Writing takes part of the hour.'),
     recall: z
       .string()
       .min(1)
       .nullish()
       .describe(
-        'Something out of your own past to cast your mind back to. Casting back fills the whole moment: you do nothing else with it, and what comes back reaches you a moment later.',
+        'Something from your own past to think back to. Thinking back takes the whole moment: you do nothing else with it, and what comes back reaches you a moment later.',
       ),
     importance: z
       .number()
       .int()
       .min(1)
       .max(10)
-      .describe('How deeply this moment matters to you, one through ten.'),
+      .describe('How much this moment matters to you, one to ten.'),
     reconsider_at: ReconsiderAtSchema.nullish().describe(
-      'When you mean to return to your thoughts: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.',
+      'When you mean to think again: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.',
     ),
   })
   .strict()

@@ -96,7 +96,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
     loop.step()
     expect(isExposed(loop.state, CFG, 'yusuf')).toBe(false)
     const prose = proseFor(bridge, 'yusuf')
-    expect(prose).toContain('these walls are holding it off you')
+    expect(prose).toContain('the walls are keeping it off you')
     expect(prose).not.toContain('The cold is getting into you')
   })
 
@@ -108,7 +108,7 @@ describe('the cold a body can feel, and the thing that answers it', () => {
     const outside = proseFor(bridge, 'amara')
     const inside = proseFor(bridge, 'yusuf')
     expect(outside).toContain('The cold is getting into you out here')
-    expect(inside).toContain('these walls are holding it off you')
+    expect(inside).toContain('the walls are keeping it off you')
   })
 
   it('a mild afternoon says nothing about the cold at all', () => {
@@ -277,7 +277,7 @@ describe('the road to a fed fire, opened before the light goes', () => {
   // The fire is named, not placed: `walk` and `stoke` both take the mark, and the tile the line
   // used to carry was the one thing in it a mind could copy into a coordinate walk.
   const NEEDS_WOOD =
-    'The night will be cold; the hearth in a fire pit (structure_fire_pit_12_11) is cold and wants wood.'
+    'Tonight will be cold. The hearth in a fire pit (structure_fire_pit_12_11) is cold and needs wood.'
   const cold = (packet: PerceptionPacket, world = coldNight): string =>
     roadLine(makeables(CFG), packet, world)
 
@@ -308,27 +308,27 @@ describe('the road to a fed fire, opened before the light goes', () => {
   it('★ the cold outranks a project: only one road is spoken, and survival takes it', () => {
     // The same packet with no cold night to answer falls through to the makeables road.
     const warm: ProseWorld = { ...coldNight, nightWillBeCold: () => false }
-    expect(cold(evening(17, 'cold'))).toContain('The night will be cold')
+    expect(cold(evening(17, 'cold'))).toContain('Tonight will be cold')
     expect(cold(evening(17, 'cold'), warm)).toBe(
-      'Plank wants 1 wood; the nearest standing tree is at (31, 44).',
+      'Plank needs 1 wood; the nearest standing tree is at (31, 44).',
     )
   })
 
   it('says nothing at noon: a road opened all day is a sentence nobody reads', () => {
-    expect(cold(evening(12, 'cold'))).not.toContain('The night will be cold')
+    expect(cold(evening(12, 'cold'))).not.toContain('Tonight will be cold')
   })
 
   it('says nothing about a fire somebody is already feeding', () => {
-    expect(cold(evening(17, 'lit'))).not.toContain('wants wood')
+    expect(cold(evening(17, 'lit'))).not.toContain('needs wood')
   })
 
   it('says nothing when no hearth is in sight — a want with no road is not spoken', () => {
-    expect(cold(evening(17))).not.toContain('The night will be cold')
+    expect(cold(evening(17))).not.toContain('Tonight will be cold')
   })
 
   it('says nothing on a night the cold never gets into', () => {
     expect(cold(evening(17, 'cold'), { ...coldNight, nightWillBeCold: () => false })).not.toContain(
-      'The night will be cold',
+      'Tonight will be cold',
     )
   })
 

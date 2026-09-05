@@ -83,8 +83,8 @@ thought is one short line nobody else hears.`
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what they had to say.',
   left: 'It ended because somebody walked away.',
-  capped: 'It ended while still going; there was more to say.',
-  timeout: 'It ended in a silence nobody filled.',
+  capped: 'It ended while it was still going. There was more to say.',
+  timeout: 'It ended because nobody said anything more.',
 }
 
 function castLaw(living: readonly { name: string }[]): string {
@@ -300,11 +300,11 @@ function sceneSystem(voice: SceneVoice): string {
   }).system
 }
 
-const CLOSE_SYSTEM = `A conversation in the valley of San Junipero has just ended. Set down what happened in it, and what it left standing between the people who were in it.
+const CLOSE_SYSTEM = `A conversation in the valley of San Junipero has just ended. Write down what happened in it, and what it left between the people who were in it.
 
-The summary is two sentences at most, plain, naming people by name. It is what each of them will carry away, so write what was said and what changed by it, and nothing about how it reads.
+The summary is two sentences at most, plain, naming people by name. It is what each of them will remember, so write what was said and what changed because of it, and nothing about how it reads.
 
-Then the ties. A tie is one thing one person now holds about another: a promise made, a debt owed, a slight taken, a grudge kept, an attraction felt, a secret held, an alliance struck, kin claimed. Write one only where the talk itself made it or paid it off. Most conversations make none, and an invented tie is worse than a missing one. Mark a tie settled when the talk squared something that was already owed.
+Then the ties. A tie is one thing one person now holds about another: a promise, a debt, a slight, a grudge, an attraction, a secret, an alliance, or being family. Write one only where the talk itself made it or paid it off. Most conversations make none, and an invented tie is worse than a missing one. Mark a tie settled when the talk cleared something that was already owed.
 
 Name nobody who was not in the conversation.`
 

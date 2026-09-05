@@ -76,8 +76,8 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
   // A mind's own day log carries ordinary English back into the prompt, so an ordinary word in
   // the enforced set crashes every remaining turn of its day.
   const ordinaryPhrases: Record<string, string> = {
-    milestone: 'Your mind wanders back over the day: finishing the roof felt like a milestone.',
-    milestones: 'Your mind wanders back over the day: the milestones of a long summer.',
+    milestone: 'Looking back over the day: finishing the roof felt like a milestone.',
+    milestones: 'Looking back over the day: the milestones of a long summer.',
     tier: 'Nadia stacked the baskets, the small ones on the upper tier.',
     tiers: 'The riverbank falls away in tiers down to the water.',
     construct: 'Omar means to construct a rail along the deck.',
@@ -329,7 +329,7 @@ describe('the naming law', () => {
       { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] },
       { x: 67, y: 94 },
     )
-    expect(line).toContain('The town keeps ground for a new roof at (67, 94)')
+    expect(line).toContain('The town keeps ground for a new building at (67, 94)')
     expect(scanForLayoutLeak(line)).toEqual([])
     expect(scanPromptForGlassLeak(line)).toEqual([])
     // And it says nothing at all when there is nowhere left, rather than an empty phrase.

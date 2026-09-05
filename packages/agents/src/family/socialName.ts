@@ -33,7 +33,7 @@ const SocialNameAnswer = z.object({ name: z.string() }).strict()
 
 export function promptBirthLine(born: AgentBornPayload): string {
   const [child, object] = born.sex === 'f' ? ['daughter', 'her'] : ['son', 'him']
-  return `You have borne a ${child}. The town rolls will know ${object} as ${born.name} — what do you call ${object}?`
+  return `You have had a ${child}. The town rolls will have ${object} down as ${born.name}. What do you call ${object}?`
 }
 
 function namingPrompt(
@@ -45,7 +45,7 @@ function namingPrompt(
     system: [
       'You have just given birth, and the child is here.',
       'Answer with the one name you will use for this child from now on, and nothing else.',
-      'It may be the name the town rolls carry, or it may be your own — a name out of your family, a word for what you see in the face, whatever you would actually say.',
+      'It can be the name on the town rolls, or one of your own: a name from your family, a word for what you see in the face, whatever you would actually say.',
       `You speak ${v.register}.`,
     ].join('\n'),
     user: [

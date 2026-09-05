@@ -78,9 +78,9 @@ function tiesFrom(
 }
 
 export const FALLBACK_DAY_TITLE = 'A long day'
-export const FALLBACK_AUTOBIOGRAPHY = 'A long day; too weary to make sense of it.'
+export const FALLBACK_AUTOBIOGRAPHY = 'A long day. Too tired to make sense of it.'
 export const FALLBACK_DIGEST_CHARS = 2000
-const FALLBACK_EMPTY_DIGEST = 'Nothing of the day comes back.'
+const FALLBACK_EMPTY_DIGEST = 'Nothing from today comes back.'
 
 // A night with no headroom left must still leave the day written down, or the
 // mind wakes with a hole where yesterday was and never gets it back.
@@ -295,19 +295,19 @@ function nightPrompt(dayMemories: MemoryRow[], instruction: string[]): LlmPrompt
 
 export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return nightPrompt(dayMemories, [
-    'Before sleep, you sort the day into what is solidly true.',
+    'Before sleep, you sort out what you are sure actually happened today.',
     // "From each moment" is a pass per memory against an unbounded array; asking for the few
     // surest ones asks for the same work once.
     'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
     'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
-    'Write down only what the memories actually show, never what you merely suspect.',
+    'Write down only what the memories actually show, not what you suspect.',
   ])
 }
 
 export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return nightPrompt(dayMemories, [
-    'Before sleep, you gather the day into scenes.',
-    'Group the moments into a few natural scenes, each with a short title and a short telling of what happened.',
+    'Before sleep, you break the day up into scenes.',
+    'Group the moments into a few scenes, each with a short title and a short account of what happened.',
     'For each scene, list the memories it draws from.',
   ])
 }
@@ -320,11 +320,11 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
   return {
     system: [
       'Before sleep, you look back over the whole day.',
-      'Give the day a single title and a short telling that holds its scenes together.',
+      'Give the day one title and a short account that ties its scenes together.',
       'Then name what you carry into tomorrow, as `standing`: at most three short lines, one each',
       'for what you want, what you promised or owe, and what you are in the middle of making.',
-      'Leave `standing` empty rather than invent one; write each line as a thing you are about,',
-      'not as a report of the day.',
+      'Leave `standing` empty rather than make one up. Write each line as something you are set',
+      'on, not as a report of the day.',
     ].join('\n'),
     messages: [{ role: 'user', content: `The day held these scenes:\n${JSON.stringify(scenes)}` }],
   }
@@ -337,7 +337,7 @@ export function updateLedgerPrompt(
 ): LlmPrompt {
   return {
     system: [
-      'Before sleep, you revisit your private note about one person.',
+      'Before sleep, you go back to your private note about one person.',
       'Rewrite that note from the day, keeping what still holds and adding what changed.',
       'The note is yours alone: your opinion, your trust, what they owe you and what you owe them.',
     ].join('\n'),
@@ -356,11 +356,11 @@ export function updateLedgerPrompt(
 
 export function listTiesPrompt(dayMemories: MemoryRow[], people: readonly string[]): LlmPrompt {
   return nightPrompt(dayMemories, [
-    'Before sleep, you count what the day left standing between you and other people.',
+    'Before sleep, you go over what the day left between you and other people.',
     'A tie is one thing YOU now hold about one of them: a promise you made or they made you, a',
-    'debt, a slight taken, a grudge kept, an attraction felt, a secret held, an alliance struck.',
+    'debt, a slight, a grudge, an attraction, a secret, an alliance.',
     'Write one only where today actually made it or paid it off, and mark it settled when the day',
-    'squared something that was already owed. Most days leave one or two, and many leave none.',
+    'cleared something that was already owed. Most days leave one or two, and many leave none.',
     people.length === 0
       ? 'Name nobody: you were alone today.'
       : `Name only these people: ${people.join(', ')}.`,
@@ -378,7 +378,7 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
         role: 'user',
         content: [
           `Your day:\n${daySummary}`,
-          `You hold dear: ${doc.values.join(', ')}.`,
+          `What matters to you: ${doc.values.join(', ')}.`,
           `Your mood: ${doc.current.mood}.`,
         ].join('\n'),
       },

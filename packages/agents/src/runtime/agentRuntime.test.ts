@@ -833,7 +833,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Three tiles a tick carries the five-tile walk inside one turn, so what the second prompt
     // finds underway is the next step of the same plan, still running.
     expect(second).toContain('You are in the middle of: take item_1 (step 2 of 3).')
-    expect(second).toContain('Answer wait and it goes on.')
+    expect(second).toContain('Answer wait and it carries on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {
@@ -984,7 +984,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 120)
     expect(saidOn(prompts, 0)).not.toContain('Last turn:')
-    expect(saidOn(prompts, 1)).toContain('Last turn: eat did not take —')
+    expect(saidOn(prompts, 1)).toContain('Last turn: eat did not work:')
     expect(saidOn(prompts, 2)).not.toContain('Last turn:')
   })
 
@@ -1473,7 +1473,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Last user message is block 6, `now`. It is the one place the words appear.
     const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
     expect(nowA).toContain('a house (10 wood)')
-    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is feeding')
+    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is keeping fed')
     expect(a.find((m) => m.role === 'system')!.text).not.toContain('a house (10 wood)')
     // And not in the day log, which is the day's events: a standing fact repeated every turn
     // would compact the day out of the mind that lived it.
@@ -1739,7 +1739,7 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
-      'You realize you cannot: your hands do not yet know the weave — perhaps someone nearby knows the craft.',
+      'You realize you cannot: your hands do not yet know the weave. Maybe someone nearby knows the craft.',
     )
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
   })
@@ -1772,7 +1772,7 @@ describe('arbiter seam (T19)', () => {
     expect(memories.map((m) => m.importance)).toEqual([3])
     // The second ask is still answered, from the mind's own refusal, in the next turn's line.
     expect(saidOn(prompts, 2)).toContain(
-      `Last turn: ${TRIED_FREEFORM} did not take — the reeds will not hold that shape.`,
+      `Last turn: ${TRIED_FREEFORM} did not work: the reeds will not hold that shape.`,
     )
     expect(REFUSAL_MEMORY_TICKS).toBe(240)
   })
@@ -2045,7 +2045,7 @@ describe('arbiter seam (T19)', () => {
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
     expect(memoriesOfKind(agentDb, 'action')).toEqual([])
     const next = saidOn(prompts, 1)
-    expect(next).toContain(`Last turn: ${TRIED_FREEFORM} did not take — ${CANNOT_BEGIN}.`)
+    expect(next).toContain(`Last turn: ${TRIED_FREEFORM} did not work: ${CANNOT_BEGIN}.`)
     for (const text of [next, ...memoriesOfKind(agentDb, 'action').map((m) => m.text)]) {
       expect(text).not.toContain('unknown verb')
       expect(text).not.toContain('experiment')
@@ -2311,7 +2311,7 @@ describe('arbiter wiring expansion (T20)', () => {
     await stepUntil(loop, () => prompts.length >= 2, 400)
     expect(memoriesOfKind(agentDb, 'action')).toEqual([])
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
-    expect(saidOn(prompts, 1)).toContain(`did not take — ${CANNOT_BEGIN}.`)
+    expect(saidOn(prompts, 1)).toContain(`did not work: ${CANNOT_BEGIN}.`)
   })
 })
 
@@ -2354,9 +2354,9 @@ describe('what the town has learned reaches every mind', () => {
 describe('refusal prose teaches a path (T18)', () => {
   it('appends the hint only to an insufficient_skill verdict', () => {
     expect(refusalMemoryText('you have not the hands for it', 'insufficient_skill')).toBe(
-      'You realize you cannot: you have not the hands for it — perhaps someone nearby knows the craft.',
+      'You realize you cannot: you have not the hands for it. Maybe someone nearby knows the craft.',
     )
-    expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
+    expect(CRAFT_HINT).toBe('. Maybe someone nearby knows the craft.')
   })
 
   // ★ One-way glass: the engine's registry names and param schemas must never enter a memory.
@@ -2453,9 +2453,9 @@ describe("a beat spent on one's own past", () => {
     const { model, prompts } = capturingModel([RECALL_TURN, BENIGN_TURN, BENIGN_TURN])
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 90)
-    expect(saidOn(prompts, 0)).not.toContain('You cast your mind back')
-    expect(saidOn(prompts, 1)).toContain('You cast your mind back to the storehouse.')
-    expect(saidOn(prompts, 2)).not.toContain('You cast your mind back')
+    expect(saidOn(prompts, 0)).not.toContain('You think back to')
+    expect(saidOn(prompts, 1)).toContain('You think back to the storehouse.')
+    expect(saidOn(prompts, 2)).not.toContain('You think back to')
   })
 
   it('reads its own book back, dated by the day the world counts', async () => {
@@ -2468,9 +2468,11 @@ describe("a beat spent on one's own past", () => {
       mindConfig: { ...FAST_MIND, journalTicks: 0 },
     })
     await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
-    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain('turn back the pages')
+    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain(
+      'What you have written in your own book',
+    )
     expect(prompts[1]!.find((m) => m.role === 'user')!.text).toBe(
-      'You turn back the pages of your own book:\nDay 1: The roof held.',
+      'What you have written in your own book:\nDay 1: The roof held.',
     )
   })
 })
@@ -2590,12 +2592,12 @@ describe('every turn row says what bought it', () => {
 
 describe('★ an empty vessel is a want for water, though it names none', () => {
   it('reads the water road off a refusal that names water, and off an empty vessel', () => {
-    expect(wantedWater('Last turn: drinking did not take — no water there.')).toBe(true)
-    expect(wantedWater('Last turn: drinking did not take — the skin is empty.')).toBe(true)
-    expect(wantedWater('Last turn: drinking did not take — the bucket is empty.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not work: no water there.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not work: the skin is empty.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not work: the bucket is empty.')).toBe(true)
   })
   it('leaves a refusal about anything else alone', () => {
-    expect(wantedWater('Last turn: stoking did not take — not enough wood.')).toBe(false)
+    expect(wantedWater('Last turn: stoking did not work: not enough wood.')).toBe(false)
     expect(wantedWater(null)).toBe(false)
   })
 })
@@ -2696,7 +2698,7 @@ describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
     // The mind never asked; the hands came off, and the very next turn is the one the alarm rang.
     expect(wakeReasonsLogged(agentDb)[1]).toBe('body_alarm')
     expect(saidOn(prompts, 1)).toContain(
-      `Last turn: you broke off mourning — ${BODY_WOULD_NOT_GO_ON}.`,
+      `Last turn: you stopped mourning: ${BODY_WOULD_NOT_GO_ON}.`,
     )
     // Said once. The next turn opens on a body standing free, with nothing to explain.
     await stepUntil(loop, () => runtime.stats().turns >= 3, 200)
@@ -2736,9 +2738,9 @@ describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
   // The line names the act as it was happening, so a coined verb reads as a thing being done
   // rather than as the slug it is stored under.
   it('says what was broken off in the words the act was happening in', () => {
-    expect(brokeOffLine('fish', 'why')).toBe('Last turn: you broke off fishing — why.')
-    expect(brokeOffLine(MOURN, 'why')).toContain('you broke off mourning')
-    expect(brokeOffLine('recipe:plank', 'why')).toContain('you broke off making plank')
+    expect(brokeOffLine('fish', 'why')).toBe('Last turn: you stopped fishing: why.')
+    expect(brokeOffLine(MOURN, 'why')).toContain('you stopped mourning')
+    expect(brokeOffLine('recipe:plank', 'why')).toContain('you stopped making plank')
     expect(brokeOffLine('stow', 'why')).toContain('stowing')
     expect(brokeOffLine('inscribe', 'why')).toContain('inscribing')
   })
@@ -2794,7 +2796,7 @@ describe('★ the morning line names what this mind wants', () => {
 
     const carried = prompts
       .map((_, i) => i)
-      .filter((i) => saidOn(prompts, i).includes('Today you most want'))
+      .filter((i) => saidOn(prompts, i).includes('Today the thing you want most is'))
     const mornings = wakeReasonsBilled(agentDb)
       .map((reason, i) => ({ reason, i }))
       .filter((r) => r.reason === 'morning')
@@ -2804,7 +2806,7 @@ describe('★ the morning line names what this mind wants', () => {
     expect(carried).toEqual(mornings)
     // Nothing fed a want overnight, so the seven stand level and the contract's order decides.
     expect(saidOn(prompts, carried[0]!)).toContain(
-      'Today you most want belonging; who could give you that?',
+      'Today the thing you want most is belonging. Who could give you that?',
     )
   })
 })

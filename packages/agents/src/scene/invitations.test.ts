@@ -60,7 +60,7 @@ describe('what the invitee is told', () => {
     }
     expect(askPhrase('court', 'Omar')).toContain('walk out together')
     expect(askPhrase('propose', 'Omar')).toContain('partners for good')
-    expect(askPhrase('lie_with', 'Omar')).toContain('lie together')
+    expect(askPhrase('lie_with', 'Omar')).toContain('sleep together')
   })
 })
 
@@ -82,10 +82,10 @@ describe('the ties a relationship leaves', () => {
 
   it('a bedding is a secret, unless the two of them already belong to each other', () => {
     expect(tiesFor(accepted('lie_with'), { roof: 'house' })[0]?.text).toBe(
-      'what passed between you under the house',
+      'what happened between you under the house',
     )
     expect(tiesFor(accepted('lie_with'), { roof: null })[0]?.text).toBe(
-      'what passed between you under one roof',
+      'what happened between you under one roof',
     )
     expect(tiesFor(accepted('lie_with'), { partnered: true })).toEqual([])
   })
@@ -100,7 +100,7 @@ describe('the ties a relationship leaves', () => {
     })
     expect(tiesFor(refused([]))).toEqual([])
     expect(tiesFor(refused(['salma']))).toEqual([
-      { agentId: B, personId: A, kind: 'slight', text: 'refused you before others' },
+      { agentId: B, personId: A, kind: 'slight', text: 'turned you down in front of other people' },
     ])
   })
 

@@ -1362,7 +1362,7 @@ describe('a yes is the same verb aimed back', () => {
         .ties.open()
         .find((t) => t.kind === 'secret')
       expect(secret?.text, 'the place by its name, never its mark').toBe(
-        'what passed between you under the house',
+        'what happened between you under the house',
       )
     }
   })
@@ -1410,7 +1410,7 @@ describe('a no said in front of people', () => {
       { personId: OMAR, kind: 'slight', source: 'relationship', settled: false },
     ])
     expect(tiesOf(h, OMAR), 'the one who said no holds nothing').toEqual([])
-    expect(memoriesOf(h, NADIA)).toContain('Omar would not have you.')
+    expect(memoriesOf(h, NADIA)).toContain('Omar turned you down.')
     expect(h.loop.state.agents[OMAR]).not.toHaveProperty('asked')
   })
 
@@ -1421,7 +1421,7 @@ describe('a no said in front of people', () => {
     await turnOfTheWorld(h)
 
     expect(tiesOf(h, NADIA)).toEqual([])
-    expect(memoriesOf(h, NADIA)).toContain('Omar would not have you.')
+    expect(memoriesOf(h, NADIA)).toContain('Omar turned you down.')
   })
 
   it('counts an answer with nothing said as an answer and not as a pass', async () => {

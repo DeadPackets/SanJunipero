@@ -212,7 +212,7 @@ describe('★ the road out is offered only where something stands behind it', ()
   it('says it to a mind that has had nobody’s company for six days', async () => {
     const t = await mind({ day: 6, fedAt: 0 })
     try {
-      expect(t.said).toContain('days now with nobody')
+      expect(t.said).toContain('days now without anybody')
       expect(t.said).toContain('name it leave_town')
     } finally {
       t.stop()
@@ -222,7 +222,7 @@ describe('★ the road out is offered only where something stands behind it', ()
   it('does not say it at five', async () => {
     const t = await mind({ day: 5, fedAt: 0 })
     try {
-      expect(t.said).not.toContain('days now with nobody')
+      expect(t.said).not.toContain('days now without anybody')
     } finally {
       t.stop()
     }
@@ -236,7 +236,7 @@ describe('★ the road out is offered only where something stands behind it', ()
       },
     })
     try {
-      expect(near.said).toContain('Amara went down the valley road')
+      expect(near.said).toContain('Amara left down the valley road')
     } finally {
       near.stop()
     }
@@ -247,7 +247,7 @@ describe('★ the road out is offered only where something stands behind it', ()
       },
     })
     try {
-      expect(far.said).not.toContain('Amara went down the valley road')
+      expect(far.said).not.toContain('Amara left down the valley road')
     } finally {
       far.stop()
     }
@@ -261,7 +261,7 @@ describe('★ the road out is offered only where something stands behind it', ()
       },
     })
     try {
-      expect(three.said).toContain('times now the town has watched you')
+      expect(three.said).toContain('times now the town has seen you break')
     } finally {
       three.stop()
     }
@@ -272,7 +272,7 @@ describe('★ the road out is offered only where something stands behind it', ()
       },
     })
     try {
-      expect(two.said).not.toContain('times now the town has watched you')
+      expect(two.said).not.toContain('times now the town has seen you break')
     } finally {
       two.stop()
     }

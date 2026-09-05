@@ -300,8 +300,8 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
         .map((r) => r.text)
         .sort(),
     ).toEqual([
-      'You have let go of what stood between you and nadia: She took the last loaf.',
-      'You have let go of what stood between you and omar: A day on the well gate.',
+      'You have let go of what was between you and nadia: She took the last loaf.',
+      'You have let go of what was between you and omar: A day on the well gate.',
     ])
     expect(
       ties.open().map((t) => t.kind),

@@ -164,7 +164,7 @@ describe('a witnessed act', () => {
           },
         ],
       })
-    expect(seen('sight')).toContain('You watch Omar raises a cup to the room.')
+    expect(seen('sight')).toContain('You see Omar raises a cup to the room.')
     expect(seen('sound')).toContain('You hear Omar raises a cup to the room.')
   })
 })

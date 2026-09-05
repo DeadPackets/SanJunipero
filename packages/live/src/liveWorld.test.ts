@@ -1270,7 +1270,7 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     const said = memoriesOf(dir, 'amara')
     expect(said.some((t) => t.startsWith('You realize you cannot:'))).toBe(true)
     // `insufficient_skill` earns the one sanctioned door — a refusal must leave one open.
-    expect(said.some((t) => t.includes('perhaps someone nearby knows the craft'))).toBe(true)
+    expect(said.some((t) => t.includes('Maybe someone nearby knows the craft'))).toBe(true)
     // And nothing was codified: a refusal must not mint physics.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)

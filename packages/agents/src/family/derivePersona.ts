@@ -89,13 +89,13 @@ export function derivePersona(
   const wordBudget = meanBudget(parents)
 
   const born = [
-    `Born in this town to ${mother.identity.name} and ${father.identity.name}, and ${SPAWN_AGE_YEARS} years old from the first breath, as everyone here is.`,
-    `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the house ${pn.subject} was born in, the two faces over it, and almost nothing else yet.`,
+    `Born in this town to ${mother.identity.name} and ${father.identity.name}, and ${SPAWN_AGE_YEARS} years old from the start, like everyone here.`,
+    `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the house ${pn.subject} was born in and the two people in it, and almost nothing else yet.`,
   ].join(' ')
   // No parents to name: a walker's history is a road, and the two cards behind them are only
   // where the voice came from. What lies down the valley is theirs to say and nobody else's.
   const road = [
-    `Came up the valley road at ${age}, with what would go in a pack and no plan past the first roof.`,
+    `Came up the valley road at ${age}, with what fits in a pack and no plan past finding a roof.`,
     `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the road behind ${pn.object} and nothing of this town yet.`,
   ].join(' ')
 
@@ -121,9 +121,9 @@ export function derivePersona(
     current:
       origin === 'road'
         ? {
-            mood: 'road-worn and looking around',
+            mood: 'tired from the road and looking around',
             worries: ['whether this town has room for one more'],
-            goals: ['find out what this place is', 'find out who here would have you'],
+            goals: ['find out what this place is', 'find out who here would take you in'],
           }
         : {
             mood: 'new to all of it',

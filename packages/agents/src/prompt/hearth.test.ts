@@ -232,7 +232,7 @@ describe('the one-way glass holds over every sentence this lane added', () => {
   const AUTHORED = [
     'The hearth here is cold.',
     'A fire is burning in the hearth here.',
-    'Firelight moves inside it.',
+    'There is firelight inside it.',
     'There are beds in here.',
     'There are beds in it.',
     'There is no inside to it yet.',
