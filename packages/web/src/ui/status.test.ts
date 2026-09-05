@@ -311,3 +311,25 @@ describe('statusLiteralOffenders — the synonym bug cannot come back', () => {
     ])
   })
 })
+
+describe('the roster’s two closing lines', () => {
+  const html = (gone: number, left: number): string =>
+    renderToStaticMarkup(
+      createElement(RosterListView, {
+        rows: [],
+        gone,
+        left,
+        sort: 'name' as const,
+        openId: null,
+        onSort: () => {},
+        onToggle: () => {},
+      }),
+    )
+
+  it('counts the dead and the departed apart, and prints neither line for nobody', () => {
+    expect(html(2, 1)).toContain('2 rest in the town’s memory.')
+    expect(html(2, 1)).toContain('One went down the valley road.')
+    expect(html(0, 3)).toContain('3 went down the valley road.')
+    expect(html(0, 0)).not.toMatch(/memory|valley road/)
+  })
+})
