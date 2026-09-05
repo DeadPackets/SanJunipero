@@ -1,8 +1,9 @@
 import type Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, SOMEONE, type SimEvent, verbPhrase } from '@sj/shared'
-import { applyFootnotes, publishClean } from './chronicle.js'
+import { applyFootnotes, publishClean, withoutStrangers } from './chronicle.js'
 import type { NarratorStore } from './store.js'
 import type {
+  CastMember,
   ChapterRow,
   HeatScores,
   Milestone,
@@ -145,6 +146,7 @@ export async function writeBiography(deps: {
   agentId: string
   name: string
   throughDay: number
+  cast?: readonly CastMember[] | undefined
   alert?: (d: string) => void
 }): Promise<PublicationRow> {
   const record = collectPublicRecord(deps.world, deps.agentId, deps.throughDay)
@@ -166,8 +168,9 @@ export async function writeBiography(deps: {
       deps.alert?.(
         `dangling_citation: biography of ${deps.agentId} cited unknown ledger numbers ${seen.dangling.join(', ')}`,
       )
+    const where = `biography of ${deps.agentId}`
     title = bio.title
-    body = publishClean(deps, `biography of ${deps.agentId}`, seen.text)
+    body = publishClean(deps, where, withoutStrangers(deps, where, seen.text, deps.cast ?? []))
   }
   const id = deps.store.insertPublication({
     day: deps.throughDay,

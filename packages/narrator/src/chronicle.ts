@@ -285,6 +285,7 @@ export async function renderEra(deps: {
   endDay: number
   chapters: ChapterRow[]
   validEventIds: number[]
+  cast?: readonly CastMember[] | undefined
   alert?: ((d: string) => void) | undefined
 }): Promise<EraRow> {
   const { store, startDay, endDay, chapters } = deps
@@ -310,7 +311,8 @@ export async function renderEra(deps: {
     )
   let citations = seen.citations
   if (citations.length === 0) citations = chapters[0]!.citations.slice(0, 1)
-  const text = publishClean(deps, `era days ${startDay}-${endDay}`, seen.text)
+  const where = `era days ${startDay}-${endDay}`
+  const text = publishClean(deps, where, withoutStrangers(deps, where, seen.text, deps.cast ?? []))
   const id = store.insertEra({
     startDay,
     endDay,

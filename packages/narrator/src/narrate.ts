@@ -42,6 +42,18 @@ export class ChapterRenderError extends Error {
   }
 }
 
+// Living AND dead: prose may name a grave, and may name nothing else. The world's own roster
+// answers where it is in reach, because only it knows who has died.
+const castRoll = (
+  cast: readonly { id: string; name: string }[] | undefined,
+  state: WorldState | undefined,
+): CastMember[] => {
+  const known = Object.values(state?.agents ?? {})
+  return known.length > 0
+    ? known.map((a) => ({ name: a.name, alive: a.alive }))
+    : (cast ?? []).map((c) => ({ name: c.name, alive: true }))
+}
+
 // The incremental one-day job: segment -> score -> firsts -> institutions -> chapter.
 // Idempotent per day (chapters.day is UNIQUE).
 export async function narrateDay(deps: {
@@ -73,12 +85,8 @@ export async function narrateDay(deps: {
   const nameOf = (id: string): string => personWords(names.get(id))
   // A scene is stored as the tile it happened on. The prompt is given the place instead, so no
   // chapter can echo a coordinate the model was never shown.
-  // Living AND dead: the chronicle may name a grave, and may name nothing else.
   const known = Object.values(deps.world?.state?.agents ?? {})
-  const roll: CastMember[] =
-    known.length > 0
-      ? known.map((a) => ({ name: a.name, alive: a.alive }))
-      : (deps.cast ?? []).map((c) => ({ name: c.name, alive: true }))
+  const roll = castRoll(deps.cast, deps.world?.state)
   const standing = Object.values(deps.world?.state?.structures ?? {})
   const placeOf = (location: string): string | null => {
     const m = /^(\d+),(\d+)$/.exec(location)
@@ -216,6 +224,7 @@ export async function narrateWeek(deps: {
   llm: NarratorLlm
   days: ChapterRow[]
   validEventIds: number[]
+  cast?: readonly CastMember[]
   alert?: (d: string) => void
 }): Promise<EraRow> {
   if (deps.days.length === 0) throw new Error('narrateWeek requires at least one chapter')
@@ -227,6 +236,7 @@ export async function narrateWeek(deps: {
     endDay: chapters[chapters.length - 1]!.day,
     chapters,
     validEventIds: deps.validEventIds,
+    cast: deps.cast,
     alert: deps.alert,
   })
 }
@@ -258,6 +268,7 @@ export async function closeDay(deps: {
   alert?: (d: string) => void
 }): Promise<ChapterRow> {
   const { store, llm, cast } = deps
+  const roll = castRoll(cast, deps.world?.state)
   const { chapter, heat, milestones } = await narrateDay({
     store,
     llm,
@@ -305,6 +316,7 @@ export async function closeDay(deps: {
         agentId: subject.id,
         name: subject.name,
         throughDay: day,
+        cast: roll,
         ...(deps.alert === undefined ? {} : { alert: deps.alert }),
       })
     } catch (err) {
@@ -322,6 +334,7 @@ export async function closeDay(deps: {
         llm,
         days,
         validEventIds: seqsBetweenDays(deps.worldDb, week.startDay, week.endDay),
+        cast: roll,
         ...(deps.alert === undefined ? {} : { alert: deps.alert }),
       })
   }
