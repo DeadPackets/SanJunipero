@@ -17,7 +17,7 @@ import type { WorldMirror } from './worldMirror.js'
 
 /** The newest this many scenes. The list is polled by every open filmstrip and a long-lived town
  *  has thousands. */
-const MOMENT_MAX = 240
+export const MOMENT_MAX = 240
 
 export type MomentDeps = {
   db: Database.Database
@@ -26,9 +26,11 @@ export type MomentDeps = {
 }
 
 export function makeMomentsReader(deps: MomentDeps): () => Moment[] {
+  // The newest rows, not the whole log: a close is always newer than its open, so a scene whose
+  // open is in the window has its close in it too, and the pair survives the bound intact.
   const selScenes = deps.db.prepare(
     `SELECT seq, tick, type, payload FROM events WHERE type IN ('scene_opened', 'scene_closed')
-     ORDER BY tick, seq`,
+     ORDER BY tick DESC, seq DESC LIMIT ?`,
   )
 
   // R4: a scene is stored as the tile it happened on, and a viewer is never shown a pair of
@@ -43,12 +45,14 @@ export function makeMomentsReader(deps: MomentDeps): () => Moment[] {
   /** The log records no room. The narrator's own scene rows are the only place a place is ever
    *  written down, and they are time WINDOWS over the same events rather than these scenes — so
    *  there is no key to join on, and the window a scene happened inside answers for it. */
-  const placeAt = (): ((tick: number) => string | null) => {
+  const placeAt = (fromTick: number): ((tick: number) => string | null) => {
     let windows: Pick<SceneRow, 'start_tick' | 'end_tick' | 'location'>[] = []
     try {
       windows = (deps.narratorDb
-        ?.prepare('SELECT start_tick, end_tick, location FROM scenes ORDER BY start_tick')
-        .all() ?? []) as typeof windows
+        ?.prepare(
+          'SELECT start_tick, end_tick, location FROM scenes WHERE end_tick >= ? ORDER BY start_tick',
+        )
+        .all(fromTick) ?? []) as typeof windows
     } catch {
       /* a narrator db that predates the table simply has no places to give */
     }
@@ -58,16 +62,23 @@ export function makeMomentsReader(deps: MomentDeps): () => Moment[] {
     }
   }
 
-  return () => {
-    const where = placeAt()
+  // One scan per world generation: `/api/moments` is polled by every open filmstrip and every
+  // share card asks the same question of the same log.
+  let held: { seq: number; moments: Moment[] } | null = null
+
+  const read = (): Moment[] => {
+    const rows = (
+      selScenes.all(MOMENT_MAX * 2) as {
+        seq: number
+        tick: number
+        type: string
+        payload: string
+      }[]
+    ).reverse()
+    const where = placeAt(rows[0]?.tick ?? 0)
     const open = new Map<string, Moment>()
     const out: Moment[] = []
-    for (const r of selScenes.all() as {
-      seq: number
-      tick: number
-      type: string
-      payload: string
-    }[]) {
+    for (const r of rows) {
       const p = JSON.parse(r.payload) as Record<string, unknown>
       const id = typeof p.id === 'string' ? p.id : null
       if (id === null) continue
@@ -99,5 +110,11 @@ export function makeMomentsReader(deps: MomentDeps): () => Moment[] {
       started.summary = summary === '' ? null : summary
     }
     return out.sort(byDayThenStakes).slice(0, MOMENT_MAX)
+  }
+
+  return () => {
+    const seq = deps.mirror.seq()
+    if (held?.seq !== seq) held = { seq, moments: read() }
+    return held.moments
   }
 }
