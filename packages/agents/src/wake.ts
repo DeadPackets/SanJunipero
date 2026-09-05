@@ -150,9 +150,13 @@ export function wakeReasons(
   // plan wake out of it is a turn spent being refused for hands that are full.
   if (packet.self.activity === 'lie_with' && !packet.self.asleep && !rousing && !failing) return []
 
-  // A listener takes no turn at all — that is what makes hearing free.
-  if (floor.inScene && !packet.self.asleep && !rousing && !failing) {
-    return floor.holdsFloor ? ['floor'] : []
+  // A listener takes no turn at all — that is what makes hearing free. A failing body that holds
+  // the floor says its line first; the alarm reaches it the beat after, still in the talk, where
+  // its turn can eat, say goodbye or walk off in a way the others remember. r16 counted 250 alarm
+  // turns and 90 of 117 talks ending on a body that left without a word.
+  if (floor.inScene && !packet.self.asleep && !rousing) {
+    if (floor.holdsFloor) return ['floor']
+    if (!failing) return []
   }
 
   const reasons: WakeReason[] = []
