@@ -21,15 +21,17 @@ function Section({
 }
 
 export function RosterExpanded({
+  id,
   becoming,
   onOpenFull,
 }: {
+  id: string
   becoming: Becoming
   onOpenFull: () => void
 }) {
   const b = becoming
   return (
-    <div className="roster-expanded" role="group" aria-label="Who they have become">
+    <div id={id} className="roster-expanded" role="group" aria-label="Who they have become">
       <p className="rx-lived">{b.lived}</p>
 
       <Section name="done" empty={b.done.length === 0}>

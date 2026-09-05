@@ -159,11 +159,13 @@ export function Ticker({ scene }: { scene: Scene | null }) {
     if (node === null || text === '' || scene?.wantsMotion() !== true) return
     let x = 0
     let last = performance.now()
+    // Measured once: reading `scrollWidth` inside the loop forces a layout on every frame, and
+    // the line only changes width when `text` does, which re-runs this effect.
+    const once = node.scrollWidth / 2
     return joinStageLoop(() => {
       const now = performance.now()
       x -= (TICKER_PX_PER_S * (now - last)) / 1000
       last = now
-      const once = node.scrollWidth / 2
       if (once > 0 && -x >= once) x += once
       node.style.transform = `translateX(${Math.round(x)}px)`
     })

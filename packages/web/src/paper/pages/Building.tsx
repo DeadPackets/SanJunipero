@@ -67,6 +67,8 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   }
 
   const settled = prov.loaded && (prov.data === null || journal.loaded)
+  // `loaded` is true on a refusal too, so the failed branch has to come first or a dropped
+  // read prints "no one remembers who began this" as a fact about the town.
   return (
     <section className="provenance">
       <h3 className="feed-head">{structureTitle(structure)}</h3>

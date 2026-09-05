@@ -12,6 +12,7 @@ import { sceneWindow, type MomentPlay } from '../../ui/replayRun.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
+import { Skeleton } from './Skeleton.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
 
@@ -142,8 +143,10 @@ export function Moments({ store, momentId, onPlay, onMoment }: PageProps) {
   const days = useMemo(() => momentDays(moments ?? []), [moments])
 
   if (read.failed && moments === null) return <OutOfReach onRetry={record.retry} />
-  if (moments !== null && moments.length === 0)
-    return <p className="feed-empty">{EMPTY_COPY.moments}</p>
+  // An empty shelf is a town with no kept days; the read is still out, and the two are not the
+  // same sentence.
+  if (moments === null) return <Skeleton rows={3} />
+  if (moments.length === 0) return <p className="feed-empty">{EMPTY_COPY.moments}</p>
 
   const watch = (picked: Moment): void => {
     onMoment(picked.id)

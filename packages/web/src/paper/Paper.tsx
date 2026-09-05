@@ -125,6 +125,7 @@ export function Paper({
       />
       <section
         className="paper"
+        id="paper"
         data-open={open ? 'yes' : 'no'}
         role="dialog"
         aria-modal="false"
@@ -236,11 +237,17 @@ export function Paper({
           </div>
         </header>
         {key === 'laws' && notice !== null && (
-          <p className="laws-notice" role={notice.ok ? undefined : 'alert'}>
+          <p className="laws-notice" role="status" aria-live={notice.ok ? 'polite' : 'assertive'}>
             {notice.words}
           </p>
         )}
-        <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
+        <div
+          className="paper-sheet"
+          id="paper-sheet"
+          role="tabpanel"
+          aria-labelledby={`paper-tab-${current}`}
+          tabIndex={-1}
+        >
           {open ? (
             // Keyed by the page, not the tab: a tab switch must not drop the page's feeds and
             // refetch them, so a caught page clears on the next arm or the next time it is opened.

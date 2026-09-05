@@ -16,6 +16,7 @@ import {
 import { milestonesFeed } from '../../ui/feeds.js'
 import { pointPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { useFrameCoalesced } from '../../ui/onFrame.js'
 import type { PageProps } from './types.js'
 
 const KEY_STEP_TICKS = 10
@@ -71,6 +72,7 @@ function DayStripView({
   viewTick,
   live,
   marks,
+  marksDown,
   onScrub,
   onMark,
   onLive,
@@ -79,6 +81,7 @@ function DayStripView({
   viewTick: number
   live: boolean
   marks: readonly Mark[]
+  marksDown: boolean
   onScrub: (tick: number) => void
   onMark: (mark: Mark) => void
   onLive: () => void
@@ -94,12 +97,15 @@ function DayStripView({
     const r = el.getBoundingClientRect()
     onScrub(((clientX - r.left) / r.width) * span)
   }
+  // A drag commits once a frame: every sample went to the route, and the route re-renders the
+  // stage, the sky and forty figures with it.
+  const drag = useFrameCoalesced(pick)
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
-      e.key === 'ArrowLeft'
+      e.key === 'ArrowLeft' || e.key === 'ArrowDown'
         ? -KEY_STEP_TICKS
-        : e.key === 'ArrowRight'
+        : e.key === 'ArrowRight' || e.key === 'ArrowUp'
           ? KEY_STEP_TICKS
           : e.key === 'PageDown'
             ? -KEY_PAGE_TICKS
@@ -124,6 +130,13 @@ function DayStripView({
         Drag the strip to hold a minute still, or pick a mark to watch it. The stamp reads REPLAY
         until you come back to now.
       </p>
+      {/* The strip scrubs without its marks, so this is a note beside a working control rather
+          than a page-wide refusal — but a bare strip must not read as a town with no days. */}
+      {marksDown && (
+        <p className="sheet-note" role="status">
+          The marks along the strip could not be read. Scrubbing still works.
+        </p>
+      )}
       <div className="day-marks">
         {marks.map((mk) => {
           const at = tickToMoment(mk.tick)
@@ -131,7 +144,8 @@ function DayStripView({
             <button
               key={`${mk.kind}-${mk.tick}`}
               type="button"
-              className={`mark ${mk.kind}`}
+              className="mark"
+              data-kind={mk.kind}
               style={{ left: markLeft(mk.tick, span) }}
               aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Watch this moment.`}
               onClick={() => {
@@ -158,11 +172,11 @@ function DayStripView({
         aria-valuetext={`Day ${m.day} ${m.time}`}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          e.currentTarget.setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
-          if (e.buttons === 1) pick(e.clientX)
+          if (e.buttons === 1) drag(e.clientX)
         }}
       >
         {gridDays(span).map((d) => (
@@ -193,8 +207,8 @@ export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
-  const sources =
-    usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
+  const marksRead = usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS)
+  const sources = marksRead.data ?? EMPTY_SOURCES
   const firsts = useFeed(milestonesFeed).data ?? NO_FIRSTS
 
   const edge = Math.max(liveEdge, 1)
@@ -213,6 +227,7 @@ export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
       viewTick={viewTick}
       live={mode.live}
       marks={marks}
+      marksDown={marksRead.failed && marksRead.data === null}
       onScrub={(tick) => {
         onScrub(Math.max(0, Math.min(edge, Math.round(tick))))
       }}

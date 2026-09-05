@@ -27,7 +27,10 @@ export function LevelMatrixTable({
               </th>
               {matrix.heads.map((h) => (
                 <th key={h.id} scope="col" className="matrix-head">
-                  <abbr title={h.name}>{h.short}</abbr>
+                  <abbr title={h.name} aria-hidden="true">
+                    {h.short}
+                  </abbr>
+                  <span className="stage-sr">{h.name}</span>
                 </th>
               ))}
             </tr>

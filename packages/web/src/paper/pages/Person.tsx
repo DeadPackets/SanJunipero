@@ -79,7 +79,10 @@ function NeedBar({ label, value }: { label: string; value: number }) {
         aria-valuenow={v}
         aria-valuetext={`${v} of 100`}
       >
-        <div className={v < NEED_LOW ? 'need-fill low' : 'need-fill'} style={{ width: `${v}%` }} />
+        <div
+          className={v < NEED_LOW ? 'need-fill low' : 'need-fill'}
+          style={{ transform: `scaleX(${v / 100})` }}
+        />
       </div>
     </div>
   )
