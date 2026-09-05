@@ -80,6 +80,38 @@ describe('migrateLlmTables', () => {
     }).not.toThrow()
   })
 
+  // ★ A reservation is released in a JS `finally`, so a kill or an OOM leaves it behind and it
+  // counts against that caller's budget for ever. One process owns the ledger: boot clears them.
+  it('★ clears the reservations a killed process left behind, and no call it billed', () => {
+    const db = openDb()
+    db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)').run(
+      Date.now(),
+      'reflection',
+      0.005,
+    )
+    insertLlmCall(db, {
+      agentId: null,
+      caller: 'reflection',
+      model: 'm',
+      provider: 'Wafer',
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      reasoningTokens: 0,
+      costUsd: 0.01,
+      estimatedCostUsd: 0.01,
+      reportedCostUsd: null,
+      latencyMs: 90,
+      ok: true,
+      error: null,
+    })
+
+    migrateLlmTables(db)
+
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_reservations').get()).toEqual({ n: 0 })
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 1 })
+  })
+
   it('adds the two bill columns to a table that predates them, leaving its rows alone', () => {
     const db = new Database(':memory:')
     db.exec(`

@@ -87,6 +87,9 @@ export function migrateLlmTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
+  // A reservation is released in a JS `finally`, which a kill never reaches. One process owns
+  // this ledger, so anything still reserved when it opens belongs to a run that is gone.
+  db.exec('DELETE FROM llm_reservations')
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
