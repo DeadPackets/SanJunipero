@@ -83,11 +83,38 @@ describe('protocol', () => {
     expect(() => ServerMsg.parse({ ...msg, importance: 11 })).toThrow()
   })
 
-  it('is at version 7: a v6 viewer reads a thought that has no weight to gate on', () => {
-    expect(PROTOCOL_VERSION).toBe(7)
+  it('is at version 8: a v7 viewer polls a heat the town no longer keeps', () => {
+    expect(PROTOCOL_VERSION).toBe(8)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })
+  })
+
+  it('carries the cut and the act, and refuses a cut with nobody in it', () => {
+    const cut = {
+      t: 'director',
+      tick: 850,
+      cut: {
+        sceneId: 'scene_850_abcd1234',
+        agentIds: ['nadia'],
+        score: 24,
+        why: 'Nadia — a slight',
+      },
+      quiet: false,
+      act: 'II',
+    }
+    expect(ServerMsg.parse(cut)).toEqual(cut)
+    // The quiet round turns on this, so the shape must allow it.
+    expect(ServerMsg.parse({ ...cut, cut: null, act: null })).toEqual({
+      ...cut,
+      cut: null,
+      act: null,
+    })
+    expect(() => ServerMsg.parse({ ...cut, cut: { ...cut.cut, agentIds: [] } })).toThrow()
+    expect(() => ServerMsg.parse({ ...cut, cut: { ...cut.cut, why: '' } })).toThrow()
+    expect(() => ServerMsg.parse({ ...cut, act: 'IV' })).toThrow()
+    // A body-level cut belongs to nobody's scene, and says so rather than inventing one.
+    expect(ServerMsg.parse({ ...cut, cut: { ...cut.cut, sceneId: null } })).toBeTruthy()
   })
 
   it('carries a replay: the ask names a minute, the answer names the log head at it', () => {

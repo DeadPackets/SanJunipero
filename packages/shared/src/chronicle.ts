@@ -113,6 +113,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_conceived',
   // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.
   'scene_opened',
+  'scene_turned',
   'scene_line',
   'scene_closed',
   // The mind already remembers letting go; the feed does not need to watch it happen.

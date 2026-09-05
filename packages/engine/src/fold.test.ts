@@ -286,6 +286,43 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     golden(event, 'b3e8ff6d1b3b92d0b6ee8d7af55e1bdfd56658f055932dba9b7f7ea9f4eb0f5f')
   })
 
+  // The camera and the viewer's frame read this one; the world only witnesses that the talk
+  // became something else, so no golden can move for it.
+  it('witness: a talk turning folds to nothing and moves no hash', () => {
+    const event = ev(5, 'scene_turned', {
+      id: 'scene_5_abcd1234',
+      kind: 'quarrel',
+      participants: ['a1', 'a2'],
+      stakes: 8,
+    })
+    const before = town()
+    expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
+    expect(stateHash(fold(before, event, DEFAULT_CONFIG))).toBe(stateHash(before))
+  })
+
+  it('witness: a talk turning is parsed, so a malformed one cannot reach a replay', () => {
+    expect(() =>
+      fold(town(), ev(5, 'scene_turned', { id: 's', kind: 'quarrel' }), DEFAULT_CONFIG),
+    ).toThrow()
+    expect(() =>
+      fold(
+        town(),
+        ev(5, 'scene_turned', { id: 's', kind: 'gossip', participants: [], stakes: 8 }),
+        DEFAULT_CONFIG,
+      ),
+    ).toThrow()
+  })
+
+  // A cast on the closing frame is optional, so every log recorded before it still parses.
+  it('witness: a scene closing parses with a cast and without one', () => {
+    const base = { id: 'scene_5_abcd1234', summary: 's', deltas: [], closeReason: 'ended' }
+    const before = town()
+    expect(fold(before, ev(5, 'scene_closed', base), DEFAULT_CONFIG)).toBe(before)
+    expect(
+      fold(before, ev(5, 'scene_closed', { ...base, participants: ['a1'] }), DEFAULT_CONFIG),
+    ).toBe(before)
+  })
+
   // The bond graph reads this one off the log. The world only witnesses that a tie ran out,
   // so a log carrying one replays to the byte the same state a log without it reaches.
   it('witness: a tie letting go folds to nothing and moves no hash', () => {

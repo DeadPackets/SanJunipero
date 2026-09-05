@@ -47,6 +47,7 @@ import {
   AgentSpawned,
   AgentTended,
   SceneOpened,
+  SceneTurned,
   SceneLineSaid,
   SceneClosed,
   TieLetGo,
@@ -291,6 +292,10 @@ export function fold(
     // A scene lives in the minds that are having it; the world only witnesses that it happened.
     case 'scene_opened': {
       SceneOpened.parse(event.payload)
+      return state
+    }
+    case 'scene_turned': {
+      SceneTurned.parse(event.payload)
       return state
     }
     case 'scene_line': {

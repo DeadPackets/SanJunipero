@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 7 // 7: a thought carries its weight — a v6 viewer has nothing to gate the wisps on
+export const PROTOCOL_VERSION = 8 // 8: the director's cut and act ride the socket; a v7 viewer polls a heat that no longer exists
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -124,6 +124,32 @@ export const ServerScene = z
   })
   .strict()
 export type ServerScene = z.infer<typeof ServerScene>
+// What the camera is on and why. `score` is the gateway's own unbounded number and NOT the
+// scene frame's 0-10 stakes: one is what the town has riding on a talk, the other is how that
+// talk ranks against a death two streets away.
+export const StakeScoreSchema = z
+  .object({
+    sceneId: z.string().min(1).nullable(),
+    agentIds: z.array(z.string().min(1)).min(1),
+    score: z.number().nonnegative(),
+    why: z.string().min(1),
+  })
+  .strict()
+export type StakeScore = z.infer<typeof StakeScoreSchema>
+// The act mark rides here rather than on the cut, because it still reads while the quiet round
+// turns and there is no cut at all.
+export const ServerDirector = z
+  .object({
+    t: z.literal('director'),
+    tick,
+    /** Null: nothing is scored, and the viewer's quiet round turns. */
+    cut: StakeScoreSchema.nullable(),
+    /** The beat after a peak: the shot holds and nothing displaces it. */
+    quiet: z.boolean(),
+    act: z.enum(['I', 'II', 'III']).nullable(),
+  })
+  .strict()
+export type ServerDirector = z.infer<typeof ServerDirector>
 export const ServerMsg = z.discriminatedUnion('t', [
   ServerSnapshot,
   ServerPaused,
@@ -133,6 +159,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerThought,
   ServerAssets,
   ServerScene,
+  ServerDirector,
 ])
 export type ServerMsg = z.infer<typeof ServerMsg>
 

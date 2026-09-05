@@ -301,6 +301,16 @@ export const SceneOpened = z
     stakes: z.number().int().min(0).max(10),
   })
   .strict()
+// A talk that turned into something else, or grew a voice. The frame the viewer holds and the
+// camera's own scorer both keep the opening kind and the opening pair without it.
+export const SceneTurned = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation']),
+    participants: z.array(z.string().min(1)),
+    stakes: z.number().int().min(0).max(10),
+  })
+  .strict()
 export const SceneLineSaid = z
   .object({
     id: z.string().min(1),
@@ -334,6 +344,8 @@ export const SceneClosed = z
         .strict(),
     ),
     closeReason: z.enum(['ended', 'left', 'capped', 'timeout']),
+    // Optional: every log recorded before the cast rode the closing frame still parses.
+    participants: z.array(z.string().min(1)).optional(),
   })
   .strict()
 
