@@ -76,8 +76,8 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
   // A mind's own day log carries ordinary English back into the prompt, so an ordinary word in
   // the enforced set crashes every remaining turn of its day.
   const ordinaryPhrases: Record<string, string> = {
-    milestone: 'Your mind wanders back over the day: finishing the roof felt like a milestone.',
-    milestones: 'Your mind wanders back over the day: the milestones of a long summer.',
+    milestone: 'Looking back over the day: finishing the roof felt like a milestone.',
+    milestones: 'Looking back over the day: the milestones of a long summer.',
     tier: 'Nadia stacked the baskets, the small ones on the upper tier.',
     tiers: 'The riverbank falls away in tiers down to the water.',
     construct: 'Omar means to construct a rail along the deck.',

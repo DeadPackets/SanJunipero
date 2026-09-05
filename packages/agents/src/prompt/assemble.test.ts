@@ -828,7 +828,7 @@ describe('compaction', () => {
 
     const compacted = compactDayLog(dayLog, 'the day blurred into chores and quiet hours.')
     expect(compacted.length).toBe(11)
-    expect(compacted[0]).toContain('Your mind wanders')
+    expect(compacted[0]).toContain('Looking back over the day')
     expect(compacted[0]).toContain('the day blurred into chores and quiet hours.')
     expect(compacted.slice(1)).toEqual(dayLog.slice(-10))
   })
@@ -960,7 +960,7 @@ describe('the book a mind can turn back to', () => {
       }),
     )
     expect(a.messages[0]!.content).toBe(
-      'You turn back the pages of your own book:\n' +
+      'What you have written in your own book:\n' +
         'Day 3: The roof held through the storm.\n' +
         'Day 5: Nadia brought bread again.',
     )
@@ -971,7 +971,9 @@ describe('the book a mind can turn back to', () => {
   it('says nothing at all when nothing is written yet', () => {
     const a = assemblePrompt(fixtureBlocks({ journal: [] }))
     expect(a.messages).toHaveLength(3)
-    expect(serialize(fixtureBlocks({ journal: [] }))).not.toContain('turn back the pages')
+    expect(serialize(fixtureBlocks({ journal: [] }))).not.toContain(
+      'What you have written in your own book',
+    )
   })
 
   it('shows at most the last five pages, and never a tick number', () => {
@@ -1029,7 +1031,7 @@ describe('what a spent beat brings back', () => {
     )
     const block = a.messages[2]!.content
     expect(block).toBe(
-      'You cast your mind back to the night the river rose. What comes back:\n' +
+      'You think back to the night the river rose. What comes back:\n' +
         'The water came over the fork by dawn.\n' +
         'Omar carried the child out.',
     )
@@ -1039,7 +1041,7 @@ describe('what a spent beat brings back', () => {
 
   it('says nothing comes back rather than leaving the asking unanswered', () => {
     const a = assemblePrompt(fixtureBlocks({ recalled: { query: 'my mother', memories: [] } }))
-    expect(a.messages[2]!.content).toBe('You cast your mind back to my mother. Nothing comes back.')
+    expect(a.messages[2]!.content).toBe('You think back to my mother. Nothing comes back.')
   })
 
   it('adds no message at all on a turn that cast nothing back', () => {
@@ -1052,13 +1054,13 @@ describe('a mind that is already in the middle of something', () => {
     const a = assemblePrompt(fixtureBlocks({ underway: { what: 'walk 62 70', step: 2, of: 4 } }))
     const last = a.messages.at(-1)!.content
     expect(last).toContain('You are in the middle of: walk 62 70 (step 2 of 4).')
-    expect(last).toContain('Answer wait and it goes on.')
+    expect(last).toContain('Answer wait and it carries on.')
   })
 
   it('prints no step for a one-act plan, and nothing at all for a mind with its hands free', () => {
     const one = fixtureBlocks({ underway: { what: 'eat item_bread', step: 1, of: 1 } })
     expect(assemblePrompt(one).messages.at(-1)!.content).toContain(
-      'You are in the middle of: eat item_bread. Your body',
+      'You are in the middle of: eat item_bread. You keep at it',
     )
     expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
   })
@@ -1168,7 +1170,7 @@ describe('what stands within reach', () => {
     const system = said(['A store held in common'])
     expect(system).toContain('Nobody here has done any of these')
     expect(system).toContain('a store held in common')
-    expect(system).toContain('Say what you mean to do in your own words and try it.')
+    expect(system).toContain('Say what you want to do in your own words and try it.')
   })
 
   it('reads as a sentence when there are several, and says nothing when there are none', () => {
@@ -1206,7 +1208,7 @@ describe('what the town has agreed', () => {
   const said = (laws: string[]): string => assemblePrompt(fixtureBlocks({ laws })).system
 
   it('quotes the sentences the town actually said', () => {
-    expect(said([LAW])).toContain('The town has agreed these, and holds one another to them:')
+    expect(said([LAW])).toContain('The town has agreed on these and holds each other to them:')
     expect(said([LAW])).toContain(`"${LAW}"`)
   })
 
@@ -1242,12 +1244,14 @@ describe('what the town has agreed', () => {
       fixtureBlocks({ customs: ['Long Turning'], laws: [LAW], frontier: ['A store in common'] }),
     ).system
     expect(system.indexOf('The town has taken to')).toBeLessThan(
-      system.indexOf('The town has agreed these'),
+      system.indexOf('The town has agreed on these'),
     )
-    expect(system.indexOf('The town has agreed these')).toBeLessThan(
+    expect(system.indexOf('The town has agreed on these')).toBeLessThan(
       system.indexOf('Nobody here has done any of these'),
     )
-    expect(system.indexOf('The town has agreed these')).toBeLessThan(system.indexOf('Name: Tamar'))
+    expect(system.indexOf('The town has agreed on these')).toBeLessThan(
+      system.indexOf('Name: Tamar'),
+    )
   })
 
   // A rule has an id and a number of its own, and a mind may hear neither: the words alone.

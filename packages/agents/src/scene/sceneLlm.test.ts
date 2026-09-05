@@ -170,7 +170,7 @@ describe('the scene turn keeps the cached prefix', () => {
     const blocks = fixtureBlocks()
     // The journal, the day log and the moment prose are what a turn pays for every time.
     expect(prompts[0]).not.toContain(blocks.dayLog[0])
-    expect(prompts[0]).not.toContain('You turn back the pages')
+    expect(prompts[0]).not.toContain('What you have written in your own book')
     expect(prompts[0]).toContain('It is your turn.')
   })
 })
@@ -610,7 +610,7 @@ describe('what the town has agreed reaches a scene line too', () => {
     const { model, prompts } = answering(TURN)
     const llm = makeSceneLlm(client(model), voice({ laws: () => laws }))
     return llm.line(ask()).then(() => {
-      expect(turnSystem).toContain('The town has agreed these, and holds one another to them:')
+      expect(turnSystem).toContain('The town has agreed on these and holds each other to them:')
       expect(prompts[0]).toContain(turnSystem)
     })
   })

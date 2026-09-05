@@ -833,7 +833,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Three tiles a tick carries the five-tile walk inside one turn, so what the second prompt
     // finds underway is the next step of the same plan, still running.
     expect(second).toContain('You are in the middle of: take item_1 (step 2 of 3).')
-    expect(second).toContain('Answer wait and it goes on.')
+    expect(second).toContain('Answer wait and it carries on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {
@@ -2453,9 +2453,9 @@ describe("a beat spent on one's own past", () => {
     const { model, prompts } = capturingModel([RECALL_TURN, BENIGN_TURN, BENIGN_TURN])
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 90)
-    expect(saidOn(prompts, 0)).not.toContain('You cast your mind back')
-    expect(saidOn(prompts, 1)).toContain('You cast your mind back to the storehouse.')
-    expect(saidOn(prompts, 2)).not.toContain('You cast your mind back')
+    expect(saidOn(prompts, 0)).not.toContain('You think back to')
+    expect(saidOn(prompts, 1)).toContain('You think back to the storehouse.')
+    expect(saidOn(prompts, 2)).not.toContain('You think back to')
   })
 
   it('reads its own book back, dated by the day the world counts', async () => {
@@ -2468,9 +2468,11 @@ describe("a beat spent on one's own past", () => {
       mindConfig: { ...FAST_MIND, journalTicks: 0 },
     })
     await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
-    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain('turn back the pages')
+    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain(
+      'What you have written in your own book',
+    )
     expect(prompts[1]!.find((m) => m.role === 'user')!.text).toBe(
-      'You turn back the pages of your own book:\nDay 1: The roof held.',
+      'What you have written in your own book:\nDay 1: The roof held.',
     )
   })
 })
