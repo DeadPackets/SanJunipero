@@ -256,7 +256,8 @@ export async function renderChapter(deps: {
   alert?: ((d: string) => void) | undefined
 }): Promise<ChapterRow> {
   const { store, llm, day, scenes } = deps
-  const sceneIds = store.insertScenes(scenes)
+  // The rooms are written down only once the chapter is in hand: a render that fails would
+  // otherwise leave them behind, and `chapters.day` — the idempotence — never sees them.
   const summary = await llm.summarizeChapter(
     sceneDigests(scenes, deps.typeCounts ?? (() => ({})), deps.look ?? {}),
     deps.cast ?? [],
@@ -272,6 +273,7 @@ export async function renderChapter(deps: {
     citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
   const grounded = withoutStrangers(deps, `chapter for day ${day}`, seen.text, deps.cast ?? [])
   const text = publishClean(deps, `chapter for day ${day}`, grounded)
+  const sceneIds = store.insertScenes(scenes)
   const id = store.insertChapter({ day, title: summary.title, text, citations, sceneIds })
   return { id, day, title: summary.title, text, citations, sceneIds }
 }

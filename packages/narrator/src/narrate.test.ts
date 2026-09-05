@@ -227,6 +227,29 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
     expect((caught as ChapterRenderError).message).toContain('response did not match schema')
   })
 
+  // ★ The scenes were written before the call, so a night that would not render left its rooms
+  // behind — and a re-run of that day wrote them all a second time.
+  it('★ leaves no rooms behind on a night that did not render', async () => {
+    const store = memStore()
+    await narrateDay({
+      store,
+      llm: throwingLlm(),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    }).catch(() => null)
+    expect(store.scenesForDay(1)).toEqual([])
+
+    await narrateDay({
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(store.scenesForDay(1)).toHaveLength(3)
+  })
+
   it('says the pass ran on a night that rendered, so a caller can count the nights it did not', async () => {
     const { db, store, llm } = semanticRig()
     const out = await narrateDay({
