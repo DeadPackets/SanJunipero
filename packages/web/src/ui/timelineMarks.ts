@@ -1,3 +1,5 @@
+import { MINUTES_PER_DAY } from '@sj/shared'
+
 /**
  * Marks come from the RECORD — the world's own event log and the narrator's tables — never from
  * `store.recentEvents()`, a 400-entry ring holding only what arrived since the viewer connected.
@@ -176,8 +178,6 @@ export type MarkSources = {
    *  gateway can turn an agent id into a name. */
   discoveries: readonly { tick: number; words: string }[]
 }
-
-const MINUTES_PER_DAY = 1440
 
 /** At most this many labelled ticks on the day track. One per sim-day is a label every 5.8px by
  *  day 120, which is a grey band and 121 nodes rebuilt on every render. */

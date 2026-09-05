@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import {
   DAY_TICKS_MAX,
   MARK_COALESCE_TICKS,
@@ -378,5 +380,18 @@ describe('the day track’s labelled ticks', () => {
       expect(ticks.at(-1)!).toBeLessThanOrEqual(days)
       expect([...ticks].sort((a, b) => a - b)).toEqual(ticks)
     }
+  })
+})
+
+// Two copies of one number must agree by hand: `Days.tsx` places its grid off the shared clock
+// and `marksFrom` placed its chapter marks off a local 1440, on the same track.
+describe('the town has one day length', () => {
+  it('is the shared one everywhere the viewer counts days', () => {
+    for (const f of ['./timelineMarks.ts', './discoveryModel.ts']) {
+      const source = readFileSync(new URL(f, import.meta.url), 'utf8')
+      expect(source, f).not.toMatch(/const MINUTES_PER_DAY = /)
+      expect(source, f).toContain('MINUTES_PER_DAY')
+    }
+    expect(gridDays(MINUTES_PER_DAY * 3)).toEqual([0, 1, 2, 3])
   })
 })
