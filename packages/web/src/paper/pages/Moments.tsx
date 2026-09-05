@@ -14,6 +14,7 @@ import {
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
+import { useFrameCoalesced } from '../../ui/onFrame.js'
 import { momentStamp } from '../stamp.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
@@ -160,6 +161,7 @@ function PlayerStripView({
     const r = el.getBoundingClientRect()
     onSeek((clientX - r.left) / r.width)
   }
+  const drag = useFrameCoalesced(pick)
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
@@ -200,11 +202,11 @@ function PlayerStripView({
         aria-valuetext={momentStamp(player.tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          e.currentTarget.setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
-          if (e.buttons === 1) pick(e.clientX)
+          if (e.buttons === 1) drag(e.clientX)
         }}
       >
         <span className="player-head" style={{ left: `${frac * 100}%` }} />
@@ -259,10 +261,13 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
     setPlayerOf((prev) => ({ id: liveId, state: step(playerFor(prev)) }))
   }
 
+  const openStart = open?.startTick ?? null
   useEffect(() => {
-    if (open === null) return
-    onJump(open.startTick)
-  }, [open, onJump])
+    if (openStart === null) return
+    onJump(openStart)
+    // Keyed on the day's id and its first tick, never on the object: `/api/moments` re-polls,
+    // and a fresh object every beat sent the playhead back to the start of the day.
+  }, [liveId, openStart, onJump])
 
   // Scrubs go out only when the tick actually changes, so 60 frames a second do not become 60
   // socket messages.

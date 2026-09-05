@@ -14,6 +14,7 @@ import {
 } from '../../ui/timelineMarks.js'
 import { milestonesFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { useFrameCoalesced } from '../../ui/onFrame.js'
 import type { PageProps } from './types.js'
 
 const KEY_STEP_TICKS = 10
@@ -92,6 +93,9 @@ function DayStripView({
     const r = el.getBoundingClientRect()
     onScrub(((clientX - r.left) / r.width) * span)
   }
+  // A drag commits once a frame: every sample went to the route, and the route re-renders the
+  // stage, the sky and forty figures with it.
+  const drag = useFrameCoalesced(pick)
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
@@ -165,11 +169,11 @@ function DayStripView({
         aria-valuetext={`Day ${m.day} ${m.time}`}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          e.currentTarget.setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
-          if (e.buttons === 1) pick(e.clientX)
+          if (e.buttons === 1) drag(e.clientX)
         }}
       >
         {gridDays.map((d) => (

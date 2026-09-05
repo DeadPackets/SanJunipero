@@ -155,7 +155,9 @@ export function BondsGraph({
     const el = boxRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => {
-      setDims({ w: el.clientWidth, h: el.clientHeight })
+      const w = el.clientWidth
+      const h = el.clientHeight
+      setDims((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
     })
     ro.observe(el)
     return () => {

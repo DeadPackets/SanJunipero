@@ -407,7 +407,9 @@ export function ExportLink({ token, onNotice }: { token: string; onNotice: (s: s
         a.href = url
         a.download = 'san-junipero-run.tar'
         a.click()
-        URL.revokeObjectURL(url)
+        setTimeout(() => {
+          URL.revokeObjectURL(url)
+        }, 0)
       })
       .catch((err: unknown) => {
         onNotice(err instanceof Error ? err.message : String(err))

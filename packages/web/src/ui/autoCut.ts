@@ -34,8 +34,8 @@ export function useAutoCut(armed: boolean): { autoCut: boolean; toggle: () => vo
   }, [armed])
 
   useEffect(() => {
-    window.addEventListener('pointerdown', hold)
-    window.addEventListener('keydown', hold)
+    window.addEventListener('pointerdown', hold, { passive: true })
+    window.addEventListener('keydown', hold, { passive: true })
     window.addEventListener('wheel', hold, { passive: true })
     return () => {
       window.removeEventListener('pointerdown', hold)
