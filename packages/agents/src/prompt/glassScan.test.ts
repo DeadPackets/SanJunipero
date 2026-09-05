@@ -15,6 +15,7 @@ import {
 import { assemblePrompt } from './assemble.js'
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
+import { SCENE_ANSWER } from '../scene/sceneLlm.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
 // The constants themselves, not copies of them: a test that retypes the string it guards stops
 // guarding the day somebody edits the source and not the test.
@@ -353,5 +354,16 @@ describe('the naming law', () => {
   it('has one copy for the unnamed case, and it is not a label', () => {
     expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering not yet named')
     expect(scanPromptForGlassLeak(UNNAMED_CONSTRUCT_COPY)).toEqual([])
+  })
+})
+
+describe('★ the words a relationship is asked for in', () => {
+  it('leaves the four verbs and the scene answer clean of any ops word', () => {
+    expect(scanPromptForGlassLeak(CAPABILITIES)).toEqual([])
+    for (const verb of ['court', 'propose', 'lie_with', 'leave_partner']) {
+      expect(CAPABILITIES, verb).toContain(`${verb}: name it ${verb}`)
+      expect(scanPromptForGlassLeak(`name it ${verb}; give targetId`), verb).toEqual([])
+    }
+    expect(scanPromptForGlassLeak(SCENE_ANSWER)).toEqual([])
   })
 })

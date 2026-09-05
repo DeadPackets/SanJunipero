@@ -8,6 +8,7 @@ import type { PersonalityDoc } from '../personality.js'
 import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { TIE_PHRASE, type Tie } from '../memory/ties.js'
+import { askPhrase } from './invitations.js'
 import {
   SceneTurnSchema,
   TIE_KINDS,
@@ -63,9 +64,11 @@ export function sceneWordCap(voice: IdentityCore['voiceCard']): number {
 
 // CAPABILITIES tells every prompt to name an act. A scene line is not an act, and this is the
 // one place that has to say so.
-const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
+export const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
 
-Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.`
+Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.
+
+To ask the one you speak to for something, put in "ask": court to walk out together, propose to be partners for good, lie_with to lie together under a roof of yours or theirs; leave it empty otherwise. If somebody has asked you such a thing, answer it in "answer": accept or refuse.`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what there was to say.',
@@ -139,6 +142,17 @@ function renderLateness(tick: number, energy: number): string {
   return parts.length === 0 ? '' : `${parts.join(' ')} ${SLEEP_WILL_KEEP}`
 }
 
+/** The one thing this line has to settle, said to the one who has to settle it. Empty for the
+ *  asker and for everybody else, so an ordinary talk pays nothing for it. */
+export function renderInvitation(
+  invitation: Scene['invitation'],
+  agentId: string,
+  nameOf: (id: string) => string,
+): string {
+  if (invitation === undefined || invitation.to !== agentId) return ''
+  return askPhrase(invitation.verb, nameOf(invitation.from))
+}
+
 /** Who is here and whose turn it is, in one block AFTER the thread. It sits last because it is
  *  the one part a join or a leave rewrites, and every byte above it stays cached. */
 function renderFloor(opts: {
@@ -193,6 +207,7 @@ export function sceneBlock(
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderLateness(ask.tick, ask.energy),
+    renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),
       others: rest.map((p) => p.name),

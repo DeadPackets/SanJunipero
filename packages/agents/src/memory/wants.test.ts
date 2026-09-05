@@ -305,3 +305,10 @@ function occasionFor(kind: WantKind): WantOccasion {
   if (found === undefined) throw new Error(`no occasion feeds ${kind}`)
   return found
 }
+
+describe('the wants a relationship answers', () => {
+  it('feeds affection off a partnership and legacy off a child', () => {
+    expect(FED_BY.partnered).toBe('affection')
+    expect(FED_BY.child).toBe('legacy')
+  })
+})

@@ -188,6 +188,7 @@ const ACT_IMPORTANCE: Record<string, number> = {
   wear: 2,
   craft: 6,
   give: 6,
+  lie_with: 8,
   tend: 6,
   inscribe: 6,
   build: 7,
@@ -355,7 +356,6 @@ export class AgentRuntime {
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
   readonly #wantBias: WantBias
-  readonly #partners: ReadonlySet<string>
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
@@ -439,8 +439,6 @@ export class AgentRuntime {
     ties?: RuntimeTies | undefined
     /** How much faster than everybody else this mind feels a want, off its voice card. */
     wantBias?: WantBias | undefined
-    /** Whoever this mind is partnered to. A talk one of them is in feeds affection. */
-    partners?: readonly string[] | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -456,7 +454,6 @@ export class AgentRuntime {
     this.#scenes = deps.scenes ?? null
     this.#ties = deps.ties ?? null
     this.#wantBias = deps.wantBias ?? {}
-    this.#partners = new Set(deps.partners ?? [])
   }
 
   start(agentId: string): void {
@@ -603,6 +600,12 @@ export class AgentRuntime {
    *  breaks a tie for the floor when two people have said the same amount. */
   warmthToward(otherId: string): number {
     return this.#company.get(otherId)?.warmth ?? 0
+  }
+
+  /** A want answered by something only the log knows: a partnership, a birth, a public no. */
+  feedWants(occasions: readonly WantOccasion[], tick: number): void {
+    if (occasions.length === 0) return
+    this.#book(() => this.#wants?.feed(occasions, tick))
   }
 
   #onTick(tick: number): void {
@@ -766,8 +769,8 @@ export class AgentRuntime {
     const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
     if (scene !== null) {
       fed.add('scene')
-      if (scene.participants.some((id) => id !== this.#agentId && this.#partners.has(id)))
-        fed.add('partner_scene')
+      const partner = this.#bridge.partnerOf(this.#agentId)
+      if (partner !== null && scene.participants.includes(partner)) fed.add('partner_scene')
     }
     if (this.#bridge.expressedAt(this.#agentId).length > 0) fed.add('expressed_at')
     const places = this.#bridge.knownPlaces(this.#agentId)

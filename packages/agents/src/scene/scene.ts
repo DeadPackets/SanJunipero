@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { stateHash, type SceneKind } from '@sj/shared'
+import { INVITATION_VERBS, stateHash, type InvitationVerb, type SceneKind } from '@sj/shared'
 import type { Tie } from '../memory/ties.js'
 
 export type Move = 'press' | 'give_way' | 'deflect' | 'tease' | 'none'
@@ -36,7 +36,7 @@ export type Scene = {
   topic: string | null
   stakes: number
   proposal?: { lawText: string; predicate: LawPredicate }
-  invitation?: { verb: 'court' | 'propose' | 'lie_with'; from: string; to: string }
+  invitation?: { verb: InvitationVerb; from: string; to: string; askedTick: number }
   passes: number
   timeouts: number
   closedTick: number | null
@@ -54,6 +54,8 @@ export const SceneTurnSchema = z
     move: z.enum(['press', 'give_way', 'deflect', 'tease', 'none']),
     stance: z.enum(['for', 'against', 'unsure']).nullable(),
     answer: z.enum(['accept', 'refuse']).nullable(),
+    /** An invitation this line puts to whoever it is aimed at. Null in every ordinary line. */
+    ask: z.enum(INVITATION_VERBS).nullable(),
     leave: z.boolean(),
     importance: z.number().int().min(1).max(10),
   })
@@ -200,7 +202,7 @@ export function addressedIn(
 
 /** The name a mind wrote in `to`, back to an id. It is handed the roster to choose from, so a
  *  name that is not on it is a miss and the floor falls through to the anchor. */
-function idNamed(
+export function idNamed(
   to: string,
   ids: readonly string[],
   nameOf: (id: string) => string | null,

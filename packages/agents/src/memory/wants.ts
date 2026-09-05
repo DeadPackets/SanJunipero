@@ -19,11 +19,12 @@ export const WANT_RISE_PER_TICK = 0.017
  *  reaches it, and past that more waiting says nothing a morning line could act on. */
 export const WANT_CAP = 100
 
-/** What feeds a want, one occasion per row of the contract. `law_broken` and `child` have no
- *  source in the world yet — Task 13 raises the first and a birth is an engine event. */
+/** What feeds a want, one occasion per row of the contract. `law_broken` has no source in the
+ *  world yet; Task 13 raises it. */
 export const FED_BY = {
   scene: 'belonging',
   partner_scene: 'affection',
+  partnered: 'affection',
   expressed_at: 'affection',
   taught: 'esteem',
   praised: 'esteem',

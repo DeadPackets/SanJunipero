@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, replayFromGenesis, RngStreams, TickLoop } from '@sj/engine'
-import { SimConfigSchema, stateHash, type SimConfig, type SimEvent, type TileId } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  INVITATION_STANDS_TICKS,
+  SimConfigSchema,
+  stateHash,
+  type SimConfig,
+  type SimEvent,
+  type TileId,
+} from '@sj/shared'
 import { SCENE_CORPUS, SCENE_CORPUS_LINES } from '@sj/shared/testutil'
 import { EngineBridge } from '../runtime/bridge.js'
 import { openAgentDb } from '../memory/schema.js'
 import { TieStore } from '../memory/ties.js'
 import { SceneCoordinator, type SceneMind } from './coordinator.js'
+import { INVITATION_STAKES } from './invitations.js'
 import {
   FLOOR_TIMEOUT_MS,
   lineCapFor,
@@ -37,6 +46,7 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
     move: line.move,
     stance: null,
     answer: null,
+    ask: null,
     leave: line.leave,
     importance: line.importance,
     ...over,
@@ -47,11 +57,13 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
  *  where a test needs a silence, a leaving or a stall no recording has. */
 class FakeSceneLlm implements SceneLlm {
   readonly asks: SceneAsk[] = []
+  /** Lines the test hands back by hand, so one can land after the floor has moved off it. */
+  readonly held: ((turn: SceneTurn) => void)[] = []
   closes = 0
   constructor(
     readonly agentId: string,
     readonly calls: Map<string, number>,
-    private readonly script: (ask: SceneAsk, nth: number) => SceneTurn | 'stall',
+    private readonly script: (ask: SceneAsk, nth: number) => SceneTurn | 'stall' | 'hold',
     private readonly closer: () => SceneClose = () => ({ summary: '', deltas: [] }),
   ) {}
 
@@ -60,6 +72,7 @@ class FakeSceneLlm implements SceneLlm {
     this.asks.push(structuredClone(ask))
     const answer = this.script(ask, this.asks.length - 1)
     if (answer === 'stall') return new Promise<SceneTurn>(() => {})
+    if (answer === 'hold') return new Promise<SceneTurn>((resolve) => this.held.push(resolve))
     return answer
   }
 
@@ -77,7 +90,11 @@ function simConfig(): SimConfig {
   })
 }
 
-function buildWorld(who: readonly { id: string; name: string; x: number }[]) {
+const HOUSE = 'structure_1'
+
+type Who = { id: string; name: string; x: number; ageDays?: number; inside?: boolean }
+
+function buildWorld(who: readonly Who[]) {
   const config = simConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -89,7 +106,23 @@ function buildWorld(who: readonly { id: string; name: string; x: number }[]) {
   const emit = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  for (const w of who) emit('agent_spawned', { id: w.id, name: w.name, x: w.x, y: 3, ageDays: 30 })
+  emit('structure_planned', {
+    id: HOUSE,
+    kind: 'house',
+    x: 2,
+    y: 2,
+    w: 4,
+    h: 4,
+    maxHp: 50,
+    flammable: true,
+    builderId: NADIA,
+    owner: NADIA,
+  })
+  emit('structure_completed', { id: HOUSE })
+  for (const w of who) {
+    emit('agent_spawned', { id: w.id, name: w.name, x: w.x, y: 3, ageDays: w.ageDays ?? 30 })
+    if (w.inside === true) emit('agent_entered', { agentId: w.id, structureId: HOUSE })
+  }
   const loop = new TickLoop({
     store,
     state,
@@ -114,8 +147,8 @@ function buildWorld(who: readonly { id: string; name: string; x: number }[]) {
 type Harness = ReturnType<typeof harness>
 
 function harness(opts: {
-  who?: readonly { id: string; name: string; x: number }[]
-  script?: (agentId: string) => (ask: SceneAsk, nth: number) => SceneTurn | 'stall'
+  who?: readonly Who[]
+  script?: (agentId: string) => (ask: SceneAsk, nth: number) => SceneTurn | 'stall' | 'hold'
   closer?: () => SceneClose
   now?: () => number
   ties?: Record<string, TieDelta[]>
@@ -127,6 +160,7 @@ function harness(opts: {
   const world = buildWorld(who)
   const calls = new Map<string, number>()
   const remembered: { agentId: string; text: string; importance: number }[] = []
+  const fed: { agentId: string; occasion: string }[] = []
   const dbs = new Map<string, Database.Database>()
   const llms = new Map<string, FakeSceneLlm>()
   const minds = new Map<string, SceneMind>()
@@ -149,6 +183,9 @@ function harness(opts: {
         remembered.push({ agentId: w.id, text: m.text, importance: m.importance })
       },
       warmth: () => 0,
+      feed: (occasions) => {
+        for (const o of occasions) fed.push({ agentId: w.id, occasion: o })
+      },
     })
   }
   const coordinator = new SceneCoordinator({
@@ -156,7 +193,7 @@ function harness(opts: {
     mindFor: (id) => minds.get(id) ?? null,
     ...(opts.now === undefined ? {} : { now: opts.now }),
   })
-  return { ...world, coordinator, calls, remembered, llms, minds, dbs }
+  return { ...world, coordinator, calls, remembered, fed, llms, minds, dbs }
 }
 
 /** Drive the scene the way the runtimes do: whoever holds the floor asks for a line. */
@@ -757,5 +794,334 @@ describe('the corpus', () => {
     expect(SCENE_CORPUS.length).toBeGreaterThan(0)
     expect(SCENE_CORPUS_LINES.some((l) => l.leave)).toBe(true)
     expect(new Set(SCENE_CORPUS_LINES.map((l) => l.move)).size).toBeGreaterThan(1)
+  })
+})
+
+// ── Relationships as chosen acts ──────────────────────────────────────────────────────────────
+// Every row here drives the REAL court/propose/lie_with/leave_partner verbs through the bridge
+// and the engine's own fold. Nothing hand-writes an event.
+
+const ADULTS: Who[] = [
+  { id: NADIA, name: 'Nadia', x: 3, ageDays: ADULT_AGE_DAYS },
+  { id: OMAR, name: 'Omar', x: 4, ageDays: ADULT_AGE_DAYS },
+]
+
+const INDOORS: Who[] = ADULTS.map((w) => ({ ...w, inside: true }))
+
+/** One tick of the real world, then the coordinator's own look at what the log now says. */
+async function turnOfTheWorld(h: Harness): Promise<void> {
+  h.loop.step()
+  await flush()
+  h.coordinator.onTick(h.loop.tick)
+  await flush()
+}
+
+/** What a mind names in an ordinary turn, put through the engine exactly as a runtime puts it. */
+async function act(h: Harness, agentId: string, verb: string, targetId: string): Promise<string> {
+  const settled = h.bridge.submit(agentId, { verb, params: { targetId } })
+  await turnOfTheWorld(h)
+  const res = await settled
+  return res.ok ? 'ok' : res.reason
+}
+
+const answering = (answer: 'accept' | 'refuse') => () => (_a: SceneAsk, n: number) =>
+  fromCorpus(n, { leave: false, answer, speech: 'Yes, then.' })
+
+const tiesOf = (h: Harness, id: string) =>
+  h.minds
+    .get(id)!
+    .ties.all()
+    .map((t) => ({
+      personId: t.personId,
+      kind: t.kind,
+      source: t.source,
+      settled: t.settledTick !== null,
+    }))
+
+const memoriesOf = (h: Harness, id: string): string[] =>
+  h.remembered.filter((r) => r.agentId === id).map((r) => r.text)
+
+describe('an ask opens a scene of its own', () => {
+  it('hands the invitee the floor and writes the asker the memory of asking', async () => {
+    const h = harness({ who: ADULTS })
+    expect(await act(h, NADIA, 'court', OMAR)).toBe('ok')
+
+    const scene = h.coordinator.open()[0]!
+    expect(scene.kind).toBe('invitation')
+    expect(scene.participants).toEqual([NADIA, OMAR])
+    expect(scene.floor, 'the one who has to answer holds it').toBe(OMAR)
+    expect(scene.invitation).toEqual({
+      verb: 'court',
+      from: NADIA,
+      to: OMAR,
+      askedTick: h.loop.tick,
+    })
+    expect(scene.stakes).toBe(INVITATION_STAKES)
+    h.loop.step()
+    const opened = sceneEvents(h.engineDb).find((e) => e.type === 'scene_opened')
+    expect((opened?.payload as { kind?: string } | undefined)?.kind).toBe('invitation')
+    expect(memoriesOf(h, NADIA)).toEqual(['You asked Omar to walk out together.'])
+  })
+
+  it('takes over the talk two people are already in rather than opening a second', async () => {
+    const h = harness({
+      who: ADULTS,
+      script: (id) => (_a, n) =>
+        fromCorpus(n, { leave: false, ask: id === NADIA ? 'propose' : null, to: 'Omar' }),
+    })
+    const talk = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    expect(talk.kind).toBe('talk')
+    // Nadia has the floor back after Omar's line, and puts the question in that line.
+    await h.coordinator.takeFloor(OMAR, NOON)
+    await h.coordinator.takeFloor(NADIA, NOON)
+    await turnOfTheWorld(h)
+
+    expect(h.coordinator.open(), 'one scene, upgraded').toHaveLength(1)
+    const scene = h.coordinator.open()[0]!
+    expect(scene.id).toBe(talk.id)
+    expect(scene.kind).toBe('invitation')
+    expect(scene.invitation?.verb).toBe('propose')
+    expect(scene.floor).toBe(OMAR)
+  })
+
+  // Risk 2: the scan re-aims the floor while the mouth that held it is still with a provider.
+  it('drops a line still in flight when the scan re-aims the floor under it', async () => {
+    const h = harness({
+      who: ADULTS,
+      script: (id) => (id === NADIA ? () => 'hold' : (_a, n) => fromCorpus(n, { leave: false })),
+    })
+    h.coordinator.noteSpoken(OMAR, 'Nadia. Six planks.', NOON)
+    const inFlight = h.coordinator.takeFloor(NADIA, NOON)
+    expect(h.coordinator.open()[0]?.floor).toBe(NADIA)
+
+    await act(h, OMAR, 'court', NADIA)
+    const scene = h.coordinator.open()[0]!
+    expect(scene.invitation?.from, 'the ask took the floor over').toBe(OMAR)
+    const said = scene.thread.length
+
+    h.llms.get(NADIA)!.held[0]!(fromCorpus(0, { leave: false, speech: 'Six, then.' }))
+    await inFlight
+    expect(scene.thread.length, 'the line came back to a floor that had already moved').toBe(said)
+    expect(scene.invitation, 'and it did not answer for her either').not.toBeUndefined()
+  })
+
+  it('lets the ask go stale where nobody is home to answer it', async () => {
+    const h = harness({ who: ADULTS })
+    const deaf = new SceneCoordinator({
+      bridge: h.bridge,
+      mindFor: (id) => (id === NADIA ? h.minds.get(id)! : null),
+    })
+    h.bridge.submit(NADIA, { verb: 'court', params: { targetId: OMAR } })
+    h.loop.step()
+    await flush()
+    deaf.onTick(h.loop.tick)
+    await flush()
+    expect(deaf.open(), 'no mind to hand the floor to').toHaveLength(0)
+    expect(memoriesOf(h, NADIA)).toContain('Omar gave you no answer.')
+  })
+})
+
+describe('a yes is the same verb aimed back', () => {
+  it('courting: both hold an attraction the relationship wrote', async () => {
+    const h = harness({ who: ADULTS, script: answering('accept') })
+    await act(h, NADIA, 'court', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(tiesOf(h, NADIA)).toEqual([
+      { personId: OMAR, kind: 'attraction', source: 'relationship', settled: false },
+    ])
+    expect(tiesOf(h, OMAR)).toEqual([
+      { personId: NADIA, kind: 'attraction', source: 'relationship', settled: false },
+    ])
+    expect(h.coordinator.open()[0]?.invitation, 'answered and cleared').toBeUndefined()
+    expect(h.coordinator.open(), 'and the talk goes on').toHaveLength(1)
+  })
+
+  it('proposing: the world holds the partnership and both books say so', async () => {
+    const h = harness({ who: ADULTS, script: answering('accept') })
+    await act(h, NADIA, 'propose', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(h.bridge.partnerOf(NADIA)).toBe(OMAR)
+    expect(h.bridge.partnerOf(OMAR)).toBe(NADIA)
+    for (const id of [NADIA, OMAR]) {
+      expect(tiesOf(h, id).filter((t) => t.kind === 'kin')).toHaveLength(1)
+      expect(
+        h.minds
+          .get(id)!
+          .ties.open()
+          .find((t) => t.kind === 'kin')?.text,
+      ).toBe('your partner')
+    }
+    expect(memoriesOf(h, NADIA)).toContain('You and Omar are partners now.')
+    expect(memoriesOf(h, OMAR)).toContain('You and Nadia are partners now.')
+    expect(
+      h.fed
+        .filter((f) => f.occasion === 'partnered')
+        .map((f) => f.agentId)
+        .sort(),
+    ).toEqual([NADIA, OMAR].sort())
+  })
+
+  it('lying together: the hour begins, the scene ends, and the secret is theirs alone', async () => {
+    const h = harness({ who: INDOORS, script: answering('accept') })
+    await act(h, NADIA, 'lie_with', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(h.loop.state.agents[NADIA]?.activity?.verb).toBe('lie_with')
+    expect(h.loop.state.agents[OMAR]?.activity?.verb).toBe('lie_with')
+    expect(h.coordinator.open(), 'two bodies busy for an hour hold no floor').toHaveLength(0)
+    expect(closeReasonOf(h)).toBe('ended')
+    for (const id of [NADIA, OMAR]) {
+      const secret = h.minds
+        .get(id)!
+        .ties.open()
+        .find((t) => t.kind === 'secret')
+      expect(secret?.text, 'the place by its name, never its mark').toBe(
+        'what passed between you under the house',
+      )
+    }
+  })
+
+  it('writes no secret between two who are already partners', async () => {
+    const h = harness({ who: INDOORS, script: answering('accept') })
+    await act(h, NADIA, 'propose', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+    await act(h, NADIA, 'lie_with', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(tiesOf(h, NADIA).filter((t) => t.kind === 'secret')).toEqual([])
+  })
+
+  it('tells them both the moment passed when the world refuses the yes', async () => {
+    const h = harness({ who: ADULTS, script: answering('accept') })
+    await act(h, NADIA, 'court', OMAR)
+    // Nadia walks off between the ask and the answer.
+    h.emitNext('agent_moved', { id: NADIA, x: 21, y: 3 })
+    h.loop.step()
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    for (const id of [NADIA, OMAR]) {
+      expect(memoriesOf(h, id).some((m) => m.startsWith('The moment passed:'))).toBe(true)
+    }
+    expect(tiesOf(h, OMAR).filter((t) => t.kind === 'attraction')).toEqual([])
+  })
+})
+
+describe('a no said in front of people', () => {
+  it('is a slight the asker holds, and only where somebody heard it', async () => {
+    const h = harness({
+      who: [...ADULTS, { id: SALMA, name: 'Salma', x: 5, ageDays: ADULT_AGE_DAYS }],
+      script: answering('refuse'),
+    })
+    await act(h, NADIA, 'court', OMAR)
+    expect(h.coordinator.open()[0]?.audience).toEqual([SALMA])
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(tiesOf(h, NADIA)).toEqual([
+      { personId: OMAR, kind: 'slight', source: 'relationship', settled: false },
+    ])
+    expect(tiesOf(h, OMAR), 'the one who said no holds nothing').toEqual([])
+    expect(memoriesOf(h, NADIA)).toContain('Omar would not have you.')
+    expect(h.loop.state.agents[OMAR]).not.toHaveProperty('asked')
+  })
+
+  it('leaves no tie at all where the two of them were alone', async () => {
+    const h = harness({ who: ADULTS, script: answering('refuse') })
+    await act(h, NADIA, 'court', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+
+    expect(tiesOf(h, NADIA)).toEqual([])
+    expect(memoriesOf(h, NADIA)).toContain('Omar would not have you.')
+  })
+
+  it('counts an answer with nothing said as an answer and not as a pass', async () => {
+    const h = harness({
+      who: ADULTS,
+      script: () => () => fromCorpus(0, { leave: false, answer: 'refuse', speech: null }),
+    })
+    await act(h, NADIA, 'court', OMAR)
+    const scene = h.coordinator.open()[0]!
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    expect(scene.passes, 'a no is a thing said').toBe(0)
+    expect(scene.closedTick).toBeNull()
+  })
+})
+
+describe('an ask nobody ever answered', () => {
+  it('leaves the asker a memory and the log nothing', async () => {
+    let clock = 0
+    const h = harness({ who: ADULTS, script: () => () => 'stall', now: () => clock })
+    await act(h, NADIA, 'court', OMAR)
+    for (let i = 0; i < 2; i += 1) {
+      const floor = h.coordinator.open()[0]?.floor
+      if (floor === undefined || floor === null) break
+      void h.coordinator.takeFloor(floor, h.loop.tick)
+      clock += FLOOR_TIMEOUT_MS
+      h.coordinator.onTick(h.loop.tick + 1 + i)
+      await flush()
+    }
+    expect(h.coordinator.open()).toHaveLength(0)
+    expect(memoriesOf(h, NADIA)).toContain('Omar gave you no answer.')
+    h.loop.step()
+    const log = sceneEvents(h.engineDb).map((e) => e.type)
+    expect(log).not.toContain('invitation_refused')
+  })
+
+  it('reads a reciprocal past the window as a fresh ask and not as a yes', async () => {
+    const h = harness({ who: ADULTS })
+    await act(h, NADIA, 'court', OMAR)
+    for (let i = 0; i < INVITATION_STANDS_TICKS + 1; i += 1) h.loop.step()
+    expect(await act(h, OMAR, 'court', NADIA)).toBe('ok')
+    expect(h.loop.state.agents[NADIA]?.asked?.byId, 'an ask, not an acceptance').toBe(OMAR)
+    expect(h.bridge.partnerOf(NADIA)).toBeNull()
+  })
+})
+
+describe('a partner left', () => {
+  it('settles the kin tie, opens a grudge, and tells them both, with no scene in it', async () => {
+    const h = harness({ who: ADULTS, script: answering('accept') })
+    await act(h, NADIA, 'propose', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+    for (const s of h.coordinator.open()) void s
+    // No scene: an ordinary turn, and the scan is the only thing that hears of it.
+    expect(await act(h, NADIA, 'leave_partner', OMAR)).toBe('ok')
+
+    expect(h.bridge.partnerOf(NADIA)).toBeNull()
+    expect(tiesOf(h, NADIA).find((t) => t.kind === 'kin')?.settled).toBe(true)
+    expect(tiesOf(h, OMAR).find((t) => t.kind === 'kin')?.settled).toBe(true)
+    expect(tiesOf(h, OMAR).find((t) => t.kind === 'grudge')).toEqual({
+      personId: NADIA,
+      kind: 'grudge',
+      source: 'relationship',
+      settled: false,
+    })
+    expect(memoriesOf(h, NADIA)).toContain('You left Omar.')
+    expect(memoriesOf(h, OMAR)).toContain('Nadia has left you.')
+  })
+
+  it('makes the next talk that names the leaver a quarrel', async () => {
+    const h = harness({ who: ADULTS, script: answering('accept') })
+    await act(h, NADIA, 'propose', OMAR)
+    await h.coordinator.takeFloor(OMAR, h.loop.tick)
+    await turnOfTheWorld(h)
+    await act(h, NADIA, 'leave_partner', OMAR)
+    for (const scene of h.coordinator.open()) void scene
+    h.coordinator.leave(NADIA, h.loop.tick)
+    h.coordinator.leave(OMAR, h.loop.tick)
+    await flush()
+
+    expect(h.coordinator.noteSpoken(OMAR, 'Nadia said it would be for good.', NOON)?.kind).toBe(
+      'quarrel',
+    )
   })
 })

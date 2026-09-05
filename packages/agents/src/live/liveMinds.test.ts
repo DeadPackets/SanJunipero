@@ -102,7 +102,10 @@ function scriptedModel(): MockLanguageModelV4 {
 // reflects over, so the night these rows are about would never come.
 const DUSK_DAY_0 = 1200
 
-function buildWorld(startTick = DUSK_DAY_0) {
+type Body = { id: string; name: string }
+const ONE_BODY: Body[] = [{ id: AGENT, name: 'Tamar' }]
+
+function buildWorld(startTick = DUSK_DAY_0, bodies: readonly Body[] = ONE_BODY) {
   const config = SimConfigSchema.parse({
     needs: { hungerDecayPerTick: 0.5 },
     structures: { sleepIndoorsOnly: false },
@@ -113,17 +116,19 @@ function buildWorld(startTick = DUSK_DAY_0) {
   const store = new EventStore(openDb(':memory:'))
   const rng = new RngStreams('live-minds-test')
   let state = genesisState(config, terrain)
-  state = fold(
-    state,
-    store.append(state.tick, 'agent_spawned', {
-      id: AGENT,
-      name: 'Tamar',
-      x: 3,
-      y: 3,
-      ageDays: 30,
-    }),
-    config,
-  )
+  bodies.forEach((b, i) => {
+    state = fold(
+      state,
+      store.append(state.tick, 'agent_spawned', {
+        id: b.id,
+        name: b.name,
+        x: 3 + i,
+        y: 3,
+        ageDays: 30,
+      }),
+      config,
+    )
+  })
   const worldTick = createWorldTick(config, rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -152,9 +157,14 @@ const SPEC: MindSpec = {
 }
 
 async function bootOne(
-  opts: { dreamBudgetUsd?: number; startTick?: number; minds?: readonly MindSpec[] } = {},
+  opts: {
+    dreamBudgetUsd?: number
+    startTick?: number
+    minds?: readonly MindSpec[]
+    bodies?: readonly Body[]
+  } = {},
 ) {
-  const { loop, bridge, store, config, terrain } = buildWorld(opts.startTick)
+  const { loop, bridge, store, config, terrain } = buildWorld(opts.startTick, opts.bodies)
   const opsDb = openAgentDb(':memory:')
   migrateLlmTables(opsDb)
   const mindDb = openAgentDb(':memory:')
@@ -185,7 +195,7 @@ async function bootOne(
       bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
     },
   })
-  return { loop, booted, opsDb, mindDb, store, config, terrain }
+  return { loop, booted, bridge, opsDb, mindDb, store, config, terrain }
 }
 
 const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve))
@@ -340,6 +350,7 @@ const SCENE_TURN = {
   move: 'none',
   stance: null,
   answer: null,
+  ask: null,
   leave: false,
   importance: 4,
 }
@@ -401,5 +412,71 @@ describe('a town that is closing waits on the talk it is paying for', () => {
     await line
     expect(booted.busy()).toBe(false)
     booted.stop()
+  })
+})
+
+describe('★ founders written as partners are partners in the world too', () => {
+  const PAIR: MindSpec[] = [
+    {
+      ...SPEC,
+      id: 'amina',
+      identity: { ...tamarIdentity, name: 'Amina' },
+      kin: [{ id: 'bilal', relation: 'partner' }],
+    },
+    {
+      ...SPEC,
+      id: 'bilal',
+      identity: { ...tamarIdentity, name: 'Bilal' },
+      sex: 'm',
+      kin: [{ id: 'amina', relation: 'partner' }],
+    },
+  ]
+  const BODIES: Body[] = [
+    { id: 'amina', name: 'Amina' },
+    { id: 'bilal', name: 'Bilal' },
+  ]
+  const formed = (store: EventStore): unknown[] =>
+    store.readFrom(0).filter((e) => e.type === 'partnership_formed')
+
+  it('announces the partnership once, from the lower mark alone', async () => {
+    const { loop, booted, bridge, store } = await bootOne({ minds: PAIR, bodies: BODIES })
+    loop.step()
+    booted.stop()
+
+    expect(formed(store), 'one event, not one per half').toHaveLength(1)
+    expect(bridge.partnerOf('amina')).toBe('bilal')
+    expect(bridge.partnerOf('bilal')).toBe('amina')
+  })
+
+  it('announces nothing on a second boot against the same world', async () => {
+    const { loop, booted, bridge, store, opsDb, mindDb } = await bootOne({
+      minds: PAIR,
+      bodies: BODIES,
+    })
+    loop.step()
+    booted.stop()
+    void opsDb
+    void mindDb
+
+    const again = bootMinds({
+      minds: PAIR,
+      bridge,
+      embedder: await FakeEmbedder.create(),
+      dbFor: () => openAgentDb(':memory:'),
+      turnLlm: (id) => {
+        const db = openAgentDb(':memory:')
+        migrateLlmTables(db)
+        return new LlmClient({
+          model: scriptedModel(),
+          db,
+          caller: 'turn',
+          agentId: id,
+          maxRetries: 0,
+        })
+      },
+    })
+    loop.step()
+    again.stop()
+    expect(formed(store), 'the world already knew').toHaveLength(1)
   })
 })

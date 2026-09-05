@@ -284,6 +284,7 @@ describe('the recorded corpus', () => {
         move: line.move,
         stance: null,
         answer: null,
+        ask: null,
         leave: line.leave,
         importance: line.importance,
       })

@@ -13,7 +13,8 @@ import {
   threadLinesFor,
   type SceneVoice,
 } from './sceneLlm.js'
-import { openScene, type SceneAsk, type SceneLine } from './scene.js'
+import { openScene, SceneTurnSchema, type SceneAsk, type SceneLine } from './scene.js'
+import { askPhrase } from './invitations.js'
 
 const ZERO_USAGE = {
   inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
@@ -117,6 +118,7 @@ const TURN = JSON.stringify({
   move: 'press',
   stance: null,
   answer: null,
+  ask: null,
   leave: false,
   importance: 4,
 })
@@ -485,5 +487,58 @@ describe('the close', () => {
     const { model } = answering(answer(many))
     const llm = makeSceneLlm(client(model), voice())
     expect((await llm.close(closed())).deltas).toHaveLength(6)
+  })
+})
+
+describe('the one thing an invitation line has to settle', () => {
+  const asked = (to: string): SceneAsk => {
+    const a = ask()
+    a.scene.invitation = { verb: 'court', from: 'yusuf', to, askedTick: 600 }
+    return a
+  }
+
+  it('puts the question to the one who has to answer it, by name', () => {
+    const said = block(asked('tamar'))
+    expect(said).toContain(askPhrase('court', 'Yusuf'))
+    expect(said).toContain('accept or refuse')
+  })
+
+  it('says nothing of it to the one who asked', () => {
+    expect(block(asked('yusuf'))).not.toContain(askPhrase('court', 'Yusuf'))
+  })
+
+  it('costs a talk with no invitation in it not one byte', () => {
+    expect(block()).not.toContain(askPhrase('court', 'Yusuf'))
+    expect(block()).toBe(block(ask()))
+  })
+
+  it('teaches the ask and the answer in the same breath, every line', () => {
+    expect(block()).toContain('put in "ask"')
+    expect(block()).toContain('answer it in "answer": accept or refuse')
+    expect(block()).toContain('lie_with')
+  })
+})
+
+describe('what a scene turn may name', () => {
+  const turn = (over: Record<string, unknown> = {}): unknown => ({
+    thought: 'Well.',
+    speech: 'Yes.',
+    to: null,
+    gesture: null,
+    move: 'none',
+    stance: null,
+    answer: null,
+    ask: null,
+    leave: false,
+    importance: 4,
+    ...over,
+  })
+
+  it('takes the three asks and an empty one, and no word of its own invention', () => {
+    for (const verb of ['court', 'propose', 'lie_with', null]) {
+      expect(SceneTurnSchema.safeParse(turn({ ask: verb })).success, String(verb)).toBe(true)
+    }
+    expect(SceneTurnSchema.safeParse(turn({ ask: 'marry' })).success).toBe(false)
+    expect(SceneTurnSchema.safeParse(turn({ ask: undefined })).success).toBe(false)
   })
 })

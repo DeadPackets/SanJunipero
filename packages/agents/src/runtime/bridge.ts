@@ -27,7 +27,7 @@ import {
   type WorldState,
 } from '@sj/engine'
 import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
-import { isWet, isWoody, type SimConfig, type SimEvent } from '@sj/shared'
+import { isWet, isWoody, RELATIONSHIP_EVENT_TYPES, type SimConfig, type SimEvent } from '@sj/shared'
 import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
@@ -576,6 +576,30 @@ export class EngineBridge {
    *  a day it was not there for. */
   lastSeq(): number {
     return this.#store.lastSeq()
+  }
+
+  /** Whoever this body belongs to, or nobody. The world's only word on it: a partnership is
+   *  two consents in the log, and this is what they folded to. */
+  partnerOf(agentId: string): string | null {
+    return this.#loop.state.agents[agentId]?.partnerId ?? null
+  }
+
+  /** The roof this body stands under, in the town's own word for it. Null under open sky. */
+  roofOf(agentId: string): string | null {
+    const inside = this.#loop.state.agents[agentId]?.insideId
+    const roof = inside === undefined ? undefined : this.#loop.state.structures[inside]
+    return roof === undefined ? null : (placeName(roof) ?? roof.kind)
+  }
+
+  /** The five relationship events since `afterSeq`, oldest first, and the birth that comes of
+   *  one. Read off the same window perception is composed from. */
+  relationshipEventsSince(afterSeq: number): SimEvent[] {
+    return this.#recentEvents().filter(
+      (ev) =>
+        ev.seq > afterSeq &&
+        (RELATIONSHIP_EVENT_TYPES.includes(ev.type as (typeof RELATIONSHIP_EVENT_TYPES)[number]) ||
+          ev.type === 'agent_born'),
+    )
   }
 
   /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same
