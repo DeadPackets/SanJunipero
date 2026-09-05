@@ -32,6 +32,40 @@ describe('the scene frame', () => {
     expect(closed?.scene).toEqual({ ...OPENED, open: false, summary: 'She got a day out of him.' })
   })
 
+  it('re-sends the scene when the talk turns, with the new kind, cast and stakes', () => {
+    const relay = makeSceneRelay()
+    relay([ev('scene_opened', OPENED)])
+    const [turned] = relay([
+      ev('scene_turned', {
+        id: OPENED.id,
+        kind: 'council',
+        participants: ['nadia', 'omar', 'salma'],
+        stakes: 8,
+      }),
+    ])
+    expect(ServerScene.safeParse(turned).success).toBe(true)
+    expect(turned?.scene).toEqual({
+      ...OPENED,
+      kind: 'council',
+      participants: ['nadia', 'omar', 'salma'],
+      stakes: 8,
+      open: true,
+    })
+    // and the close carries the turn forward, not the opening pair
+    const [closed] = relay([
+      ev('scene_closed', { id: OPENED.id, summary: 'A rule.', deltas: [], closeReason: 'ended' }),
+    ])
+    expect(closed?.scene.participants).toEqual(['nadia', 'omar', 'salma'])
+  })
+
+  it('says nothing about a turn in a scene it never saw open', () => {
+    expect(
+      makeSceneRelay()([
+        ev('scene_turned', { id: OPENED.id, kind: 'quarrel', participants: ['a'], stakes: 7 }),
+      ]),
+    ).toEqual([])
+  })
+
   it('sends no frame for a line — the words already reach a viewer as speech', () => {
     const relay = makeSceneRelay()
     relay([ev('scene_opened', OPENED)])

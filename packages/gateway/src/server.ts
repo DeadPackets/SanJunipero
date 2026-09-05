@@ -7,6 +7,7 @@ import {
   DEFAULT_CONFIG,
   PROTOCOL_VERSION,
   TICK_REAL_MS,
+  agentName,
   personAt,
   type AssetRecord,
   type SimConfig,
@@ -17,6 +18,7 @@ import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
 import { makeSceneRelay } from './scenes.js'
+import { makeDirector } from './stakes.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
@@ -386,6 +388,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             sock.send(catchUpJson)
           }
         }
+        // The shot the town is already on. A replaying socket never gets one: a moment's own
+        // cast owns that camera.
+        if (directorJson !== null) sock.send(directorJson)
         return
       }
       if (msg.t === 'scrub') {
@@ -431,6 +436,16 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   // ── poll pump ──
   const sceneFrames = makeSceneRelay()
+  // What the camera is on, folded off the same groups the deltas ride. Read-only on the world:
+  // the names and the partnerships come out of the mirror's own state.
+  const director = makeDirector(
+    (id) => agentName(mirror.state().agents, id),
+    (id) => personAt(mirror.state().agents, id)?.partnerId ?? null,
+  )
+  director.prime(db, mirror.state().tick)
+  let directorJson: string | null = null
+  /** The cut, the beat and the act without the tick, which moves every minute on its own. */
+  let directorMark = ''
   let lastThoughtId = 0
   let lastAssetSeq = 0
   let observerSeen = false
@@ -483,6 +498,14 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
       for (const frame of sceneFrames(g.events)) hub.broadcast(JSON.stringify(frame))
+      director.fold(g.events)
+    }
+    const cut = director.frame(mirror.state().tick)
+    const mark = JSON.stringify([cut.cut, cut.quiet, cut.act])
+    if (mark !== directorMark) {
+      directorMark = mark
+      directorJson = JSON.stringify(cut)
+      hub.broadcast(directorJson)
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {
