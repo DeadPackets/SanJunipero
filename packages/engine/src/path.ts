@@ -176,9 +176,22 @@ function heapPop(heap: Node[]): Node {
   return top
 }
 
+// A search that drains its open list has walked every tile this body can reach, so it can answer
+// for every other mark too. Absent when a route was found or the budget cut the search short.
+type SearchOut = { found: PathSearch | null; reached: Set<number> | null }
+
 // One walk is searched by `validate` and again by `duration` over the same immutable world, so
 // the answer is kept against the identity of that world and the config it was judged under.
-const memo = new WeakMap<WorldState, { config: SimConfig; key: string; found: PathSearch | null }>()
+const memo = new WeakMap<WorldState, { config: SimConfig; key: string; out: SearchOut }>()
+
+function search(state: WorldState, from: Point, to: Point, config: SimConfig): SearchOut {
+  const key = `${from.x},${from.y}|${to.x},${to.y}`
+  const hit = memo.get(state)
+  if (hit?.config === config && hit.key === key) return hit.out
+  const out = runSearch(state, from, to, config)
+  memo.set(state, { config, key, out })
+  return out
+}
 
 export function searchPath(
   state: WorldState,
@@ -187,12 +200,28 @@ export function searchPath(
   config: SimConfig = DEFAULT_CONFIG,
 ): PathSearch | null {
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
-  const key = `${from.x},${from.y}|${to.x},${to.y}`
-  const hit = memo.get(state)
-  if (hit?.config === config && hit.key === key) return hit.found
-  const found = runSearch(state, from, to, config)
-  memo.set(state, { config, key, found })
-  return found
+  return search(state, from, to, config).found
+}
+
+/** The first of these marks a route reaches, in the order given. One search each until a search
+ *  drains: that one walked the whole component, and what it never touched is out of reach. */
+export function firstReachable(
+  state: WorldState,
+  from: Point,
+  tiles: Point[],
+  config: SimConfig = DEFAULT_CONFIG,
+): Point | null {
+  const { width } = pathCtx(state, config)
+  for (let i = 0; i < tiles.length; i++) {
+    const t = tiles[i]!
+    if (from.x === t.x && from.y === t.y) return t
+    const { found, reached } = search(state, from, t, config)
+    if (found !== null) return t
+    if (reached !== null) {
+      return tiles.slice(i + 1).find((p) => reached.has(p.y * width + p.x)) ?? null
+    }
+  }
+  return null
 }
 
 /** As far toward a mark as the ground goes: the mark itself when a route reaches it, and
@@ -206,7 +235,7 @@ export function searchToward(
   config: SimConfig = DEFAULT_CONFIG,
 ): PathSearch | null {
   if (from.x === to.x && from.y === to.y) return { path: [], capped: false }
-  return runSearch(state, from, to, config, true)
+  return runSearch(state, from, to, config, true).found
 }
 
 function runSearch(
@@ -215,9 +244,9 @@ function runSearch(
   to: Point,
   config: SimConfig,
   toward = false,
-): PathSearch | null {
+): SearchOut {
   const ctx = pathCtx(state, config)
-  if (!toward && !isPassable(state, to.x, to.y, ctx)) return null
+  if (!toward && !isPassable(state, to.x, to.y, ctx)) return { found: null, reached: null }
   const width = ctx.width
   // Charging a full grass tile per remaining step over-estimates the moment anything is cheaper
   // than grass — a road is 0.6 — and an over-estimating A* returns a short route, not a cheap one.
@@ -245,7 +274,8 @@ function runSearch(
     const ck = key(cur.x, cur.y)
     if (closed.has(ck)) continue
     closed.add(ck)
-    if (cur.x === to.x && cur.y === to.y) return { path: pathTo(cur), capped: false }
+    if (cur.x === to.x && cur.y === to.y)
+      return { found: { path: pathTo(cur), capped: false }, reached: null }
     for (const [dx, dy] of NEIGHBORS) {
       const nx = cur.x + dx,
         ny = cur.y + dy
@@ -262,14 +292,14 @@ function runSearch(
     // partial is no walk at all, so it reads as the refusal it is.
     if (++expansions >= budget) {
       const path = pathTo(frontier)
-      return path.length === 0 ? null : { path, capped: true }
+      return { found: path.length === 0 ? null : { path, capped: true }, reached: null }
     }
   }
   // The open list drained: no route reaches the mark. The frontier is still the nearest the
   // ground gets to it, which is a walk when the caller asked how far it could go.
-  if (!toward) return null
+  if (!toward) return { found: null, reached: closed }
   const path = pathTo(frontier)
-  return path.length === 0 ? null : { path, capped: true }
+  return { found: path.length === 0 ? null : { path, capped: true }, reached: closed }
 }
 
 export function findPath(

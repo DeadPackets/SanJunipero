@@ -13,6 +13,7 @@ import { submitIntent } from './intent.js'
 import {
   canStep,
   findPath,
+  firstReachable,
   isPassable,
   searchPath,
   searchToward,
@@ -404,6 +405,22 @@ describe('the A* node budget', () => {
     expect(findPath(s, { x: 0, y: 0 }, { x: 4, y: 0 }, withMaxNodes(DEFAULT_CONFIG, 2))).toEqual([
       [1, 0],
     ])
+  })
+
+  it('one drained search answers for every mark still on the list', () => {
+    const s = world(['..~..', '..~..', '..~..'])
+    const here = { x: 0, y: 0 }
+    const across = [
+      { x: 4, y: 0 },
+      { x: 3, y: 1 },
+    ]
+    expect(firstReachable(s, here, across, DEFAULT_CONFIG)).toBeNull()
+    // The mark that drained the search comes first: the flood it ran is what finds the second.
+    expect(firstReachable(s, here, [...across, { x: 1, y: 2 }], DEFAULT_CONFIG)).toEqual({
+      x: 1,
+      y: 2,
+    })
+    expect(firstReachable(s, here, [], DEFAULT_CONFIG)).toBeNull()
   })
 
   it('a partial that goes nowhere is a refusal, not a walk of length zero', () => {

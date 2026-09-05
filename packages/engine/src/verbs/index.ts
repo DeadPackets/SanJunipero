@@ -20,7 +20,15 @@ import {
   roomIsFull,
   sameInterior,
 } from '../interiors.js'
-import { findPath, isPassable, pathCtx, searchToward, type PathCtx, type Point } from '../path.js'
+import {
+  findPath,
+  firstReachable,
+  isPassable,
+  pathCtx,
+  searchToward,
+  type PathCtx,
+  type Point,
+} from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -267,8 +275,7 @@ function nearestReachable(
   const sorted = [...tiles].sort(
     (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
   )
-  for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
-  return { refusal: 'no path to that spot' }
+  return firstReachable(state, a, sorted, config) ?? { refusal: 'no path to that spot' }
 }
 
 // What the world says when the legs cannot start at all. Said in the place where it is true:
