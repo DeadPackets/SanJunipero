@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { GAMIFICATION_BAN } from './townStats.js'
+import { GAMIFICATION_BAN, OUT_OF_REACH } from './townStats.js'
 import { diffLines } from './diffLines.js'
 import { PersonLedgerView, PersonStoryView } from '../paper/pages/Person.js'
 import { DAYS_PER_YEAR } from '@sj/shared'
@@ -313,6 +313,34 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     const text = (story + ledger).replace(/<[^>]*>/g, ' ')
     expect(text).not.toMatch(GAMIFICATION_BAN)
     expect(text).not.toMatch(/\b(trait|background|backstory|archetype|persona|bio|origin)\b/i)
+  })
+
+  // A refused read is news about the wire, so a section with nothing to show says so and offers
+  // the read again, rather than turning forever.
+  it('says a document is out of reach rather than loading it forever', () => {
+    const down = { failed: true, retry: () => {} }
+    const story = renderToStaticMarkup(
+      createElement(PersonStoryView, {
+        thought: null,
+        journal: null,
+        changes: null,
+        journalWire: down,
+        changesWire: down,
+      }),
+    )
+    expect(story.split(OUT_OF_REACH.says).length - 1).toBe(2)
+    expect(story).not.toContain('skeleton')
+    const led = renderToStaticMarkup(
+      createElement(PersonLedgerView, {
+        agent: a,
+        tick: 0,
+        carrying: [],
+        ledger: null,
+        ledgerWire: down,
+      }),
+    )
+    expect(led).toContain(OUT_OF_REACH.says)
+    expect(led).not.toContain('skeleton')
   })
 
   it('leads with the LATEST document and the most recent edit once there is one', () => {
