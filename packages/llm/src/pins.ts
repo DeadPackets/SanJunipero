@@ -121,8 +121,6 @@ const ON_LUNA = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs
 // for 2,100 tokens to write 300 and was a third of the whole bill until it stopped.
 const JUDGES: CallSettings = { reasoning: { effort: 'xhigh' } }
 const THINKS: CallSettings = { reasoning: { effort: 'high' } }
-// A spoken line is voice, not planning; the owner asked to hear medium (2026-09-05).
-const SPEAKS: CallSettings = { reasoning: { effort: 'medium' } }
 const RESTATES: CallSettings = { reasoning: { effort: 'minimal' } }
 
 // Rehearsal r3: all 21 refused reflection attempts were 429s, and every one had a mind call
@@ -181,11 +179,11 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   council: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 28_000, dailyUsd: RAIL_FLOOR_USD },
   'law.compile': { ...ON_LUNA, ...JUDGES, maxOutputTokens: 28_000, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
-  // share one warm prefix. p99 1,127 over 523 lines; bounded at 60 s, under the scene's own
+  // share one warm prefix. Medium was heard in r24: it reasoned as long as high and doubled a tic. p99 1,127 over 523 lines; bounded at 60 s, under the scene's own
   // 90 s floor timeout, so the call dies before the floor takes the line away.
   scene: {
     ...ON_LUNA,
-    ...SPEAKS,
+    ...THINKS,
     minTimeoutMs: 60_000,
     maxQueueWaitMs: 10_000,
     maxOutputTokens: 2500,

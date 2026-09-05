@@ -99,7 +99,7 @@ it('★ every pinned caller runs on the one fleet model at its one home', () => 
 it('★ three efforts: rulings judge, turns and lines think, restatements do not', () => {
   for (const caller of RULING_CALLERS)
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'xhigh' })
-  expect(callSettingsFor('scene').reasoning).toEqual({ effort: 'medium' })
+  expect(callSettingsFor('scene').reasoning).toEqual({ effort: 'high' })
   for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight', 'narrator'])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'high' })
   for (const caller of [
