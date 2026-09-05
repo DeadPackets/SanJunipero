@@ -323,8 +323,8 @@ describe('LlmClient.object', () => {
     const P = PRICE_PER_M
     const expectedCost = ((1000 - 600) * P.input + 600 * P.cacheRead + 50 * P.output) / 1e6
     // Worked by hand off the pinned row, so a formula derived from the same table cannot agree
-    // with itself and be wrong: (400 x 0.20 + 600 x 0.02 + 50 x 1.20) / 1e6.
-    expect(expectedCost).toBeCloseTo(0.000152, 10)
+    // with itself and be wrong: (400 x 0.25 + 600 x 0.02 + 50 x 1.20) / 1e6.
+    expect(expectedCost).toBeCloseTo(0.000172, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -643,7 +643,7 @@ describe('price reconciliation', () => {
         provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: 0.0028,
+        reportedCostUsd: 0.003,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -657,7 +657,7 @@ describe('price reconciliation', () => {
     expect(detail).toContain('OpenAI')
     expect(detail).toContain('the pin is stale')
     // The bill wins: the ledger books what was charged, not what the table guessed.
-    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.0028, 12)
+    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.003, 12)
   })
 
   it('is silent when the table agrees with the provider', async () => {

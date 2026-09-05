@@ -41,7 +41,9 @@ export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   // Wafer's GLM tier, measured against its own bill: the $0.075 list tier refuses json_schema.
   // Re-reconciled 2026-09-03: reported/estimated ran 0.668 over 502 calls while DeepInfra ran
   // 0.99, so the old row over-booked Wafer by half and raised 1,232 price-divergence alerts.
-  [route(MIND_MODEL, 'OpenAI')]: { input: 0.2, output: 1.2, cacheRead: 0.02 },
+  // Fitted to 3,046 reconciled bills in r23, not read off the list: uncached input bills at
+  // 0.25, the list's 0.20 ran the estimator 10% under and raised a stale-pin alert every run.
+  [route(MIND_MODEL, 'OpenAI')]: { input: 0.25, output: 1.2, cacheRead: 0.02 },
   [route(GLM, 'Wafer')]: { input: 0.1, output: 0.35, cacheRead: 0.02 },
   [route(GLM, 'DeepInfra')]: { input: 0.075, output: 0.25, cacheRead: 0.016 },
   [route(DEEPSEEK, 'DeepInfra')]: { input: 0.08, output: 0.18, cacheRead: 0.016 },

@@ -23,7 +23,7 @@ it('pins are concrete', () => {
   // The one exception to the dated-pin law: OpenRouter publishes no dated snapshot of this
   // model, only the bare id, so there is no date to pin to.
   for (const id of FALLBACK_MODELS) expect(id, id).toMatch(/-\d{4}$/)
-  expect(PRICE_PER_M).toEqual({ input: 0.2, output: 1.2, cacheRead: 0.02 })
+  expect(PRICE_PER_M).toEqual({ input: 0.25, output: 1.2, cacheRead: 0.02 })
 })
 
 it('every allowed provider is priced on the model it serves, and the first is PRICE_PER_M', () => {
