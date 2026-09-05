@@ -11,9 +11,11 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   // that life can now DO is second, and it is the only entry here that is permanent.
   discovery_made: 19,
   agent_born: 18,
+  law_ratified: 17,
   partnership_formed: 16,
   world_grown: 15,
   partnership_dissolved: 15,
+  law_repealed: 13,
   grave_placed: 12,
   invitation_accepted: 12,
   structure_completed: 10,
@@ -23,7 +25,9 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   agent_harmed: 8,
   agent_afflicted: 8,
   invited: 8,
+  law_broken: 8,
   fire_spread: 7,
+  law_proposed: 6,
   structure_inscribed: 6,
   affliction_recovered: 6,
   affliction_worsened: 5,
@@ -40,6 +44,10 @@ export const CHRONICLE_ICONS: Record<string, string> = {
   agent_died: 'cross',
   discovery_made: 'key',
   agent_born: 'spark',
+  law_proposed: 'quill',
+  law_ratified: 'quill',
+  law_broken: 'flame',
+  law_repealed: 'quill',
   world_grown: 'star',
   grave_placed: 'cross',
   partnership_formed: 'heart',
@@ -67,11 +75,6 @@ export const CHRONICLE_ICONS: Record<string, string> = {
 // Every type the fold knows is either weighted above or named here on purpose, so a future event
 // cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
-  // The town's laws are folded now and told nowhere yet; the laws surface lane gives them lines.
-  'law_proposed',
-  'law_ratified',
-  'law_broken',
-  'law_repealed',
   // The quiet acts, named one by one (addendum §12).
   // A chase re-aims at whoever it follows every tick it runs: the walk is the story, not the
   // legs correcting themselves inside it.
@@ -268,6 +271,18 @@ export function constructLine(c: { name: string | null }): string {
     : `They have taken to gathering, and they call it ${c.name}.`
 }
 
+// Who was standing close enough to see it, in words. Capped like a cast is: a line that names
+// eight people is a list, not a sentence.
+function witnessWords(witnesses: unknown, look: ChronicleLookup): string {
+  if (!Array.isArray(witnesses)) return ''
+  const ids = witnesses.filter((w): w is string => typeof w === 'string')
+  const named = ids.slice(0, CHRONICLE_CAST_MAX).map((id) => look.agentName(id))
+  if (ids.length > CHRONICLE_CAST_MAX) named.push('others')
+  const last = named.pop()
+  if (last === undefined) return ''
+  return named.length === 0 ? last : `${named.join(', ')} and ${last}`
+}
+
 // What a passer-by would have seen of an invitation. A bedding is asked and refused where
 // nobody is watching, so only the shut door reaches the paper; and a proposal accepted is the
 // partnership line one breath later, which says it better than the yes does.
@@ -369,6 +384,21 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const leaver = str(p.byId)
       const left = leaver === str(p.aId) ? str(p.bId) : str(p.aId)
       return `${look.agentName(leaver)} has left ${look.agentName(left)}.`
+    }
+    // A rule reaches the paper in the words the town used for it, quoted. The id it is filed
+    // under is ours, and the breach names the deed rather than the clause it fell under.
+    case 'law_proposed':
+      return `${look.agentName(str(p.agentId))} put a rule to the room: “${str(p.text)}”`
+    case 'law_ratified':
+      return `The town agreed: “${str(p.text)}”`
+    case 'law_repealed':
+      return `The town let a rule go: “${str(p.text)}”`
+    case 'law_broken': {
+      const who = look.agentName(str(p.agentId))
+      const saw = witnessWords(p.witnesses, look)
+      return saw === ''
+        ? `${who} did what the town agreed against.`
+        : `${who} did what the town agreed against, and ${saw} saw.`
     }
     case 'structure_completed':
       return `The ${look.structureKind(str(p.id))} is finished.`

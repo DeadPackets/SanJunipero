@@ -56,9 +56,11 @@ describe('heat stub', () => {
       fire_spread: 10,
       invitation_refused: 10,
       law_broken: 9,
+      law_repealed: 9,
       agent_injured: 8,
       invitation_accepted: 8,
       invited: 6,
+      law_proposed: 6,
       structure_completed: 6,
       agent_collapsed: 6,
       agent_spoke: 6,
@@ -197,6 +199,37 @@ describe('heat stub', () => {
 
   it('names every weighted type, or the fold reads a row its SELECT never fetched', () => {
     for (const type of Object.keys(HEAT_WEIGHTS)) expect(FOLD_TYPES).toContain(type)
+  })
+
+  // A council is the loudest thing the town does with its mouth, and until the four are both
+  // weighted and fetched the camera could not reach the room where the rule was written.
+  it('follows the four turns of a rule to the face that turned it', () => {
+    for (const type of ['law_proposed', 'law_ratified', 'law_broken', 'law_repealed'])
+      expect(FOLD_TYPES, type).toContain(type)
+    expect(
+      score([
+        ev(1, 1, 'law_proposed', { lawId: 'law_1', agentId: 'nadia', text: 'No taking at night.' }),
+        ev(2, 2, 'law_ratified', {
+          lawId: 'law_1',
+          agentId: 'nadia',
+          text: 'No taking at night.',
+          why: '',
+          predicate: { kind: 'none' },
+          votes: { for: ['nadia'], against: [] },
+        }),
+        ev(3, 3, 'law_broken', {
+          lawId: 'law_1',
+          agentId: 'yusuf',
+          verb: 'take',
+          witnesses: ['nadia'],
+        }),
+        ev(4, 4, 'law_repealed', { lawId: 'law_1', agentId: 'omar', text: 'No taking at night.' }),
+      ]),
+    ).toEqual([
+      { fromTick: 0, toTick: 59, agentId: 'nadia', score: 6 + 12 },
+      { fromTick: 0, toTick: 59, agentId: 'omar', score: 9 },
+      { fromTick: 0, toTick: 59, agentId: 'yusuf', score: 9 },
+    ])
   })
 
   // Every payload is the engine's own, parsed, so the keys `dramatis` reaches for are the keys

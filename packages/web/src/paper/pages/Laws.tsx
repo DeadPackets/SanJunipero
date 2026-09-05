@@ -1,15 +1,9 @@
 import { useMemo, useState, useSyncExternalStore } from 'react'
-import { tickToMoment } from '@sj/shared'
-import { LAW_GROUPS, lawCopyFor, lawGroupOf, lawReadingRank } from '../../ui/lawCopy.js'
-import {
-  editRows,
-  formatLawValue,
-  lawRows,
-  postLaw,
-  type EditRow,
-  type LawRow,
-} from '../../ui/lawsModel.js'
+import { LawsResponseSchema, agentName, tickToMoment, type LawRow as TownLaw } from '@sj/shared'
+import { editRows, formatLawValue, lawRows, postLaw, type EditRow } from '../../ui/lawsModel.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import {
   ADMIN_ENDPOINT,
   ClockSection,
@@ -17,64 +11,96 @@ import {
   RulingsSection,
   SpendSection,
 } from './AdminOps.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 export function LawsPage(props: PageProps) {
   return props.tab === 'Admin' ? <Admin {...props} /> : <World {...props} />
 }
 
-/** Read-only: there is no write path. */
-function WorldLawsView({ rows, operator }: { rows: readonly LawRow[]; operator: boolean }) {
-  const byGroup = LAW_GROUPS.map((group) => ({
-    group,
-    rows: rows
-      .filter((r) => lawGroupOf(r.path) === group)
-      .sort((a, b) => lawReadingRank(a.path) - lawReadingRank(b.path)),
-  })).filter((g) => g.rows.length > 0)
+const NO_LAWS: TownLaw[] = []
+const townLaws = (body: unknown): TownLaw[] | null => {
+  const parsed = LawsResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data.laws : null
+}
 
+/** A council closes when a room stops arguing, which is not on a clock — but the sheet is only
+ *  open while somebody is reading it, and nothing here is worth a faster poll than the bonds. */
+const LAWS_REFETCH_MS = 30_000
+
+const EMPTY =
+  'Nothing is agreed yet — a law starts as a sentence somebody says out loud, and stands if the room does not argue it down.'
+
+/** Names, never ids: the votes come off the wire as ids and every one of them is looked up. */
+const voices = (ids: readonly string[], people: NameLookup): string =>
+  ids.length === 0 ? 'nobody' : ids.map((id) => agentName(people, id)).join(', ')
+
+type NameLookup = Parameters<typeof agentName>[0]
+
+/** A count nobody can misread as a rank. "Never" is the answer worth printing loudest. */
+const timesBroken = (n: number): string =>
+  n === 0 ? 'never' : n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`
+
+/** The two exceptions a reader has to be told about. A rule that stands and bites wears no
+ *  badge: that is what agreeing on something is supposed to mean. */
+function markOf(law: TownLaw): string | null {
+  if (law.repealedTick !== null) return 'let go'
+  return law.enforced ? null : 'in words only'
+}
+
+/** Read-only, like every other pane: nothing on this page is ever shown to a mind. Newest first
+ *  is the order the endpoint sends — one sorter, in the gateway, so the two cannot drift. */
+export function WorldLawsView({ laws, people }: { laws: readonly TownLaw[]; people: NameLookup }) {
   return (
-    <section className="laws" aria-label="World Laws">
+    <section className="laws" aria-label="What the town has agreed">
       <p className="sheet-note">
-        The rules this town runs on. When one changes, the change is written down here.
+        What they have agreed among themselves, newest first. Nobody wrote these but them.
       </p>
-      {byGroup.map(({ group, rows: inGroup }) => (
-        <section className="law-group" key={group}>
-          <h3 className="feed-head">{group}</h3>
-          <ul className="laws-list">
-            {inGroup.map((row) => {
-              const copy = lawCopyFor(row.path)
-              return (
-                <li key={row.path} className={row.overridden ? 'law-row changed' : 'law-row'}>
-                  <h4 className="law-title">{copy?.title ?? row.path}</h4>
-                  {copy !== null && <p className="law-says">{copy.sentence}</p>}
-                  <dl className="law-value">
-                    {(copy?.render(row.value) ?? [{ label: 'Set to', value: '—' }]).map((cell) => (
-                      <div className="law-cell" key={cell.label}>
-                        <dt>{cell.label}</dt>
-                        <dd>{cell.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  {operator && <code className="law-path">{row.path}</code>}
-                  {row.overridden && <span className="badge">changed</span>}
-                  {row.history.length > 0 && (
-                    <ol className="law-history">
-                      {row.history.map((h, i) => {
-                        const m = tickToMoment(h.tick)
-                        return (
-                          <li key={`${h.tick}-${i}`}>
-                            Changed on day {m.day}, at {m.time}
-                          </li>
-                        )
-                      })}
-                    </ol>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ))}
+      <ul className="laws-list">
+        {laws.map((law) => {
+          const agreed = tickToMoment(law.ratifiedTick)
+          const mark = markOf(law)
+          const letGo = law.repealedTick === null ? null : tickToMoment(law.repealedTick)
+          return (
+            <li className="law-row" key={law.id}>
+              <h4 className="law-title">“{law.text}”</h4>
+              {mark !== null && <span className="badge">{mark}</span>}
+              {law.why !== '' && <p className="law-says">In practice: {law.why}</p>}
+              <dl className="law-value">
+                <div className="law-cell">
+                  <dt>Put by</dt>
+                  <dd>{law.proposerName}</dd>
+                </div>
+                <div className="law-cell">
+                  <dt>Agreed</dt>
+                  <dd>
+                    Day {agreed.day}, {agreed.time}
+                  </dd>
+                </div>
+                <div className="law-cell">
+                  <dt>For</dt>
+                  <dd>{voices(law.votes.for, people)}</dd>
+                </div>
+                <div className="law-cell">
+                  <dt>Against</dt>
+                  <dd>{voices(law.votes.against, people)}</dd>
+                </div>
+                <div className="law-cell">
+                  <dt>Broken</dt>
+                  <dd>{timesBroken(law.breaches)}</dd>
+                </div>
+              </dl>
+              {letGo !== null && (
+                <ol className="law-history">
+                  <li>
+                    Let go on day {letGo.day}, at {letGo.time}
+                  </li>
+                </ol>
+              )}
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }
@@ -86,15 +112,17 @@ function useLawsSeq(store: PageProps['store']): string {
   return useSyncExternalStore(store.subscribe, seq, seq)
 }
 
-function World({ store, operatorToken }: PageProps) {
-  useLawsSeq(store)
+function World({ store }: PageProps) {
+  const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
+  const record = useEndpointFor('/api/laws', townLaws, LAWS_REFETCH_MS)
+  const read = useFeed(record)
+  const laws = read.data ?? NO_LAWS
 
-  return (
-    <WorldLawsView
-      rows={lawRows(store.getConfig(), store.getLaws(), store.lawHistory())}
-      operator={operatorToken !== null}
-    />
-  )
+  if (laws.length === 0) {
+    if (read.failed) return <OutOfReach onRetry={record.retry} />
+    return read.loaded ? <p className="feed-empty">{EMPTY}</p> : <Skeleton />
+  }
+  return <WorldLawsView laws={laws} people={state?.agents} />
 }
 
 function nextValue(row: EditRow, raw: string): unknown {
@@ -120,8 +148,10 @@ function LawEdit({
 
   return (
     <li className="law-edit">
-      <label htmlFor={id}>{lawCopyFor(row.path)?.title ?? row.path}</label>
-      <code className="law-path">{row.path}</code>
+      {/* The path IS the label now, and it keeps the data face: Silkscreen has no lowercase. */}
+      <label htmlFor={id}>
+        <code className="law-path">{row.path}</code>
+      </label>
       <span className="law-value">{settled}</span>
       {row.kind === 'boolean' ? (
         <select

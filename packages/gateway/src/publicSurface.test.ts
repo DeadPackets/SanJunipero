@@ -6,7 +6,13 @@ import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { ADULT_AGE_DAYS, CLOSE_BAD_HELLO, DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  CLOSE_BAD_HELLO,
+  DEFAULT_CONFIG,
+  LawsResponseSchema,
+  PROTOCOL_VERSION,
+} from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
@@ -155,6 +161,15 @@ describe('the public surface a stranger reaches', () => {
       expect(r.status, path).toBe(404)
       await r.text()
     }
+  })
+
+  // The town's own rules are the town's, not the operator's: `/admin/laws` is the physics dial
+  // behind the key, and the rules the town wrote are a page anybody may read.
+  it('hands a stranger the rules the town agreed on, with no key at all', async () => {
+    const gw = await gwPromise
+    const r = await fetch(`http://127.0.0.1:${gw.port}/api/laws`)
+    expect(r.status).toBe(200)
+    expect(LawsResponseSchema.parse(await r.json())).toEqual({ laws: [] })
   })
 
   it('reads no memory for __proto__, which is a truthy agent that does not exist', async () => {
