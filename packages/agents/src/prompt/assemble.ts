@@ -64,7 +64,7 @@ export type AssembledPrompt = {
   system: string // blocks 1+2+3, fixed delimiters
   messages: { role: 'user'; content: string }[] // stable→volatile; an empty block sends no message
   estTokens: number // ceil(totalChars/4)
-  needsCompaction: boolean // est(dayLog) > 6000 tokens
+  needsCompaction: boolean // est(dayLog) > DAYLOG_COMPACTION_TOKENS
   // What each rendered block cost, and no entry for one it skipped. Same estimator as
   // `estTokens`, so the entries sum to it bar the delimiters and per-block rounding.
   blockTokens: Record<string, number>
@@ -73,7 +73,9 @@ export type AssembledPrompt = {
 // Byte-stable, so blocks 1-3 form an unbroken cache prefix until sleep rewrites block 3.
 const BLOCK_DELIM = '\n\n---\n\n'
 
-const DAYLOG_COMPACTION_TOKENS = 6000
+// 2,500 and not 6,000: over r13 the day log was already 27.6% of the turn prompt and 48% of
+// its fresh-input dollars at a p90 of 3,348 tokens, which the old bound never reached.
+const DAYLOG_COMPACTION_TOKENS = 2500
 
 export const JOURNAL_LINES = 5
 const JOURNAL_MAX_CHARS = 1200
