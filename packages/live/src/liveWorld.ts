@@ -39,7 +39,6 @@ import {
   Embedder,
   LlmClient,
   MIND_MODEL,
-  modelFor,
   PROVIDER_ORDER,
   alertsSince,
   backfillUnattributed,
@@ -79,8 +78,10 @@ import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
 import { createCastArt, createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
- *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
-const LIVE_SPEND_DAILY_USD = 3
+ *  30 sim-days pass inside one at speed 1, so this is the flow, not a lifetime. r22 measured
+ *  $0.83 a sim-day, so a day watched end to end spends $25 and an unwatched one a quarter of
+ *  that; the stop is for a runaway, not a busy afternoon. `SJ_SPEND_DAILY_USD`. */
+const LIVE_SPEND_DAILY_USD = 30
 /** Dollars over the town's whole life; 0 is none. Reaching it stops every mind and leaves the
  *  town serving: the operator hears it on the ops surface, and the viewer is never dark for it. */
 const LIVE_SPEND_STOP_USD = 50
@@ -458,7 +459,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       llm: makeClient('preflight'),
       provider: 'default',
       hardAllowList: !LIVE_ALLOW_PROVIDER_FALLBACKS,
-      model: modelFor('preflight'),
+      model: MIND_MODEL,
       identity: founders[0]?.identity,
       personality: founders[0]?.personality,
       rounds: PREFLIGHT_ROUNDS,

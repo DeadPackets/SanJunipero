@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import Database from 'better-sqlite3'
 import { insertTurnOutcome, migrateLlmTables } from './callLog.js'
-import { MIND_MODEL, PROVIDER_ORDER, callSettingsFor, modelFor } from './pins.js'
+import { MIND_MODEL, PROVIDER_ORDER, callSettingsFor } from './pins.js'
 import {
   DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY,
   DEFAULT_SPEND_WINDOW_REAL_MINUTES,
@@ -121,7 +121,7 @@ describe('★ checkProviderMix — a back end past the allow-list is reported, n
   // moved to the other back end would alert every call, so the lists are pinned to agree here.
   it('★ every mind caller is served by the pin the allow-list names', () => {
     for (const caller of MIND_CALLERS) {
-      expect(modelFor(caller), caller).toBe(MIND_MODEL)
+      expect(callSettingsFor(caller).model ?? MIND_MODEL, caller).toBe(MIND_MODEL)
       expect(callSettingsFor(caller).providerOrder ?? PROVIDER_ORDER, caller).toEqual(
         PROVIDER_ORDER,
       )
@@ -390,13 +390,13 @@ describe('checkSpend (T24)', () => {
     expect(alerts(db)).toEqual([])
   })
 
-  it('the default threshold is 21x the expected five-mind rate', () => {
+  it('the default threshold is 3x the measured twelve-mind rate', () => {
     const db = openDb()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(0.4)
-    seedCall(db, 1, 0.22) // 0.22 over 15 real minutes projects to $0.704/sim-day
+    expect(DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY).toBe(2.5)
+    seedCall(db, 1, 1) // $1 over 15 real minutes projects to $3.20/sim-day
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(true)
-    seedCall(db, 1, -0.1) // pull the window back under
+    seedCall(db, 1, -0.3) // pull the window back under
     expect(checkSpend(db, { windowRealMinutes: 15, now: NOW }).alerted).toBe(false)
   })
 })

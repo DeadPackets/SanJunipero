@@ -41,13 +41,14 @@ world refuses comes back as *"you cannot"* prose, not an error. Between turns th
 machinery runs `reflection`, `dream` and `recall` callers against each mind's private
 SQLite memory, one file per mind.
 
-**The fleet.** Two models, split by what they must do
-([`packages/llm/src/pins.ts`](packages/llm/src/pins.ts)): `z-ai/glm-5.3-flash` for every
-caller that must *name what it acts on* — turns, reflections, dreams, the arbiter — and
-`deepseek/deepseek-v4-flash-0731` for the prose callers, because it wrote the best prose of
-the candidates and a text-only caller cannot emit a blank act. A preflight gate asks each
-provider the real schema with the real prompt before a town goes live; the bar is an
-action on every call.
+**The fleet.** One model at one home, `openai/gpt-5.6-luna` served by OpenAI
+([`packages/llm/src/pins.ts`](packages/llm/src/pins.ts)), split by how hard each caller may
+think: a ruling reasons at `xhigh`, a turn or a spoken line at `high`, and a caller that only
+restates what it is handed (a gist, a scene close) at `minimal`. The earlier two-model fleet
+ran 15-20 s turns with provider timeouts all afternoon; this one answers in 6 s with one
+failure in a thousand, and its prompt cache is keyed per mind. A preflight gate asks the
+provider the real schema with the real prompt before a town goes live; the bar is an action
+on every call.
 
 **The money.** Every call is booked to a ledger (`_ops.db`) at the rate the account is
 actually charged — reconciled against the provider's bill, not read off a price list — and

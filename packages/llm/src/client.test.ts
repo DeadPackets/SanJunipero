@@ -30,13 +30,9 @@ import {
   FALLBACK_MODELS,
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
-  PROSE_MODEL,
-  PROSE_PROVIDER_ORDER,
+  PINNED_CALLERS,
   PROVIDER_ORDER,
-  RULING_MODEL,
-  RULING_PROVIDER_ORDER,
   callSettingsFor,
-  modelFor,
   requestTimeoutMsFor,
   PRICE_PER_M,
 } from './pins.js'
@@ -311,7 +307,7 @@ describe('LlmClient.object', () => {
     const model = mockModel([
       {
         json: { mood: 'calm', count: 3 },
-        provider: 'Wafer',
+        provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 600 },
       },
@@ -327,8 +323,8 @@ describe('LlmClient.object', () => {
     const P = PRICE_PER_M
     const expectedCost = ((1000 - 600) * P.input + 600 * P.cacheRead + 50 * P.output) / 1e6
     // Worked by hand off the pinned row, so a formula derived from the same table cannot agree
-    // with itself and be wrong: (400 x 0.10 + 600 x 0.02 + 50 x 0.35) / 1e6.
-    expect(expectedCost).toBeCloseTo(0.0000695, 10)
+    // with itself and be wrong: (400 x 0.20 + 600 x 0.02 + 50 x 1.20) / 1e6.
+    expect(expectedCost).toBeCloseTo(0.000152, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -355,7 +351,7 @@ describe('LlmClient.object', () => {
     const model = mockModel([
       {
         json: { mood: 'busy', count: 2 },
-        provider: 'Wafer',
+        provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 500, outputTokens: 6168, reasoningTokens: 6100 },
       },
@@ -644,10 +640,10 @@ describe('price reconciliation', () => {
     const model = mockModel([
       {
         text: 'a',
-        provider: 'Wafer',
+        provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: 0.00168,
+        reportedCostUsd: 0.0028,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -658,10 +654,10 @@ describe('price reconciliation', () => {
         detail: string
       }
     ).detail
-    expect(detail).toContain('Wafer')
+    expect(detail).toContain('OpenAI')
     expect(detail).toContain('the pin is stale')
     // The bill wins: the ledger books what was charged, not what the table guessed.
-    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.00168, 12)
+    expect(rows(db)[0]!.cost_usd).toBeCloseTo(0.0028, 12)
   })
 
   it('is silent when the table agrees with the provider', async () => {
@@ -669,7 +665,7 @@ describe('price reconciliation', () => {
     const model = mockModel([
       {
         text: 'a',
-        provider: 'Wafer',
+        provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
         reportedCostUsd: (1000 * PRICE_PER_M.input + 1000 * PRICE_PER_M.output) / 1e6,
@@ -686,7 +682,7 @@ describe('price reconciliation', () => {
     const model = mockModel([
       {
         text: 'a',
-        provider: 'Wafer',
+        provider: 'OpenAI',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 10, outputTokens: 2 },
         // A tiny absolute wobble on a tiny call: a bare ratio would scream, the floor holds.
@@ -1031,14 +1027,12 @@ describe('default OpenRouter path extraBody', () => {
       'sj-amara',
     )
     expect(luna.prompt_cache_key).toBe('sj-amara')
-    const glm = defaultExtraBody(
-      FALLBACK_MODELS,
-      PROVIDER_ORDER,
-      false,
-      undefined,
-      MIND_MODEL,
-      'sj-amara',
+    expect(luna.prompt_cache_key).toBe(
+      defaultExtraBody(FALLBACK_MODELS, PROVIDER_ORDER, false, undefined, MIND_MODEL, 'sj-amara')
+        .prompt_cache_key,
     )
+    // The key is OpenAI's: a model served anywhere else gets the session id and nothing more.
+    const glm = defaultExtraBody([], ['Wafer'], false, undefined, 'z-ai/glm-5.3-flash', 'sj-amara')
     expect(glm.prompt_cache_key).toBeUndefined()
     const noMind = defaultExtraBody([], ['OpenAI'], false, undefined, 'openai/gpt-5.6-luna')
     expect(noMind.prompt_cache_key).toBeUndefined()
@@ -1066,29 +1060,26 @@ describe('default OpenRouter path extraBody', () => {
       const body = new LlmClient({ db, caller }).requestBody()
       expect(body.provider.allow_fallbacks, caller).toBe(false)
       // And no floating alias can answer instead of the model this caller was pinned to.
-      expect(body.models, caller).toEqual([modelFor(caller)])
+      expect(body.models, caller).toEqual([MIND_MODEL])
     }
   })
 
-  // ★ Two models on two back ends: the body a caller sends must name its own pair and no other,
-  // or a GLM caller's json_schema lands on a back end that answers with a thought and no act.
-  it('★ each caller sends its own fleet row, model and back end together', () => {
+  // ★ One model at one home for every caller: the body each sends must name that pair and no
+  // other, or a json_schema lands on a back end that answers with a thought and no act.
+  it('★ every caller sends the one fleet row, model and back end together', () => {
     const db = openDb()
     const body = (caller: string): { models: string[]; homes: string[] | undefined } => {
       const b = new LlmClient({ db, caller }).requestBody()
       return { models: b.models, homes: b.provider.only ?? b.provider.order }
     }
-    expect(body('turn')).toEqual({ models: [MIND_MODEL], homes: PROVIDER_ORDER })
-    expect(body('preflight')).toEqual(body('turn'))
-    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], homes: PROSE_PROVIDER_ORDER })
-    // The court is the one caller off the fleet's two models: what it writes is permanent.
-    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], homes: RULING_PROVIDER_ORDER })
+    for (const caller of [...PINNED_CALLERS, 'nobody-pinned-this'])
+      expect(body(caller), caller).toEqual({ models: [MIND_MODEL], homes: PROVIDER_ORDER })
   })
 
-  // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
-  // the other home. Run D's dear second name is gone; DeepInfra costs half of Wafer.
+  // A closed allow-list: a name outside it is a hard failure. One home, because `openai/fast`
+  // bills 2x for the same answer and is the only other one.
   it('★ the request body carries exactly the pinned allow-list', () => {
-    expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
+    expect(PROVIDER_ORDER).toEqual(['OpenAI'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
       order: PROVIDER_ORDER,
       allow_fallbacks: false,
@@ -1152,8 +1143,8 @@ describe('default OpenRouter path extraBody', () => {
     const db = openDb()
     const night = new LlmClient({ db, caller: 'reflection' })
     const edit = night.forCaller('reflection.edit')
-    expect(night.requestBody()).not.toHaveProperty('reasoning')
-    expect(edit.requestBody()).not.toHaveProperty('reasoning')
+    expect(night.requestBody().reasoning).toEqual({ effort: 'high' })
+    expect(edit.requestBody().reasoning).toEqual({ effort: 'high' })
     expect(edit.requestBody().provider).toEqual(night.requestBody().provider)
   })
 })
@@ -1275,7 +1266,7 @@ describe('★ a generation that answered but produced no output still bills what
     expect(
       (db.prepare('SELECT finish_reason AS r FROM llm_calls').get() as { r: string | null }).r,
     ).toBe('length')
-    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('4000 output token ceiling')
+    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('28000 output token ceiling')
   })
 })
 
@@ -1286,12 +1277,11 @@ describe('★ one unified call discipline, the arbiter included', () => {
     const db = openDb()
     const bound = (caller: string): number =>
       (new LlmClient({ db, caller }) as unknown as { requestTimeoutMs: number }).requestTimeoutMs
-    for (const caller of ['constructs', 'nobody-pinned-this']) {
-      expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
-    }
-    // Wafer's tail is prefill, not decode: the turn's 600-token ceiling needs 13.6 s and its
-    // answers have taken 43.5 s, so this one caller is bounded by the provider instead.
-    expect(bound('turn')).toBe(70_000)
+    expect(bound('nobody-pinned-this')).toBe(MIN_REQUEST_TIMEOUT_MS)
+    // The route's own floor: a restating caller's 1,500-token ceiling needs 34 s, and the
+    // model's tail is its thinking, so the 90 s floor rules where the ceiling is small.
+    expect(bound('constructs')).toBe(90_000)
+    expect(bound('turn')).toBe(Math.ceil((7500 / 44) * 1000))
     for (const caller of [
       'arbiter',
       'reflection',
@@ -1316,7 +1306,7 @@ describe('★ one unified call discipline, the arbiter included', () => {
     ).rejects.toThrow()
     expect(rows(db), 'a third attempt only spends the stall again').toHaveLength(2)
     expect(alertsOf(db, 'llm_call_failed')).toEqual([
-      'arbiter: 2 attempt(s) failed, the last bounded at 91s — scripted failure',
+      'arbiter: 2 attempt(s) failed, the last bounded at 636s — scripted failure',
     ])
   })
 

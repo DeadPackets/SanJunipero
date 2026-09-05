@@ -1,26 +1,20 @@
 import type Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, TICK_REAL_MS } from '@sj/shared'
 import { insertAlert } from './callLog.js'
-import { MIND_MODEL, PINNED_CALLERS, modelFor } from './pins.js'
+import { PER_MIND_CALLERS } from './pins.js'
 
 // Derived, never typed: a window of W real minutes covers W/48 of a sim-day at the shipped
 // tick, and its spend scales by 48/W to reach $/sim-day. Moving the tick moves this with it.
 export const REAL_MINUTES_PER_SIM_DAY = (MINUTES_PER_DAY * TICK_REAL_MS) / 60_000
 export const DEFAULT_SPEND_WINDOW_REAL_MINUTES = 15
-// 21x the expected $0.019/sim-day for the shipped five-mind cast — itself an expectation
-// and not a measurement.
-export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
+// 3x the $0.83/sim-day r22 measured for twelve minds on the fleet model, reasoning included.
+export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 2.5
 
 export const REAL_MINUTES_PER_SIM_HOUR = REAL_MINUTES_PER_SIM_DAY / 24
 
 /** The callers a mind's own thinking goes through, and the only ones the per-mind rate counts.
- *  The narrator, the arbiter, the tier-2.5 pass and the forge are town work at any cast size.
- *  Read off the pins, or a caller put on the mind's route is invisible to the ceiling it drives:
- *  `preflight` is a fixed few calls before any mind exists, and `recall` has no pin of its own. */
-export const MIND_CALLERS: string[] = [
-  ...PINNED_CALLERS.filter((c) => c !== 'preflight' && modelFor(c) === MIND_MODEL),
-  'recall',
-]
+ *  Read off the pins, plus `recall`, which has no pin of its own. */
+export const MIND_CALLERS: string[] = [...PER_MIND_CALLERS, 'recall']
 
 const MIND_CALLER_SLOTS = MIND_CALLERS.map(() => '?').join(',')
 
