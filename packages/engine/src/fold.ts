@@ -78,6 +78,10 @@ import {
   Invited,
   InvitationAccepted,
   InvitationRefused,
+  LawBroken,
+  LawProposed,
+  LawRatified,
+  LawRepealed,
   Marked,
   PartnershipDissolved,
   PartnershipFormed,
@@ -119,6 +123,7 @@ import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
 import { renames } from './naming.js'
 import { findPath } from './path.js'
+import { markLaw, type Law } from './socialLaws.js'
 
 // Kept as its own step so a batch of N folds to exactly the state the N separate events left.
 function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig): AgentBody {
@@ -295,6 +300,42 @@ export function fold(
     case 'scene_closed': {
       SceneClosed.parse(event.payload)
       return state
+    }
+    // A rule put to the room, and a rule somebody broke: both witnessed, neither folded. What
+    // the town agreed is state; what it argued about and what it caught is the log's to keep.
+    case 'law_proposed': {
+      LawProposed.parse(event.payload)
+      return state
+    }
+    case 'law_broken': {
+      LawBroken.parse(event.payload)
+      return state
+    }
+    case 'law_ratified': {
+      const p = LawRatified.parse(event.payload)
+      if (state.socialLaws?.[p.lawId]) throw new Error(`law_ratified twice for ${p.lawId}`)
+      const socialLaws = state.socialLaws ?? {}
+      const law: Law = {
+        id: p.lawId,
+        ordinal: Object.keys(socialLaws).length + 1,
+        text: p.text,
+        predicate: p.predicate,
+        proposedBy: p.agentId,
+        ratifiedTick: event.tick,
+        votes: p.votes,
+        repealedTick: null,
+        why: p.why,
+      }
+      return { ...state, socialLaws: { ...socialLaws, [p.lawId]: law } }
+    }
+    case 'law_repealed': {
+      const p = LawRepealed.parse(event.payload)
+      const law = state.socialLaws?.[p.lawId]
+      if (!law) throw new Error(`law_repealed for unknown law ${p.lawId}`)
+      return {
+        ...state,
+        socialLaws: { ...state.socialLaws, [p.lawId]: { ...law, repealedTick: event.tick } },
+      }
     }
     // A promise nobody kept, letting go of itself. The bond graph weighs it; the world does not.
     case 'tie_let_go': {
@@ -628,7 +669,11 @@ export function fold(
       const p = ActionCompleted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
-      const body = p.verb === 'eat' ? rested(a) : a
+      const rest = p.verb === 'eat' ? rested(a) : a
+      // A prerequisite done, or a tithe paid: only a standing law that names this verb leaves
+      // anything behind, so a town that has agreed nothing never grows the field.
+      const lawMarks = markLaw(state, p.agentId, p.verb, a.activity?.params ?? {}, event.tick)
+      const body = lawMarks === undefined ? rest : { ...rest, lawMarks }
       // A meal is remembered by kind for as long as the variety window is wide, and the
       // remembering happens before the belly fills — the kind just eaten counts toward it.
       const kind = p.verb === 'eat' ? p.results?.kind : undefined

@@ -202,6 +202,9 @@ export type SeenEvent =
       name: string
       saying?: string
     }
+  // Something the town agreed against, done where somebody could see it. `self` is the breaker's
+  // own copy: being seen is the whole of what a forbid costs.
+  | { kind: 'law_broken'; breakerName: string; lawText: string; self: boolean }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
@@ -727,6 +730,24 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
         itemKind: p.kind,
       })
     }
+  }
+
+  // Who saw it was settled the moment it happened, by the same lens a taking is seen through;
+  // the packet only asks whether this body is on that list, or is the one who did it.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'law_broken') continue
+    const p = ev.payload as { lawId?: unknown; agentId?: unknown; witnesses?: unknown }
+    if (typeof p.lawId !== 'string' || typeof p.agentId !== 'string') continue
+    const law = state.socialLaws?.[p.lawId]
+    if (law === undefined) continue
+    const mine = p.agentId === self.id
+    if (!mine && !(Array.isArray(p.witnesses) && p.witnesses.includes(self.id))) continue
+    seen.push({
+      kind: 'law_broken',
+      breakerName: lens.nameOf(p.agentId),
+      lawText: law.text,
+      self: mine,
+    })
   }
 
   // A dance is a thing at a place and obeys the light like everything else seen; a song is

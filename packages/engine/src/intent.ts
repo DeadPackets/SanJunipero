@@ -1,5 +1,6 @@
 import type { SimConfig } from '@sj/shared'
 import { effectiveConfig } from './laws.js'
+import { judgeLaws, witnessesOf } from './socialLaws.js'
 import type { WorldState } from './state.js'
 import { readAsPerson, soleObstacle } from './verbs/autofill.js'
 import {
@@ -135,11 +136,22 @@ export function submitIntent(
       return walkFirst(state, config, agentId, verb, p, cause)
     }
   }
+  // The town's own rules, judged where the world's are: a rule the town can hold somebody to
+  // refuses in the town's words, and a rule it only forbids lets the act through witnessed.
+  const judged = judgeLaws(state, config, agentId, verb, p, state.tick)
+  if (judged !== null && 'refusal' in judged) return { ok: false, reason: judged.refusal }
+  const witnessed: PendingEvent[] =
+    judged === null
+      ? []
+      : judged.broken.map((lawId) => ({
+          type: 'law_broken',
+          payload: { lawId, agentId, verb, witnesses: witnessesOf(state, config, agentId) },
+        }))
   const events: PendingEvent[] = []
   if (a.asleep && verb !== 'sleep') events.push({ type: 'agent_woke', payload: { agentId } })
   if (def.atOnce !== undefined) {
     events.push(...def.atOnce(state, config, agentId, p))
-    return { ok: true, events }
+    return { ok: true, events: [...events, ...witnessed] }
   }
   // The one place a duration is settled, so the dark can charge for work without every verb
   // having to remember that it is night.
@@ -148,5 +160,5 @@ export function submitIntent(
   const duration = penalty === 1 ? base : Math.ceil(base * penalty)
   events.push({ type: 'action_started', payload: { agentId, verb, params: p, duration } })
   if (def.onStart) events.push(...def.onStart(state, config, agentId, p))
-  return { ok: true, events }
+  return { ok: true, events: [...events, ...witnessed] }
 }

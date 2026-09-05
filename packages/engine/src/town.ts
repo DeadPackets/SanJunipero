@@ -26,6 +26,9 @@ import { authoredOrigin, type WorldState } from './state.js'
 // TOWN_SQUARE is in the authored frame; the array origin walks as the world grows, so the
 // square's array coordinate is the authored one less state.origin. No town means no plots.
 
+// The plaza is 16 tiles across from its north-west corner; anything inside that is at the square.
+export const SQUARE_RADIUS = 16
+
 /** TOWN_SQUARE is the plaza's north-west corner, not its middle. Ring-independent by construction:
  *  every offset is a difference of two plazaOf(rings) points. 254 of 256 — well and pit stand bare. */
 const PLAZA_PAVED: readonly { dx: number; dy: number }[] = (() => {
