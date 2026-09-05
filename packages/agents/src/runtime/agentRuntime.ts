@@ -146,7 +146,7 @@ const TIES_SHOWN_PER_PERSON = 2
 
 // Rendered at prose time and never written back into a stored ruling. Only a skill deficit
 // earns it: a thing nobody can do teaches no one a false path.
-export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
+export const CRAFT_HINT = '. Maybe someone nearby knows the craft.'
 
 // Engine-side words: a parameter schema spelled out in braces, or a registry name. Every
 // other engine reason is the town's own sentence now and reaches the mind whole.
@@ -158,7 +158,7 @@ function isBodyNoOp(reason: string, verb: string): boolean {
   return reason.startsWith('unknown verb:') && (BODY_NOOPS.has(verb) || TURN_FIELDS.has(verb))
 }
 
-export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
+export const OPAQUE_REFUSAL = 'it does not work, and you cannot say why'
 
 // Whether the reason can be said out loud at all. Asked once, so the memory and the next turn
 // cannot drift apart the day the pattern changes.
@@ -211,13 +211,13 @@ export function actImportance(verb: string): number {
 /** The same refusal, said to the next turn instead of only to the memory store. A reason that
  *  reached a memory row had to win retrieval to be seen, and mostly did not (rehearsal4 K20). */
 export function lastTurnLine(what: string, reason: string): string {
-  return `Last turn: ${what} did not take — ${sayable(reason)}.`
+  return `Last turn: ${what} did not work: ${sayable(reason)}.`
 }
 
 /** The other thing a turn can open with: not an act refused, but an act the body set down
  *  half-finished. A mind that woke standing empty-handed would otherwise never learn why. */
 export function brokeOffLine(verb: string, why: string): string {
-  return `Last turn: you broke off ${verbPhraseGerund(verb)} — ${sayable(why)}.`
+  return `Last turn: you stopped ${verbPhraseGerund(verb)}: ${sayable(why)}.`
 }
 
 /** The verb that takes a body's hands off what they are doing. */
@@ -225,7 +225,7 @@ const STOP = 'stop'
 
 // What a body says to itself when it stops before it meant to. It never asked; the hands came
 // off the work because the body was failing under it.
-export const BODY_WOULD_NOT_GO_ON = 'your body would not carry it any further'
+export const BODY_WOULD_NOT_GO_ON = 'your body could not keep going'
 
 // The reasons `drink`, `fill` and `fish` are turned away by all name the water. Read off the
 // rendered line, which is the one place a refusal survives into the next turn. An empty vessel
@@ -240,7 +240,7 @@ export const TRIED_FREEFORM = 'what you tried'
 
 // What a mind is told when the court could not be reached or the ruling could not be made law:
 // no verb of the world's and no machinery word, only a try that did not begin.
-export const CANNOT_BEGIN = 'you turn it over and cannot begin it now'
+export const CANNOT_BEGIN = 'you think it over and cannot start it now'
 
 // A refusal with a context-dependent class is never short-circuited by precedent, so the same
 // ask every turn would be a full ruling every turn. Inside this window the mind's own refusal
@@ -1425,7 +1425,7 @@ export class AgentRuntime {
         await this.#mem!.insertMemory({
           tick,
           kind: 'reflection',
-          text: `You have let go of what stood between you and ${who}: ${t.text}`,
+          text: `You have let go of what was between you and ${who}: ${t.text}`,
           importance: LET_GO_IMPORTANCE,
           tags: { ...EMPTY_TAGS, people: [who] },
         })
@@ -1493,7 +1493,7 @@ export class AgentRuntime {
       const name = nameOf.get(t.personId)
       if (name === undefined) continue
       const rows = held.get(name) ?? []
-      if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]} — ${t.text}`)
+      if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]}: ${t.text}`)
       held.set(name, rows)
     }
     return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join('; ')}.`]))

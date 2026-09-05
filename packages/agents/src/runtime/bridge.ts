@@ -59,7 +59,7 @@ export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredom
 export type Intent = { verb: string; params: Record<string, unknown> }
 export type SubmitResult = { ok: true } | { ok: false; reason: string }
 
-export const ROLLED_BACK = 'the moment came apart'
+export const ROLLED_BACK = 'nothing came of the moment'
 
 type QueuedSubmit = {
   agentId: string

@@ -1072,12 +1072,12 @@ describe('the refusal the next turn is actually told about', () => {
   const line = lastTurnLine('eat', 'the food must be in your hands')
 
   it("says the verb and the reason the engine gave, in the engine's own words", () => {
-    expect(line).toBe('Last turn: eat did not take — the food must be in your hands.')
+    expect(line).toBe('Last turn: eat did not work: the food must be in your hands.')
   })
 
   it('flattens a reason spelled the way only a schema spells it', () => {
     expect(lastTurnLine('stow', 'needs {itemId, structureId}')).toBe(
-      `Last turn: stow did not take — ${OPAQUE_REFUSAL}.`,
+      `Last turn: stow did not work: ${OPAQUE_REFUSAL}.`,
     )
   })
 
@@ -1104,7 +1104,7 @@ describe('the refusal the next turn is actually told about', () => {
 
   it("names the words the mind used when there was no verb, not a schema's blank", () => {
     expect(lastTurnLine(TRIED_FREEFORM, 'the reeds will not hold that shape')).toBe(
-      'Last turn: what you tried did not take — the reeds will not hold that shape.',
+      'Last turn: what you tried did not work: the reeds will not hold that shape.',
     )
   })
 
