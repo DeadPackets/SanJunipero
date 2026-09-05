@@ -98,10 +98,8 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
       </ul>
       <p className="orbit-key">
         <b>Nearer means closer.</b>{' '}
-        {orbit.rings
-          .map((r) => `${BOND_LEVEL_WORD[r.level].toLowerCase()} ${String(r.r)}`)
-          .join(' · ')}
-        . No line means they have never met.
+        {orbit.rings.map((r) => BOND_LEVEL_WORD[r.level].toLowerCase()).join(' · ')}. No line means
+        they have never met.
       </p>
     </div>
   )
