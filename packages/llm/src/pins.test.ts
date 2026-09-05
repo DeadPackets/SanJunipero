@@ -321,7 +321,7 @@ it('an unpinned caller keeps the routing it has always had', () => {
   expect(modelFor('nobody-pinned-this')).toBe(MIND_MODEL)
 })
 
-it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh and at max for a ruling', async () => {
+it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh', async () => {
   vi.stubEnv('SJ_FLEET', 'luna')
   vi.resetModules()
   try {
@@ -331,7 +331,7 @@ it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh 
       expect(luna.callSettingsFor(caller).providerOrder).toEqual(RULING_PROVIDER_ORDER)
       expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'xhigh' })
     }
-    expect(luna.callSettingsFor('arbiter').reasoning).toEqual({ effort: 'max' })
+    expect(luna.callSettingsFor('arbiter').reasoning).toEqual({ effort: 'xhigh' })
     expect(luna.callSettingsFor('scene').maxOutputTokens).toBe(300 + 6000)
     expect(luna.callSettingsFor('arbiter').maxOutputTokens).toBe(4000 + 24_000)
     expect(luna.requestTimeoutMsFor('scene')).toBeGreaterThanOrEqual(90_000)
