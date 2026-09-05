@@ -150,7 +150,7 @@ publishes its box in view coordinates — otherwise a bubble pushed below a figu
 
 | Arm | Tabs |
 |---|---|
-| Folk | People · Bonds · Families |
+| Folk | People · Bonds · Families · Customs |
 | Chronicle | Today · Firsts · Chapters · Moments · Days |
 | Found | Things · Places |
 | Laws | World · Admin |
@@ -173,7 +173,7 @@ story and the live feed is the column beside it, split at `40rem` of the sheet's
 container — below that they stack, because two columns of a 760px sheet are two gutters. 40 and
 not 44: a 760px sheet is 42.5rem of container, so at 44 the split could not fire at any width
 between 641px and 1920px and the front page was one 80-character ribbon on every laptop.
-Running prose stops at `--measure` (68ch); the sheet is as wide as it needs to be, a paragraph
+Running prose stops at `--measure` (62ch, which is nearer 78 characters than 62); the sheet is as wide as it needs to be, a paragraph
 is as wide as it can be read at. The
 lead drops its slab and its frame and takes a Fraunces drop cap; its section heading stays in
 the tree as a visually-hidden `h3`, because the edition's own headline is what a sighted reader
@@ -203,7 +203,7 @@ the sheet's own instant snap.
 
 ## Breakpoints
 
-One media query in 1,383 lines was a width-only 640px, and **height is what a landscape phone runs
+One media query in the whole sheet was a width-only 640px, and **height is what a landscape phone runs
 out of**. Several now, and the sheet's own lists read the sheet rather than the window.
 
 | Query | What it is for |
@@ -287,10 +287,10 @@ once.
   there is no tint step to lose; `createWorldLabel` resolves the family from the style's fill,
   and a fill with no atlas falls back to a canvas glyph, which draws its own colour.
 - **A page never prints an empty state over a broken wire.** `Read<T>` carries `failed`, and
-  the seven branches that would otherwise say "the town has not done this yet" say
-  `OUT_OF_REACH` and offer the read again. An empty state is news about the town; this is news
+  every branch that would otherwise say "the town has not done this yet" says
+  `OUT_OF_REACH` and offers the read again. An empty state is news about the town; this is news
   about the wire, and they are not the same sentence.
-- The signpost's arms are a **disclosure set**: `aria-expanded` + `aria-controls="paper-sheet"`,
+- The signpost's arms are a **disclosure set**: `aria-expanded` + `aria-controls="paper"`,
   never `aria-pressed`. Hover lifts an arm 1px onto a warmer plank; the open arm sits 1px down on
   a darker one — three drawn rasters, two channels each, no filter: a brightness filter took the
   label to 1.53:1 and flickered 1.2 → 0.94 → 1.2 when a pressed arm was pressed. The focus ring

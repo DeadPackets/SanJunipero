@@ -442,7 +442,7 @@ body {
   text-transform: uppercase; color: var(--ink-quiet);
 }
 .room-lives { display: block; margin: 0; }
-.room-names, .room-empty, .room-who {
+.room-names, .room-who {
   font-family: var(--font-body); font-size: var(--f-3); color: var(--ink);
 }
 

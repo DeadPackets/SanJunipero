@@ -525,6 +525,9 @@ describe('the legend rebuilds on data and only places on the camera', () => {
       world: { scale: { x: 1 } },
       getZoom: () => 1,
       viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+      // The legend publishes its boxes to the one occupancy table and reads everybody else's,
+      // so the stub answers for both halves of that.
+      tags: { setOccupied: () => undefined, occupied: () => [] },
     } as unknown as Scene
     const store = { getState: () => state } as unknown as WorldStore
     const layer = createLandmarkLayer(scene, store)

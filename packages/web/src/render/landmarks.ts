@@ -233,11 +233,12 @@ export const leashOf = (of: readonly Rect[], size: { w: number; h: number }): Re
 export function placeLandmarks(
   marks: readonly PlaceableMark[],
   view: Rect,
+  taken: readonly Rect[] = [],
 ): { id: string; sx: number; sy: number; rect: Rect }[] {
   const m0 = LANDMARK_CULL_MARGIN_PX
-  // every named place, and every plate already put down — one list, so `placeTag` is not
-  // handed a fresh concatenation of the two per mark
-  const avoid: Rect[] = marks.flatMap((m) => m.of)
+  // every named place, every plate already put down, and every box another label layer has
+  // published — one list, so `placeTag` is not handed a fresh concatenation per mark
+  const avoid: Rect[] = [...taken, ...marks.flatMap((m) => m.of)]
   const out: { id: string; sx: number; sy: number; rect: Rect }[] = []
   for (const m of marks) {
     if (m.sx < view.x - m0 || m.sx > view.x + view.w + m0) continue
@@ -346,7 +347,10 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
     const alpha = landmarkAlpha(scene.getZoom())
     node.visible = alpha > 0
     node.alpha = alpha
-    if (!node.visible) return
+    if (!node.visible) {
+      scene.tags.setOccupied('landmarks', [])
+      return
+    }
 
     const z = scene.world.scale.x
     const inv = worldTextScale(z)
@@ -364,15 +368,21 @@ export function createLandmarkLayer(scene: Scene, store: WorldStore): LandmarkLa
     // Only what was placed is drawn, and the sweep below still has to run: a legend that gave
     // way must not take an early return out of it and leak its plates.
     const placed = new Set<string>()
+    // ONE occupancy: a landmark that reads nobody else's boxes and publishes none of its own
+    // composites with the toponym beside it, and two names over one another are neither.
+    const mine: Rect[] = []
     if (fits) {
-      for (const at of placeLandmarks(wanted, scene.viewRect())) {
+      const taken = scene.tags.occupied('landmarks')
+      for (const at of placeLandmarks(wanted, scene.viewRect(), taken)) {
         const t = labels.get(at.id)
         if (t === undefined) continue
         placed.add(at.id)
+        mine.push(at.rect)
         t.node.visible = true
         t.node.position.set(Math.round(at.sx), Math.round(at.sy + LANDMARK_PAD_Y * inv))
       }
     }
+    scene.tags.setOccupied('landmarks', mine)
     for (const [id, t] of labels) if (!placed.has(id)) t.node.visible = false
   }
 
