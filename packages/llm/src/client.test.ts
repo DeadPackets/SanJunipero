@@ -1401,6 +1401,21 @@ describe('a re-ask waits out the window it was refused in', () => {
     expect(model.doGenerateCalls).toHaveLength(2)
   })
 
+  // ★ A model that answers off-schema is not a transient fault, and the response_format path has
+  // never re-asked one. The tool path threw a plain Error, so the loop billed a second ask.
+  it('★ never re-asks a tool call the schema refused', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'no tool call at all' }, { text: 'nor this one' }])
+    await expect(
+      new LlmClient({ model, db, caller: 'turn', transport: 'tool' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: z.object({ a: z.number() }),
+      }),
+    ).rejects.toThrow(/tool transport/)
+    expect(model.doGenerateCalls, 'an off-schema answer was asked for twice').toHaveLength(1)
+  })
+
   // ★ The stall budget used to be re-armed by a burst: once `attempt` had passed `maxRetries`,
   // the stall check could never fire again, so reflection billed three 45 s stalls for two.
   it('spends the stall budget once, whatever order a burst arrives in', async () => {

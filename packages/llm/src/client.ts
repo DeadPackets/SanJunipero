@@ -325,10 +325,18 @@ export class LlmClient {
         })
         note(stepFacts(r))
         const parsed = schema.safeParse(r.toolCalls[0]?.input)
-        if (!parsed.success)
-          throw new Error(
-            `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`,
-          )
+        if (!parsed.success) {
+          // The same class the response_format path throws: an off-schema answer is a wrong
+          // answer, and the loop must not bill an identical second ask for it.
+          const why = `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`
+          throw new NoObjectGeneratedError({
+            message: why,
+            text: JSON.stringify(r.toolCalls[0]?.input ?? null),
+            response: r.response,
+            usage: r.usage,
+            finishReason: r.finishReason,
+          })
+        }
         return parsed.data
       }
       try {
