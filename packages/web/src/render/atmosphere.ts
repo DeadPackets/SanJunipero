@@ -7,6 +7,7 @@ import { bakeTexture } from './textures.js'
 import type { Scene } from './scene.js'
 import { clockTint, gradingMatrix, skyLevel } from './tints.js'
 import { crossTint } from '../ui/sceneTransition.js'
+import { moonAltitude } from '../ui/skyModel.js'
 import { progress } from '../ui/motion.js'
 
 export type Atmosphere = { update(state: WorldState): void; destroy(): void }
@@ -14,6 +15,13 @@ export type Atmosphere = { update(state: WorldState): void; destroy(): void }
 /** The ceiling, reached at dawn and dusk when sky and ground differ most. */
 export const SKY_MAX_ALPHA = 0.16
 export const SKY_TEX_H = 64
+
+/** ★ The moon, cool where every other light in the town is warm — it is the one thing after
+ *  dark that is not a fire, and the roofs have to be able to say so. */
+export const MOON_COLOR = 0xcdd8ff
+/** Screened over the deep-blue multiply, 0.14 lifts a roof clear of its own wall and leaves
+ *  the ground it stands on where the night put it. */
+export const MOON_MAX_ALPHA = 0.14
 
 export function skyAlpha(sky: number): number {
   return SKY_MAX_ALPHA * (0.35 + 0.65 * (1 - Math.abs(0.5 - sky) * 2))
@@ -47,7 +55,15 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   sky.autoGarbageCollect = false
   const skyMask = new Graphics()
   sky.mask = skyMask
-  scene.screen.lights.addChild(skyMask, sky)
+  // The moon rides the same ramp over the same ground: one traveller, one curve, and the arc
+  // over the town cannot disagree with the light on it.
+  const moon = new Sprite(sky.texture)
+  moon.blendMode = 'screen'
+  moon.eventMode = 'none'
+  moon.autoGarbageCollect = false
+  moon.tint = MOON_COLOR
+  moon.mask = skyMask
+  scene.screen.lights.addChild(skyMask, sky, moon)
   let maskedTerrain: TileId[][] | null = null
   const fitSky = (terrain: TileId[][]): void => {
     maskedTerrain = terrain
@@ -62,9 +78,11 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       .poly([...corner(0, 0), ...corner(w, 0), ...corner(w, h), ...corner(0, h)])
       .fill(0xffffff)
     const b = cameraBoundsOf(terrain)
-    sky.position.set(b.minX, b.minY)
-    sky.width = b.maxX - b.minX
-    sky.height = b.maxY - b.minY
+    for (const s of [sky, moon]) {
+      s.position.set(b.minX, b.minY)
+      s.width = b.maxX - b.minX
+      s.height = b.maxY - b.minY
+    }
   }
 
   const filter = new ColorMatrixFilter()
@@ -96,6 +114,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       if (state.terrain !== maskedTerrain) fitSky(state.terrain)
       sky.tint = quad.tint
       sky.alpha = skyAlpha(skyLevel(minute))
+      moon.alpha = MOON_MAX_ALPHA * moonAltitude(minute)
 
       // The matrix is a pure function of the kind, and assigning it re-uploads the filter's
       // uniforms — so it is written when the weather turns, not on every frame of it.
@@ -117,6 +136,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
     destroy() {
       quad.destroy()
       skyMask.destroy()
+      moon.destroy()
       sky.destroy(true)
     },
   }

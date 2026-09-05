@@ -1312,6 +1312,8 @@ body {
     transition: opacity var(--t-fast) var(--ease-enter);
     animation: cue-in var(--t-fast) var(--ease-enter) backwards;
   }
+  /* A sound chip is the cue mark's own news, in the corner rather than the middle: same fade. */
+  .sound-cue { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
   @keyframes cue-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -1810,7 +1812,7 @@ body {
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
   .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
-  .thoughts-button {
+  .thoughts-button, .sound-button {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }
@@ -1836,7 +1838,7 @@ body {
 /* ── the corner cluster: two 44px targets, each with the glyph everyone already knows ─────── */
 /* Bottom-LEFT, not the top-right the pattern usually takes: the sun arc owns the top edge and
    the quiet stamp sits under it, so this is the one corner nothing else stands in at any width. */
-.help-button, .thoughts-button {
+.help-button, .thoughts-button, .sound-button {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
@@ -1849,24 +1851,26 @@ body {
   transition-property: translate, background-color;
   transition-timing-function: var(--ease-tap);
 }
-.help-button:hover, .thoughts-button:hover { background: var(--honey-l); }
-.help-button:active, .thoughts-button:active {
+.help-button:hover, .thoughts-button:hover, .sound-button:hover { background: var(--honey-l); }
+.help-button:active, .thoughts-button:active, .sound-button:active {
   translate: 0 1px; box-shadow: var(--frame-tight);
 }
 @media (prefers-reduced-motion: no-preference) {
   /* A transition reads the duration of the state it goes TO, so the hover-out is instant; the
      press and the switch's own change of paper both answer an input and read the tap band. */
-  .help-button, .thoughts-button { transition-duration: 0s; }
+  .help-button, .thoughts-button, .sound-button { transition-duration: 0s; }
   .help-button:hover, .help-button:active,
-  .thoughts-button:hover, .thoughts-button:active { transition-duration: var(--t-tap); }
-  .thoughts-button[aria-pressed='false'] { transition-duration: var(--t-tap); }
+  .thoughts-button:hover, .thoughts-button:active,
+  .sound-button:hover, .sound-button:active { transition-duration: var(--t-tap); }
+  .thoughts-button[aria-pressed='false'],
+  .sound-button[aria-pressed='false'] { transition-duration: var(--t-tap); }
 }
 /* The ground under it is the town, so the ring carries its own the way the signpost's does. */
-.help-button:focus-visible, .thoughts-button:focus-visible {
+.help-button:focus-visible, .thoughts-button:focus-visible, .sound-button:focus-visible {
   outline: 2px solid var(--honey); outline-offset: 2px;
   box-shadow: var(--frame), 0 0 0 6px var(--deep);
 }
-[data-broadcast='on'] :is(.help-button, .thoughts-button) { display: none; }
+[data-broadcast='on'] :is(.help-button, .thoughts-button, .sound-button) { display: none; }
 
 /* The second slab, an --s-3 gap over the first. It carries no text at all: `--font-sign` is on
    an 8px grid and the ladder has no legal size for it under 16, so the mark is drawn as pixels. */
@@ -1876,8 +1880,39 @@ body {
 .thoughts-glyph { display: block; image-rendering: pixelated; }
 /* Off steps one notch inside the same family, the way `.legend-chip.off` does — honey to sand is
    1.10:1, so the paper is never the signal; the emptied wisp is. Deep holds 11.2:1 on sand. */
-.thoughts-button[aria-pressed='false'] { background: var(--sand); }
-.thoughts-button[aria-pressed='false']:hover { background: var(--parchment); }
+.thoughts-button[aria-pressed='false'],
+.sound-button[aria-pressed='false'] { background: var(--sand); }
+.thoughts-button[aria-pressed='false']:hover,
+.sound-button[aria-pressed='false']:hover { background: var(--parchment); }
+
+/* The third slab, one --s-3 over the wisp. Same drawn mark, same reason: the ladder has no
+   legal size for `--font-sign` under 16px and it has no ♪ at any size. */
+.sound-button {
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + 2 * var(--s-3));
+}
+.sound-glyph { display: block; image-rendering: pixelated; }
+
+/* ── the sound cues: what the town is making a noise about, whether or not you can hear it ── */
+/* Muted is the default, so these chips ARE the signal for almost every viewer. They stand in
+   the cue's own register — cream on the four-way halo, letter-spaced — because that is what a
+   mark over the town is, and they stack UPWARD from the cluster so a bell arriving on top
+   leaves every chip under it exactly where the eye left it. */
+.sound-cues {
+  position: absolute; z-index: 25; margin: 0; padding: 0; list-style: none;
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 132px + 3 * var(--s-3));
+  display: flex; flex-direction: column-reverse; gap: var(--s-2);
+  pointer-events: none;
+}
+.sound-cue {
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+  color: var(--cream); text-shadow: var(--halo-deep);
+  pointer-events: none;
+}
+[data-broadcast='on'] .sound-cues, [data-paper='on'] .sound-cues { display: none; }
+
+
 
 .key-map {
   position: fixed; inset: 0; z-index: 45;

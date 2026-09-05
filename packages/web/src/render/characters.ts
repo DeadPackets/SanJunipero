@@ -15,6 +15,7 @@ import {
   lyingHitPolygon,
 } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
+import { shadowCast } from '../ui/skyModel.js'
 import { artOptional, characterArt, type TextureBook } from './textures.js'
 import {
   SLOT_ABOVE_HEAD_PX,
@@ -535,6 +536,8 @@ export function createCharacterLayer(
     // ── pass two: the rank, then everything that hangs off a body's position ────────────────
     const ranks = crowdOffsets(standing)
     const wantsMotion = scene.wantsMotion()
+    // once a frame for every body: the sun's height is a function of the minute, not of who
+    const sun = shadowCast(nowTick)
     for (const { a, e, pos, bobY } of drawing) {
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
@@ -562,7 +565,11 @@ export function createCharacterLayer(
       const { sx, sy } = feetOf(px, py)
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
-      e.shadow.position.set(sx, sy)
+      // ★ The sun's own height, off the same token the arc draws: a low sun draws the blob
+      // out and lays it away from the light, and noon puts it back under the feet.
+      e.shadow.position.set(sx + sun.dx, sy)
+      e.shadow.scale.set(sun.scaleX, sun.scaleY)
+      e.shadow.alpha = SHADOW_ALPHA * sun.alpha
       // On the ground, not on the body: the ring takes the shadow's point, so an idle bob
       // does not lift it off the tile.
       e.ring.position.set(sx, sy)

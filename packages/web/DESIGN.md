@@ -238,6 +238,81 @@ out of**. Several now, and the sheet's own lists read the sheet rather than the 
 **With the sheet open the signpost stays whole at every width** — 0 px² of overlap measured at
 320, 375, 390, 768, 844×390, 1024, 1440 and 2560, against 36,352 px² (100% hidden) at ≤390 before.
 
+## The night
+
+The night was the same picture at 0.45 of its own light, which is a hole rather than an hour.
+It is now a place to watch, and every part of it reads the light model that was already there —
+`render/tints.ts`'s one day clock and `ui/skyModel.ts`'s one traveller. There is no second one.
+
+| Mark | What it is | Where |
+|---|---|---|
+| the night floor | `NIGHT_FLOOR` = `[0.5, 0.58, 0.95]`, the multiply quad's darkest tint | `render/tints.ts` |
+| the window | a `--f4e289` glow on every LIT hearth house, at the art's window or the front face | `render/lightPools.ts` |
+| the fireflies | 90 pooled 2px lights over grass, on a clear night only | `render/fireflies.ts` |
+| the moon | a second screened ramp over the same masked ground, `#CDD8FF` at 0.14 | `render/atmosphere.ts` |
+| the long shadow | the contact blob stretched and laid away from a low sun | `ui/skyModel.ts` → `render/characters.ts` |
+
+**The floor is a measured number, not a mood.** `[0.45, 0.52, 0.95]` left a roof at 0.536 of its
+own luma; `[0.5, 0.58, 0.95]` puts it at 0.590 and holds the blue cast exactly (the hue ladder
+`r < g < b` is unchanged). Everything downstream reads it: `skyLevel` derives from the floor's
+own luminance, so the lamps, the sky ramp and the glow all moved with it and none of them was
+retuned by hand. One consequence is recorded rather than hidden — under the brighter night the
+pale paving (`#e8d5bc`) now carries the landmark ink at 4.60:1 where every other tile still
+fails, so the plate is still load-bearing but for ten grounds rather than eleven.
+
+**A hearth the art does not PAINT is a fire indoors**, and a fire indoors reaches the town
+through a wall. Only the cabin's manifest ever named a window; cottage, farmhouse and house
+burned all night behind a dark facade. `windowSpot` falls back to the front face at the cabin's
+own height (`370/512` of the painted cell) for any lit source with no painted flame — which is
+exactly the four hearth kinds, and never a fire pit or a lamp post, whose flame is already lit
+on screen. The gate is `flamesAt` itself: an unfed hearth is not in the list at all.
+
+**Clear is not a second list of weather words** — it is exactly the weather `WEATHER_DIAG` does
+not grade, so a kind added to the grade cannot forget to put the swarm away. The fireflies come
+out at `FIREFLY_DUSK` (0.5 of the fall to night), so the golden hour stays a golden hour.
+Ninety sprites are built once and only written to; the blinks are 0.43 Hz and 0.61 Hz, under the
+3 Hz floor every light in the renderer is held to.
+
+**A low sun draws the shadow out and then lets it go.** `shadowCast` is a hump, not a ramp: the
+blob stretches to `SHADOW_MAX_STRETCH` (2.6×) through the golden band and is back under the feet
+as the sun touches the horizon, so nothing snaps at the minute the light goes. It falls away
+from the sun — east at dawn, west at dusk — and softens as it lengthens. Read once a frame for
+the whole cast, because the sun's height is a function of the minute and not of who is standing
+in it.
+
+## Sound
+
+**Opt-in, diegetic, synthesized, and muted until a viewer says otherwise.** `ui/sound.ts` is the
+whole of it: no audio file, no CDN, no `Audio` element. An `AudioContext` is opened inside the
+click that unmutes — the gesture the autoplay policy wants — and never before.
+
+`soundCues(scene)` is **the one list**. The synth is handed it and the chips are stamped from
+it, so a sound the chips cannot name cannot be played, and a chip with nothing behind it cannot
+be printed. Every voice in it has a source the viewer can point at:
+
+| Voice | Its source on screen | Gain |
+|---|---|---|
+| wind | every canopy and every column of smoke drifting on `windNow()` | 0.12, +0.16 in a storm |
+| rain | the drops `weatherFx` is drawing | 0.24 rain, 0.34 storm |
+| crickets | the fireflies, on the same clear night, in the same frame | 0.20 × the night |
+| fire | a lit flame inside the view rect | 0.09 + 0.045 each, capped 0.20 |
+| murmur | the people in the open scene the camera can see | 0.06 + 0.03 each, capped 0.14 |
+| a bell | `law_ratified` — what the town just decided | a struck one-shot, 2.4 s |
+
+The loudest world the town can build — a storm, at night, over fires, in a scene — sums to 0.96
+before `SOUND_MASTER` (0.55), so the mix cannot clip. Every continuous voice is one filtered tap
+off a single two-second noise loop, built once on the first unmute and only ramped afterwards;
+the bell is the one exception and strikes two partials on the bell ratio (784 Hz × 2.76).
+
+**A chip stands for a START, never for a running voice.** The sun arc is the one permanent mark
+over the town, so "♪ WIND" may not sit in the corner all day: `trackStarts` stamps a voice the
+instant it enters the mix and `standingChips` holds it `CUE_CHIP_MS` (4.2 s). The chip is the
+cue mark's own material — cream, `--font-body` 600 at `--f-1`, 0.18em, on the four-way
+`--halo-deep` — stacked `column-reverse` above the corner cluster, so a bell arriving on top
+leaves every chip under it where the eye left it. The "♪" toggle is the cluster's third 44px
+slab, its mark drawn on the 8×8 grid for the same reason the wisp is: `--font-sign` has no ♪ and
+no legal size under 16px. Off empties the note rather than darkening the paper.
+
 ## Motion
 
 `ui/motion.ts` holds the table; the CSS custom properties are derived from it and a test fails if

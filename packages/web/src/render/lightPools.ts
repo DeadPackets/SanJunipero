@@ -35,6 +35,24 @@ export const FIRE_ALPHA = 0.62
 export const BLOOM_R = 22
 export const WINDOW_R = 16
 
+/** The cabin is the one house whose art names its window; its own point, as a fraction of the
+ *  painted cell, is the height every other hearth house is lit at. */
+const WINDOW_V = 370 / 512
+
+/** Where a lit structure shows through its wall, in the art's own cell coordinates. A source
+ *  whose art PAINTS its flame — a fire pit, a lamp post — has no window: its light is already
+ *  on screen, and a second one would be invented. */
+export function windowSpot(
+  points: BuildingPoints | null,
+  texW: number,
+  texH: number,
+): CellPoint | null {
+  if (points === null || texW <= 1) return null
+  if (points.window !== undefined) return points.window
+  if (points.flame !== undefined) return null
+  return { x: Math.round(texW / 2), y: Math.round(texH * WINDOW_V) }
+}
+
 /** Two incommensurate sines: no two lamps agree, and none of them strobes. Written for the
  *  fire's alpha; the pool takes it rescaled to its own base and the window glow doubled. */
 const BREATH_SLOW = 0.06
@@ -259,17 +277,21 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
             view,
           )
         }
-        if (pts.window !== undefined) {
+        const win =
+          l.sprite === null
+            ? null
+            : windowSpot(pts, l.sprite.texture.width, l.sprite.texture.height)
+        if (win !== null) {
           l.glow ??= light(tex, GLOW_COLOR)
           place(
             l.glow,
-            pointOn(l.sprite, pts.window),
+            pointOn(l.sprite, win),
             WINDOW_R,
             WINDOW_R,
             (GLOW_BASE_ALPHA + 2 * b) * strength,
             view,
           )
-        }
+        } else if (l.glow !== null) l.glow.visible = false
       }
       // Only a flame that has left the WORLD takes its light with it — a torch burnt to ash, a
       // lamp knocked down. Never one that merely went off screen or out of season.
