@@ -43,7 +43,7 @@ export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
 
 /** Where a moment belongs to ONE of the two people the payload names: the one who was asked
  *  wears the question, and the one who was turned down wears the rain. */
-export const MOMENT_EMOTE_ONE: Readonly<Record<string, string>> = {
+const MOMENT_EMOTE_ONE: Readonly<Record<string, string>> = {
   invited: 'agentId',
   invitation_refused: 'byId',
 }

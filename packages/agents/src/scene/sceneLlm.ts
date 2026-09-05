@@ -147,7 +147,7 @@ function renderLateness(tick: number, energy: number): string {
 
 /** The one thing this line has to settle, said to the one who has to settle it. Empty for the
  *  asker and for everybody else, so an ordinary talk pays nothing for it. */
-export function renderInvitation(
+function renderInvitation(
   invitation: Scene['invitation'],
   agentId: string,
   nameOf: (id: string) => string,
@@ -159,11 +159,7 @@ export function renderInvitation(
 /** The one thing a talk that has turned into a vote has to settle, said to whoever has to
  *  settle it. The word for such a gathering is ours and not theirs, so it is never said: what
  *  the mind is told is that somebody put a rule to the room and everyone answers it. */
-export function renderProposal(
-  scene: Scene,
-  agentId: string,
-  nameOf: (id: string) => string,
-): string {
+function renderProposal(scene: Scene, agentId: string, nameOf: (id: string) => string): string {
   const proposal = scene.proposal
   if (scene.kind !== 'council' || proposal === undefined) return ''
   if (proposal.proposedBy === agentId) {

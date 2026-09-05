@@ -175,7 +175,7 @@ function noiseBuffer(ctx: AudioContext): AudioBuffer {
 
 type Voice = { gain: GainNode }
 
-export function createSoundscape(): Soundscape {
+function createSoundscape(): Soundscape {
   const wake = (): AudioContext | null => {
     if (typeof AudioContext === 'undefined') return null
     return new AudioContext()
