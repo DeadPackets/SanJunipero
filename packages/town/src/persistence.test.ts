@@ -175,6 +175,33 @@ describe('★ a resumed world refuses a boot that is not the same world', () => 
     ).rejects.toThrow(/seed/)
   }, 60_000)
 
+  // ★ The population the guard was written for: a town built before the identity row existed.
+  // `stored === null` short-circuited the check, and the boot then stamped whatever the
+  // environment said that day — after which every later boot agreed with it.
+  it('★ refuses a log that has a history but no identity, rather than stamping one', async () => {
+    const dbPath = join(dir, 'unstamped.db')
+    await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 } })
+    const db = openDb(dbPath)
+    db.exec('DELETE FROM world_meta')
+    db.close()
+
+    await expect(
+      startDevWorld({
+        realMsPerTick: 100_000,
+        port: 0,
+        dbPath,
+        world: { map: 'showcase', rings: 3 },
+      }),
+    ).rejects.toThrow(/no identity/)
+
+    const after = openDb(dbPath)
+    try {
+      expect(readWorldMeta(after), 'the refused boot stamped the town anyway').toBeNull()
+    } finally {
+      after.close()
+    }
+  }, 60_000)
+
   it('a fresh start re-stamps the identity instead of refusing', async () => {
     const dbPath = join(dir, 'restamp.db')
     await runTo(dbPath, 5, { world: { map: 'showcase', rings: 1 } })

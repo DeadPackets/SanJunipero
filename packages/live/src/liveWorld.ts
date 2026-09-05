@@ -75,8 +75,8 @@ import { createDiscoveryArt } from './discoveryCommission.js'
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
  *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
 const LIVE_SPEND_DAILY_USD = 3
-/** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
- *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
+/** Dollars over the town's whole life; 0 is none. Reaching it stops every mind and leaves the
+ *  town serving: the operator hears it on the ops surface, and the viewer is never dark for it. */
 const LIVE_SPEND_STOP_USD = 50
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's tick this is every 20 s
@@ -103,6 +103,16 @@ export function idleGapTicks(env: Record<string, string | undefined> = process.e
   const raw = Number(env.SJ_IDLE_GAP)
   return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_IDLE_GAP_TICKS
 }
+/** The detector never joins a gathering to one more than `windowDays` older, so an event past
+ *  that window can no longer make a candidate — held, it is the whole log in memory. One day of
+ *  margin, because the pass runs on the boundary of the day it is closing. */
+export function trimRecognizerWindow(events: SimEvent[], tick: number, windowDays: number): void {
+  const oldest = tick - (windowDays + 1) * MINUTES_PER_DAY
+  let drop = 0
+  while (drop < events.length && events[drop]!.tick < oldest) drop += 1
+  if (drop > 0) events.splice(0, drop)
+}
+
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
@@ -210,8 +220,9 @@ export async function settle(
 
 /** A per-call cap cannot see a slow leak; this bounds CALLS per unit time, PER MIND. Calls, not
  *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
- *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 14 is 3x, per ruling 25. */
-const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 14
+ *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours) over the callers the
+ *  monitor then counted; the scene lines it did not are 735 of 1,307 more, so 7.3, and 22 is 3x. */
+const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 22
 // A rate needs a span to be a rate: two sim-hours is four real minutes at 1x and a burst of
 // night reflections spread thin enough not to read as a runaway.
 const LIVE_RATE_MIN_SPAN_SIM_HOURS = 2
@@ -221,6 +232,9 @@ const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 /** How often the operator hears a projected burn. Well under every hard stop, so a leak is on
  *  the ops surface with an hour left to look at it. */
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
+/** How long the close may spend asking who served the rows nobody claimed. The container allows
+ *  20 s for the whole shutdown, and the three reports after this one need the rest of it. */
+const STOP_SWEEP_MS = 3_000
 /** How often unattributed rows are asked about. One sweep drains far more than any town
  *  produces in a minute, and the endpoint is never asked twice inside one. */
 const LIVE_BACKFILL_REAL_SECONDS = 60
@@ -259,6 +273,12 @@ function dailyStopMessage(spent: number, budget: number): string {
     '        Measured over the last 24 real hours. Every mind is stopped and no further call will',
     '        be made. The town on disk is intact. SJ_SPEND_DAILY_USD raises the budget.',
   ].join('\n')
+}
+
+/** A refusal the ledger raised, not a fault: the minds must not run, and the town must keep
+ *  serving anyway. `serve.ts` boots the scripted cast on this one and refuses on every other. */
+export class MindsHeldError extends Error {
+  override readonly name = 'MindsHeldError'
 }
 
 /** The daily budget refuses a boot too, and BEFORE the pre-flight: a container that restarts on
@@ -378,26 +398,27 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const priorRateStop = rateStopOnRecord(opsDb)
   if (priorRateStop !== null) {
     opsDb.close()
-    throw new Error(rateStopRefusal(priorRateStop, opts.agentDbDir))
+    throw new MindsHeldError(rateStopRefusal(priorRateStop, opts.agentDbDir))
   }
   const alreadySpent = ledgerTotalUsd(opsDb)
   if (cap > 0 && alreadySpent >= cap) {
     opsDb.close()
-    throw new Error(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
+    throw new MindsHeldError(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
   }
   const today = spentToday()
   if (today >= dailyBudget) {
     opsDb.close()
-    throw new Error(dailyReachedRefusal(today, dailyBudget))
+    throw new MindsHeldError(dailyReachedRefusal(today, dailyBudget))
   }
 
   const openRouterKey = process.env.OPENROUTER_API_KEY ?? ''
 
   /** A row whose answer named no back end books at the ceiling for ever otherwise; asking
    *  OpenRouter who served it is the only way back to a real price. */
+  const unclaimable = new Set<string>()
   const sweepUnattributed = async (): Promise<void> => {
     if (openRouterKey === '') return
-    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey })
+    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey, unclaimable })
     if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
   }
 
@@ -749,6 +770,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           // One at a time: the first pass on a resumed town is the whole log, and a spread
           // that wide overflows the argument stack.
           for (const ev of fresh) recognizerEvents.push(ev)
+          trimRecognizerWindow(recognizerEvents, tick, config.constructs.windowDays)
           void runConstructPass({
             events: recognizerEvents,
             baseConfig: config,
@@ -852,7 +874,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (retired.length > 0) log(`stream: retired ${retired.join(', ')} — ${RETIRED_REASON}`)
       }
       bridge.onTick((tick) => {
-        tickHistory.push({ ms: Date.now(), tick })
+        // Not past a stop: the trim below sits behind the spend check, which a stopped town
+        // never reaches, so a sample pushed here would stay for the life of the process.
+        if (!stopped) tickHistory.push({ ms: Date.now(), tick })
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
           if (built !== null) retireTheDay(built, tick)
@@ -907,7 +931,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (today >= dailyBudget) {
           console.error(dailyStopMessage(today, dailyBudget))
           stopMinds()
-          opts.onSpendStop?.(spent, cap)
+          // The day's figures, not the lifetime pair: this is the line that was crossed.
+          opts.onSpendStop?.(today, dailyBudget)
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
@@ -963,8 +988,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       arbiterDb?.close()
       narratorDb?.close()
       // Before every report, not between them: a row still booked at the ceiling makes both
-      // the provider table and the reconciliation ratio a lie.
-      await sweepUnattributed()
+      // the provider table and the reconciliation ratio a lie. Bounded, because 25 rows at a 10 s
+      // fetch each would sit out the container's whole stop grace and take the reports with it.
+      let sweeping = true
+      void sweepUnattributed()
+        .catch(() => {
+          /* a price nobody answered for is the ceiling, which is where it already sits */
+        })
+        .finally(() => {
+          sweeping = false
+        })
+      if (!(await settle(() => sweeping, STOP_SWEEP_MS))) {
+        log('stream: the last unclaimed prices went unasked — the town closed first')
+      }
       // Each of these says nothing about a run with nothing to say, so a quiet ops surface
       // still means a quiet run.
       for (const row of reportDeadCalls(opsDb)) {

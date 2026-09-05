@@ -1,6 +1,6 @@
 // Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
 // behind the body proves nothing about the seam.
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +15,7 @@ import {
   PROVIDER_ORDER,
 } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS } from '@sj/shared'
+import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS, type SimEvent } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -31,9 +31,11 @@ import {
   DEFAULT_IDLE_GAP_TICKS,
   idleGapTicks,
   ledgerTotalUsd,
+  MindsHeldError,
   preflightCostUsd,
   restorableSnapshot,
   settle,
+  trimRecognizerWindow,
 } from './liveWorld.js'
 
 // What no puppet in `founders.ts` will ever say, because `founders.ts` cannot speak at all.
@@ -620,12 +622,45 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now() - 60 * 60 * 1000, 0.06)
     await run(world, 10)
     expect(stops).toHaveLength(1)
+    // The pair the DAY was judged on, not the lifetime one: $40 of yesterday is in neither.
+    expect(stops[0]!.cap, 'the daily stop reported the lifetime cap').toBe(0.05)
+    expect(stops[0]!.spent).toBeGreaterThanOrEqual(0.06)
+    expect(stops[0]!.spent, 'the daily stop reported the lifetime total').toBeLessThan(40)
     expect(ledgerTotalUsd(opsDb), 'and the lifetime total was never the trigger').toBeLessThan(50)
 
     const atStop = eventsOf(dir, 'agent_spoke').length
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+
+  // ★ 25 unclaimed rows at a 10 s fetch each is four minutes in front of the run's three reports,
+  // inside a 20 s stop grace: the container SIGKILLs the process and the reports never run.
+  it('★ closes inside the container’s grace when the price sweep will not answer', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'a-key-for-a-sweep-that-hangs')
+    vi.stubGlobal('fetch', () => new Promise(() => {}))
+    try {
+      const dir = tmp()
+      const { world, opsDb } = await liveWorld({ dir })
+      await run(world, 2)
+      opsDb
+        .prepare(
+          `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error, provider, generation_id)
+         VALUES (?, NULL, 'turn', 'm', 10, 10, 0, 0, 0.001, 5, 1, NULL, NULL, 'gen-unanswered')`,
+        )
+        .run(Date.now() - 60_000)
+
+      const started = Date.now()
+      await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+      expect(Date.now() - started, 'the sweep held the close open past the grace').toBeLessThan(
+        15_000,
+      )
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  }, 60_000)
 
   it('refuses a boot that is already over the day, before the pre-flight spends a cent', async () => {
     const dir = tmp()
@@ -634,7 +669,10 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now(), 0.4)
     await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
 
+    // Typed, not bare: `serve.ts` boots the town scripted on this one and refuses on every other
+    // failure, so a spent day costs the viewer nothing.
     await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toThrow(/daily budget/)
+    await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toBeInstanceOf(MindsHeldError)
   }, 60_000)
 
   // A run that never reconciles is a run whose dollar figures have no second opinion. The stale
@@ -755,9 +793,10 @@ describe('★ the money, inside the served world', () => {
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     // Run C's measured 4.7 calls a mind a sim-hour, for two minds over a 12-sim-hour window,
-    // and a nightly reflection burst on top of it.
+    // a nightly reflection burst on top of it, and the ledger's share of lines said out loud.
     callsTo(opsDb, 'turn', 113)
     callsTo(opsDb, 'reflection', 12)
+    callsTo(opsDb, 'scene', 70)
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
@@ -1374,6 +1413,35 @@ describe('★ the chronicle, written on the day boundary', () => {
     expect(narratorRows(dir, 'SELECT day FROM chapters')).toEqual([])
     expect(narratorRows(dir, 'SELECT day FROM publications')).toEqual([])
   }, 120_000)
+})
+
+// ★ Every tile a body crosses is a row, and the array held all of them since boot — the whole
+// log on a resumed town — inside a 1.5 GB container, re-walked whole at every day boundary.
+describe('★ the recognizer holds the window it reads, not the town’s whole life', () => {
+  const moved = (day: number): SimEvent =>
+    ({ seq: day, tick: day * MINUTES_PER_DAY, type: 'agent_moved', payload: {} }) as SimEvent
+
+  it('drops the days no gathering can still be joined to', () => {
+    const events = Array.from({ length: 30 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 29 * MINUTES_PER_DAY, 7)
+    expect(events.map((e) => e.tick / MINUTES_PER_DAY)).toEqual([
+      21, 22, 23, 24, 25, 26, 27, 28, 29,
+    ])
+  })
+
+  // A stopped town keeps ticking — that is the design — and the rate window's trim sits behind
+  // an early return it never passes. Nothing reads the array after a stop, so the guard is the
+  // only thing there is to hold on to.
+  it('stops sampling the rate window once the minds are stopped', () => {
+    const src = readFileSync(new URL('./liveWorld.ts', import.meta.url), 'utf8')
+    expect(src).toContain('if (!stopped) tickHistory.push(')
+  })
+
+  it('leaves a town younger than the window untouched', () => {
+    const events = Array.from({ length: 4 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 3 * MINUTES_PER_DAY, 7)
+    expect(events).toHaveLength(4)
+  })
 })
 
 describe('★ the liveliness dial', () => {

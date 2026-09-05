@@ -26,15 +26,29 @@ const DEFAULTS: Pick<WorldEnv, 'interiors' | 'builders' | 'bridge' | 'jointBuild
 }
 
 export const intEnv = (name: string, fallback: number, min: number): number => {
-  const asked = Number(process.env[name] ?? fallback)
+  const raw = process.env[name]
+  // `Number('') === 0`: a key left with nothing after the `=` is a knob nobody set, and taking
+  // it as zero is the unlit town compose.yaml warns about.
+  const asked = raw === undefined ? fallback : raw.trim() === '' ? Number.NaN : Number(raw)
   if (Number.isInteger(asked) && asked >= min) return asked
-  if (process.env[name] !== undefined)
-    console.log(`world: ${name}=${process.env[name]} ignored; using ${fallback}`)
+  if (raw !== undefined) console.log(`world: ${name}=${raw} ignored; using ${fallback}`)
   return fallback
 }
 
-const boolEnv = (name: string, fallback: boolean): boolean =>
-  process.env[name] === undefined ? fallback : process.env[name] !== '0'
+const BOOL_ON: ReadonlySet<string> = new Set(['1', 'true', 'on', 'yes'])
+const BOOL_OFF: ReadonlySet<string> = new Set(['0', 'false', 'off', 'no'])
+
+const boolEnv = (name: string, fallback: boolean): boolean => {
+  const raw = process.env[name]
+  if (raw === undefined) return fallback
+  // Every word an operator writes for off, and a line when it is none of them: `!== '0'` read
+  // `false` and `off` as ON, and said nothing about it.
+  const asked = raw.trim().toLowerCase()
+  if (BOOL_ON.has(asked)) return true
+  if (BOOL_OFF.has(asked)) return false
+  console.log(`world: ${name}=${raw} ignored; using ${fallback ? 'on' : 'off'}`)
+  return fallback
+}
 
 export function parseWorldEnv(): WorldEnv {
   return {

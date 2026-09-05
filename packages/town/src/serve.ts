@@ -24,15 +24,34 @@ export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 const numEnv = (name: string, ok: (n: number) => boolean): number | undefined => {
   const raw = process.env[name]
   if (raw === undefined) return undefined
-  const asked = Number(raw)
+  // `Number('') === 0`: a bare `SJ_SPEND_CAP_USD=` would read as a cap of zero, and every
+  // `cap > 0` guard downstream is off at zero.
+  const asked = raw.trim() === '' ? Number.NaN : Number(raw)
   if (ok(asked)) return asked
   console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
   return undefined
 }
-const usdEnv = (name: string): number | undefined =>
+export const usdEnv = (name: string): number | undefined =>
   numEnv(name, (n) => Number.isFinite(n) && n >= 0)
 const countEnv = (name: string): number | undefined =>
   numEnv(name, (n) => Number.isInteger(n) && n >= 1)
+
+/** A refusal the ledger raised is a budget event, not a fault: the container restarts on a
+ *  non-zero exit and the next boot re-reads the same ledger, so exiting would leave the viewer
+ *  dark for the day the rolling window takes to free. Any other failure still refuses. */
+export async function castOrScripted<E extends Error>(
+  build: () => Promise<LiveCast>,
+  Held: abstract new (...args: never[]) => E,
+): Promise<LiveCast | null> {
+  try {
+    return await build()
+  } catch (e) {
+    if (!(e instanceof Held)) throw e
+    console.error(e.message)
+    console.error('stream: the minds are held — the town keeps serving, scripted, at $0.00/hour')
+    return null
+  }
+}
 
 export async function main(): Promise<void> {
   if (!existsSync(`${CLIENT_DIST}index.html`)) {
@@ -56,25 +75,31 @@ export async function main(): Promise<void> {
   let world: Awaited<ReturnType<typeof startDevWorld>> | undefined
   // A FACTORY, not a cast: `startDevWorld` deletes the minds when `SJ_FRESH=1`, and a cast
   // built out here would already be holding those files open. Wipe first, build second.
-  const castFactory = (): Promise<LiveCast> =>
-    import('@sj/live').then(({ createLiveCast }) =>
-      createLiveCast({
-        agentDbDir: mindsDir,
-        narratorDbPath,
-        ...(process.env.SJ_MODELS_DIR === undefined
-          ? {}
-          : { modelsDir: process.env.SJ_MODELS_DIR }),
-        ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
-        ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
-        ...(maxMinds === undefined ? {} : { maxMinds }),
-        // The cap kills the process: a stream that stops thinking and keeps serving is a town of
-        // statues nobody would notice for hours.
-        onSpendStop: () => {
-          void world?.stop().then(() => process.exit(1))
-        },
-        // Opt-OUT. It fires only on an act the engine has no verb for: per-novelty, not per-turn.
-        useArbiter: process.env.SJ_ARBITER !== '0',
-      }),
+  const castFactory = (): Promise<LiveCast | null> =>
+    import('@sj/live').then(({ createLiveCast, MindsHeldError }) =>
+      castOrScripted(
+        () =>
+          createLiveCast({
+            agentDbDir: mindsDir,
+            narratorDbPath,
+            ...(process.env.SJ_MODELS_DIR === undefined
+              ? {}
+              : { modelsDir: process.env.SJ_MODELS_DIR }),
+            ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
+            ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
+            ...(maxMinds === undefined ? {} : { maxMinds }),
+            // The cap holds the minds and leaves the town standing: a stream that keeps serving
+            // costs nothing, and a process that exits here restarts into the same refusal.
+            onSpendStop: () => {
+              console.error(
+                'stream: the minds are stopped — the town keeps serving, scripted, at $0.00/hour',
+              )
+            },
+            // Opt-OUT. It fires only on an act the engine has no verb for: per-novelty, not per-turn.
+            useArbiter: process.env.SJ_ARBITER !== '0',
+          }),
+        MindsHeldError,
+      ),
     )
 
   try {
@@ -145,7 +170,12 @@ export async function main(): Promise<void> {
 
   // A stream is a long-running process and a container stops it with a signal; without this the
   // world dies mid-write and the next boot reads a half-flushed db.
+  // Once, however many signals arrive: a second SIGTERM behind a slow drain used to run the whole
+  // teardown again on the same handles, with both `process.exit(0)` calls racing the WAL flush.
+  let stopping = false
   const stop = (signal: string): void => {
+    if (stopping) return
+    stopping = true
     console.log(`stream: ${signal} — closing the town`)
     admin?.close()
     void running.stop().then(() => process.exit(0))

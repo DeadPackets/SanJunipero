@@ -88,10 +88,13 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     expect(r).toEqual({ callsPerMindSimHour: 8, sampledCalls: 16 })
   })
 
-  it('counts only what a mind spends its own calls on', () => {
+  // ★ A line said out loud is a mind's own call — a third of them, by the ledger. Counted
+  // anywhere but here, a conversation loop can hold the floor at any rate the day's budget allows.
+  it('counts only what a mind spends its own calls on, the words it says among them', () => {
     const db = openDb()
-    expect(MIND_CALLERS).toEqual(['turn', 'reflection', 'reflection.edit', 'dream', 'recall'])
-    for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'recall']) {
+    const mind = ['turn', 'reflection', 'reflection.edit', 'dream', 'scene', 'recall']
+    expect(MIND_CALLERS).toEqual(mind)
+    for (const caller of mind) {
       seedProviderCall(db, { agoMinutes: 1, caller, provider: 'Baidu' })
     }
     for (const caller of ['narrator', 'arbiter', 'semantic', 'forge', 'preflight', 'constructs']) {
@@ -99,7 +102,7 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     }
 
     const r = projectCallRate(db, { minds: 1, windowRealMinutes: 15, now: NOW })
-    expect(r.sampledCalls, 'town work was billed to the cast').toBe(5)
+    expect(r.sampledCalls, 'town work was billed to the cast').toBe(6)
   })
 
   it('leaves a call older than the window out of the flow', () => {
@@ -262,6 +265,21 @@ describe('dead calls — paid for, and nothing came back', () => {
     )
     expect(classifyFailure('fetch failed')).toBe('other')
     expect(classifyFailure(null)).toBe('other')
+  })
+
+  // ★ A call the bound cut off is ledgered with no tokens, $0 and no generation id, so no cap
+  // and no backfill can ever see it. Counted under its own name, it is at least a number an
+  // operator can hold against the provider's invoice.
+  it('★ tells a call the bound cut off from any other failure', () => {
+    expect(classifyFailure('The operation was aborted.')).toBe('aborted')
+    expect(classifyFailure('The operation was aborted due to timeout.')).toBe('aborted')
+
+    const db = openDb()
+    fail(db, 'omar', 'The operation was aborted.')
+    fail(db, 'omar', 'fetch failed')
+    expect(deadCallCounts(db)[0]).toMatchObject({ calls: 2, aborted: 1, otherFailures: 1 })
+    reportDeadCalls(db)
+    expect(alerts(db)[0]!.detail).toContain('1 cut off')
   })
 
   it('counts them per mind per day, beside the calls that mind was billed for', () => {

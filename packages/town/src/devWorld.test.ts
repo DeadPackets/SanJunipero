@@ -104,17 +104,20 @@ describe('dev world server', () => {
       const step = dw.loop.step.bind(dw.loop)
       let thrown = 0
       dw.loop.step = () => {
-        if (thrown < 3) {
+        if (thrown < 10) {
           thrown += 1
           throw new Error('the observer scan fell over')
         }
         step()
       }
-      await until(() => thrown >= 3, 12_000)
+      await until(() => thrown >= 10, 12_000)
       const frozenAt = dw.loop.state.tick
       await until(() => dw.loop.state.tick > frozenAt, 12_000)
-      // Three identical throws, one line: a repeating fault does not fill the log.
-      expect(err.mock.calls.filter((c) => String(c[0]).includes('fell over'))).toHaveLength(1)
+      // ★ Ten identical throws, two lines: quiet enough not to fill the log, loud enough that a
+      // world frozen on one repeating fault cannot pass for a healthy one.
+      const said = err.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('fell over'))
+      expect(said).toHaveLength(2)
+      expect(said[1]).toContain('10 times')
     } finally {
       await dw.stop()
     }

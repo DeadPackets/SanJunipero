@@ -87,6 +87,9 @@ export function migrateLlmTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
+  // A reservation is released in a JS `finally`, which a kill never reaches. One process owns
+  // this ledger, so anything still reserved when it opens belongs to a run that is gone.
+  db.exec('DELETE FROM llm_reservations')
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
@@ -261,8 +264,13 @@ export type UnattributedCall = {
  *  still has one. A row outside the band is never asked about again. */
 export function unattributedCalls(
   db: Database.Database,
-  window: { from: number; until: number; limit: number },
+  window: { from: number; until: number; limit: number; skip?: readonly string[] },
 ): UnattributedCall[] {
+  const skip = window.skip ?? []
+  // Excluded in SQL, not after: filtered afterwards they would still fill the limit and hold
+  // every newer row out of the window.
+  const notThese =
+    skip.length === 0 ? '' : `AND generation_id NOT IN (${skip.map(() => '?').join(',')})`
   return db
     .prepare(
       `SELECT id, generation_id AS generationId, agent_id AS agentId, model,
@@ -270,10 +278,10 @@ export function unattributedCalls(
               cache_read_tokens AS cacheReadTokens
          FROM llm_calls
         WHERE provider IS NULL AND generation_id IS NOT NULL AND ok = 1
-          AND ts >= ? AND ts <= ?
+          AND ts >= ? AND ts <= ? ${notThese}
         ORDER BY id LIMIT ?`,
     )
-    .all(window.from, window.until, window.limit) as UnattributedCall[]
+    .all(window.from, window.until, ...skip, window.limit) as UnattributedCall[]
 }
 
 export type CallPricing = {

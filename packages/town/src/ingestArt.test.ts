@@ -44,6 +44,7 @@ import {
   ingestLibraryArt,
   ingestProductionArt,
   ingestTerrainArt,
+  type IngestEntry,
 } from './ingestArt.js'
 import { townStructuresFor } from './founders.js'
 import { SHOWCASE_CONFIG } from './devWorld.js'
@@ -54,6 +55,14 @@ afterAll(() => {
 })
 
 describe('ingestProductionArt', () => {
+  // ★ `missing` had no producer anywhere — every lister throws on a half-present directory
+  // instead — so the `NO ART for <kind>` line it fed was a diagnostic that could never print.
+  it('★ carries only the two actions its listers can produce', () => {
+    // @ts-expect-error a third action would be a state no ingest can reach
+    const unreachable: IngestEntry = { kind: 'shed', action: 'missing', id: 'x' }
+    expect(unreachable.action).toBe('missing')
+  })
+
   it('registers every committed cell and every committed sheet, idempotently', async () => {
     const db = openForgeDb(join(dir, 'codex.db'))
     const codex = new AssetCodex(db)

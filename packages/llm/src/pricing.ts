@@ -33,6 +33,9 @@ export type BookOpts = {
   reported: number | null
   served: string
   provider: string | null
+  /** Off on the backfill sweep: the ceiling alert was raised when the row was written, and the
+   *  sweep re-pricing it says nothing new about the same call. */
+  alertCeiling?: boolean
 }
 
 /** The provider's own charge wins when offered: it is the bill. The table stays as the second
@@ -41,7 +44,7 @@ export function bookCostUsd(db: Database.Database, opts: BookOpts): number {
   const { agentId, computed, reported, served, provider } = opts
   // A route nobody has priced must never book cheap: it books at the worst rate any endpoint
   // charges for this model, and it says so.
-  if (computed.source === 'ceiling') {
+  if (computed.source === 'ceiling' && opts.alertCeiling !== false) {
     insertAlert(db, {
       agentId,
       kind: 'llm_price_unpriced_route',

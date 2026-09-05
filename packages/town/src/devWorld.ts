@@ -39,6 +39,7 @@ import {
   assertSameWorld,
   ensureWorldMetaTable,
   readWorldMeta,
+  unstampedWorldRefusal,
   writeWorldMeta,
 } from './worldMeta.js'
 
@@ -162,8 +163,9 @@ export async function startDevWorld(
     /** Per-mind memory dbs (`<id>.db`), thrown away with the world when `fresh` is asked for. */
     agentDbDir?: string
     /** A FACTORY, not a cast: one built before this call has already opened the per-mind dbs
-     *  that `fresh` deletes. */
-    cast?: () => Promise<LiveCast>
+     *  that `fresh` deletes. Hands back null when the ledger holds the minds — the town is
+     *  served scripted rather than not served at all. */
+    cast?: () => Promise<LiveCast | null>
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH
@@ -191,7 +193,9 @@ export async function startDevWorld(
     try {
       ensureWorldMetaTable(probe)
       const stored = readWorldMeta(probe)
-      if (stored && new EventStore(probe).lastSeq() > 0) assertSameWorld(stored, identity)
+      const lived = new EventStore(probe).lastSeq() > 0
+      if (lived && stored === null) throw new Error(unstampedWorldRefusal(identity))
+      if (stored && lived) assertSameWorld(stored, identity)
     } finally {
       probe.close()
     }
@@ -205,11 +209,7 @@ export async function startDevWorld(
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
       const entries = ingestProductionArt(forgeDb)
-      const gone = entries.filter((e) => e.action === 'missing')
-      console.log(
-        `dev world: ingested production art (${entries.length - gone.length} of ${entries.length} assets)`,
-      )
-      for (const e of gone) console.log(`dev world:   NO ART for ${e.kind} — ${e.detail ?? ''}`)
+      console.log(`dev world: ingested production art (${entries.length} assets)`)
     } catch (e) {
       console.log(
         `dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`,
@@ -354,14 +354,24 @@ export async function startDevWorld(
   // moves `loop.speed` and `loop.paused`, and an interval already armed cannot be re-timed.
   const beatMs = opts.realMsPerTick ?? DEV_MS_PER_TICK
   // A throw out of one tick must not take the beat with it: skipping `arm()` freezes the world
-  // for good, with no line anywhere. One alert per distinct fault, so a repeating one is quiet.
+  // for good, with no line anywhere. A repeating fault speaks at 1, 10, 100 …: quiet enough not
+  // to fill the log, loud enough that a frozen world cannot pass for a healthy one.
   let lastFault = ''
+  let faults = 0
+  let loudAt = 1
   const beatFailed = (err: unknown): void => {
     const why = err instanceof Error ? err.message : String(err)
-    if (why === lastFault) return
-    lastFault = why
-    console.error(`dev world: tick ${loop.state.tick} threw — ${why}`)
-    cast?.ops?.alert('tick_failed', why)
+    if (why !== lastFault) {
+      lastFault = why
+      faults = 0
+      loudAt = 1
+    }
+    faults += 1
+    if (faults !== loudAt) return
+    loudAt *= 10
+    const times = faults === 1 ? '' : `${faults} times `
+    console.error(`dev world: tick ${loop.state.tick} threw ${times}— ${why}`)
+    cast?.ops?.alert('tick_failed', `${why} (${faults} in a row)`)
   }
   const beat = (): void => {
     try {

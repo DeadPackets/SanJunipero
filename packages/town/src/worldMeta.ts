@@ -29,6 +29,20 @@ export function writeWorldMeta(db: Database.Database, meta: WorldMeta): void {
 
 const FRESH_HINT = 'start a new town instead with SJ_FRESH=1'
 
+/** A log with events and no identity row is not a first boot: stamping it makes whatever the
+ *  environment says today the baseline every later boot agrees with, and it cannot be undone. */
+export function unstampedWorldRefusal(asked: WorldMeta): string {
+  return [
+    'world on disk has a history but no identity, so this boot cannot tell which town it is.',
+    `        It would have called it map ${asked.map}, rings ${asked.rings}, seed ${asked.seed},`,
+    '        and every later boot would then agree with that, right or wrong.',
+    '        If that is the town, stamp it yourself:',
+    `        INSERT INTO world_meta (id, map, rings, seed)` +
+      ` VALUES (1, '${asked.map}', ${asked.rings}, '${asked.seed}');`,
+    `        Otherwise ${FRESH_HINT}.`,
+  ].join('\n')
+}
+
 /** Throws when the town on disk is not the town this boot asked for. Names both sides, because
  *  "map mismatch" without the two values is a bug report the operator has to write. */
 export function assertSameWorld(stored: WorldMeta, asked: WorldMeta): void {

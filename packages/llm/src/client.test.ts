@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
-import { mockModel } from './testutil/mockModel.js'
+import { mockModel, recordingModel } from './testutil/mockModel.js'
 import {
   insertLlmCall,
   makeBudgetGuard,
@@ -78,6 +78,39 @@ describe('migrateLlmTables', () => {
     expect(() => {
       migrateLlmTables(db)
     }).not.toThrow()
+  })
+
+  // ★ A reservation is released in a JS `finally`, so a kill or an OOM leaves it behind and it
+  // counts against that caller's budget for ever. One process owns the ledger: boot clears them.
+  it('★ clears the reservations a killed process left behind, and no call it billed', () => {
+    const db = openDb()
+    db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)').run(
+      Date.now(),
+      'reflection',
+      0.005,
+    )
+    insertLlmCall(db, {
+      agentId: null,
+      caller: 'reflection',
+      model: 'm',
+      provider: 'Wafer',
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      reasoningTokens: 0,
+      costUsd: 0.01,
+      estimatedCostUsd: 0.01,
+      reportedCostUsd: null,
+      latencyMs: 90,
+      finishReason: 'stop',
+      ok: true,
+      error: null,
+    })
+
+    migrateLlmTables(db)
+
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_reservations').get()).toEqual({ n: 0 })
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 1 })
   })
 
   it('adds the two bill columns to a table that predates them, leaving its rows alone', () => {
@@ -882,6 +915,26 @@ describe('★ the one-way glass, on every prompt a mind reads', () => {
     }
   })
 
+  // ★ The repair rung appends the provider's own bytes and the schema complaint AFTER the one
+  // sealing pass — the only two messages in the client that reached a provider unsealed.
+  it('★ seals the two messages the repair rung appends', async () => {
+    const db = openDb()
+    const { model, sent } = recordingModel([
+      { text: 'god_afterlife, and not JSON either' },
+      { json: { a: 1 } },
+    ])
+    await new LlmClient({ model, db, caller: 'turn' }).object({
+      system: 'You are Amara.',
+      messages: [{ role: 'user', content: 'answer' }],
+      schema: z.object({ a: z.number() }),
+      repairOnce: true,
+    })
+
+    expect(sent, 'the repair rung never ran').toHaveLength(2)
+    expect(sent[1]).not.toContain('god_afterlife')
+    expect(sent[1]).toContain('[redacted]')
+  })
+
   it('leaves a clean prompt byte-for-byte alone and writes no row', async () => {
     const db = openDb()
     const { model, sent } = recorder()
@@ -1346,6 +1399,47 @@ describe('a re-ask waits out the window it was refused in', () => {
       }),
     ).rejects.toThrow('scripted failure')
     expect(model.doGenerateCalls).toHaveLength(2)
+  })
+
+  // ★ A model that answers off-schema is not a transient fault, and the response_format path has
+  // never re-asked one. The tool path threw a plain Error, so the loop billed a second ask.
+  it('★ never re-asks a tool call the schema refused', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'no tool call at all' }, { text: 'nor this one' }])
+    await expect(
+      new LlmClient({ model, db, caller: 'turn', transport: 'tool' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: z.object({ a: z.number() }),
+      }),
+    ).rejects.toThrow(/tool transport/)
+    expect(model.doGenerateCalls, 'an off-schema answer was asked for twice').toHaveLength(1)
+  })
+
+  // ★ The stall budget used to be re-armed by a burst: once `attempt` had passed `maxRetries`,
+  // the stall check could never fire again, so reflection billed three 45 s stalls for two.
+  it('spends the stall budget once, whatever order a burst arrives in', async () => {
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      let sent = 0
+      const script = [new Error('scripted failure'), refused, new Error('scripted failure')]
+      const model = new MockLanguageModelV4({
+        doGenerate: () => {
+          sent += 1
+          return Promise.reject(script[sent - 1] ?? new Error(`re-asked ${sent} times, for three`))
+        },
+      })
+      const call = new LlmClient({ model, db, caller: 'reflection' })
+        .text({ messages: [{ role: 'user', content: 'u' }] })
+        .catch((err: unknown) => err)
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(20_000)
+      await call
+      expect(model.doGenerateCalls, 'two stalls billed, not three').toHaveLength(3)
+      expect(alertsOf(db, 'llm_call_failed')[0]).toContain('reflection: 3 attempt(s)')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('sleeps before the retry that follows a 429, and books both attempts', async () => {
