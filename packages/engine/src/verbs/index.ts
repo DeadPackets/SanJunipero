@@ -1389,8 +1389,10 @@ const harvest: VerbDef = makeVerb({
   },
   onComplete(state, config, agentId, params) {
     const p = HarvestParams.parse(params)
-    const crop = state.crops[p.cropId]!
-    const def = config.crops[crop.kind]!
+    const crop = state.crops[p.cropId]
+    if (!crop || crop.withered) return []
+    const def = config.crops[crop.kind]
+    if (!def) return []
     // Water near the roots is worth more than skill at the sickle: the ground decides the number.
     const qty = Math.floor(def.yield * fertilityAt(state.terrain, crop.x, crop.y, config))
     return [

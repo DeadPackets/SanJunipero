@@ -254,6 +254,15 @@ describe('verb: harvest', () => {
     return fold(s, ev('crop_grew', { cropId: 'crop_1', stage: 3 }), FAST)
   }
 
+  function twoAtOnePlot(): WorldState {
+    const s = fold(
+      mature(),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      FAST,
+    )
+    return s
+  }
+
   it('is registered with the farming skill', () => {
     expect(VERBS.harvest!.kind).toBe('harvest')
     expect(VERBS.harvest!.skill).toEqual({ track: 'farming', xp: 1 })
@@ -322,6 +331,24 @@ describe('verb: harvest', () => {
     // fertility 1.375 one tile from the bank: floor(3 x 1.375) = 4.
     expect(harvestQty(['.#~', '...'])).toBe(4)
     expect(harvestQty(['.#.', '...'])).toBe(3)
+  })
+
+  it('the second of two reapers over one plot completes as nothing, and the tick still folds', () => {
+    let s = twoAtOnePlot()
+    for (const id of ['a1', 'a2']) {
+      const r = submitIntent(s, FAST, id, 'harvest', { cropId: 'crop_1' })
+      if (!r.ok) throw new Error(r.reason)
+      s = applyAll(s, r.events)
+    }
+    const out = runAct(s, FAST)
+    expect(out.events.filter((e) => e.type === 'crop_harvested')).toHaveLength(1)
+    expect(out.events.filter((e) => e.type === 'item_spawned')).toHaveLength(1)
+    expect(out.events).toContainEqual({
+      type: 'action_completed',
+      payload: { agentId: 'a2', verb: 'harvest' },
+    })
+    expect(out.state.crops).toEqual({})
+    expect(out.state.agents.a2!.activity).toBeNull()
   })
 })
 
