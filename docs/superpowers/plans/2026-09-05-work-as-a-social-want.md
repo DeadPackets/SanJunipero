@@ -201,6 +201,45 @@ Files: `packages/live/src/liveWorld.ts` (LIVE_PHYSICS), `packages/engine/src/ver
    and an afflicted one can (update the "an herb is a remedy" test in `verbs.test.ts` to an ailing
    eater); stoke refused on a fresh fire and allowed once half burned.
 
+## Task 7: a perception is remembered short, from the packet, and needs no night call
+
+Measured on r24 (12 minds, 3.06 sim-days): a perception memory row is the whole `now` prose,
+1,365 characters on average, and perception rows are 89% of every mind's memory bytes (Leyla:
+154 KB of 173 KB after three days). At night `reflection.gist` spends one call per long row to
+write a 45% copy beside it: 880 calls in three days, $0.165 a sim-day, 14% of the bill, and the
+copy must keep every mark, so it cannot get much shorter. The scenery ("The night sky is clear.
+The air is mild.") is what the row is mostly made of, and nothing reads it back. Writing the row
+short at the moment it is made removes the night call, cuts memory growth about six-fold, and
+shortens the "What you remember" block and the reflection's input, with every mark still there.
+
+Files: `packages/agents/src/prompt/prose.ts` (new `perceptionMemoryText`),
+`packages/agents/src/runtime/agentRuntime.ts` (the `insertMemory({ kind: 'perception' })` call),
+tests beside each. `packages/agents/src/memory/gist.ts` is untouched: `needsGist` keeps gisting
+any long row, so a world resumed with old long rows still gets its short forms.
+
+1. `perceptionMemoryText(packet: PerceptionPacket): string`, deterministic and byte-stable for
+   the same packet, in this order and nothing else:
+   a. When and where, one sentence: the calendar words of `packet.time` as `calendarLine` says
+      them, then "at (x, y)" or "inside <roof> (<structure id>)" when `packet.self.inside` is set
+      (use the same `roofSaid` words as `perceptionToProse`).
+   b. Company, when any: "With <names>." from `packet.visible.agents` names, in packet order.
+   c. Within reach, when any: "Within reach: 2 bread (item_...), 3 herb (item_...)." from the
+      same reach items the prose lists as "close enough to touch", marks in full, at most 8, then
+      "and N more". Marks are why the row exists: a first gist that paraphrased
+      `item_..._bread` as "bread" left the next turn unable to name what it reached (fd5a93e1).
+   d. Near, when any: at most 3 visible structures by name with mark, nearest first, as the prose
+      says them.
+   e. In hand, when any: "In hand: <kinds and marks>."
+   No weather, no light, no ground, no affordance sentences, no want or stock lines, no heard
+   speech (speech has its own rows).
+2. `agentRuntime.ts`: the perception row's `text` becomes `perceptionMemoryText(packet)`; the
+   `now` prose the turn reads is unchanged. Importance and tags unchanged.
+3. Tests: renders the fixture packet as specified and is byte-identical across two calls; a busy
+   packet (12 visible agents, 20 reach items, 6 structures) renders under 700 characters
+   (`GIST_MIN_CHARS`), so no gist is ever asked for it; every reach mark in the packet appears
+   in the text (up to the cap); the runtime writes the short text and the scene block renders
+   the marks; `needsGist` is false for the new row.
+
 ## Out of scope, noted for later
 
 Talking while working (a scene opening between two bodies at work without stopping the hands),
