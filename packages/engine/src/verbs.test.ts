@@ -225,6 +225,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
           {
             need: 'hunger',
             delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
+            reason: 'meal',
           },
         ],
       },
