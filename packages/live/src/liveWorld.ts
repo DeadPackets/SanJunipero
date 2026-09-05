@@ -36,6 +36,7 @@ import {
   MIND_MODEL,
   modelFor,
   PROVIDER_ORDER,
+  alertsSince,
   backfillUnattributed,
   checkActRate,
   checkProviderMix,
@@ -853,6 +854,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
       let nextSpendAlertAt = Date.now() + spendAlertMs
+      let lastRailAlertId = 0
       const rateWindow = opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES
       // One sample a tick, trimmed to the window: the rate is judged over the sim-hours these
       // ticks covered, so a loop slowed by idle pacing or paused is not read as a runaway.
@@ -893,6 +895,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           if (projected.alerted) {
             log(`stream: spend — projected $${projected.usdPerSimDay.toFixed(2)}/sim-day`)
           }
+        }
+        // A caller that has spent its own day. One line per trip, and the town keeps running:
+        // the rail holds that caller and nobody else.
+        for (const a of alertsSince(opsDb, lastRailAlertId, 'caller_rail_tripped')) {
+          lastRailAlertId = a.id
+          log(`stream: rail — ${a.detail}`)
         }
         // One line per window, never a stop: only the operator can answer a back end that got
         // past the allow-list.

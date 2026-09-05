@@ -133,6 +133,10 @@ export type CallSettings = {
   rateLimitRetries?: number
   // How long this caller queues at the back end's admission gate before giving its ask up unsent.
   maxQueueWaitMs?: number
+  // This caller's own ceiling for a rolling 24 hours. The town's daily budget is the total; this
+  // is what stops ONE caller eating it, and tripping it holds that caller and nobody else.
+  // Seeded at 2x the caller's share of rehearsal 11's ledger under the $3 day, floor $0.05.
+  dailyUsd?: number
 }
 
 // Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
@@ -153,6 +157,10 @@ const ON_RULING: CallSettings = {
 // before the night writes its gists, so two attempts left 1 night in 10 getting that far.
 const WAITS_OUT_A_BURST = { rateLimitRetries: 3, maxQueueWaitMs: 60_000 }
 
+/** The rail no caller goes under, however little rehearsal 11 saw it spend: a caller measured
+ *  at a tenth of a cent still has to be able to answer the day it is actually needed. */
+export const RAIL_FLOOR_USD = 0.05
+
 // A ceiling is 2x that caller's measured p99, taken as it will NOW run: the answer alone where
 // reasoning is off, the whole output where it stays on. On GLM it can never be off, so each of
 // those ceilings carries 2x87 tokens more of mandatory preamble. Truncation is a hard failure.
@@ -161,16 +169,27 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // full twelve-step turn measured 1,019 output tokens live, which 600 would have truncated.
   // One call ahead of you drains in Wafer's 14.7 s p95 and an idle turn is 60 s apart, so 20 s of
   // queue covers a wait one deep; past that the mind is standing still and gives the ask up.
-  turn: { ...ON_GLM, maxQueueWaitMs: 20_000, maxOutputTokens: 1500, temperature: 1 },
+  turn: {
+    ...ON_GLM,
+    maxQueueWaitMs: 20_000,
+    maxOutputTokens: 1500,
+    temperature: 1,
+    dailyUsd: 3.31,
+  },
   // 700 truncated the ledger writes and 1500 cleared the longest of them; +174 for the preamble.
-  reflection: { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 1750 },
+  reflection: { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 1750, dailyUsd: 0.8 },
   // Sized around a thinking preamble larger than this model's, so neither of these moves.
-  'reflection.edit': { ...ON_GLM, ...WAITS_OUT_A_BURST, maxOutputTokens: 13000 },
+  'reflection.edit': {
+    ...ON_GLM,
+    ...WAITS_OUT_A_BURST,
+    maxOutputTokens: 13000,
+    dailyUsd: 0.16,
+  },
   // A dream is prose, but it is a mind caller: one allow-list guards everything a mind thinks
   // through, and that one-line law is worth more than a stylist's dreams at 1% of the bill.
-  dream: { ...ON_GLM, maxOutputTokens: 2500 },
+  dream: { ...ON_GLM, maxOutputTokens: 2500, dailyUsd: RAIL_FLOOR_USD },
   // Pre-flight's act bar gates exactly the pair the turn will run on. It never leaves that pair.
-  preflight: { ...ON_GLM, maxOutputTokens: 2500 },
+  preflight: { ...ON_GLM, maxOutputTokens: 2500, dailyUsd: RAIL_FLOOR_USD },
   // One long memory set down short at the night boundary. The ask is two or three sentences;
   // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
   'reflection.gist': {
@@ -178,12 +197,13 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
     providerOrder: GIST_PROVIDER_ORDER,
     reasoning: { enabled: false },
     maxOutputTokens: 200,
+    dailyUsd: 0.27,
   },
   // The court writes what the town can never take back, so it is the one place the fleet pays
   // for a stronger reader. Thinking is what buys the judgement; 4,000 covers it and the ruling.
-  arbiter: ON_RULING,
-  council: ON_RULING,
-  'law.compile': ON_RULING,
+  arbiter: { ...ON_RULING, dailyUsd: 0.18 },
+  council: { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
+  'law.compile': { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
   // share one warm prefix; bounded under the scene's own 30 s floor, which drops a later answer.
   scene: {
@@ -192,19 +212,35 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
     maxQueueWaitMs: 10_000,
     maxOutputTokens: 300,
     temperature: 1,
+    dailyUsd: 0.75,
   },
   // Narrator prose is what its thinking buys, and 5.5% of the bill is what it costs.
   // Two sentences and a short list of ties, once per scene. Prose, so it takes the prose pin.
-  'scene.close': { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 600 },
-  narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000 },
-  naming: ON_DEEPSEEK,
-  voice: ON_DEEPSEEK,
+  'scene.close': {
+    ...ON_DEEPSEEK,
+    reasoning: { enabled: false },
+    maxOutputTokens: 600,
+    dailyUsd: 0.06,
+  },
+  narrator: { ...ON_DEEPSEEK, maxOutputTokens: 22000, dailyUsd: 0.12 },
+  naming: { ...ON_DEEPSEEK, dailyUsd: RAIL_FLOOR_USD },
+  voice: { ...ON_DEEPSEEK, dailyUsd: RAIL_FLOOR_USD },
   // Reading one day back for its firsts is a lookup, not a judgement: thinking about it once
   // spent 31,179 reasoning tokens and still answered nothing. 4,000 stands on one call.
-  semantic: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 4000 },
+  semantic: {
+    ...ON_DEEPSEEK,
+    reasoning: { enabled: false },
+    maxOutputTokens: 4000,
+    dailyUsd: RAIL_FLOOR_USD,
+  },
   // Picking one label out of five spent 14,072 output tokens, 99.5% of it reasoning; off, it
   // answers in 20. 500 and not 100: the schema returns one ruling per candidate.
-  constructs: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 500 },
+  constructs: {
+    ...ON_DEEPSEEK,
+    reasoning: { enabled: false },
+    maxOutputTokens: 500,
+    dailyUsd: RAIL_FLOOR_USD,
+  },
 }
 
 /** Every caller with a pin of its own, in declaration order. The rate monitor reads this so a

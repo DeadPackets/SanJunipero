@@ -18,10 +18,12 @@ import {
   insertTurnOutcome,
   makeBudgetGuard,
   mergeBlockTokens,
+  oldestCallTsSince,
   sumCostUsd,
   type BudgetGuard,
   type LlmCallInsert,
 } from './callLog.js'
+import { railHold, tripRail, RAIL_WINDOW_MS } from './rails.js'
 import { bookCostUsd, computeCostUsd } from './pricing.js'
 import {
   FALLBACK_MODELS,
@@ -85,6 +87,22 @@ function stepFacts(r: GeneratedStep): StepFacts {
 }
 
 export class BudgetExceededError extends Error {}
+
+/** One caller has spent its own day. Its calls are refused and every other caller keeps going:
+ *  a `turn` refusal dozes one mind, a `scene` refusal times one floor out, and the town runs. */
+export class CallerRailError extends BudgetExceededError {
+  constructor(
+    readonly caller: string,
+    readonly spentUsd: number,
+    readonly railUsd: number,
+    readonly untilMs: number,
+  ) {
+    super(
+      `LLM caller rail reached for '${caller}': spent $${spentUsd.toFixed(4)} of` +
+        ` $${railUsd.toFixed(2)} for the day; held until ${new Date(untilMs).toISOString()}`,
+    )
+  }
+}
 
 // The provider's own bytes from a generation the schema refused. Anything else is not a wrong
 // answer and must never be re-asked.
@@ -224,6 +242,7 @@ export class LlmClient {
   private readonly maxQueueWaitMs: number
   private readonly limiter: AdaptiveLimiter
   private readonly budgetUsd: number | undefined
+  private readonly dailyUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
   private readonly temperature: number | undefined
   private readonly transport: 'response_format' | 'tool'
@@ -254,6 +273,7 @@ export class LlmClient {
     // key's concurrency at that back end, shared by every mind and every pass in the process.
     this.limiter = limiterFor(this.providerOrder.join(','))
     this.budgetUsd = opts.budgetUsd
+    this.dailyUsd = pinned.dailyUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.temperature = opts.temperature ?? pinned.temperature
     this.transport = opts.transport ?? 'response_format'
@@ -460,19 +480,51 @@ export class LlmClient {
         `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} of $${this.budgetUsd.toFixed(6)}`,
       )
     }
+    const now = Date.now()
+    // Already held: the map is the answer, so a held caller costs no SQL on the tick thread.
+    const standing = this.dailyUsd === undefined ? null : railHold(this.caller, now)
+    if (standing !== null) {
+      throw new CallerRailError(this.caller, standing.spentUsd, standing.railUsd, standing.untilMs)
+    }
     // Pre-book what this call is expected to cost, so concurrent callers cannot
     // all read the same headroom and all spend it.
-    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null)
-    if (reservation === null) {
-      throw new BudgetExceededError(
-        `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
-      )
+    const rail =
+      this.dailyUsd === undefined ? null : { usd: this.dailyUsd, sinceMs: now - RAIL_WINDOW_MS }
+    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null, rail)
+    if ('held' in reservation) {
+      if (reservation.held === 'budget') {
+        throw new BudgetExceededError(
+          `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
+        )
+      }
+      throw this.holdOnRail(reservation.spentUsd, rail!, now)
     }
     try {
       return await this.invokeReserved(exec, bill)
     } finally {
-      this.guard.release(reservation)
+      this.guard.release(reservation.id)
     }
+  }
+
+  /** Records the trip, writes the operator one line for it, and hands back the refusal. The
+   *  hold lifts when the oldest call in the window rolls out of it. */
+  private holdOnRail(
+    spentUsd: number,
+    rail: { usd: number; sinceMs: number },
+    now: number,
+  ): CallerRailError {
+    const oldest = oldestCallTsSince(this.db, this.caller, rail.sinceMs) ?? now
+    const untilMs = oldest + RAIL_WINDOW_MS
+    const hold = { caller: this.caller, untilMs, spentUsd, railUsd: rail.usd }
+    if (tripRail(hold, now)) {
+      this.alert(
+        'caller_rail_tripped',
+        `${this.caller} has spent $${spentUsd.toFixed(4)} of its $${rail.usd.toFixed(2)} for` +
+          ` the day; its calls are held until ${new Date(untilMs).toISOString()},` +
+          ` the town keeps running`,
+      )
+    }
+    return new CallerRailError(this.caller, spentUsd, rail.usd, untilMs)
   }
 
   private async invokeReserved<T>(
