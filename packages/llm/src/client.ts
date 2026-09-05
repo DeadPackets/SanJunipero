@@ -470,13 +470,16 @@ export class LlmClient {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
-    let attempt = 0
+    let sends = 0
+    // Two budgets, two counters: one shared attempt number lets a burst re-ask carry the counter
+    // past `maxRetries`, after which no stall can ever spend its own bound again.
+    let bursts = 0
+    let stalls = 0
     // One patience for the whole call, not one per attempt: a budget the retries each spent in
     // full would multiply the two waits together.
     const queueUntil = Date.now() + this.maxQueueWaitMs
-    // The outer bound is whichever budget is larger; which one this failure may spend is decided
-    // against the error itself, below.
-    for (; attempt <= Math.max(this.maxRetries, this.rateLimitRetries); attempt++) {
+    for (;;) {
+      sends += 1
       try {
         return await this.limiter.run(
           () => this.attemptOnce(model, modelName, exec, bill),
@@ -492,8 +495,8 @@ export class LlmClient {
         if (NoObjectGeneratedError.isInstance(err)) throw err
         // Only a burst limit earns the pinned patience: it is refused in milliseconds and bills
         // nothing, where re-asking a stall this often would sit out the whole bound each time.
-        if (attempt === (rateLimited(err) ? this.rateLimitRetries : this.maxRetries)) break
-        const wait = retryBackoffMs(err, attempt)
+        if (rateLimited(err) ? ++bursts > this.rateLimitRetries : ++stalls > this.maxRetries) break
+        const wait = retryBackoffMs(err, sends - 1)
         // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
         if (wait > this.requestTimeoutMs) break
         if (wait > 0) await sleep(wait)
@@ -504,7 +507,7 @@ export class LlmClient {
     }
     this.alert(
       'llm_call_failed',
-      `${this.caller}: ${attempt + 1} attempt(s) failed, the last bounded at ` +
+      `${this.caller}: ${sends} attempt(s) failed, the last bounded at ` +
         `${(this.requestTimeoutMs / 1000).toFixed(0)}s — ` +
         (lastError instanceof Error ? lastError.message : String(lastError)),
     )

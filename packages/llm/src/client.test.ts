@@ -1348,6 +1348,32 @@ describe('a re-ask waits out the window it was refused in', () => {
     expect(model.doGenerateCalls).toHaveLength(2)
   })
 
+  // ★ The stall budget used to be re-armed by a burst: once `attempt` had passed `maxRetries`,
+  // the stall check could never fire again, so reflection billed three 45 s stalls for two.
+  it('spends the stall budget once, whatever order a burst arrives in', async () => {
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      let sent = 0
+      const script = [new Error('scripted failure'), refused, new Error('scripted failure')]
+      const model = new MockLanguageModelV4({
+        doGenerate: () => {
+          sent += 1
+          return Promise.reject(script[sent - 1] ?? new Error(`re-asked ${sent} times, for three`))
+        },
+      })
+      const call = new LlmClient({ model, db, caller: 'reflection' })
+        .text({ messages: [{ role: 'user', content: 'u' }] })
+        .catch((err: unknown) => err)
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(20_000)
+      await call
+      expect(model.doGenerateCalls, 'two stalls billed, not three').toHaveLength(3)
+      expect(alertsOf(db, 'llm_call_failed')[0]).toContain('reflection: 3 attempt(s)')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('sleeps before the retry that follows a 429, and books both attempts', async () => {
     const db = openDb()
     const model = answeringAfter(refused)
