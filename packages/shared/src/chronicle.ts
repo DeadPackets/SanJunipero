@@ -308,6 +308,10 @@ function invitationLine(type: string, verb: string, asker: string, invitee: stri
 /** A reason is a thing somebody said, not a paragraph; past this the feed is a transcript. */
 export const SAYING_MAX = 120
 
+/** The tick the world's first bodies stand up on — `founders.ts` and `scripted.ts` both spawn
+ *  the whole cast here, and nobody can walk into a town that has not begun. */
+export const FOUNDING_TICK = 1
+
 function clipSaying(saying: string): string {
   const said = saying.trim()
   return said.length <= SAYING_MAX ? said : `${said.slice(0, SAYING_MAX - 1).trimEnd()}…`
@@ -386,7 +390,7 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       return `${str(p.name)} was born.`
     // The founding is nobody's arrival: the town began with them. Anybody after it walked in.
     case 'agent_spawned':
-      return ev.tick === 0 ? null : `${look.agentName(str(p.id))} came to the town.`
+      return ev.tick <= FOUNDING_TICK ? null : `${look.agentName(str(p.id))} came to the town.`
     case 'scene_closed': {
       const summary = str(p.summary).trim()
       return summary === '' ? null : summary

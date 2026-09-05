@@ -11,6 +11,7 @@ import {
   NOT_CHRONICLED,
   UNNAMED_CONSTRUCT_COPY,
   CHRONICLE_CAST_MAX,
+  FOUNDING_TICK,
   SAYING_MAX,
   chronicleCast,
   chronicleIcon,
@@ -678,8 +679,12 @@ describe('somebody walking into the town', () => {
   const spawn = (tick: number): SimEvent =>
     ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 1, y: 1, ageDays: 7000 }, tick)
 
+  // founders.ts:613 and scripted.ts:209 both stand the whole cast up on tick 1, so `tick > 0`
+  // would have read day 0 as twelve strangers walking in.
   it('says nothing of the founding — the town began with those people', () => {
     expect(chronicleLine(spawn(0), look)).toBeNull()
+    expect(chronicleLine(spawn(FOUNDING_TICK), look)).toBeNull()
+    expect(FOUNDING_TICK).toBe(1)
   })
 
   it('reads as an arrival on any tick after it, by name and never by id', () => {
