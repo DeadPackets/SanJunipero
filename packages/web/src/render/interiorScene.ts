@@ -775,8 +775,10 @@ export function createInteriorScene(
     if (beforePush === null) return
     const { sx, sy, stop } = beforePush
     beforePush = null
-    if (scene.getZoomStop() !== stop) scene.setZoom(stop)
+    // Centre FIRST: the transit pins whatever is at screen centre when a stop is asked for, and
+    // re-pins it every frame it runs. Zoom first and the door is what comes back.
     scene.centerOnScreen(sx, sy)
+    if (scene.getZoomStop() !== stop) scene.setZoom(stop)
   }
 
   function setActive(structureId: string | null): void {

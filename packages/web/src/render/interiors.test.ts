@@ -849,3 +849,22 @@ describe('★ inside a room, the pointer has somewhere to land', () => {
     expect(bodyFor).toContain('onSelect(agentId)')
   })
 })
+
+// ★ The zoom transit re-pins the world point that was at screen centre when `setZoom` was
+// called, on every frame it runs. Restoring the framing second means the transit throws it away.
+describe('★ leaving a room gives the camera back, not the door', () => {
+  const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
+  const restore = /function restoreCamera\([\s\S]*?\n  \}/.exec(SRC)![0]
+
+  it('★ restoreCamera centres on the point it stored BEFORE it asks for the stop', () => {
+    expect(restore).toContain('centerOnScreen')
+    expect(restore).toContain('setZoom')
+    expect(restore.indexOf('centerOnScreen')).toBeLessThan(restore.indexOf('setZoom'))
+  })
+
+  // The entry path is the proof: it wants the DOOR pinned, so it centres on the door first.
+  it('pushInTo still centres on the door before it pushes in', () => {
+    const push = /function pushInTo\([\s\S]*?\n  \}/.exec(SRC)![0]
+    expect(push.indexOf('centerOn(')).toBeLessThan(push.indexOf('setZoom'))
+  })
+})
