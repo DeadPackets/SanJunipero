@@ -896,7 +896,7 @@ export function fold(
         ...(sourceId === undefined ? {} : { sourceId }),
       }
       const afflictions = [...prev.filter((x) => x.kind !== p.kind), merged].sort((l, r) =>
-        l.kind.localeCompare(r.kind),
+        l.kind < r.kind ? -1 : l.kind > r.kind ? 1 : 0,
       )
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
     }
