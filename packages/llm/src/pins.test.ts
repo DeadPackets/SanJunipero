@@ -253,6 +253,17 @@ it('★ the strong pin reaches the permanent record and nothing else', () => {
   }
 })
 
+// ★ A by-model row for a fleet model can never be read: `pricesFor` gates that table on the
+// model NOT being pinned, so such a row reads as a fallback price that never fires.
+it('★ prices a fleet model an unnamed back end served at the ceiling, never off a model row', () => {
+  for (const model of [MIND_MODEL, PROSE_MODEL]) {
+    expect(pricesFor(model, 'Nobody'), model).toEqual({
+      prices: CEILING_PRICE_PER_M,
+      source: 'ceiling',
+    })
+  }
+})
+
 // Its own row, keyed by the model: this one is not two-homed, and pricing it by the back end
 // would book it at whatever the fleet's GLM costs there.
 it('★ the ruling model prices at its own rate, never the fleet"s', () => {

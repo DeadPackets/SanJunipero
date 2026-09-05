@@ -79,10 +79,10 @@ export const CEILING_PRICE_PER_M: ModelPrices = { input: 0.44, output: 1.32, cac
 // from the order rather than named, so a flip cannot leave the estimator quoting the old home.
 export const PRICE_PER_M: ModelPrices = PRICE_PER_M_BY_ROUTE[route(MIND_MODEL, PROVIDER_ORDER[0]!)]!
 
-// Keyed by the model where the model, not the back end, is what sets the price: a fallback that
-// answered, and the single-homed ruling model. An unlisted model books at the ceiling.
+// Keyed by the model where the model, not the back end, is what sets the price: the single-homed
+// ruling model. A FLEET model may never be listed here — `pricesFor` reads this table only for a
+// model the pins do not name, so such a row is dead. An unlisted model books at the ceiling.
 const PRICE_PER_M_BY_MODEL: Record<string, ModelPrices> = {
-  [MIND_MODEL]: PRICE_PER_M,
   [RULING_MODEL]: { input: 0.2, output: 1.2, cacheRead: 0.02 },
 }
 
