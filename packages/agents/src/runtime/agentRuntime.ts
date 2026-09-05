@@ -372,9 +372,11 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, when, and why. Read before the god is asked again,
-  // and again before a sentence it already carries is written into the day a second time.
+  // What this mind has already been refused, when, and why. Read before the god is asked again.
   #refusedIntents = new Map<string, { tick: number; reason: string }>()
+  // The sentences the mind already carries, so one thing that happened is written down once.
+  // Its own budget: an act writes one of these every turn, and a precedent is rare and dear.
+  #heldTexts = new Map<string, { tick: number; reason: string }>()
   // How far down the world's log this mind has read its own finished acts.
   #lastActSeq = 0
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
@@ -898,27 +900,28 @@ export class AgentRuntime {
   }
 
   #rememberRefusal(description: string, reason: string): void {
-    this.#remember(sameIntent(description), reason)
+    this.#remember(this.#refusedIntents, sameIntent(description), reason)
   }
 
-  #remember(key: string, reason: string): void {
-    this.#refusedIntents.delete(key)
-    this.#refusedIntents.set(key, { tick: this.#bridge.currentTick(), reason })
+  #remember(
+    into: Map<string, { tick: number; reason: string }>,
+    key: string,
+    reason: string,
+  ): void {
+    into.delete(key)
+    into.set(key, { tick: this.#bridge.currentTick(), reason })
     // Insertion-ordered, so the first key is the oldest.
-    while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
-      this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
-    }
+    while (into.size > REFUSAL_MEMORY_SIZE) into.delete(into.keys().next().value!)
   }
 
   /** Whether this mind already carries this sentence from inside the refusal window. kamal
-   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval.
-   *  The NUL keeps these keys apart from the intents the arbiter's precedent is looked up by. */
+   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval. */
   #alreadyHeld(text: string): boolean {
-    const key = `\u0000${sameIntent(text)}`
-    const held = this.#refusedIntents.get(key)
+    const key = sameIntent(text)
+    const held = this.#heldTexts.get(key)
     if (held !== undefined && this.#bridge.currentTick() - held.tick < REFUSAL_MEMORY_TICKS)
       return true
-    this.#remember(key, text)
+    this.#remember(this.#heldTexts, key, text)
     return false
   }
 

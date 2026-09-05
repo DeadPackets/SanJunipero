@@ -1761,6 +1761,49 @@ describe('arbiter seam (T19)', () => {
     expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
   })
 
+  // One map held both the court's precedents and the sentences the mind already carries, on one
+  // sixteen-slot budget: nine ideas spend eighteen slots and the first precedent is gone.
+  it('keeps a precedent through the sentences the same acts write down', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: `${intent} will not hold that shape`,
+        class: 'physically_impossible',
+      }
+    }
+    const ideas = [
+      'weave reeds into a mat',
+      'bank the fire with river clay',
+      'split the elm with a wedge',
+      'salt the fish for winter',
+      'dam the brook below the ford',
+      'sink a post at the corner',
+      'boil the bones for glue',
+      'peg the roof against the wind',
+      'card the wool by the hearth',
+    ]
+    const { loop, agentDb } = await setup({
+      model: turnModel(
+        [...ideas, ideas[0]!].map((freeform) => ({
+          thought: 'I will try it.',
+          action: { freeform },
+          importance: 3,
+        })),
+      ),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= ideas.length, 400)
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(seen).toEqual(ideas)
+  })
+
   // ★ Run D spent 3 of its 9 rulings on `stand`, `think` and `none player`, ~11 ticks of
   // silence each. The body was already standing still; there is nothing for a god to rule on.
   it('★ a word for standing still is a quiet beat, not a ruling and not a refusal', async () => {
