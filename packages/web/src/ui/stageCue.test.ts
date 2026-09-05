@@ -103,13 +103,17 @@ describe('★ the stage says what just happened', () => {
     ).toBeNull()
   })
 
-  it('★ says a law in its own words, and says who broke one', () => {
-    expect(
-      cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)?.text,
-    ).toBe('The town made it law — No fire after dark')
-    expect(cueFor(ev('law_ratified', { lawId: 'l1' }), state)?.text).toBe('The town made it law.')
-    const broken = cueFor(ev('law_broken', { lawId: 'l1', agentId: 'yusuf', verb: 'take' }), state)
-    expect(broken?.text).toBe("Yusuf broke the town's own law.")
+  it('★ says a law in the same words the paper does, and says who broke one', () => {
+    // One copy for the stage and the page: the chronicle's line, never a second table here.
+    const agreed = cueFor(ev('law_ratified', { lawId: 'l1', text: 'No fire after dark' }), state)
+    expect(agreed?.text).toContain('No fire after dark')
+    expect(agreed?.text).toMatch(/^The town agreed/)
+    const broken = cueFor(
+      ev('law_broken', { lawId: 'l1', agentId: 'yusuf', verb: 'take', witnesses: [] }),
+      state,
+    )
+    expect(broken?.text).toMatch(/^Yusuf did what the town agreed against/)
+    expect(broken?.text).not.toMatch(/law_|l1/)
     expect(broken?.bodies).toEqual(['yusuf'])
   })
 
