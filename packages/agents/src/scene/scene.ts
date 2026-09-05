@@ -1,12 +1,12 @@
 import { z } from 'zod'
 import { INVITATION_VERBS, stateHash, type InvitationVerb, type SceneKind } from '@sj/shared'
+import type { LawPredicate } from '@sj/engine'
 import type { Tie } from '../memory/ties.js'
 
 export type Move = 'press' | 'give_way' | 'deflect' | 'tease' | 'none'
 
-// Task 13 compiles a law into the engine's own predicate; until it exists the only shape a
-// proposal can carry is the empty one.
-type LawPredicate = { kind: 'none' }
+/** Where one mind stands on a rule somebody put to the room. */
+export type Stance = 'for' | 'against' | 'unsure'
 
 export type SceneLine = {
   agentId: string
@@ -35,7 +35,14 @@ export type Scene = {
   thread: SceneLine[]
   topic: string | null
   stakes: number
-  proposal?: { lawText: string; predicate: LawPredicate }
+  /** A rule put to the room, whoever put it, and where each of the others came down on it.
+   *  The predicate is empty until the court reads the words at the close. */
+  proposal?: {
+    lawText: string
+    proposedBy: string
+    stances: Record<string, Stance>
+    predicate: LawPredicate
+  }
   invitation?: { verb: InvitationVerb; from: string; to: string; askedTick: number }
   passes: number
   timeouts: number
@@ -243,9 +250,59 @@ export function nextFloor(
     .sort((a, b) => b.warm - a.warm || a.id.localeCompare(b.id))[0]!.id
 }
 
-const PROPOSAL_PATTERNS = [/from now on/i, /call it/i, /we should all/i, /new rule/i]
+// What a person sounds like putting a rule to a room, and what they sound like letting one go.
+// Loose on purpose: a false proposal costs a talk that ends with nobody agreeing anything, and
+// the tally, the six-a-day cap and the repeal path are all downstream of it.
+const PROPOSAL_PATTERNS = [
+  /from now on/i,
+  /from this day/i,
+  /call it/i,
+  /we should all/i,
+  /let us agree/i,
+  /the rule is/i,
+  /new rule/i,
+  /nobody (?:may|shall|is to)/i,
+  /no longer/i,
+  /let go of the rule/i,
+]
 
 export const proposesALaw = (text: string): boolean => PROPOSAL_PATTERNS.some((p) => p.test(text))
+
+/** The id the rule this scene passes will carry. Derived from the scene's own id, which is
+ *  derived from the opening tick and the cast, so one council can never ratify twice. */
+export const lawIdOf = (scene: Scene): string => scene.id.replace(/^scene_/, 'law_')
+
+export type CouncilTally = { for: string[]; against: string[]; unsure: string[]; passed: boolean }
+
+/** Where the room came down. The one who put it counts for it; silence is not opposition, so a
+ *  majority is of whoever took a side — but a rule said to a departing back passes nothing, so
+ *  somebody other than the proposer has to have answered at all. */
+export function tallyCouncil(scene: Scene): CouncilTally {
+  const proposal = scene.proposal
+  if (proposal === undefined) return { for: [], against: [], unsure: [], passed: false }
+  const voters = Object.keys(proposal.stances)
+    .filter((id) => id !== proposal.proposedBy)
+    .sort()
+  const heldBy = (stance: Stance): string[] =>
+    voters.filter((id) => proposal.stances[id] === stance)
+  const forIt = [proposal.proposedBy, ...heldBy('for')]
+  const against = heldBy('against')
+  return {
+    for: forIt,
+    against,
+    unsure: heldBy('unsure'),
+    passed: voters.length > 0 && forIt.length > against.length,
+  }
+}
+
+/** Everyone still in the talk but the one who put the rule has said where they stand, so there
+ *  is nothing left for the talk to settle. */
+export function councilDecided(scene: Scene): boolean {
+  const proposal = scene.proposal
+  if (proposal === undefined) return false
+  const others = scene.participants.filter((id) => id !== proposal.proposedBy)
+  return others.length > 0 && others.every((id) => proposal.stances[id] !== undefined)
+}
 
 const QUARREL_TIE_KINDS: readonly TieKind[] = ['grudge', 'slight']
 

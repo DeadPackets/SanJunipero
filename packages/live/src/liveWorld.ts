@@ -599,6 +599,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               roster: () => built.roster(),
               customs: () => built.customs(),
               frontier: () => built.frontier(),
+              compileLaw: (ask) => built.compileLaw(ask),
             })
 
       // A child still owed its household comes up the way a live birth does — household

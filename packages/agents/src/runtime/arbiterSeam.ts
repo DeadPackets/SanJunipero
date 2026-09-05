@@ -1,4 +1,5 @@
 import type { EngineBridge } from './bridge.js'
+import type { LawPredicate } from '@sj/engine'
 import type { DiscoveryCredit, RosterEntry } from '@sj/shared'
 
 // @sj/arbiter depends on @sj/agents, so the arbiter's own types cannot come back here without a
@@ -32,6 +33,14 @@ export type Codifier = (
   credit: DiscoveryCredit,
 ) => { ruleId: number; verb: string }
 
+/** What the court makes of a rule a town just agreed: the shape the world can hold them to, the
+ *  number of a standing rule it lets go of, and one sentence saying how the words were read. */
+export type LawSeam = (ask: {
+  text: string
+  standing: { ordinal: number; text: string }[]
+  places: { id: string; kind: string; name?: string }[]
+}) => Promise<{ predicate: LawPredicate; repeals: number | null; why: string }>
+
 // The four things the runtime needs of the arbiter: rule on it, make it law, say what laws the
 // town already has, and say what the town has named for itself.
 export type SeamArbiter = {
@@ -42,6 +51,8 @@ export type SeamArbiter = {
   customs?: () => readonly string[]
   /** What stands one step beyond what the town practices, in the codex's own words. */
   frontier?: () => readonly string[]
+  /** Read a rule the town agreed. Absent, a rule is kept in words only. */
+  compileLaw?: LawSeam
 }
 
 // Values only, in sorted key order: this string is a precedent key, so anything varying per

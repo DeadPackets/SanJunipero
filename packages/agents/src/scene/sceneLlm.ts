@@ -29,6 +29,9 @@ export type SceneVoice = {
   roster?: () => readonly RosterEntry[]
   /** The town's own names for its habits, from the same seam the ordinary turn reads. */
   customs?: () => readonly string[]
+  /** What the town has agreed and holds each other to. One more block of the shared prefix, so
+   *  a rule reaches a scene line and an ordinary turn as the same bytes. */
+  laws?: () => readonly string[]
   /** What stands at the edge of the known valley. One more block of the shared prefix: without
    *  it the scene line and the ordinary turn stop being the same bytes at customs. */
   frontier?: () => readonly string[]
@@ -153,6 +156,29 @@ export function renderInvitation(
   return askPhrase(invitation.verb, nameOf(invitation.from))
 }
 
+/** The one thing a talk that has turned into a vote has to settle, said to whoever has to
+ *  settle it. The word for such a gathering is ours and not theirs, so it is never said: what
+ *  the mind is told is that somebody put a rule to the room and everyone answers it. */
+export function renderProposal(
+  scene: Scene,
+  agentId: string,
+  nameOf: (id: string) => string,
+): string {
+  const proposal = scene.proposal
+  if (scene.kind !== 'council' || proposal === undefined) return ''
+  if (proposal.proposedBy === agentId) {
+    return (
+      `You have put a rule to everyone here: "${proposal.lawText}" Hear them out. ` +
+      'It holds if more of them are for it than against, and it holds nobody if nobody answers.'
+    )
+  }
+  return (
+    `${nameOf(proposal.proposedBy)} has put a rule to everyone here: "${proposal.lawText}" ` +
+    'Say where you stand on it in "stance": for, against, or unsure. The talk ends when ' +
+    'everybody has answered.'
+  )
+}
+
 /** Who is here and whose turn it is, in one block AFTER the thread. It sits last because it is
  *  the one part a join or a leave rewrites, and every byte above it stays cached. */
 function renderFloor(opts: {
@@ -208,6 +234,7 @@ export function sceneBlock(
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderLateness(ask.tick, ask.energy),
     renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
+    renderProposal(ask.scene, ask.agentId, nameOf),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),
       others: rest.map((p) => p.name),
@@ -227,6 +254,7 @@ function sceneSystem(voice: SceneVoice): string {
     rulesOfBeing: RULES_OF_BEING,
     ...(voice.roster === undefined ? {} : { roster: voice.roster() }),
     ...(voice.customs === undefined ? {} : { customs: voice.customs() }),
+    ...(voice.laws === undefined ? {} : { laws: voice.laws() }),
     ...(voice.frontier === undefined ? {} : { frontier: voice.frontier() }),
     identity: voice.identity,
     personality: voice.personality(),

@@ -13,12 +13,15 @@ import {
   isFoodKind,
   FUEL_KIND,
   isPassable,
+  LAWS_SHOWN,
   loneCandidateFor,
   distantWater,
   makeables,
   naturalPlaces,
   placeName,
   recipeTileKind,
+  SQUARE_RADIUS,
+  standingLaws,
   submitIntent,
   waterWithinReach,
   WELL_KIND,
@@ -26,15 +29,13 @@ import {
   type TickLoop,
   type WorldState,
 } from '@sj/engine'
-import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
+import type { Law, Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import { isWet, isWoody, RELATIONSHIP_EVENT_TYPES, type SimConfig, type SimEvent } from '@sj/shared'
 import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // How far off a body still picks water out of the middle distance.
 const WATER_VISTA_RADIUS = 40
-// The plaza is 16 tiles across from its north-west corner; a crowd on it is a crowd at the square.
-const SQUARE_RADIUS = 16
 
 // A window shorter than the gap between a mind's turns makes the town half-deaf. The boredom
 // floor is the longest an awake mind can go without a turn; 10% covers the tick it lands on.
@@ -273,6 +274,34 @@ export class EngineBridge {
       seen.add(p.agentId)
     }
     return [...seen].sort()
+  }
+
+  /** Every rule the town still holds itself to, in the order it agreed them. */
+  socialLaws(): Law[] {
+    return standingLaws(this.#loop.state)
+  }
+
+  /** What a mind is told the town agreed: the sentences alone, the newest handful of them, in
+   *  the order they were agreed. Never a number and never an id — a rule is quoted by its words
+   *  or it is not in the prompt at all. */
+  lawTexts(): string[] {
+    return this.socialLaws()
+      .slice(-LAWS_SHOWN)
+      .map((l) => l.text)
+  }
+
+  /** The roofs the whole town uses: everything standing that nobody owns. What a rule may point
+   *  at, and the only buildings the court is allowed to name in one. */
+  publicPlaces(): { id: string; kind: string; name?: string }[] {
+    const state = this.#loop.state
+    return Object.keys(state.structures)
+      .sort()
+      .flatMap((id) => {
+        const s = state.structures[id]!
+        if (s.owner !== undefined || s.stage !== 'complete') return []
+        const name = placeName(s)
+        return [{ id: s.id, kind: s.kind, ...(name === undefined ? {} : { name }) }]
+      })
   }
 
   /** Whoever aimed an `express:*` at this body inside the recent window. Perception reports

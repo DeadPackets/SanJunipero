@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { EventStore, openDb } from '@sj/engine/store'
-import { fold, genesisState, replayFromGenesis, RngStreams, TickLoop } from '@sj/engine'
+import {
+  fold,
+  genesisState,
+  LAW_TEXT_MAX,
+  replayFromGenesis,
+  RngStreams,
+  TickLoop,
+} from '@sj/engine'
 import {
   ADULT_AGE_DAYS,
   INVITATION_STANDS_TICKS,
@@ -15,7 +22,7 @@ import { SCENE_CORPUS, SCENE_CORPUS_LINES } from '@sj/shared/testutil'
 import { EngineBridge } from '../runtime/bridge.js'
 import { openAgentDb } from '../memory/schema.js'
 import { TieStore } from '../memory/ties.js'
-import { SceneCoordinator, type SceneMind } from './coordinator.js'
+import { MAX_COMPILES_PER_DAY, SceneCoordinator, type SceneMind } from './coordinator.js'
 import { INVITATION_STAKES } from './invitations.js'
 import {
   FLOOR_TIMEOUT_MS,
@@ -24,8 +31,10 @@ import {
   type SceneClose,
   type SceneLlm,
   type SceneTurn,
+  type Stance,
   type TieDelta,
 } from './scene.js'
+import type { LawSeam } from '../runtime/arbiterSeam.js'
 
 const NADIA = 'nadia'
 const OMAR = 'omar'
@@ -152,6 +161,8 @@ function harness(opts: {
   closer?: () => SceneClose
   now?: () => number
   ties?: Record<string, TieDelta[]>
+  laws?: LawSeam
+  onError?: (kind: string, detail: string) => void
 }) {
   const who = opts.who ?? [
     { id: NADIA, name: 'Nadia', x: 3 },
@@ -192,6 +203,8 @@ function harness(opts: {
     bridge: world.bridge,
     mindFor: (id) => minds.get(id) ?? null,
     ...(opts.now === undefined ? {} : { now: opts.now }),
+    ...(opts.laws === undefined ? {} : { laws: opts.laws }),
+    ...(opts.onError === undefined ? {} : { onError: opts.onError }),
   })
   return { ...world, coordinator, calls, remembered, fed, llms, minds, dbs }
 }
@@ -728,12 +741,265 @@ describe('a quarrel needs a tie', () => {
     expect(h.coordinator.noteSpoken(OMAR, 'Nadia said it would be six.', NOON)?.kind).toBe('talk')
   })
 
-  it('carries the proposal a council opened on', () => {
+  it('carries the proposal a council opened on, and who put it', () => {
     const h = harness({})
     const scene = h.coordinator.noteSpoken(NADIA, 'From now on we draw at dawn.', NOON)
     expect(scene?.kind).toBe('council')
     expect(scene?.proposal).toEqual({
       lawText: 'From now on we draw at dawn.',
+      proposedBy: NADIA,
+      stances: {},
+      predicate: { kind: 'none' },
+    })
+  })
+})
+
+const lawEvents = (db: Database.Database): SimEvent[] =>
+  (
+    db
+      .prepare("SELECT seq, tick, type, payload FROM events WHERE type LIKE 'law_%' ORDER BY seq")
+      .all() as { seq: number; tick: number; type: string; payload: string }[]
+  ).map((r) => ({
+    seq: r.seq,
+    tick: r.tick,
+    type: r.type,
+    payload: JSON.parse(r.payload) as unknown,
+  }))
+
+const NIGHT_TAKE = { kind: 'forbid', verb: 'take', when: 'night' } as const
+const PROPOSAL = 'From now on nobody takes from the store after dark.'
+const READING = {
+  predicate: NIGHT_TAKE,
+  repeals: null,
+  why: 'the store is shut, and the dark is when',
+}
+
+/** A court that answers the same way every time, and keeps what it was asked. */
+function court(answer: Awaited<ReturnType<LawSeam>> = READING): {
+  seam: LawSeam
+  asks: Parameters<LawSeam>[0][]
+} {
+  const asks: Parameters<LawSeam>[0][] = []
+  return {
+    asks,
+    seam: (ask) => {
+      asks.push(structuredClone(ask))
+      return Promise.resolve(answer)
+    },
+  }
+}
+
+/** A whole council in one call: somebody puts a rule, and whoever answers says where they stand.
+ *  The talk closes itself the moment the last of them has. */
+async function council(h: Harness, tick: number, said = PROPOSAL): Promise<void> {
+  h.coordinator.noteSpoken(NADIA, said, tick)
+  for (let i = 0; i < 4; i++) {
+    const floor = h.coordinator.open()[0]?.floor
+    if (floor === undefined || floor === null) return
+    await h.coordinator.takeFloor(floor, tick)
+  }
+}
+
+/** Every mind answers with the stance the test gave it, and says something while it does. */
+const stanced =
+  (stances: Record<string, Stance | null>, to: Record<string, string> = {}) =>
+  (agentId: string) =>
+  (): SceneTurn =>
+    fromCorpus(0, {
+      speech: 'That is where I stand.',
+      leave: false,
+      stance: stances[agentId] ?? null,
+      to: to[agentId] ?? null,
+    })
+
+describe('a town writes its own rule', () => {
+  it('tells the world a rule was put the moment somebody says it', async () => {
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: court().seam })
+    await council(h, NOON)
+    h.loop.step()
+    const proposed = lawEvents(h.engineDb).filter((e) => e.type === 'law_proposed')
+    expect(proposed).toHaveLength(1)
+    expect(proposed[0]!.payload).toMatchObject({ agentId: NADIA, text: PROPOSAL })
+    expect((proposed[0]!.payload as { lawId: string }).lawId.startsWith('law_')).toBe(true)
+  })
+
+  it('caps a rule at the length every prompt will carry it at', async () => {
+    const long = `From now on ${'we all bring one back '.repeat(12)}`
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: court().seam })
+    await council(h, NOON, long)
+    h.loop.step()
+    const text = (lawEvents(h.engineDb)[0]!.payload as { text: string }).text
+    expect(text.length).toBe(LAW_TEXT_MAX)
+  })
+
+  it('keeps each mind’s word on it, and lets a later one override', async () => {
+    let answered = 0
+    const h = harness({
+      script: () => () =>
+        fromCorpus(0, {
+          speech: 'Still thinking.',
+          leave: false,
+          stance: answered++ === 0 ? 'against' : 'for',
+        }),
+      laws: court().seam,
+    })
+    h.coordinator.noteSpoken(NADIA, PROPOSAL, NOON)
+    const scene = h.coordinator.open()[0]!
+    await h.coordinator.takeFloor(OMAR, NOON)
+    expect(scene.proposal?.stances).toEqual({ [OMAR]: 'against' })
+  })
+
+  it('closes the talk and ratifies with the court’s own reading once everybody has answered', async () => {
+    const { seam, asks } = court()
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: seam })
+    await council(h, NOON)
+    expect(closeReasonOf(h)).toBe('ended')
+    const ratified = lawEvents(h.engineDb).filter((e) => e.type === 'law_ratified')
+    expect(ratified).toHaveLength(1)
+    expect(ratified[0]!.payload).toMatchObject({
+      agentId: NADIA,
+      text: PROPOSAL,
+      why: READING.why,
+      predicate: NIGHT_TAKE,
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    expect(asks, 'one call, and only for the vote that passed').toHaveLength(1)
+    expect(asks[0]!.text).toBe(PROPOSAL)
+  })
+
+  it('folds the rule into the world the town now lives under', async () => {
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: court().seam })
+    await council(h, NOON)
+    h.loop.step()
+    const standing = h.bridge.socialLaws()
+    expect(standing).toHaveLength(1)
+    expect(standing[0]).toMatchObject({ ordinal: 1, text: PROPOSAL, predicate: NIGHT_TAKE })
+    expect(h.bridge.lawTexts()).toEqual([PROPOSAL])
+  })
+})
+
+describe('a rule the room did not pass', () => {
+  const THREE: readonly Who[] = [
+    { id: NADIA, name: 'Nadia', x: 3 },
+    { id: OMAR, name: 'Omar', x: 4 },
+    { id: SALMA, name: 'Salma', x: 5 },
+  ]
+
+  it('asks the court nothing when more stood against it than for it', async () => {
+    const { seam, asks } = court()
+    const h = harness({
+      who: THREE,
+      script: stanced({ [OMAR]: 'against', [SALMA]: 'against' }, { [OMAR]: 'Salma' }),
+      laws: seam,
+    })
+    await council(h, NOON)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).map((e) => e.type)).toEqual(['law_proposed'])
+    expect(asks).toHaveLength(0)
+  })
+
+  it('passes nothing when the one who had to answer walked out first', async () => {
+    const { seam, asks } = court()
+    const h = harness({
+      script: (agentId) => () =>
+        fromCorpus(0, { speech: 'No.', leave: agentId === OMAR, stance: null }),
+      laws: seam,
+    })
+    await council(h, NOON)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).map((e) => e.type)).toEqual(['law_proposed'])
+    expect(asks).toHaveLength(0)
+  })
+})
+
+describe('a rule with no court behind it', () => {
+  it('still passes, kept in words only', async () => {
+    const h = harness({ script: stanced({ [OMAR]: 'for' }) })
+    await council(h, NOON)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).find((e) => e.type === 'law_ratified')?.payload).toMatchObject({
+      predicate: { kind: 'none' },
+      why: 'kept in words only',
+    })
+  })
+
+  it('says so and passes anyway when the court throws', async () => {
+    const errors: string[] = []
+    const h = harness({
+      script: stanced({ [OMAR]: 'for' }),
+      laws: () => Promise.reject(new Error('the court is out')),
+      onError: (kind) => errors.push(kind),
+    })
+    await council(h, NOON)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).find((e) => e.type === 'law_ratified')?.payload).toMatchObject({
+      predicate: { kind: 'none' },
+      why: 'kept in words only',
+    })
+    expect(errors).toContain('law_compile')
+  })
+
+  it('stops asking after six rules in one day', async () => {
+    const { seam, asks } = court()
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: seam })
+    for (let i = 0; i < MAX_COMPILES_PER_DAY + 1; i++) await council(h, NOON + i)
+    h.loop.step()
+    expect(asks).toHaveLength(MAX_COMPILES_PER_DAY)
+    const ratified = lawEvents(h.engineDb).filter((e) => e.type === 'law_ratified')
+    expect(ratified, 'the seventh still passed; it is only held to in words').toHaveLength(
+      MAX_COMPILES_PER_DAY + 1,
+    )
+    expect(ratified.at(-1)!.payload).toMatchObject({ why: 'kept in words only' })
+  })
+})
+
+describe('letting a rule go', () => {
+  it('repeals the standing rule the court named, and ratifies nothing new', async () => {
+    let answer: Awaited<ReturnType<LawSeam>> = READING
+    const asks: Parameters<LawSeam>[0][] = []
+    const h = harness({
+      script: stanced({ [OMAR]: 'for' }),
+      laws: (ask) => {
+        asks.push(structuredClone(ask))
+        return Promise.resolve(answer)
+      },
+    })
+    await council(h, NOON)
+    h.loop.step()
+    const first = h.bridge.socialLaws()[0]!
+
+    answer = { predicate: { kind: 'none' }, repeals: 1, why: 'the town has had enough of it' }
+    await council(h, NOON + 1, 'We let go of the rule about the store.')
+    h.loop.step()
+
+    expect(asks[1]!.standing).toEqual([{ ordinal: 1, text: PROPOSAL }])
+    const types = lawEvents(h.engineDb).map((e) => e.type)
+    expect(types.filter((t) => t === 'law_ratified')).toHaveLength(1)
+    expect(lawEvents(h.engineDb).find((e) => e.type === 'law_repealed')?.payload).toMatchObject({
+      lawId: first.id,
+      agentId: NADIA,
+    })
+    expect(h.bridge.socialLaws(), 'nothing stands any more').toHaveLength(0)
+  })
+})
+
+describe('a scene written before a council could count', () => {
+  it('comes back with nobody having voted and the anchor as the one who put it', () => {
+    const h = harness({})
+    const scene = structuredClone(h.coordinator.noteSpoken(NADIA, PROPOSAL, NOON)!)
+    const stored = {
+      ...scene,
+      proposal: { lawText: scene.proposal!.lawText, predicate: { kind: 'none' as const } },
+    }
+    const fresh = new SceneCoordinator({
+      bridge: h.bridge,
+      mindFor: (id) => h.minds.get(id) ?? null,
+    })
+    fresh.adopt(stored)
+    expect(fresh.open()[0]!.proposal).toEqual({
+      lawText: PROPOSAL,
+      proposedBy: NADIA,
+      stances: {},
       predicate: { kind: 'none' },
     })
   })
@@ -750,6 +1016,25 @@ describe('the log', () => {
     expect(events.filter((e) => e.type === 'scene_opened')).toHaveLength(1)
     expect(events.filter((e) => e.type === 'scene_line').length).toBeGreaterThan(1)
     expect(events.filter((e) => e.type === 'scene_closed')).toHaveLength(1)
+    const replayed = replayFromGenesis(h.store, h.config, h.terrain)
+    expect(stateHash(replayed)).toBe(stateHash(h.loop.state))
+  })
+
+  it('replays a town that wrote rules to the same world it lives in', async () => {
+    let answer: Awaited<ReturnType<LawSeam>> = READING
+    const h = harness({ script: stanced({ [OMAR]: 'for' }), laws: () => Promise.resolve(answer) })
+    await council(h, NOON)
+    h.loop.step()
+    const lawId = h.bridge.socialLaws()[0]!.id
+    h.emitNext('law_broken', { lawId, agentId: OMAR, verb: 'take', witnesses: [NADIA] })
+    h.loop.step()
+    answer = { predicate: { kind: 'none' }, repeals: 1, why: 'the town has had enough of it' }
+    await council(h, NOON + 1, 'We let go of the rule about the store.')
+    h.loop.step()
+
+    expect(new Set(lawEvents(h.engineDb).map((e) => e.type))).toEqual(
+      new Set(['law_proposed', 'law_ratified', 'law_broken', 'law_repealed']),
+    )
     const replayed = replayFromGenesis(h.store, h.config, h.terrain)
     expect(stateHash(replayed)).toBe(stateHash(h.loop.state))
   })

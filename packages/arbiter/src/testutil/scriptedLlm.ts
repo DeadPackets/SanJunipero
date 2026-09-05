@@ -71,6 +71,12 @@ export class ScriptedLlm {
     return Promise.resolve({ value: wire, usage: emptyUsage() })
   }
 
+  /** The real client hands back another of itself under a second name; the script, the counters
+   *  and the prompt log are the same either way. */
+  forCaller(): ScriptedLlm {
+    return this
+  }
+
   text(): Promise<{ text: string; usage: LlmUsage }> {
     return Promise.resolve({ text: '', usage: emptyUsage() })
   }

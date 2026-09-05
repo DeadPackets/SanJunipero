@@ -1,5 +1,6 @@
 // Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
 import { sanitizeSpokenText, type RosterEntry } from '@sj/shared'
+import { LAWS_SHOWN, LAW_TEXT_MAX } from '@sj/engine'
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
@@ -37,6 +38,9 @@ export type PromptBlocks = {
   // What the town has named, on the same terms and beside it: shared by every mind, and rewritten
   // only on the day somebody gives a habit a word.
   customs?: readonly string[]
+  // What the town has agreed and holds each other to, in the words somebody actually said.
+  // Texts alone: a rule has an id and a number, and a mind may hear neither.
+  laws?: readonly string[]
   frontier?: readonly string[]
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
@@ -182,6 +186,12 @@ function renderFrontier(names: readonly string[]): string {
   )
 }
 
+function renderLaws(texts: readonly string[]): string {
+  const said = texts.slice(-LAWS_SHOWN).map((t) => `"${t.slice(0, LAW_TEXT_MAX)}"`)
+  if (said.length === 0) return ''
+  return ['The town has agreed these, and holds one another to them:', ...said].join('\n')
+}
+
 function renderCustoms(names: readonly string[]): string {
   if (names.length === 0) return ''
   const said = names.map((n) => `the ${n}`)
@@ -204,6 +214,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const shared = renderShared(blocks.rulesOfBeing)
   const roster = renderRoster(blocks.roster ?? [])
   const customs = renderCustoms(blocks.customs ?? [])
+  const laws = renderLaws(blocks.laws ?? [])
   const frontier = renderFrontier(blocks.frontier ?? [])
   const identity = renderIdentity(blocks.identity)
   const personality = renderPersonality(blocks.personality)
@@ -211,6 +222,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     shared,
     ...(roster.length === 0 ? [] : [roster]),
     ...(customs.length === 0 ? [] : [customs]),
+    ...(laws.length === 0 ? [] : [laws]),
     ...(frontier.length === 0 ? [] : [frontier]),
     identity,
     personality,
@@ -235,6 +247,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
     ['shared', shared],
     ['roster', roster],
     ['customs', customs],
+    ['laws', laws],
     ['frontier', frontier],
     ['identity', identity],
     ['personality', personality],

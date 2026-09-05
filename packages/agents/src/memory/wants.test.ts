@@ -152,6 +152,14 @@ describe('what a mind can see for itself', () => {
     expect(occasionsInPacket(packet({ seen: taken('Omar') }), ME)).toEqual([])
   })
 
+  it('a neighbour breaking what the town agreed answers order, and your own doing does not', () => {
+    const breach = (self: boolean): PerceptionPacket['seen'] => [
+      { kind: 'law_broken', breakerName: 'Nadia', lawText: 'Nobody takes at night.', self },
+    ]
+    expect(occasionsInPacket(packet({ seen: breach(false) }), ME)).toEqual(['law_broken'])
+    expect(occasionsInPacket(packet({ seen: breach(true) }), ME)).toEqual([])
+  })
+
   it('a blow answers rivalry', () => {
     expect(occasionsInPacket(packet({ feltEvents: ['you_were_attacked'] }), ME)).toEqual(['slight'])
     expect(occasionsInPacket(packet({ feltEvents: ['rain_started'] }), ME)).toEqual([])
@@ -276,24 +284,22 @@ describe('★ a want survives a snapshot and restore', () => {
   })
 })
 
-describe('★ a want nothing can answer is not what a mind is asked about', () => {
-  it('skips `order` when it alone is starving, and is not suppressing anything else', () => {
+describe('★ the want a broken rule answers', () => {
+  it('names `order` now that the town can write a rule to break', () => {
     const { wants } = store()
     wants.begin(0)
-    // Everything the world can answer, answered now. `order` has climbed since the first tick
-    // and nothing in the town has ever been able to touch it.
     const late = 9 * MINUTES_PER_DAY
     wants.feed(['scene', 'expressed_at', 'taught', 'new_place', 'slight', 'verb_codified'], late)
 
-    // ★ Not vacuous: `order` IS the store's highest, alone at the cap, and still not the answer.
+    // ★ Not vacuous: `order` IS the store's highest, alone at the cap, and it is the answer.
     expect(wants.levelOf('order', late)).toBe(WANT_CAP)
     expect(wants.levels(late)[0]!.kind).toBe('order')
-    expect(wants.top(late)).not.toBe('order')
+    expect(wants.top(late)).toBe('order')
 
-    // And what it does name is a real want that is genuinely rising again.
-    const later = late + 3 * MINUTES_PER_DAY
-    expect(wants.top(later)).toBe('belonging')
-    expect(wants.levelOf('belonging', later)).toBeGreaterThan(0)
+    // And a neighbour breaking what the town agreed is what puts it down again.
+    wants.feed(['law_broken'], late)
+    expect(wants.levelOf('order', late)).toBe(0)
+    expect(wants.top(late)).not.toBe('order')
   })
 })
 

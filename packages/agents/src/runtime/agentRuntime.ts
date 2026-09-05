@@ -1122,6 +1122,7 @@ export class AgentRuntime {
       rulesOfBeing: RULES_OF_BEING,
       ...(this.#roster === null ? {} : { roster: this.#roster() }),
       ...(this.#customs === null ? {} : { customs: this.#customs() }),
+      laws: this.#bridge.lawTexts(),
       ...(this.#frontier === null ? {} : { frontier: this.#frontier() }),
       identity: this.#identity,
       personality: {
