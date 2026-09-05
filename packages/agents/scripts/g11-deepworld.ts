@@ -1544,7 +1544,7 @@ async function main(): Promise<void> {
         mapWidth: grown.terrain[0]!.length,
         mapHeight: grown.terrain.length,
         growths: grown.growths ?? 0,
-        trafficKeys: Object.keys(grown.traffic ?? {}).length,
+        trafficKeys: (grown.traffic ?? []).filter((n) => n > 0).length,
         faunaCount: Object.keys(grown.fauna ?? {}).length,
         forageableCount: Object.keys(grown.forageables ?? {}).length,
         snapshotBytes,

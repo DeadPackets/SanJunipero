@@ -33,6 +33,7 @@ import {
   type RngStreams,
   type Structure,
   type WorldState,
+  type TickHandler,
 } from '@sj/engine'
 import { devTown, type DevStructure } from './devTown.js'
 // Type-only, so no import cycle survives compilation.
@@ -493,10 +494,7 @@ function makePatrolPolicy(f: FounderDef) {
   }
 }
 
-export type FoundersOnTick = (ctx: {
-  tick: number
-  emit: (type: string, payload: unknown) => void
-}) => void
+export type FoundersOnTick = TickHandler
 
 export type FoundersOpts = {
   /** Drained at the tick boundary before physics; absent, a law has no channel to arrive on. */
@@ -611,7 +609,7 @@ export function makeFoundersOnTick(
   const policies = new Map(cast.map((f) => [f.id, makePatrolPolicy(f)]))
   const worldTick = createWorldTick(config, rng, opts.laws)
   const structures = opts.structures ?? SCRIPTED_STRUCTURES
-  return ({ tick, emit }) => {
+  return ({ tick, emit, apply }) => {
     if (tick === 1) {
       for (const f of cast) {
         emit('agent_spawned', {
@@ -661,8 +659,8 @@ export function makeFoundersOnTick(
       }
     }
 
-    const result = worldTick(getState())
-    for (const e of result.events) emit(e.type, e.payload)
+    const result = worldTick(getState(), apply)
+    if (apply === undefined) for (const e of result.events) emit(e.type, e.payload)
 
     // ★ EVERYTHING BELOW THIS LINE IS A PUPPET STRING. A live cast keeps the town and the
     // world systems above and takes none of it — see `minds` on FoundersOpts.
