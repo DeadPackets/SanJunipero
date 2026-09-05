@@ -42,7 +42,7 @@ walk (x, y) — sleep (nothing) — wake (nothing) — stop (nothing) — enter 
 eat (itemId) — drink (nothing, or itemId for a vessel in hand) — fill (itemId) — take (itemId) — drop (itemId)
 give (itemId, targetId) — stow (itemId, structureId) — speak (text) — write (text, and itemId to write on one in hand) — read (itemId)
 inscribe (structureId, text) — teach (targetId, track) — tend (targetId) — attack (targetId)
-court (targetId) — propose (targetId) — lie_with (targetId) — leave_partner (targetId)
+court (targetId) — propose (targetId) — lie_with (targetId) — leave_partner (targetId) — leave_town (nothing)
 wear (itemId) — doff (nothing) — kindle (itemId) — snuff (itemId) — stoke (structureId) — extinguish (structureId)
 till (x, y) — plant (x, y, kind) — harvest (cropId) — fish (x, y) — forage (nodeId, or nothing where trees stand) — hunt (faunaId)
 chop (x, y) — pave (x, y) — dig_channel (x, y) — douse (x, y) — build (kind, and x, y only for a thing smaller than a building) — craft (recipe)`

@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
   ARBITER_DB_FILE,
+  DAYS_PER_YEAR,
   DISCOVERY_EVENT,
   MINUTES_PER_DAY,
+  POPULATION_MAX_DEFAULT,
   REFLECTION_SETTLE_MS,
   type SimEvent,
 } from '@sj/shared'
@@ -22,6 +24,9 @@ import {
   preflightRefusal,
   runPreflight,
   wireBirths,
+  wireArrivals,
+  ensureArrivals,
+  needsArrival,
   resolveCast,
   FOUNDER_MINDS,
   type BootedMinds,
@@ -71,7 +76,7 @@ import {
   type TranscriptRecord,
 } from '@sj/narrator'
 import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
-import { createDiscoveryArt } from './discoveryCommission.js'
+import { createCastArt, createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
  *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
@@ -244,10 +249,6 @@ const LIVE_BACKFILL_REAL_SECONDS = 60
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
-/** The population ceiling: nothing else in the world stops the town growing, and every mind is
- *  another live bill. Twelve founders, four travellers, four births. `SJ_MAX_MINDS`. */
-const LIVE_MAX_MINDS = 20
-
 function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
     `STREAM STOPPED: each of the ${minds} live mind(s) is making ${rate.toFixed(1)} calls a` +
@@ -383,7 +384,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = Math.max(opts.maxMinds ?? LIVE_MAX_MINDS, founders.length)
+  // The world's own ceiling is announced from here at attach; this is the runtime's last line.
+  const maxMinds = Math.max(opts.maxMinds ?? POPULATION_MAX_DEFAULT, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -498,11 +500,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
   let stopBirths: (() => void) | null = null
+  let stopArrivals: (() => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
     stopBirths?.()
+    stopArrivals?.()
     booted?.stop()
     bridge?.drain('the moment passes')
   }
@@ -541,6 +545,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
+      // The ceiling as a world law, not a runtime opinion: the engine refuses a conception at
+      // it, and a replay of this log reaches the same town. Announced only when it moved.
+      if (loop.state.laws?.['population.maxMinds'] !== maxMinds)
+        bridge.announce('config_changed', { path: 'population.maxMinds', value: maxMinds })
       const restoring = new Map<string, RuntimeSnapshot>()
       for (const m of cast) {
         const row = dbFor(m.id)
@@ -561,6 +569,23 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
         onError: (kind, err) => {
           log(`stream: no art for ${kind} — ${String(err)}`)
+        },
+      })
+      // A face for anybody the town makes. Same wallet as the objects, its own day's share.
+      const faces = createCastArt({
+        codex: new AssetCodex(db),
+        opsDb,
+        spendableUsd: () =>
+          Math.min(
+            dailyBudget - spentToday(),
+            cap > 0 ? cap - ledgerTotalUsd(opsDb) : Number.POSITIVE_INFINITY,
+          ),
+        apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
+        ...(process.env.SJ_ART_DAILY_USD === undefined
+          ? {}
+          : { artDailyUsd: Number(process.env.SJ_ART_DAILY_USD) }),
+        onError: (id, err) => {
+          log(`stream: no face for ${id} — ${String(err)}`)
         },
       })
 
@@ -606,7 +631,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // A child still owed its household comes up the way a live birth does — household
       // first, then the mind — so `ensureChildren` below is what boots it.
       booted = bootMinds({
-        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
+        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id)) && !needsArrival(m, dbFor(m.id))),
         bridge,
         embedder,
         dbFor,
@@ -650,8 +675,53 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         opsDb,
         namingLlm: makeClient('naming'),
         maxMinds,
+        onPerson: (p) => {
+          faces.onPerson(p)
+        },
         log,
       })
+      // The road's own repair, beside the birth one: a walker whose first memory a crash cut
+      // short is booted here, not left with a mind and no reason to be in the valley.
+      void ensureArrivals({
+        cast: new Map(cast.map((m) => [m.id, m])),
+        store,
+        dbFor,
+        embedder,
+        boot: (spec) => {
+          booted?.add(spec)
+        },
+      }).catch((err: unknown) => {
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'arrival_failed',
+          detail: err instanceof Error ? err.message : String(err),
+        })
+      })
+      stopArrivals = wireArrivals({
+        booted,
+        bridge,
+        store,
+        dbFor,
+        embedder,
+        opsDb,
+        maxMinds,
+        onPerson: (p) => {
+          faces.onPerson(p)
+        },
+        log,
+      })
+      // A face still owed from before a restart. The codex already holds every founder's, so
+      // this asks only after the people the town made.
+      for (const m of cast) {
+        if (m.bornDay === undefined && m.arrivedDay === undefined) continue
+        faces.onPerson({
+          id: m.id,
+          name: m.identity.name,
+          sex: m.sex,
+          ageYears: Math.floor(m.ageDays / DAYS_PER_YEAR),
+          parents: null,
+        })
+      }
       saveRuntime = (tick: number): void => {
         for (const { agentId, snapshot } of booted?.snapshots() ?? []) {
           dbFor(agentId)

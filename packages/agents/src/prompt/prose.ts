@@ -53,6 +53,8 @@ type PerceptionSeen =
       name: string
       saying?: string
     }
+  // Somebody walked in off the valley road where this pair of eyes could see the edge.
+  | { kind: 'stranger_arrived'; name: string }
 
 type PerceptionAgent = {
   id: string
@@ -66,6 +68,8 @@ type PerceptionAgent = {
   worn?: string
   // How the body looks when it looks bad, already in words. Absent on a well one.
   condition?: string
+  // A face the valley has only just seen for the first time. Absent once the town is used to it.
+  stranger?: true
   // Tags a minted verb left on the body, readable by anyone who can see it.
   marks?: Record<string, string>
 }
@@ -682,7 +686,7 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
 export function valleyExtentLine(world?: ProseWorld): string {
   const e = world?.extent?.()
   if (e === undefined) return ''
-  return `The valley runs from (0, 0) to (${e.w - 1}, ${e.h - 1}); past its edges there is nothing to find.`
+  return `The valley runs from (0, 0) to (${e.w - 1}, ${e.h - 1}); past its edges there is only the road out of it.`
 }
 
 // Two tiles is the same spot: a step to the water butt and back is not a walk that went
@@ -739,6 +743,47 @@ export function absenceLine(company: readonly Company[], tick: number): string {
  *  want and asks for a person, because a want with no road is worse than no want at all. */
 export function wantLine(want: WantKind | null): string {
   return want === null ? '' : `Today you most want ${want}; who could give you that?`
+}
+
+/** How long a mind goes without anybody's company before the road out is worth saying. */
+export const RESTLESS_DAYS = 6
+/** How long the road stays open in the words of the one who took it before you. */
+export const PARTNER_GONE_DAYS = 7
+/** How many times the town has to see you break what it agreed, and inside how many days. */
+export const SHUNNED_BREACHES = 3
+export const SHUNNED_DAYS = 7
+
+/** Why the road out is worth saying to this mind today. Nothing else is ever a reason: the
+ *  verb is always there, and a mind with nothing wrong is never handed it. */
+export type RoadCause =
+  | { kind: 'restless'; days: number }
+  | { kind: 'partner_gone'; name: string; days: number }
+  | { kind: 'shunned'; times: number }
+
+const daysAgo = (days: number): string =>
+  days <= 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`
+
+/** The road out, said only where something stands behind it. Never a refusal and never advice:
+ *  the way out of the valley is a fact about the world, and what to do with it is the mind's. */
+export function roadOutLine(cause: RoadCause | null): string {
+  if (cause === null) return ''
+  if (cause.kind === 'restless') {
+    return (
+      `${cause.days} days now with nobody's company. The road out of the valley is open to you:` +
+      ' name it leave_town and your legs take you down it for good; nothing here holds you.'
+    )
+  }
+  if (cause.kind === 'partner_gone') {
+    return (
+      `${cause.name} went down the valley road ${daysAgo(cause.days)}.` +
+      ' The road is still there; you could follow, and it is named leave_town.'
+    )
+  }
+  return (
+    `${cause.times} times now the town has watched you do what it agreed against.` +
+    ' The road out of the valley is open to you: name it leave_town and your legs take you' +
+    ' down it for good.'
+  )
 }
 
 // What "at the fire" means, in the tiles its own glow lights.
@@ -1062,22 +1107,29 @@ export function perceptionToProse(
 
   // ★ Said on every turn the feet are there, not once on arriving: world three's Nadia stood on
   // column 75 four separate times and learned where the valley stopped only by being refused.
-  if (packet.atRim) lines.push("You are standing at the valley's edge; nothing lies beyond.")
+  if (packet.atRim)
+    lines.push(
+      "You are standing at the valley's edge, where the road comes in; the town lies up the road.",
+    )
 
   for (const a of packet.visible.agents) {
     const dressed = a.worn === undefined ? '' : `, ${a.worn}`
     // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
     // ailing is a body nobody tends, and the live run tended nobody at all.
     const ails = a.condition === undefined ? '' : `, ${a.condition}`
+    // Said first, because it is the thing a pair of eyes lands on FIRST: a face nobody in the
+    // valley has seen before.
+    const road = a.stranger === true ? ', a stranger come up the valley road,' : ''
     const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
+    const who = `${a.name} (${a.id})${road}`
     if (a.collapsed)
       lines.push(
-        `${a.name} (${a.id}) lies collapsed ${where} — hold food out to them and they will eat it from your hand.`,
+        `${who} lies collapsed ${where} — hold food out to them and they will eat it from your hand.`,
       )
-    else if (a.asleep) lines.push(`${a.name} (${a.id}) sleeps ${where}.`)
-    else lines.push(`${a.name} (${a.id}) stands ${where}.`)
+    else if (a.asleep) lines.push(`${who} sleeps ${where}.`)
+    else lines.push(`${who} stands ${where}.`)
   }
 
   for (const s of packet.visible.structures) {
@@ -1148,6 +1200,8 @@ export function perceptionToProse(
       // The saying is the inventor's own words for the attempt, reported: "he said he would…".
       const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.pronoun} would ${s.saying}`
       lines.push(`${s.inventorName} has worked out ${s.name}${why}.`)
+    } else if (s.kind === 'stranger_arrived') {
+      lines.push(`You watch ${s.name} come up the valley road into the valley.`)
     } else if (s.kind === 'law_broken') {
       lines.push(
         s.self

@@ -45,9 +45,24 @@ export {
   type BootMindsOpts,
   type Kin,
   type MindSpec,
+  type NewPerson,
 } from './live/liveMinds.js'
 export { wireBirths, type BirthsOpts } from './live/newborn.js'
-export { resolveCast } from './live/resolveCast.js'
+export {
+  arrivalGap,
+  arrivalMemory,
+  ensureArrivals,
+  lastArrivalDay,
+  needsArrival,
+  wireArrivals,
+  type ArrivalsOpts,
+} from './live/arrivals.js'
+export {
+  arrivalSpec,
+  resolveCast,
+  strangerSpec,
+  type AgentArrivedPayload,
+} from './live/resolveCast.js'
 export { ensureChildren, needsHousehold } from './live/ensureChild.js'
 export { DEFAULT_MIND_CONFIG, type MindConfig } from './wake.js'
 export { SceneCoordinator, type SceneMind } from './scene/coordinator.js'

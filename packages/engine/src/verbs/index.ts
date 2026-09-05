@@ -40,6 +40,7 @@ import {
   type WorldState,
 } from '../state.js'
 import { ageBand } from '../systems/aging.js'
+import { roadRimOf } from '../town.js'
 import { fleeTo } from '../systems/fauna.js'
 import { CONCEPTION_CHANCE_PER_ACT, motherAndFather } from '../systems/reproduction.js'
 import { isSpoiling, spoilageFor } from '../systems/spoilage.js'
@@ -133,6 +134,7 @@ export type VerbKind =
   | 'propose'
   | 'lie_with'
   | 'leave_partner'
+  | 'leave_town'
 
 export type VerbDef = {
   kind: string
@@ -610,6 +612,12 @@ export function approachFor(
   const acts = (from: Point): boolean =>
     (from.x !== a.x || from.y !== a.y) &&
     def.validate(bodyAt(state, agentId, from), config, agentId, params) === null
+  // The one act whose mark is not a thing in the world but the world's own edge: where the road
+  // leaves the valley. Nothing in `params` can point at it, so it is asked for by name.
+  if (verb === 'leave_town') {
+    const rim = roadRimOf(state, config)
+    return rim !== null && acts(rim) ? rim : null
+  }
   const ctx = pathCtx(state, config)
   const marks = marksOf(state, params)
   for (const at of marks) {
@@ -2658,6 +2666,30 @@ const leavePartner: VerbDef = makeVerb({
   },
 })
 
+// The road out. No answer is asked of anybody, and there is no coming back: the body walks to
+// the valley's edge and off the end of the town's story.
+const leaveTown: VerbDef = makeVerb({
+  kind: 'leave_town',
+  params: z.object({}).strict(),
+  takes: 'minutes',
+  validate(state, _config, agentId) {
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'you are indoors; step outside first'
+    if (!isMapRim(state, a.x, a.y)) return "you are not at the valley's edge"
+    return null
+  },
+  onComplete(state, _config, agentId) {
+    const a = state.agents[agentId]!
+    const out: PendingEvent[] = []
+    if (a.partnerId !== undefined) {
+      const [aId, bId] = [agentId, a.partnerId].sort()
+      out.push({ type: 'partnership_dissolved', payload: { aId, bId, byId: agentId } })
+    }
+    out.push({ type: 'agent_departed', payload: { agentId } })
+    return out
+  },
+})
+
 export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
@@ -2701,6 +2733,7 @@ export const VERBS: Record<string, VerbDef> = {
   propose,
   lie_with: lieWith,
   leave_partner: leavePartner,
+  leave_town: leaveTown,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id, and bring

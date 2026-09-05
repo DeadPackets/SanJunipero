@@ -18,6 +18,16 @@ import type { MindConfig } from '../wake.js'
 
 export type Kin = { id: string; relation: 'partner' | 'parent' | 'child' }
 
+/** A person the town has just gained, told to whoever is interested off the world log: the art
+ *  that has to be drawn for them, and nothing else so far. `parents` is null off the road. */
+export type NewPerson = {
+  id: string
+  name: string
+  sex: 'f' | 'm'
+  ageYears: number
+  parents: [string, string] | null
+}
+
 // A scene's own summary is tagged by the scene, not by a cue reader.
 const EMPTY_SCENE_TAGS = { people: [], place: null, objects: [], topics: [] }
 
@@ -30,6 +40,9 @@ export type MindSpec = {
   sex: 'f' | 'm'
   /** The sim day this person's first personality is stamped with. Founders have none. */
   bornDay?: number
+  /** The sim day this person came up the valley road. Founders and the born have none, and it
+   *  is what says a mind is still owed the memory of walking in. */
+  arrivedDay?: number
   /** Declared in the persona so a kin tie can be seeded from it; a body born in the world
    *  gets its kin from the birth instead. */
   kin?: readonly Kin[]
@@ -114,6 +127,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       : new SceneCoordinator({
           bridge: opts.bridge,
           mindFor: (id) => minds.get(id) ?? null,
+          everyone: () => [...cast.keys()],
           ...(opts.arbiter?.compileLaw === undefined ? {} : { laws: opts.arbiter.compileLaw }),
         })
   // The closed roll a scene line is held to. Read per line, never snapshot: `cast` keeps the
@@ -140,7 +154,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
     if (!hasPersonality(db, spec.id))
-      personality.init(spec.personality, spec.bornDay ?? opts.day ?? 0)
+      personality.init(spec.personality, spec.bornDay ?? spec.arrivedDay ?? opts.day ?? 0)
     const ties = new TieStore(db, spec.id)
     ties.seedKin(spec.kin ?? [], opts.bridge.currentTick())
     if (sceneClient !== undefined) {

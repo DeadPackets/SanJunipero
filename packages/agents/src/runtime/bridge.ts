@@ -1,7 +1,13 @@
 import { type EventStore } from '@sj/engine/store'
 import {
+  AgentArrived,
   ambientTempAt,
   composePerception,
+  effectiveConfig,
+  headcount,
+  mintId,
+  roadRimOf,
+  spoilageFor,
   groundForBuilding,
   hears,
   townSquareOf,
@@ -30,7 +36,15 @@ import {
   type WorldState,
 } from '@sj/engine'
 import type { Law, Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
-import { isWet, isWoody, RELATIONSHIP_EVENT_TYPES, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  isWet,
+  isWoody,
+  MINUTES_PER_DAY,
+  PRESENCE_EVENT_TYPES,
+  RELATIONSHIP_EVENT_TYPES,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
@@ -620,15 +634,108 @@ export class EngineBridge {
     return roof === undefined ? null : (placeName(roof) ?? roof.kind)
   }
 
-  /** The five relationship events since `afterSeq`, oldest first, and the birth that comes of
-   *  one. Read off the same window perception is composed from. */
+  /** The five relationship events since `afterSeq`, oldest first, the birth that comes of one,
+   *  and the two that change who is in the valley at all. Read off the same window perception
+   *  is composed from. */
   relationshipEventsSince(afterSeq: number): SimEvent[] {
     return this.#recentEvents().filter(
       (ev) =>
         ev.seq > afterSeq &&
         (RELATIONSHIP_EVENT_TYPES.includes(ev.type as (typeof RELATIONSHIP_EVENT_TYPES)[number]) ||
+          PRESENCE_EVENT_TYPES.includes(ev.type as (typeof PRESENCE_EVENT_TYPES)[number]) ||
           ev.type === 'agent_born'),
     )
+  }
+
+  /** How many people the valley is holding, unborn included. The one number the ceiling is
+   *  measured against, wherever it is measured. */
+  headcount(): number {
+    return headcount(this.#loop.state)
+  }
+
+  /** The ceiling as the world's own laws have it now, which is what an operator's change moved. */
+  maxMinds(): number {
+    return effectiveConfig(this.#simConfig, this.#loop.state.laws).population.maxMinds
+  }
+
+  /** Where the valley road meets the edge of the map. Null for a world with no town. */
+  roadRim(): { x: number; y: number } | null {
+    return roadRimOf(this.#loop.state, this.#simConfig)
+  }
+
+  /** Whether this world holds a body of this id at all — living, dead or gone down the road. */
+  hasBody(agentId: string): boolean {
+    return this.#loop.state.agents[agentId] !== undefined
+  }
+
+  /** The next id this world will mint, for an emitter that has to name a thing before the
+   *  fold has seen the one before it. */
+  mintId(prefix: string, offset = 0): string {
+    return mintId(this.#loop.state, prefix, offset)
+  }
+
+  /** The counter itself, for a cadence that must be read off the world and never rolled. */
+  nextEntityId(): number {
+    return this.#loop.state.counters.nextEntityId
+  }
+
+  /** How long a thing of this kind keeps, stamped the way the world stamps its own. */
+  spoilage(kind: string): { spoilage?: { spawnDay: number; days: number } } {
+    return spoilageFor(this.#loop.state, kind, this.#simConfig)
+  }
+
+  /** Everyone who came up the road and has not yet stood in a talk. Read off the whole log,
+   *  so a restart rebuilds exactly the set the run before it was carrying. */
+  strangersSoFar(): string[] {
+    const met = new Set<string>()
+    for (const ev of this.#store.readTypeFrom(0, 'scene_opened')) {
+      const p = ev.payload as { participants?: unknown }
+      if (!Array.isArray(p.participants)) continue
+      for (const id of p.participants) if (typeof id === 'string') met.add(id)
+    }
+    return this.#store
+      .readTypeFrom(0, 'agent_arrived')
+      .flatMap((ev) => {
+        const p = AgentArrived.safeParse(ev.payload)
+        return p.success ? [p.data.id] : []
+      })
+      .filter((id) => !met.has(id))
+  }
+
+  /** A partner of this body who went down the valley road since `sinceTick`: the departure the
+   *  log holds, matched to the dissolution that same act emitted. Names and days, never ids. */
+  partnersGoneSince(agentId: string, sinceTick: number): { name: string; day: number }[] {
+    const from = this.#store.lastSeqThroughTick(sinceTick)
+    const mine = new Set<string>()
+    for (const ev of this.#store.readTypeFrom(from, 'partnership_dissolved')) {
+      const p = ev.payload as { aId?: unknown; bId?: unknown; byId?: unknown }
+      if (typeof p.byId !== 'string') continue
+      if (p.aId === agentId || p.bId === agentId) mine.add(p.byId)
+    }
+    const out: { name: string; day: number }[] = []
+    for (const ev of this.#store.readTypeFrom(from, 'agent_departed')) {
+      const p = ev.payload as { agentId?: unknown }
+      if (typeof p.agentId !== 'string' || !mine.has(p.agentId)) continue
+      const body = this.#loop.state.agents[p.agentId]
+      if (body === undefined) continue
+      out.push({ name: body.name, day: Math.floor(ev.tick / MINUTES_PER_DAY) })
+    }
+    return out
+  }
+
+  /** How many times this body was seen doing what the town had agreed against, since a tick.
+   *  Unwitnessed does not count: being seen is the whole of what a forbid costs. */
+  breachesOf(agentId: string, sinceTick: number): number {
+    let n = 0
+    for (const ev of this.#store.readTypeFrom(
+      this.#store.lastSeqThroughTick(sinceTick),
+      'law_broken',
+    )) {
+      const p = ev.payload as { agentId?: unknown; witnesses?: unknown }
+      if (p.agentId !== agentId) continue
+      if (Array.isArray(p.witnesses) && p.witnesses.length > 0) n += 1
+    }
+    return n
   }
 
   /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same

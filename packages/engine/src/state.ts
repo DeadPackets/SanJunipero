@@ -68,6 +68,10 @@ export type AgentBody = {
   sex?: 'f' | 'm' // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   pregnant?: { sinceDay: number; byId: string }
   parents?: [string, string] // [motherId, fatherId]; only ever set on the born
+  // The day this body came up the valley road, and the day it walked back down. Both absent on
+  // every founder and every child, so a town nobody has come to hashes as it always did.
+  arrived?: { day: number }
+  departed?: { day: number }
   // The ask standing over this body, so the engine can tell a second consent from a fresh first.
   // Absent until the first one, and cleared by the answer.
   asked?: { byId: string; verb: InvitationVerb; tick: number }

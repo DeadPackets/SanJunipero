@@ -50,6 +50,9 @@ export type Scene = {
     predicate: LawPredicate
   }
   invitation?: { verb: InvitationVerb; from: string; to: string; askedTick: number }
+  /** Whoever in this talk the town is meeting for the first time. Absent in every talk between
+   *  people who already know each other, which is nearly all of them. */
+  stranger?: string
   passes: number
   timeouts: number
   closedTick: number | null

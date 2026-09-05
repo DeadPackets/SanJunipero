@@ -61,6 +61,7 @@ court: name it court; give targetId, the person at your side you would walk out 
 propose: name it propose; give targetId, the person at your side you would take as your partner for good. Only they can say yes
 lie_with: name it lie_with; give targetId, the person beside you, under a roof that is yours or theirs, and only if they say yes. A child may come of it
 leave_partner: name it leave_partner; give targetId, the partner you are leaving. It needs no answer, and it is not forgotten
+leave_town: name it leave_town when you mean to go down the valley road for good; nothing more is needed. Your legs carry you to the valley's edge, and then out of it with whatever you hold. Nobody's leave is asked and there is no walking back
 experiment: name it experiment; give description, what you attempt
 
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you

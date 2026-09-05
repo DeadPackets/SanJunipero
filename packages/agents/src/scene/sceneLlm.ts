@@ -156,6 +156,23 @@ function renderInvitation(
   return askPhrase(invitation.verb, nameOf(invitation.from))
 }
 
+/** The one thing a talk with a face nobody here has seen before has to settle: who they are.
+ *  Said to both sides — the walker is asked for their own account, and the town for its own. */
+function renderTelling(scene: Scene, agentId: string, nameOf: (id: string) => string): string {
+  const stranger = scene.stranger
+  if (stranger === undefined) return ''
+  if (stranger === agentId) {
+    return (
+      'Nobody here knows you yet. They will ask where you have come from and what you are' +
+      ' for, and what you say now is what this town will hold you to.'
+    )
+  }
+  return (
+    `${nameOf(stranger)} came up the valley road and nobody here knows them. Find out what` +
+    ' you want to know, and tell them what you want them to know of this place.'
+  )
+}
+
 /** The one thing a talk that has turned into a vote has to settle, said to whoever has to
  *  settle it. The word for such a gathering is ours and not theirs, so it is never said: what
  *  the mind is told is that somebody put a rule to the room and everyone answers it. */
@@ -230,6 +247,7 @@ export function sceneBlock(
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderLateness(ask.tick, ask.energy),
     renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
+    renderTelling(ask.scene, ask.agentId, nameOf),
     renderProposal(ask.scene, ask.agentId, nameOf),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),

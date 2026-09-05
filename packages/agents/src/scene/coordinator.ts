@@ -34,8 +34,10 @@ import {
   momentPassedLine,
   noAnswerLine,
   peopleIn,
+  DEPARTED_IMPORTANCE,
   readFact,
   tiesFor,
+  wentDownTheRoadLine,
   type RelationshipFact,
 } from './invitations.js'
 
@@ -66,6 +68,9 @@ export type SceneCoordinatorOpts = {
   /** The court, for the one call a passed rule makes. Absent, a town still writes its rules —
    *  they are kept in words only, and the neighbours are the whole of the enforcement. */
   laws?: LawSeam
+  /** Everyone the town holds a mind for, by id. Read when somebody walks out, so the people
+   *  who knew them hear of it. Absent, a leaving reaches only whoever was standing in a talk. */
+  everyone?: () => readonly string[]
   /** The wall clock the floor timeout is measured on. Injected so a test need not wait 30 s. */
   now?: () => number
   onError?: (kind: string, detail: string) => void
@@ -112,6 +117,7 @@ function wantsFrom(fact: RelationshipFact): [string, WantOccasion][] {
 export class SceneCoordinator {
   readonly #bridge: EngineBridge
   readonly #mindFor: (agentId: string) => SceneMind | null
+  readonly #everyone: () => readonly string[]
   readonly #laws: LawSeam | null
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
@@ -132,14 +138,24 @@ export class SceneCoordinator {
   /** How far into the log the relationship scan has read. Starts where the world stands, so a
    *  restart never replays yesterday's weddings. */
   #lastSeq: number
+  /** Everyone who came up the valley road and has not yet stood in a talk. Rebuilt from the log
+   *  at boot, so a restart carries exactly the set the run before it had. */
+  readonly #strangers: Set<string>
 
   constructor(opts: SceneCoordinatorOpts) {
     this.#bridge = opts.bridge
     this.#mindFor = opts.mindFor
+    this.#everyone = opts.everyone ?? ((): readonly string[] => [])
     this.#laws = opts.laws ?? null
     this.#now = opts.now ?? Date.now
     this.#onError = opts.onError ?? NO_REPORT
     this.#lastSeq = opts.bridge.lastSeq()
+    this.#strangers = new Set(opts.bridge.strangersSoFar())
+  }
+
+  /** Everyone the town has not properly met yet. The viewer never sees it; a test does. */
+  strangers(): string[] {
+    return [...this.#strangers].sort()
   }
 
   /** Every open scene, for the gateway's frame and for a snapshot. */
@@ -210,6 +226,7 @@ export class SceneCoordinator {
       stakes: OPENING_STAKES,
     })
     scene.kind = this.#kindAfter(scene, said, tick)
+    this.#tellingIfStranger(scene)
     scene.stakes = this.#stakesOf(scene)
     if (scene.kind === 'council') this.#propose(scene, agentId, said)
     this.#scenes.set(scene.id, scene)
@@ -246,6 +263,7 @@ export class SceneCoordinator {
     if (scene.participants.includes(agentId)) return
     scene.audience = scene.audience.filter((id) => id !== agentId)
     scene.participants = [...scene.participants, agentId].sort()
+    this.#tellingIfStranger(scene)
     appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
     scene.stakes = this.#stakesOf(scene)
     this.#turned(scene)
@@ -646,6 +664,14 @@ export class SceneCoordinator {
   }
 
   #writeFact(fact: RelationshipFact, tick: number): void {
+    if (fact.type === 'agent_arrived') {
+      this.#strangers.add(fact.agentId)
+      return
+    }
+    if (fact.type === 'agent_departed') {
+      this.#wentDownTheRoad(fact.agentId, tick)
+      return
+    }
     const people = peopleIn(fact)
     const partnered = this.#bridge.partnerOf(people[0]!) === people[1]
     const deltas = tiesFor(fact, { partnered, roof: this.#bridge.roofOf(people[0]!) })
@@ -655,6 +681,33 @@ export class SceneCoordinator {
       this.#tell(m.agentId, m.text, m.importance, tick)
     }
     for (const [id, occasion] of wantsFrom(fact)) this.#mindFor(id)?.feed?.([occasion], tick)
+  }
+
+  /** Somebody walked out of the valley. Everyone still holding an open tie to them learns of
+   *  it — the one they belonged to hardest of all, and nobody else at all. */
+  #wentDownTheRoad(agentId: string, tick: number): void {
+    this.#strangers.delete(agentId)
+    const name = this.#nameOf(agentId) ?? agentId
+    for (const id of this.#everyone()) {
+      if (id === agentId) continue
+      const mind = this.#mindFor(id)
+      if (mind === null) continue
+      const tie = mind.ties.open().find((t) => t.personId === agentId)
+      if (tie === undefined) continue
+      const weight = tie.kind === 'kin' ? DEPARTED_IMPORTANCE.kin : DEPARTED_IMPORTANCE.other
+      this.#tell(id, wentDownTheRoadLine(name), weight, tick)
+    }
+  }
+
+  /** The first talk a stranger stands in is the one where the town finds out who they are. It
+   *  is said to both sides, and once it is over they are one of the people here. */
+  #tellingIfStranger(scene: Scene): void {
+    const stranger = scene.participants.find((id) => this.#strangers.has(id))
+    if (stranger === undefined) return
+    this.#strangers.delete(stranger)
+    scene.stranger = stranger
+    // A quarrel or a rule put to the room is what this talk is ABOUT; being new is not.
+    if (scene.kind === 'talk') scene.kind = 'telling'
   }
 
   /** An ask reached the world. It opens a scene between the two of them, or takes over the one
@@ -679,6 +732,7 @@ export class SceneCoordinator {
         stakes: INVITATION_STAKES,
       })
       scene.kind = 'invitation'
+      this.#tellingIfStranger(scene)
       scene.stakes = this.#stakesOf(scene)
       this.#scenes.set(scene.id, scene)
       this.#announced.set(scene.id, this.#mark(scene))

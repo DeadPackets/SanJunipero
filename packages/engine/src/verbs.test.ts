@@ -111,6 +111,7 @@ const TIER1 = [
   'propose',
   'lie_with',
   'leave_partner',
+  'leave_town',
 ]
 
 afterEach(() => {

@@ -278,6 +278,7 @@ describe('GATE G10 — automated half, gateway side', () => {
       const { entries } = await get<{ entries: ChronicleEntry[] }>('/api/chronicle')
       expect(entries.map((e) => e.type)).toEqual([
         'structure_completed',
+        'scene_closed',
         'co_slept',
         'agent_died',
         'first',
@@ -317,7 +318,12 @@ describe('GATE G10 — automated half, gateway side', () => {
       // the chronicle and the scenes are the town's own record, so they survive a missing
       // narrator — only the place is the narrator's, and it stays null until a day is written
       const { entries } = await get<{ entries: ChronicleEntry[] }>('/api/chronicle', bareBase)
-      expect(entries.map((e) => e.type)).toEqual(['structure_completed', 'co_slept', 'agent_died'])
+      expect(entries.map((e) => e.type)).toEqual([
+        'structure_completed',
+        'scene_closed',
+        'co_slept',
+        'agent_died',
+      ])
       const bareMoments = MomentsResponseSchema.parse(await get('/api/moments', bareBase)).moments
       expect(bareMoments).toHaveLength(1)
       expect(bareMoments[0]).toMatchObject({ startTick: 18, stakes: 6, location: null })

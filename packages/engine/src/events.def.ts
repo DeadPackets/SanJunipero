@@ -412,6 +412,19 @@ export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 export const AgentDied = z
   .object({ agentId: z.string(), cause: z.string(), byId: z.string().optional() })
   .strict()
+// Two presence events: who came up the valley road, and who walked back down it. The body a
+// departure leaves behind is kept, the way a death keeps one — a name outlives the person here.
+export const AgentArrived = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    sex: z.enum(['f', 'm']),
+    ageDays: z.number().int().positive(),
+    x: z.number().int(),
+    y: z.number().int(),
+  })
+  .strict()
+export const AgentDeparted = z.object({ agentId: z.string() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
 export const AgentInjured = z
   .object({ agentId: z.string(), kind: z.enum(['minor', 'serious', 'grave']) })

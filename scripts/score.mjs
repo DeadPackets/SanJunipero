@@ -8,6 +8,7 @@ import { scanPromptForGlassLeak } from '@sj/shared'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const dir = process.env.SJ_MINDS_DIR ?? join(root, 'rehearsals', 'minds')
+const worldPath = process.env.SJ_WORLD_DB ?? join(root, 'data', 'dev-world.db')
 const files = readdirSync(dir).filter((f) => f.endsWith('.db'))
 console.log('dbs:', files.join(' '))
 
@@ -95,3 +96,84 @@ if (existsSync(world)) {
   )
 }
 db?.close()
+
+// The town's own log: who came up the road, who went down it, and how many people the valley
+// held while they did. Task 14's counts — everything here is read, nothing is folded.
+if (existsSync(worldPath)) {
+  const world = new Database(worldPath, { readonly: true })
+  const rows = (type) =>
+    world
+      .prepare('SELECT seq, tick, payload FROM events WHERE type = ? ORDER BY seq')
+      .all(type)
+      .map((r) => ({ seq: r.seq, tick: r.tick, p: JSON.parse(r.payload) }))
+  const day = (tick) => Math.floor(tick / 1440)
+
+  console.log(`\n== ${worldPath}`)
+  const arrivals = rows('agent_arrived')
+  // A traveller is authored and carries an authored id; anything minted came off the road.
+  const minted = arrivals.filter((a) => /^agent_\d+$/.test(a.p.id))
+  console.log(
+    'arrivals:',
+    arrivals.length,
+    `(traveller ${arrivals.length - minted.length}, stranger ${minted.length})`,
+    arrivals.map((a) => `${a.p.name} d${day(a.tick)}`),
+  )
+
+  const departures = rows('agent_departed')
+  console.log(
+    'departures:',
+    departures.length,
+    departures.map((d) => `${d.p.agentId} d${day(d.tick)}`),
+  )
+  console.log(
+    'departures with no cause standing: see the `departure_without_cause` alert count above',
+  )
+
+  // Bodies alive and still in the valley at the turn of each sim-day.
+  const comings = [...rows('agent_spawned'), ...rows('agent_born'), ...arrivals]
+  const goings = [...rows('agent_died'), ...departures]
+  const lastDay = day(world.prepare('SELECT COALESCE(MAX(tick), 0) t FROM events').get().t)
+  const population = []
+  for (let d = 0; d <= lastDay; d++) {
+    const at = d * 1440
+    const here =
+      comings.filter((e) => e.tick <= at).length - goings.filter((e) => e.tick <= at).length
+    population.push(`d${d}:${here}`)
+  }
+  console.log('population at 00:00:', population.join(' '))
+
+  // How long a walker stood about before anybody sat down with them.
+  const tellings = rows('scene_opened').filter((s) => s.p.kind === 'telling')
+  console.log(
+    'arrival → first telling, in ticks:',
+    arrivals.map((a) => {
+      const met = tellings.find(
+        (s) => s.tick >= a.tick && (s.p.participants ?? []).includes(a.p.id),
+      )
+      return `${a.p.id}:${met === undefined ? 'never' : met.tick - a.tick}`
+    }),
+  )
+
+  // A completion with no conception behind it, at the cap, is the engine refusing a child.
+  const cap = rows('config_changed')
+    .filter((c) => c.p.path === 'population.maxMinds')
+    .at(-1)
+  const bedded = world
+    .prepare(
+      "SELECT COUNT(*) n FROM events WHERE type = 'action_completed' AND json_extract(payload,'$.verb') = 'lie_with'",
+    )
+    .get().n
+  console.log(
+    'ceiling:',
+    cap === undefined ? '(never announced)' : cap.p.value,
+    '| lie_with completions:',
+    bedded,
+    '| conceptions:',
+    rows('agent_conceived').length,
+    '| births:',
+    rows('agent_born').length,
+  )
+  world.close()
+} else {
+  console.log(`\n== no world log at ${worldPath} (set SJ_WORLD_DB)`)
+}

@@ -3,7 +3,9 @@
 // is written — a leaving from an ordinary turn and a restart mid-ask land the same ties.
 import type { InvitationVerb } from '@sj/shared'
 import {
+  AgentArrived,
   AgentBorn,
+  AgentDeparted,
   InvitationAccepted,
   InvitationRefused,
   Invited,
@@ -28,6 +30,10 @@ export type RelationshipFact =
   | { type: 'partnership_formed'; aId: string; bId: string }
   | { type: 'partnership_dissolved'; aId: string; bId: string; byId: string }
   | { type: 'agent_born'; motherId: string; fatherId: string }
+  // Not a relationship: who is in the valley at all. A coming and a going both change who the
+  // people in a talk can be talking to, and both come through the same tail.
+  | { type: 'agent_arrived'; agentId: string; name: string }
+  | { type: 'agent_departed'; agentId: string }
 
 /** The log's own row, read through the engine's own schemas so nothing here can drift off them. */
 export function readFact(ev: { type: string; payload: unknown }): RelationshipFact | null {
@@ -58,6 +64,14 @@ export function readFact(ev: { type: string; payload: unknown }): RelationshipFa
         ? { type: 'agent_born', motherId: p.data.motherId, fatherId: p.data.fatherId }
         : null
     }
+    case 'agent_arrived': {
+      const p = AgentArrived.safeParse(ev.payload)
+      return p.success ? { type: 'agent_arrived', agentId: p.data.id, name: p.data.name } : null
+    }
+    case 'agent_departed': {
+      const p = AgentDeparted.safeParse(ev.payload)
+      return p.success ? { type: 'agent_departed', agentId: p.data.agentId } : null
+    }
     default:
       return null
   }
@@ -72,6 +86,9 @@ export function peopleIn(fact: RelationshipFact): string[] {
       return [fact.aId, fact.bId]
     case 'agent_born':
       return [fact.motherId, fact.fatherId]
+    case 'agent_arrived':
+    case 'agent_departed':
+      return [fact.agentId]
     default:
       return [fact.agentId, fact.byId]
   }
@@ -89,6 +106,14 @@ export function askPhrase(verb: InvitationVerb, askerName: string): string {
 }
 
 export const noAnswerLine = (name: string): string => `${name} gave you no answer.`
+
+/** What everybody who knew them carries away from a leaving. Said the way the town would say
+ *  it: a direction and a road, because that is the whole of what anybody here saw. */
+export const wentDownTheRoadLine = (name: string): string =>
+  `${name} has gone down the valley road.`
+
+/** How deeply a leaving lands: on somebody it belonged to, and on everybody else. */
+export const DEPARTED_IMPORTANCE = { kin: 9, other: 6 } as const
 
 export const momentPassedLine = (reason: string): string => `The moment passed: ${reason}.`
 

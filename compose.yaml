@@ -35,6 +35,7 @@ services:
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
       - SJ_MAX_MINDS
+      - SJ_ART_DAILY_USD
       - SJ_IDLE_PACING
       - SJ_IDLE_AFTER_MS
       - SJ_IDLE_SPEED

@@ -15,7 +15,14 @@ import {
   PROVIDER_ORDER,
 } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { DAYS_PER_YEAR, FOUNDER_IDS, MINUTES_PER_DAY, NO_PARAMS, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  FOUNDER_IDS,
+  MINUTES_PER_DAY,
+  NO_PARAMS,
+  POPULATION_MAX_DEFAULT,
+  type SimEvent,
+} from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
@@ -300,6 +307,7 @@ async function liveWorld(opts: {
   rateWindowRealMinutes?: number
   spendAlertRealMinutes?: number
   fresh?: boolean
+  maxMinds?: number
   /** What the god answers. Absent, the arbiter caller gets the same canned client as a mind,
    *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
   verdict?: unknown
@@ -332,6 +340,7 @@ async function liveWorld(opts: {
         minds: opts.minds ?? TWO,
         ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
         preflight: false,
+        ...(opts.maxMinds === undefined ? {} : { maxMinds: opts.maxMinds }),
         embedder: new FakeEmbedder(),
         mindConfig: EAGER,
         ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
@@ -1065,6 +1074,40 @@ describe('★ the founding of twelve, under a flat cap of twenty', () => {
     ).toEqual([...FOUNDER_IDS].sort())
     // Every one of the twelve took a turn: a body with no mind behind it stands still for ever.
     expect([...thinkers(dir)].sort()).toEqual([...FOUNDER_IDS].sort())
+  }, 60_000)
+})
+
+describe('★ the ceiling as a world law', () => {
+  it('announces it once at attach, and not again on a resume that has not moved it', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    const capped = (): Record<string, unknown>[] =>
+      eventsOf(dir, 'config_changed').filter((p) => p.path === 'population.maxMinds')
+    expect(capped()).toEqual([{ path: 'population.maxMinds', value: POPULATION_MAX_DEFAULT }])
+    await world.stop()
+    worlds.pop()
+
+    // The same town, opened again with the same ceiling: the law already stands.
+    const { world: again } = await liveWorld({ dir })
+    await run(again, 3)
+    expect(capped()).toHaveLength(1)
+  }, 60_000)
+
+  it('announces the new one when the operator moves it', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    await world.stop()
+    worlds.pop()
+
+    const { world: again } = await liveWorld({ dir, maxMinds: 4 })
+    await run(again, 3)
+    expect(
+      eventsOf(dir, 'config_changed')
+        .filter((p) => p.path === 'population.maxMinds')
+        .map((p) => p.value),
+    ).toEqual([POPULATION_MAX_DEFAULT, 4])
   }, 60_000)
 })
 

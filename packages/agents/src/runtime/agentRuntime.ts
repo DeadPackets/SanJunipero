@@ -41,6 +41,12 @@ import {
   perceptionToProse,
   placesKnownLine,
   valleyExtentLine,
+  roadOutLine,
+  PARTNER_GONE_DAYS,
+  RESTLESS_DAYS,
+  SHUNNED_BREACHES,
+  SHUNNED_DAYS,
+  type RoadCause,
   absenceLine,
   type Company,
   gatheringLine,
@@ -415,6 +421,9 @@ export class AgentRuntime {
   #started = false
   #offTick: ((tick: number) => void) | null = null
   #wants: WantStore | null = null
+  // Why the road out of the valley is worth saying to this mind, as of its last turn. Null when
+  // nothing stands behind it, which is what makes a leaving with no cause worth a note.
+  #roadCause: RoadCause | null = null
   // How many places this mind knew, and how many of them carry its own name, when it last
   // looked. Null until the first look, or a resume would read its whole map as new ground.
   #knownPlaceCount: number | null = null
@@ -868,8 +877,38 @@ export class AgentRuntime {
   // Held until the body is free; a busy rejection retries instead of
   // discarding, until accepted or superseded by a newer turn's action.
   #holdIntent(intent: Intent): Promise<void> {
+    // Not a refusal: a person may leave whenever they like. It is written down because a town
+    // whose people walk out for no reason anybody can name is a town with something wrong in it.
+    if (intent.verb === 'leave_town' && this.#roadCause === null) {
+      this.#llm.alert(
+        'departure_without_cause',
+        'named the road out with nothing standing behind it: no loneliness, no partner gone, no breach witnessed',
+      )
+    }
     this.#pendingIntent = intent
     return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
+  }
+
+  /** Why the road out is worth saying today: nobody's company for long enough, a partner who
+   *  took it first, or a town that has watched this body break what it agreed. Nothing else. */
+  #whyTheRoad(tick: number): RoadCause | null {
+    const belonging = this.#wants?.levels(tick).find((w) => w.kind === 'belonging')
+    const alone =
+      belonging === undefined ? 0 : Math.floor((tick - belonging.lastFedTick) / MINUTES_PER_DAY)
+    if (alone >= RESTLESS_DAYS) return { kind: 'restless', days: alone }
+    const gone = this.#bridge.partnersGoneSince(
+      this.#agentId,
+      tick - PARTNER_GONE_DAYS * MINUTES_PER_DAY,
+    )[0]
+    if (gone !== undefined) {
+      return {
+        kind: 'partner_gone',
+        name: gone.name,
+        days: Math.floor(tick / MINUTES_PER_DAY) - gone.day,
+      }
+    }
+    const seen = this.#bridge.breachesOf(this.#agentId, tick - SHUNNED_DAYS * MINUTES_PER_DAY)
+    return seen >= SHUNNED_BREACHES ? { kind: 'shunned', times: seen } : null
   }
 
   // A try at something new goes to the arbiter, not to the verb registry. An unreachable
@@ -1049,6 +1088,9 @@ export class AgentRuntime {
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
+    // Read every turn and said only in the morning: the line is a cue, and the same reading is
+    // what tells an act of `leave_town` with nothing behind it from one the town drove.
+    this.#roadCause = this.#whyTheRoad(tick)
 
     // `Required` on purpose: a road the prose reads and the runtime forgets to wire is a
     // sentence no mind ever sees, and it fails as silence rather than as an error.
@@ -1095,6 +1137,7 @@ export class AgentRuntime {
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),
+      roadOutLine(wake.includes('morning') ? this.#roadCause : null),
       wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]
       .filter((p) => p.length > 0)
