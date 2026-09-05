@@ -66,6 +66,9 @@ export type Scene = {
    *  wears a nameplate. Written onto the handle rather than passed as a prop, the way
    *  `textScale` is: the layers live in a Pixi closure React never re-renders. */
   pickedId: string | null
+  /** Who the camera is on when nobody has picked: the auto-director's subject, written here for
+   *  the same reason `pickedId` is — the layers live in a Pixi closure React never re-renders. */
+  cameraSubject: string | null
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
@@ -295,6 +298,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     setTicking: clock.set,
     textScale: 1,
     pickedId: null,
+    cameraSubject: null,
     world,
     layers,
     graded,

@@ -333,7 +333,7 @@ export const SceneClosed = z
         })
         .strict(),
     ),
-    closeReason: z.enum(['ended', 'left', 'night', 'capped', 'timeout']),
+    closeReason: z.enum(['ended', 'left', 'capped', 'timeout']),
   })
   .strict()
 

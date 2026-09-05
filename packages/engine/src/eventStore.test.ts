@@ -1,4 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, it, expect, vi } from 'vitest'
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 
@@ -43,5 +46,40 @@ describe('EventStore', () => {
     s.saveSnapshot(60, 0, { v: 1 }, {})
     s.saveSnapshot(120, 0, { v: 2 }, {})
     expect((s.latestSnapshot()!.state as { v: number }).v).toBe(2)
+  })
+})
+
+describe('EventStore WAL checkpointer', () => {
+  it('takes the autocheckpoint off COMMIT and checkpoints on its own timer until close', () => {
+    vi.useFakeTimers()
+    const dir = mkdtempSync(join(tmpdir(), 'sj-store-'))
+    const db = openDb(join(dir, 'world.db'))
+    try {
+      const s = new EventStore(db)
+      expect(db.pragma('wal_autocheckpoint', { simple: true })).toBe(0)
+      expect(vi.getTimerCount()).toBe(1)
+
+      const pragma = vi.spyOn(db, 'pragma')
+      vi.advanceTimersByTime(5_000)
+      expect(pragma).toHaveBeenCalledWith('wal_checkpoint(PASSIVE)')
+
+      s.close()
+      expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      db.close()
+      rmSync(dir, { recursive: true, force: true })
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves a journal that is not WAL alone', () => {
+    vi.useFakeTimers()
+    try {
+      const s = new EventStore(openDb(':memory:'))
+      expect(vi.getTimerCount()).toBe(0)
+      s.close()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

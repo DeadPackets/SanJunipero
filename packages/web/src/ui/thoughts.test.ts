@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { ThoughtsButton } from '../stage/ThoughtsButton.js'
 import {
   BUBBLE_IMPORTANCE,
+  bubbleSubject,
   rememberThoughts,
   shouldBubble,
   thoughtsHidden,
@@ -111,6 +112,33 @@ describe('★ the importance gate over the heads', () => {
 
   it('★ the gate is 6, and it is the same number the plan named', () => {
     expect(BUBBLE_IMPORTANCE).toBe(6)
+  })
+
+  // ★ Nobody clicks on a broadcast, and the auto-director is the camera most of the time: read
+  // off the pick alone the gate had no subject at all and the wisps went to the heavy thoughts.
+  it('★ takes the auto-director’s subject when the viewer has picked nobody', () => {
+    expect(bubbleSubject({ pickedId: null, cameraSubject: 'omar' })).toBe('omar')
+    expect(bubbleSubject({ pickedId: null, cameraSubject: null })).toBe(null)
+    expect(
+      shouldBubble(t('omar', 1), bubbleSubject({ pickedId: null, cameraSubject: 'omar' }), ALONE),
+    ).toBe(true)
+  })
+
+  // ★ A hand on the lens outranks automation, here as at the camera.
+  it('★ and the viewer’s own pick still wins over it', () => {
+    expect(bubbleSubject({ pickedId: 'leyla', cameraSubject: 'omar' })).toBe('leyla')
+    expect(
+      shouldBubble(
+        t('omar', 1),
+        bubbleSubject({ pickedId: 'leyla', cameraSubject: 'omar' }),
+        ALONE,
+      ),
+    ).toBe(false)
+  })
+
+  it('★ the director writes the subject the gate reads', () => {
+    expect(src('./DirectorMode.tsx')).toContain('scene.cameraSubject =')
+    expect(src('../render/StageMount.tsx')).toContain('bubbleSubject(s)')
   })
 
   // ★ The T toggle is upstream of all of it: a viewer who turned the wisps off gets none,

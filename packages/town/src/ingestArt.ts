@@ -11,7 +11,7 @@ import {
 } from '@sj/forge'
 import { ROAD_AUTOTILE_KEYS, TERRAIN_TILE_KINDS, roadAutotileKind } from '@sj/shared'
 
-/** Every lister THROWS on a half-present directory rather than reporting the one kind it could
+/** Every lister warns past a half-present directory rather than reporting the one kind it could
  *  not produce, so these two are the whole of what an ingest can answer. */
 export type IngestEntry = {
   kind: string
@@ -43,7 +43,7 @@ export async function ingestTerrainArt(db: Database.Database): Promise<IngestEnt
 }
 
 // The premade library — 50 painted items, fifteen of them the furniture the interior scenes
-// place. `registerCommittedItems` THROWS on a half-present item rather than falling back.
+// place. A half-present item is warned past; the rest of the library still lands.
 export function ingestLibraryArt(db: Database.Database): IngestEntry[] {
   return registerCommittedItems(new AssetCodex(db))
 }

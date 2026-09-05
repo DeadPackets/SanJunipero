@@ -37,6 +37,15 @@ export function thoughtsHidden(graveTone: boolean, viewer: ThoughtsSetting): boo
 /** The weight, on the mind's own 1–10 scale, at which a thought is worth a wisp to a stranger. */
 export const BUBBLE_IMPORTANCE = 6
 
+/** Whose head the wisps stay with. The viewer's own pick outranks the auto-director, the way a
+ *  hand on the lens does; a broadcast nobody clicks on has only the director's subject. */
+export function bubbleSubject(scene: {
+  pickedId: string | null
+  cameraSubject: string | null
+}): string | null {
+  return scene.pickedId ?? scene.cameraSubject
+}
+
 /** ★ Twelve minds thinking every turn is twelve wisps, which is the opposite of easy to follow.
  *  Every thought is still stored and still reaches the Person page; this decides which ones are
  *  drawn over a head: the ones that matter, the one the camera is on, and the room being held. */

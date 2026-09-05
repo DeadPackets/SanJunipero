@@ -341,3 +341,14 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     golden(event, '8021c2cb539e47d3ca2026d694b2b0ecdd6bd9d5747f93277400dff041cba31d')
   })
 })
+
+describe('scene_closed', () => {
+  it('takes the four reasons the coordinator can close on, and no fifth', () => {
+    const s = genesisState(DEFAULT_CONFIG)
+    const closed = (closeReason: string) =>
+      ev(1, 'scene_closed', { id: 'sc_1', summary: 'They spoke.', deltas: [], closeReason })
+    for (const reason of ['ended', 'left', 'capped', 'timeout'])
+      expect(() => fold(s, closed(reason), DEFAULT_CONFIG)).not.toThrow()
+    expect(() => fold(s, closed('night'), DEFAULT_CONFIG)).toThrow()
+  })
+})

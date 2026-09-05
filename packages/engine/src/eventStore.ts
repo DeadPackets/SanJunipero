@@ -2,7 +2,10 @@ import type Database from 'better-sqlite3'
 import { EventEnvelope, type SimEvent } from '@sj/shared'
 import type { RngState } from './rng.js'
 
+const CHECKPOINT_EVERY_MS = 5_000
+
 export class EventStore {
+  private checkpointTimer: NodeJS.Timeout | null = null
   private insertEv
   private selFrom
   private selRange
@@ -38,6 +41,23 @@ export class EventStore {
       'INSERT INTO rng_state (id, tick, rng) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET tick=excluded.tick, rng=excluded.rng',
     )
     this.selRng = db.prepare('SELECT tick, rng FROM rng_state WHERE id = 1')
+    // Left on, the autocheckpoint runs inside the COMMIT of whichever tick pushes the WAL past
+    // 1,000 pages and puts a 20 ms tail on it (measured). PASSIVE off a timer never blocks a writer.
+    if (db.pragma('journal_mode', { simple: true }) === 'wal') {
+      db.pragma('wal_autocheckpoint = 0')
+      this.checkpointTimer = setInterval(() => {
+        if (db.open) db.pragma('wal_checkpoint(PASSIVE)')
+      }, CHECKPOINT_EVERY_MS)
+      this.checkpointTimer.unref()
+    }
+  }
+
+  /** Stops the checkpointer. The db handle stays the caller's to close. */
+  close(): void {
+    if (this.checkpointTimer !== null) {
+      clearInterval(this.checkpointTimer)
+      this.checkpointTimer = null
+    }
   }
 
   append(tick: number, type: string, payload: unknown): SimEvent {
