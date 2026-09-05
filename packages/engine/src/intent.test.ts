@@ -497,6 +497,34 @@ describe('a law the town wrote', () => {
     expect(after.ok && after.events.map((e) => e.type)).toEqual(['action_started'])
   })
 
+  it('a law for the weekend bites on Saturday and Sunday and on no other day', () => {
+    let s = lawWorld()
+    s = spawn(s, 'near', 6, 6)
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    s = fold(
+      s,
+      lawEv(
+        'law_ratified',
+        ratified('law_1', 'No taking on the weekend.', {
+          kind: 'forbid',
+          verb: 'take',
+          when: 'weekend',
+        }),
+        10,
+      ),
+    )
+    const types = (day: number) => {
+      const r = submitIntent(at(s, day * MINUTES_PER_DAY + NOON), DEFAULT_CONFIG, 'a1', 'take', {
+        itemId: 'item_1',
+      })
+      return r.ok && r.events.map((e) => e.type)
+    }
+    expect(types(4)).toEqual(['action_started'])
+    expect(types(5)).toEqual(['action_started', 'law_broken'])
+    expect(types(6)).toEqual(['action_started', 'law_broken'])
+    expect(types(7)).toEqual(['action_started'])
+  })
+
   it('a rule the world holds nobody to never fires', () => {
     let s = lawWorld()
     s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })

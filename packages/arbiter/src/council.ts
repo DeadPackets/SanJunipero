@@ -53,7 +53,7 @@ export const StrictLawCompileSchema = strictly(LawCompileSchema)
 export const COMPILE_INSTRUCTION = `You are the physics judge of San Junipero. A town has just agreed on a rule, in its own words, out loud. Say what of it the world itself can hold them to.
 
 Answer "predicate" as exactly one of five shapes:
-forbid — nobody may do a named act. "verb" is the act. Narrow it only where the rule narrows it: "when" night or day, "where" square, house or field, "whose" other when the rule is about somebody else's things. Nothing stops a forbidden act; everyone standing there sees it done, and the town does the rest.
+forbid — nobody may do a named act. "verb" is the act. Narrow it only where the rule narrows it: "when" night, day, weekend or a day of the week (Monday to Sunday), "where" square, house or field, "whose" other when the rule is about somebody else's things. Nothing stops a forbidden act; everyone standing there sees it done, and the town does the rest.
 require_before — a named act may not be done until another named act has been done that day. "verb" is the act held back, "before" the act that frees it.
 common — a kind of thing kept in a named building is one to a person: whoever already holds one may not take another. "itemKind" is the thing, "structureId" the building.
 tithe — a kind of thing may not be taken out of a named building until the taker has put one in, this day or this week. "itemKind" the thing, "qty" how many, "to" the building, "every" day or week.

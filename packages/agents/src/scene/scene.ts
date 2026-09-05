@@ -22,7 +22,7 @@ export type Move =
   | 'joke'
   | 'agree'
   | 'shift'
-export const MOVES = [
+const MOVES = [
   'press',
   'give_way',
   'deflect',
@@ -379,7 +379,7 @@ export function stakesFor(current: number, kind: SceneKind, quarrelTie: boolean)
 
 /** A rule needs a room. Two people saying "from now on" to each other have made a promise,
  *  and a promise between two is not the town agreeing to anything. */
-export const COUNCIL_MINIMUM = 3
+const COUNCIL_MINIMUM = 3
 
 /** The kind this scene has become, given the line just said. Evaluated on open and on every
  *  line; a scene only ever moves off `talk`. */

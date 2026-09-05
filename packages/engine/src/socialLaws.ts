@@ -3,7 +3,9 @@ import {
   MINUTES_PER_DAY,
   T_FARMLAND,
   dayPhaseFromTick,
+  isWeekendTick,
   visionRadiusAt,
+  weekdayFromTick,
   type SimConfig,
 } from '@sj/shared'
 import { insideOf } from './interiors.js'
@@ -111,6 +113,16 @@ function anothersThing(
   return owner !== undefined && owner !== agentId
 }
 
+function whenBites(
+  when: NonNullable<Extract<LawPredicate, { kind: 'forbid' }>['when']>,
+  tick: number,
+): boolean {
+  if (when === 'night' || when === 'day')
+    return (dayPhaseFromTick(tick) === 'night') === (when === 'night')
+  if (when === 'weekend') return isWeekendTick(tick)
+  return weekdayFromTick(tick) === when
+}
+
 function forbidBites(
   state: WorldState,
   config: SimConfig,
@@ -119,10 +131,7 @@ function forbidBites(
   params: Record<string, unknown>,
   tick: number,
 ): boolean {
-  if (p.when !== undefined) {
-    const night = dayPhaseFromTick(tick) === 'night'
-    if (p.when === 'night' ? !night : night) return false
-  }
+  if (p.when !== undefined && !whenBites(p.when, tick)) return false
   if (p.where !== undefined && !standingWhere(state, config, agentId, p.where, params)) return false
   if (p.whose === 'other' && !anothersThing(state, agentId, params)) return false
   return true

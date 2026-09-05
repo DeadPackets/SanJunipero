@@ -7,6 +7,23 @@ export const DAYS_PER_YEAR = 28
 // Derived, never typed: `simTimeFromTick` indexes SEASONS by it, so a year that is not four
 // seasons long is a season the calendar cannot name.
 export const DAYS_PER_SEASON = DAYS_PER_YEAR / SEASONS.length
+export const WEEKDAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const satisfies readonly string[] & { length: typeof DAYS_PER_SEASON }
+export type Weekday = (typeof WEEKDAYS)[number]
+export const WEEKEND: readonly Weekday[] = ['Saturday', 'Sunday']
+
+/** A season is one week long, so every season opens on a Monday and day 1 was a Monday. */
+export function weekdayFromTick(tick: number): Weekday {
+  return WEEKDAYS[Math.floor(tick / MINUTES_PER_DAY) % WEEKDAYS.length]!
+}
+export const isWeekendTick = (tick: number): boolean => WEEKEND.includes(weekdayFromTick(tick))
 
 /** A grown body of no particular age — what a fixture means when it spawns "an adult". Counted,
  *  never typed: the literal 7 300 that used to say this is an elder on a four-week year. */

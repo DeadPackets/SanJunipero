@@ -237,9 +237,9 @@ describe('the shared calendar', () => {
 
   it('names the day, the part of the day and the season, in that order', () => {
     // A season is a week now, so day 12 falls late in the first summer, not early in spring.
-    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, late summer.')
-    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, early autumn.')
-    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, late winter.')
+    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is Friday, day 12, dusk, late summer.')
+    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is Monday, day 351, night, early autumn.')
+    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is Saturday, day 223, day, late winter.')
   })
 
   it('reaches every turn through the moment prose, ahead of everything else in it', () => {
@@ -247,7 +247,7 @@ describe('the shared calendar', () => {
       ...quietMeadowPacket,
       time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
     })
-    expect(prose.startsWith('It is day 12, dusk, late summer.')).toBe(true)
+    expect(prose.startsWith('It is Friday, day 12, dusk, late summer.')).toBe(true)
     const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
     expect(a.messages.at(-1)!.content).toContain('day 12, dusk, late summer')
   })

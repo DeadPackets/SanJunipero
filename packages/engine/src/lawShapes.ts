@@ -1,3 +1,4 @@
+import { WEEKDAYS } from '@sj/shared'
 import { z } from 'zod'
 
 // The contract half of a social law: the shapes alone, with no reader of the world. A law is a
@@ -15,7 +16,7 @@ export const LawPredicateSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('forbid'),
       verb: z.string().min(1),
-      when: z.enum(['night', 'day']).optional(),
+      when: z.enum(['night', 'day', 'weekend', ...WEEKDAYS]).optional(),
       where: z.enum(['square', 'house', 'field']).optional(),
       whose: z.literal('other').optional(),
     })

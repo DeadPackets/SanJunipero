@@ -2,6 +2,7 @@ import {
   bondLevel,
   dayPhaseFromTick,
   DAYS_PER_SEASON,
+  weekdayFromTick,
   inputName,
   MINUTES_PER_DAY,
   heardLine,
@@ -284,7 +285,7 @@ export function worldDay(tick: number): number {
 // The calendar every mind shares, said the same way every turn. The phase is
 // `dayPhaseFromTick` and never a second derivation.
 export function calendarLine(time: SimTime): string {
-  return `It is day ${worldDay(time.tick)}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
+  return `It is ${weekdayFromTick(time.tick)}, day ${worldDay(time.tick)}, ${dayPhaseFromTick(time.tick)}, ${seasonPart(time.dayOfSeason)} ${time.season}.`
 }
 function footprintPhrase(w: number, h: number): string {
   if (w <= 1 && h <= 1) return 'one tile wide'

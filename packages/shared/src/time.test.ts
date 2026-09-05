@@ -7,6 +7,8 @@ import {
   DAYS_PER_SEASON,
   DAYS_PER_YEAR,
   MINUTES_PER_DAY,
+  isWeekendTick,
+  weekdayFromTick,
 } from './time.js'
 
 describe('dayPhaseFromTick', () => {
@@ -74,6 +76,15 @@ describe('simTimeFromTick', () => {
     expect(t.year).toBe(1)
     expect(t.season).toBe('spring')
     expect(t.dayOfSeason).toBe(1)
+  })
+  it('day 1 is a Monday, every season opens on one, and the weekend is Saturday and Sunday', () => {
+    expect(weekdayFromTick(0)).toBe('Monday')
+    expect(weekdayFromTick(11 * MINUTES_PER_DAY + 500)).toBe('Friday')
+    for (let season = 0; season < 4; season++)
+      expect(weekdayFromTick(season * DAYS_PER_SEASON * MINUTES_PER_DAY)).toBe('Monday')
+    expect(isWeekendTick(5 * MINUTES_PER_DAY)).toBe(true)
+    expect(isWeekendTick(6 * MINUTES_PER_DAY + 1439)).toBe(true)
+    expect(isWeekendTick(7 * MINUTES_PER_DAY)).toBe(false)
   })
   it('night spans 20:00–05:59', () => {
     expect(simTimeFromTick(20 * 60).isNight).toBe(true)
