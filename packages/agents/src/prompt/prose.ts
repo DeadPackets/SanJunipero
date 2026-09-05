@@ -1324,10 +1324,18 @@ export function perceptionToProse(
     else if (s.door !== undefined) {
       // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
       // room that is full now from a wall with no way through it ever — and can come back.
+      // At the door the walk is over: r24 spent 176 walks of no length on a door already reached,
+      // and only 58 of them were followed by a step inside.
+      const atDoor =
+        inside === undefined &&
+        Math.abs(packet.self.x - s.door.x) <= 1 &&
+        Math.abs(packet.self.y - s.door.y) <= 1
       approach =
         s.full === true
           ? 'it has a doorway, and there is no room left inside.'
-          : 'it has a doorway; walk to it and you can go in.'
+          : atDoor
+            ? 'you are at its door; enter it and you are in.'
+            : 'it has a doorway; walk to it and you can go in.'
     } else if (world?.isWalkable && !openGroundBeside(s, world.isWalkable)) {
       approach = 'there is no open ground beside it.'
     }

@@ -288,8 +288,16 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
     )
 
   it('names the doorway either way — a full room is not a wall', () => {
-    expect(seeing({})).toContain('it has a doorway; walk to it and you can go in.')
+    expect(seeing({ door: { x: 6, y: 7 } })).toContain(
+      'it has a doorway; walk to it and you can go in.',
+    )
     expect(seeing({ full: true })).toContain('it has a doorway, and there is no room left inside.')
+  })
+
+  // r24: 176 walks of no length to a door already reached, 58 of them followed by a step in.
+  it('at the door, the walk is over and the step inside is the thing named', () => {
+    expect(seeing({})).toContain('you are at its door; enter it and you are in.')
+    expect(seeing({})).not.toContain('walk to it and you can go in')
   })
 
   // The distinction the whole of R2 turns on: a mind that cannot tell "full now" from "no way

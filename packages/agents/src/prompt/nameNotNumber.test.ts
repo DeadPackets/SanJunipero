@@ -154,7 +154,7 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
 
   it('outside, the doorway is a fact and not a tile', () => {
     const said = seeing({ structures: [cabin({})] })
-    expect(said).toContain('it has a doorway; walk to it and you can go in.')
+    expect(said).toContain('you are at its door; enter it and you are in.')
     expect(sentenceWith(said, 'structure_1')).not.toMatch(PAIR)
   })
 
