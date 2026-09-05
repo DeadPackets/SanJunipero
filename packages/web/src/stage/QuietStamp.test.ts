@@ -26,6 +26,26 @@ describe('the stamp says the day, the season, the time and where the picture cam
   })
 })
 
+// ★ THE DAY HAS A SHAPE. The gateway marks the day I / II / III; the stamp is where a viewer
+// reads it, because the mark applies between cuts too and the cue slot does not stand between them.
+describe('★ the act the day has reached, beside the clock', () => {
+  it('★ reads DAY n · SEASON · HH:MM · LIVE · ACT II', () => {
+    expect(stampText(DAY_12, 'LIVE', 'II')).toBe('DAY 12 · SUMMER · 09:40 · LIVE · ACT II')
+    expect(stampText(DAY_12, 'REPLAY', 'III')).toBe('DAY 12 · SUMMER · 09:40 · REPLAY · ACT III')
+  })
+
+  it('★ says nothing before the day has anything to be an act of', () => {
+    expect(stampText(DAY_12, 'LIVE', null)).toBe('DAY 12 · SUMMER · 09:40 · LIVE')
+    expect(stampText(DAY_12, 'LIVE')).toBe(stampText(DAY_12, 'LIVE', null))
+  })
+
+  it('★ reads the mark off the gateway’s own frame, not off the clock', () => {
+    const src = readFileSync(new URL('./QuietStamp.tsx', import.meta.url), 'utf8')
+    expect(src).toContain('store.getDirector()?.act ?? null')
+    expect(src).toContain('stampText(tick, stampWord(live, awake, link, paused), act)')
+  })
+})
+
 describe('a clock nobody can know is stale says so instead', () => {
   it('is LIVE only when the town is awake and at its edge', () => {
     expect(stampWord(true, true, 'online')).toBe('LIVE')

@@ -11,7 +11,7 @@ import {
 } from '@sj/shared'
 import { chronicleGlyph } from './importantFeed.js'
 import { MARK_GLYPH, marksFrom } from './timelineMarks.js'
-import { subjectFor } from './directorCut.js'
+import { quietSubject } from './directorCut.js'
 import {
   MACHINE_CHECKABLE,
   READINESS,
@@ -279,16 +279,15 @@ describe('R1 / R3 · what a machine can say about the two human lines', () => {
   const TOWN = ['amara', 'omar', 'salma', 'yusuf']
 
   it('R1 · the frame can never be subject-less while anybody is alive', () => {
-    // 200 ticks of a town with nothing scored: `subjectFor` is TOTAL, so there is no second
-    // where the director has nobody and the camera sits on empty ground.
+    // 200 ticks with the gateway scoring nothing: the quiet round is TOTAL over a town that has
+    // anybody in it, so there is no second where the camera sits on empty ground.
     for (let tick = 0; tick < 200; tick++) {
-      expect(subjectFor([], null, tick, TOWN), `tick ${tick}`).not.toBeNull()
+      expect(quietSubject(TOWN, tick), `tick ${tick}`).not.toBeNull()
     }
   })
 
   it('R3 · and the somebody it names is always somebody in the town', () => {
-    for (let tick = 0; tick < 200; tick += 7)
-      expect(TOWN).toContain(subjectFor([], null, tick, TOWN))
+    for (let tick = 0; tick < 200; tick += 7) expect(TOWN).toContain(quietSubject(TOWN, tick))
   })
 
   it('R1 · the load-time TypeError is gone, and its guard lives with the scene', () => {

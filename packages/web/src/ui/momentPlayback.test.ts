@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { connectObservatory } from '../net/socket.js'
 import { createWorldStore } from '../state/worldStore.js'
-import { cameraClaim } from './DirectorMode.js'
+import { cameraClaim } from './directorCut.js'
 import { pointPlay, watchMomentEnd } from './replayRun.js'
 
 /** The socket the viewer really opens, with the wire in a list instead of on a network. */
@@ -122,8 +122,12 @@ describe('★ ACCEPTANCE — clicking “the first grave” in the Chronicle', (
     // IT ASKS TO PLAY, NOT TO FREEZE. This is the bug: the old path sent `scrub` here.
     expect(frames().at(-1)).toEqual({ t: 'replay', from: 1497, reqId: 1 })
 
-    // THE CAMERA IS ON THE CAST, and the heat round is not consulted for a tick it cannot score.
-    expect(cameraClaim(null, null, new Set(), 'a2', play.cast)).toEqual({
+    // THE CAMERA IS ON THE CAST, and the gateway's cut is not consulted for a tick it cannot score.
+    expect(
+      cameraClaim(null, play.cast, new Set(), {
+        cut: { sceneId: null, agentIds: ['a2'], score: 9, why: 'a death' },
+      }),
+    ).toEqual({
       by: 'moment',
       cast: ['a1'],
     })

@@ -15,7 +15,9 @@ import {
   SpeechLive,
   SubjectRing,
   QuietStamp,
+  SceneCard,
   SkyArc,
+  SleepCard,
   toggleFullscreen,
   useStageKeys,
   type RingVerb,
@@ -32,7 +34,13 @@ import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
-import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
+import {
+  FIRST_FRAME_COPY,
+  dismissFirstFrame,
+  fadeFirstLines,
+  firstFrameNote,
+  showFirstLines,
+} from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { localStore, sessionStore } from './ui/storage.js'
@@ -45,6 +53,10 @@ import type { Thing } from './paper/pages/types.js'
 type Sheet = { page: PageKey; tab: string }
 
 const NO_CAST: readonly string[] = []
+
+/** How many minds are alive to be watched — what the first two lines count. */
+const livingCount = (agents: Record<string, { alive: boolean }> | undefined): number =>
+  Object.values(agents ?? {}).filter((a) => a.alive).length
 
 /** Safari throttles history writes to 100 per 30 s, and 8x playback asks for sixteen a second. */
 const ADDRESS_BAR_MS = 500
@@ -76,6 +88,13 @@ export function App() {
   // The moment being replayed, or null for a town at the live edge or held on one still.
   const [play, setPlay] = useState<MomentPlay | null>(null)
   const [cue, setCue] = useState<string | null>(null)
+  const [why, setWhy] = useState<string | null>(null)
+  // Who the director has in frame, and the scene it is of: the card and the caption follow this
+  // one answer, so neither can name somebody the camera is not on.
+  const [shot, setShot] = useState<{ cast: readonly string[]; sceneId: string | null }>(() => ({
+    cast: NO_CAST,
+    sceneId: null,
+  }))
   const [keysOpen, setKeysOpen] = useState(false)
   const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
@@ -146,9 +165,20 @@ export function App() {
 
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
-    if (scene !== null && link === 'online') dismissFirstFrame()
-    else firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
-  }, [scene, link])
+    if (scene !== null && link === 'online') {
+      dismissFirstFrame()
+      // ...and the two lines take the card's place, over the town they are about.
+      showFirstLines(livingCount(store.getState()?.agents))
+    } else
+      firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
+  }, [scene, link, store])
+
+  // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
+  // round turn is not one: it happens the instant the town arrives, before anybody has read them.
+  const onShot = useCallback((cast: readonly string[], sceneId: string | null, cut: boolean) => {
+    if (cut) fadeFirstLines()
+    setShot({ cast, sceneId })
+  }, [])
 
   // The address bar moves without a page load, so nothing else would ever rename the tab.
   const named = subject?.kind === 'agent' && subject.id === route.agentId ? subject.name : null
@@ -393,17 +423,20 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
-      <DirectorCue text={cue} moment={moment} scene={sceneCue} />
-      {route.broadcast && <LowerThird store={store} />}
+      <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
+      <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />
+      <SleepCard store={store} />
+      <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
         store={store}
         scene={scene}
-        stage={stage}
         autoCut={autoCut}
         pinned={following}
         moment={play?.cast ?? NO_CAST}
         onCue={setCue}
+        onWhy={setWhy}
+        onShot={onShot}
       />
       {!route.broadcast && (
         <Transport store={store} play={play} handle={handle} onLive={onLive} onAt={address} />

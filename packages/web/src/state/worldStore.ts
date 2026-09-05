@@ -29,6 +29,26 @@ type LawChange = { tick: number; path: string; value: unknown }
  *  bundle that can read this town at all. */
 type Trouble = 'reload' | 'resnapshot'
 
+// The gateway's own answer to "what is worth watching". Declared here until protocol 8 carries
+// `ServerDirector` in `@sj/shared`; the shape is the frame's, field for field.
+/** One shot the gateway scored: whose it is, how hot, and the sentence that says why. */
+export type StakeScore = {
+  /** the scene the shot is of, or null when the score is a body's own — a death, a birth */
+  sceneId: string | null
+  agentIds: string[]
+  score: number
+  why: string
+}
+export type ServerDirector = {
+  t: 'director'
+  tick: number
+  /** null: nothing has scored, and the viewer's quiet round turns instead */
+  cut: StakeScore | null
+  /** the beat after a peak: the shot holds, and nothing displaces it */
+  quiet: boolean
+  act: 'I' | 'II' | 'III' | null
+}
+
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
 export type WorldStore = {
@@ -51,6 +71,9 @@ export type WorldStore = {
   /** The scene the town is holding, open or just closed. The closing frame carries the summary,
    *  so it is KEPT rather than cleared — whoever shows it decides how long it stands. */
   getScene: () => TownScene | null
+  /** What the gateway says is worth watching, and the act the day has reached. One frame, kept
+   *  until the next one changes it — the camera, the cue and the stamp all read this one. */
+  getDirector: () => ServerDirector | null
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** The world log's head as the server last reported it — the signal a read model refetches on,
@@ -59,7 +82,7 @@ export type WorldStore = {
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
   lawHistory: () => LawChange[]
-  applyServer: (msg: ServerMsg) => Trouble | null
+  applyServer: (msg: ServerMsg | ServerDirector) => Trouble | null
   subscribe: (fn: () => void) => () => void
   onEvents: (fn: (evts: SimEvent[]) => void) => () => void
 }
@@ -78,6 +101,7 @@ export function createWorldStore(): WorldStore {
   const latest = new Map<string, { tick: number; text: string }>()
   const events: SimEvent[] = []
   let scene: TownScene | null = null
+  let director: ServerDirector | null = null
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
@@ -113,6 +137,7 @@ export function createWorldStore(): WorldStore {
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
     getScene: () => scene,
+    getDirector: () => director,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -199,6 +224,9 @@ export function createWorldStore(): WorldStore {
           break
         case 'scene':
           scene = msg.scene
+          break
+        case 'director':
+          director = msg
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

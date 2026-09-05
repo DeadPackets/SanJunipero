@@ -96,7 +96,7 @@ describe('endpoint', () => {
   it('★ wakes its readers on EVERY settled read, refused ones included', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', answers([{ n: 1 }, null]))
-    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    const feed = endpoint<{ n: number }>('/api/nothing', undefined, 1000)
     let woken = 0
     feed.subscribe(() => {
       woken++
@@ -199,7 +199,7 @@ describe('a poll over an unchanged answer', () => {
   it('★ hands back the SAME read, so an unchanged body re-renders nothing', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', answers([{ n: 1 }]))
-    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    const feed = endpoint<{ n: number }>('/api/nothing', undefined, 1000)
     feed.subscribe(() => {})
     await settle()
     const first = feed.get()
@@ -212,7 +212,7 @@ describe('a poll over an unchanged answer', () => {
   it('★ still lands as a BEAT, so a round driven by the poll keeps turning', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', answers([{ n: 1 }]))
-    const feed = endpoint('/api/heat', undefined, 1000)
+    const feed = endpoint('/api/nothing', undefined, 1000)
     feed.subscribe(() => {})
     await settle()
     expect(feed.beat()).toBe(1)
@@ -227,7 +227,7 @@ describe('a poll over an unchanged answer', () => {
   it('parses a changed body and hands back a new read', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', answers([{ n: 1 }, { n: 2 }]))
-    const feed = endpoint<{ n: number }>('/api/heat', undefined, 1000)
+    const feed = endpoint<{ n: number }>('/api/nothing', undefined, 1000)
     feed.subscribe(() => {})
     await settle()
     const first = feed.get()

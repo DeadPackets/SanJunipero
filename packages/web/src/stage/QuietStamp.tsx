@@ -30,10 +30,15 @@ export function stampWord(
   return paused && word === 'LIVE' ? 'PAUSED' : word
 }
 
-export function stampText(tick: number, word: StampWord): string {
+/** The day's shape so far, as the gateway marks it: I from the first scene, II once the day has
+ *  had its hottest one, III from dusk. Null before the day has anything to be an act of. */
+export type ActMark = 'I' | 'II' | 'III'
+
+export function stampText(tick: number, word: StampWord, act: ActMark | null = null): string {
   const m = tickToMoment(tick)
   const season = simTimeFromTick(tick).season.toUpperCase()
-  return `DAY ${m.day} · ${season} · ${m.time} · ${word}`
+  const stamp = `DAY ${m.day} · ${season} · ${m.time} · ${word}`
+  return act === null ? stamp : `${stamp} · ACT ${act}`
 }
 
 /** Only while somebody is asking: a clock that is always up is a clock nobody reads. */
@@ -44,6 +49,8 @@ export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState
   const live = useSyncExternalStore(store.subscribe, isLive, isLive)
   const awake = useSyncExternalStore(store.subscribe, isAwake, isAwake)
   const paused = useSyncExternalStore(store.subscribe, store.getPaused, store.getPaused)
+  const actNow = (): ActMark | null => store.getDirector()?.act ?? null
+  const act = useSyncExternalStore(store.subscribe, actNow, actNow)
   const [shown, setShown] = useState(false)
   const isShown = useRef(false)
 
@@ -82,7 +89,7 @@ export function QuietStamp({ store, link }: { store: WorldStore; link: LinkState
   // for three seconds after the last thing the pointer did.
   return (
     <div className={shown || !live ? 'stage-stamp shown' : 'stage-stamp'}>
-      {stampText(tick, stampWord(live, awake, link, paused))}
+      {stampText(tick, stampWord(live, awake, link, paused), act)}
     </div>
   )
 }
