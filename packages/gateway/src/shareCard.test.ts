@@ -329,6 +329,25 @@ describe('the card route and the tags the app is served with', () => {
     expect(xml).toContain(`<loc>${base}/moment/1/00:00</loc>`)
   })
 
+  /** The forwarded host is a stranger's to choose, and it is written into every canonical link,
+   *  every card URL and every `<loc>` a crawler is handed. */
+  it('★ takes its address from the operator, not from a header a stranger picks', async () => {
+    const before = process.env.SJ_PUBLIC_ORIGIN
+    process.env.SJ_PUBLIC_ORIGIN = 'https://town.example/'
+    const forged = { 'x-forwarded-host': 'evil.test', 'x-forwarded-proto': 'https' }
+    try {
+      const xml = await (await fetch(`${base}/sitemap.xml`, { headers: forged })).text()
+      expect(xml).toContain('<loc>https://town.example/</loc>')
+      expect(xml).not.toContain('evil.test')
+      const html = await (await fetch(`${base}/moment/1/19:31`, { headers: forged })).text()
+      expect(html).toContain('href="https://town.example/moment/1/00:00"')
+      expect(html).not.toContain('evil.test')
+    } finally {
+      if (before === undefined) delete process.env.SJ_PUBLIC_ORIGIN
+      else process.env.SJ_PUBLIC_ORIGIN = before
+    }
+  })
+
   it('keeps the living day’s card on a short lease — it is rewritten as the day is lived', async () => {
     const live = await fetch(`${base}/card/moment/2/06:00.svg`)
     expect(live.headers.get('cache-control')).toBe('public, max-age=300')

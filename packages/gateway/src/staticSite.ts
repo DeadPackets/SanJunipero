@@ -93,7 +93,12 @@ export function withShareTags(html: string, meta: ShareMeta, origin = ''): strin
     .replace('</head>', `  ${tags}\n  </head>`)
 }
 
-export function originOf(req: IncomingMessage): string {
+/** The address the town is served at. `SJ_PUBLIC_ORIGIN` is the operator's answer and the only
+ *  trustworthy one: the headers are a stranger's to choose, and they are written into every
+ *  canonical link, every card URL and every `<loc>` a crawler follows. */
+export function originOf(req: IncomingMessage, env: NodeJS.ProcessEnv = process.env): string {
+  const pinned = (env.SJ_PUBLIC_ORIGIN ?? '').trim()
+  if (pinned !== '') return pinned.replace(/\/+$/u, '')
   const header = (name: string): string | null => {
     const v = req.headers[name]
     const first = (Array.isArray(v) ? v[0] : v)?.split(',')[0]?.trim()
