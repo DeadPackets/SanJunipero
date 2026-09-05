@@ -134,7 +134,10 @@ function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig)
   // Nothing else records this: it is the difference between dying tired and dying cold.
   const chilled =
     c.reason === 'exposure' ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 } : {}
-  return { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
+  // A swallow is the meal, whichever hand held it out: a body fed on the ground comes off
+  // the collapse ladder like one that fed itself.
+  const body = c.reason === 'meal' ? rested(a) : a
+  return { ...body, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
 }
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.

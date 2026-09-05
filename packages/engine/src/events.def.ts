@@ -45,7 +45,7 @@ export const NeedsChanged = z
           .object({
             need: z.enum(['hunger', 'energy', 'warmth', 'social', 'thirst']),
             delta: z.number(),
-            reason: z.literal('exposure').optional(),
+            reason: z.enum(['exposure', 'meal']).optional(),
           })
           .strict(),
       )

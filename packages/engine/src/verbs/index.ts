@@ -872,7 +872,13 @@ function swallowEvents(
       type: 'needs_changed',
       payload: {
         id: eaterId,
-        changes: [{ need: 'hunger', delta: mealRestore(state, config, eaterId, item.kind) }],
+        changes: [
+          {
+            need: 'hunger',
+            delta: mealRestore(state, config, eaterId, item.kind),
+            reason: 'meal',
+          },
+        ],
       },
     },
   ]
