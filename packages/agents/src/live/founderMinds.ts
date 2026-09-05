@@ -243,7 +243,7 @@ export const FOUNDER_MINDS: Mind[] = [
         [
           'names the cost of a thing in days of work before she agrees to anything',
           'puts a thing right with her own hands while the other person is still explaining',
-          'repeats what her husband just said, word for word, as its own verdict',
+          'repeats what her husband just said, word for word, as the last word on it',
           'closes a matter by announcing she will not say it twice, then does not',
         ],
         ['gossip', 'a compliment without a condition on it', 'hurry', 'sorry'],

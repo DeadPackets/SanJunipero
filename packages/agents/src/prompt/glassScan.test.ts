@@ -86,6 +86,15 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
     council: 'The neighbours held a council by the well.',
     market: 'I carried the hides down to the market.',
     custom: 'It is the custom here to eat after dark.',
+    arbiter: 'Halim stood between the two of them as arbiter, and both accepted it.',
+    arbiters: 'The old ones were the arbiters of every quarrel over a boundary stone.',
+    codex: 'A codex of remedies lay open on the shelf, its pages soft with use.',
+    ruling: 'The ruling passion of his life was the river and what it carried.',
+    rulings: 'Her rulings on who sat where at supper were never questioned.',
+    verdict: 'The verdict of the whole table was that the stew wanted salt.',
+    verdicts: 'Leyla hands down verdicts on every loaf that leaves her oven.',
+    schema: 'He drew a schema of the channel in the dust with a stick.',
+    schemas: 'Two schemas for the bridge lay side by side on the bench.',
   }
 
   it('the compacted day log may say milestone, tier or construct, byte for byte', () => {

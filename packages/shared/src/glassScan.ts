@@ -25,24 +25,18 @@ const OPS_KEYS: readonly string[] = [
   'semantic firsts',
 ]
 
-// What the ops plane calls itself: the court that judges an act, the ladder it judges against,
-// and the machinery that answers a prompt. A town has none of these, and is never told of them.
+// What the ops plane calls itself and a villager never says. Court, model and provider are left
+// off on purpose: a mind courts a neighbour, models clay and calls the river a provider.
 const OPS_PLANE_WORDS: readonly string[] = [
   'arbiter',
   'arbiters',
   'codex',
-  'court',
-  'courts',
   'ruling',
   'rulings',
   'verdict',
   'verdicts',
   'schema',
   'schemas',
-  'provider',
-  'providers',
-  'model',
-  'models',
 ]
 
 // Each is also an ordinary English noun: a mind may hear one from another mouth, but no

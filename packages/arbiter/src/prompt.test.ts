@@ -235,7 +235,7 @@ describe('the reasoning must agree with the verdict word (C9 batch-11)', () => {
   it('makes a ruling that reasons to an attempt and says impossible a format error', () => {
     const { system } = assembleAdjudicationPrompt(fixtureBlocks())
     expect(system).toContain(
-      'if your own reasoning concludes the action can be begun, the verdict is "attempt"',
+      'if your own reasoning concludes the action can be begun, the judgement is "attempt"',
     )
     expect(system).not.toMatch(FORBIDDEN_FRAMING)
   })

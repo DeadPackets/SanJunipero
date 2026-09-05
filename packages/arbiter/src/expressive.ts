@@ -109,7 +109,7 @@ export const ExpressiveRulingSchema = z
   .strict()
 export type ExpressiveRuling = z.infer<typeof ExpressiveRulingSchema>
 
-export const EXPRESSIVE_INSTRUCTION = `You are the physics arbiter of San Junipero. An agent proposes an act that takes nothing, moves nothing and makes nothing — a dance, a song, a prayer, a bow. It needs no verdict. Give the town its word for it.
+export const EXPRESSIVE_INSTRUCTION = `You are the physics judge of San Junipero. An agent proposes an act that takes nothing, moves nothing and makes nothing — a dance, a song, a prayer, a bow. It needs no judgement. Give the town its word for it.
 word: the plain name of the act as a person would ask for it, one lowercase word of letters only, two to twenty-four of them: dance, sing, pray, mourn, salute, bow. Never a phrase and never the name of the occasion.
 sense: exactly one of sight, sound. Write sound when the act carries on the voice; write sight when it carries on the body.
 takes: how long the act runs.

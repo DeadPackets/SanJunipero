@@ -57,8 +57,11 @@ describe('scanPromptForGlassLeak', () => {
 
 describe('the ops plane may not name itself to a mind', () => {
   it('flags our own words for the machinery that judges the town', () => {
-    for (const word of ['arbiter', 'codex', 'court', 'ruling', 'verdict', 'schema', 'provider'])
+    for (const word of ['arbiter', 'codex', 'ruling', 'verdict', 'schema'])
       expect(scanPromptForGlassLeak(`the ${word} said so`), word).toContain(word)
+    // A villager courts a neighbour, models clay and calls the river a provider.
+    for (const word of ['court', 'model', 'provider'])
+      expect(scanPromptForGlassLeak(`the ${word} said so`), word).toEqual([])
     expect(scanPromptForGlassLeak('the arbiter finds no way')).toEqual(['arbiter'])
     expect(scanPromptForGlassLeak('no verdict allows this')).toEqual(['verdict'])
   })
