@@ -437,6 +437,22 @@ describe('every way a scene ends', () => {
     expect(asks.find((a) => a.scene.thread.length === 9)?.wrapUp, 'the tenth line').toBe(true)
   })
 
+  // The floor-holder's runtime may be dozing off a failed provider: it never calls `takeFloor`,
+  // so nothing was ever asked and the talk used to stand still for the whole doze.
+  it('moves the floor off a mouth that never asks at all', () => {
+    let clock = 0
+    const h = harness({ now: () => clock })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(h.coordinator.open()[0]?.floor).toBe(OMAR)
+
+    clock += FLOOR_TIMEOUT_MS
+    h.coordinator.onTick(NOON + 1)
+    const scene = h.coordinator.open()[0]
+    expect(scene?.timeouts).toBe(1)
+    expect(scene?.floor, 'the floor went back to the anchor').toBe(NADIA)
+    expect(h.calls.get(OMAR) ?? 0, 'and nobody was billed for the silence').toBe(0)
+  })
+
   it('a stall is not a pass, and two of them close it as a timeout', async () => {
     let clock = 0
     const h = harness({ script: () => () => 'stall', now: () => clock })
