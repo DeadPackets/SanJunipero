@@ -279,6 +279,28 @@ describe('the caption is the whole vocabulary', () => {
   })
 })
 
+describe('a talk somebody walked out of', () => {
+  it('★ is not a shot while one body stands in it, and is again when a second joins', () => {
+    const d = director()
+    d.fold([opened(10, QUARREL, 'quarrel', ['nadia', 'yusuf'], 8)])
+    expect(d.frame(11).cut?.sceneId).toBe(QUARREL)
+    d.fold([
+      ev(12, 'scene_turned', { id: QUARREL, kind: 'quarrel', participants: ['nadia'], stakes: 8 }),
+    ])
+    expect(d.frame(13).cut?.sceneId ?? null).not.toBe(QUARREL)
+    d.fold([
+      ev(14, 'scene_turned', {
+        id: QUARREL,
+        kind: 'quarrel',
+        participants: ['nadia', 'omar'],
+        stakes: 8,
+      }),
+    ])
+    expect(d.frame(15).cut?.sceneId).toBe(QUARREL)
+    expect(d.frame(15).cut?.agentIds).toEqual(['nadia', 'omar'])
+  })
+})
+
 describe('a resumed town', () => {
   it('does not stamp ACT I on a day that already had its scenes', async () => {
     const { default: Database } = await import('better-sqlite3')

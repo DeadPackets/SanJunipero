@@ -199,7 +199,7 @@ export function makeDirector(
     const id = key.slice(2)
     if (key.startsWith('s:')) {
       const e = scenes.get(id)
-      return e === undefined ? -1 : sceneScore(e)
+      return e === undefined || (e.cast.length < 2 && e.closedAt === null) ? -1 : sceneScore(e)
     }
     const e = bodies.get(id)
     return e === undefined ? -1 : decayed(e, tick)
@@ -408,6 +408,9 @@ export function makeDirector(
         scenes.delete(id)
         continue
       }
+      // A talk somebody walked out of is one body standing there: not a shot until it closes
+      // with its summary, or somebody else joins.
+      if (e.cast.length < 2 && e.closedAt === null) continue
       offer(sceneKey(id), sceneScore(e))
     }
     for (const [id, e] of bodies) {
