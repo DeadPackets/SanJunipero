@@ -128,6 +128,19 @@ describe('publicRecordText', () => {
     ).toContain('was seen to eat')
   })
 
+  // ★ A world resumed from an older log carries raw speech, and the record puts it inside a
+  // quote fence on one line of a prompt.
+  it('★ folds a quote and a line break out of speech the log kept raw', () => {
+    const said = publicRecordText({
+      seq: 5,
+      tick: 500,
+      type: 'agent_spoke',
+      payload: { agentId: 'tamar', text: 'She said "no".\nThen she left.' },
+    })
+    expect(said).toBe(`was heard to say: "She said 'no'. Then she left."`)
+    expect(said.split('\n')).toHaveLength(1)
+  })
+
   // A verb the town coined is a slug: the record says what it means, not its id.
   it('reads a coined verb slug instead of printing it', () => {
     const seen = (verb: string): string =>

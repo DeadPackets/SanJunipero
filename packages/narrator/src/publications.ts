@@ -1,5 +1,12 @@
 import type Database from 'better-sqlite3'
-import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, SOMEONE, type SimEvent, verbPhrase } from '@sj/shared'
+import {
+  FORBIDDEN_FRAMING,
+  MINUTES_PER_DAY,
+  SOMEONE,
+  type SimEvent,
+  sanitizeSpokenText,
+  verbPhrase,
+} from '@sj/shared'
 import { applyFootnotes, publishClean, withoutStrangers } from './chronicle.js'
 import type { NarratorStore } from './store.js'
 import type {
@@ -79,7 +86,9 @@ export function publicRecordText(ev: SimEvent): string {
   const p = (ev.payload ?? {}) as P
   switch (ev.type) {
     case 'agent_spoke':
-      return `was heard to say: "${strOr(p.text, '')}"`
+      // Sanitized here as well as at the verb: a world resumed from an older log carries raw
+      // text, and this one goes inside a quote fence on one line of a prompt.
+      return `was heard to say: "${sanitizeSpokenText(strOr(p.text, ''))}"`
     case 'action_completed':
       return `was seen to ${verbPhrase(strOr(p.verb, 'act'))}`
     case 'structure_planned':
