@@ -16,6 +16,7 @@ import {
   readMindTurn,
   reconsiderTick,
 } from './turn.js'
+import { SCENE_ANSWER } from './scene/sceneLlm.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',
@@ -118,6 +119,13 @@ describe('TurnSchema', () => {
       expect(desc).not.toMatch(FORBIDDEN_FRAMING)
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
+  })
+
+  // A turn's output tokens bill 15 to 20 times a cached input token, and the field with no
+  // bound at all was the one the mind writes most freely in. The scene path already said it.
+  it('bounds the length of a thought, as the scene prompt already does', () => {
+    expect((TurnSchema.shape.thought as z.ZodType).description).toContain('one or two sentences')
+    expect(SCENE_ANSWER).toContain('thought is one short line')
   })
 })
 

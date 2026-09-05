@@ -41,7 +41,7 @@ export const TurnSchema = z
       .string()
       .min(1)
       .describe(
-        'What is going through your head this moment. Yours alone; nobody else ever hears it.',
+        'What is going through your head this moment, in one or two sentences. Yours alone; nobody else ever hears it.',
       ),
     speech: z
       .string()
