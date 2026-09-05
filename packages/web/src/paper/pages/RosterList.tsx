@@ -14,6 +14,7 @@ import { EMPTY_COPY } from '../../ui/townStats.js'
 export function RosterListView({
   rows,
   gone,
+  left = 0,
   sort,
   openId,
   becomingOf,
@@ -23,6 +24,8 @@ export function RosterListView({
 }: {
   rows: readonly RosterRow2[]
   gone: number
+  /** who went down the valley road: not dead, and not resting in anybody's memory */
+  left?: number
   sort: RosterSort
   openId: string | null
   /** absent in the cheapest tests; the list renders without an expansion */
@@ -75,6 +78,11 @@ export function RosterListView({
       {gone > 0 && (
         <p className="roster-gone">
           {gone === 1 ? 'One rests in the town’s memory.' : `${gone} rest in the town’s memory.`}
+        </p>
+      )}
+      {left > 0 && (
+        <p className="roster-gone">
+          {left === 1 ? 'One went down the valley road.' : `${left} went down the valley road.`}
         </p>
       )}
     </section>

@@ -76,13 +76,9 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   return (
     <RosterListView
       rows={rows}
-      // Somebody who walked down the valley road is not resting in anybody's memory; the
-      // `departed` marker lands with the fold's own arrivals work.
-      gone={
-        Object.values(state.agents).filter(
-          (a) => !a.alive && (a as { departed?: unknown }).departed === undefined,
-        ).length
-      }
+      // Somebody who walked down the valley road is not resting in anybody's memory.
+      gone={Object.values(state.agents).filter((a) => !a.alive && a.departed === undefined).length}
+      left={Object.values(state.agents).filter((a) => a.departed !== undefined).length}
       sort={sort}
       openId={openId}
       becomingOf={becomingOf}
