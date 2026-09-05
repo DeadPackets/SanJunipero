@@ -332,3 +332,30 @@ describe('word budgets', () => {
     expect(terse.system).not.toBe(talkative.system)
   })
 })
+
+describe('CAPABILITIES — the four acts that need another person to agree', () => {
+  const RELATIONSHIP_VERBS = ['court', 'propose', 'lie_with', 'leave_partner']
+
+  it.each(RELATIONSHIP_VERBS)('names %s with the word the registry answers to', (verb) => {
+    expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}; give targetId`, 'm'))
+  })
+
+  it('says who answers, and that three of the four need a yes', () => {
+    expect(CAPABILITIES).toMatch(/court: [^\n]*whoever is near may hear the answer/)
+    expect(CAPABILITIES).toMatch(/propose: [^\n]*Only they can say yes/)
+    expect(CAPABILITIES).toMatch(/lie_with: [^\n]*only if they say yes/)
+    expect(CAPABILITIES).toMatch(/leave_partner: [^\n]*needs no answer/)
+  })
+
+  it('warns that a child may come of one of them, and names no dial behind it', () => {
+    expect(CAPABILITIES).toContain('A child may come of it')
+    expect(CAPABILITIES).not.toMatch(/chance|roll|percent|1 in /i)
+  })
+
+  it('never names the machinery', () => {
+    for (const verb of RELATIONSHIP_VERBS) {
+      const line = CAPABILITIES.split('\n').find((l) => l.startsWith(`${verb}:`))!
+      expect(line, verb).not.toMatch(FORBIDDEN_FRAMING)
+    }
+  })
+})

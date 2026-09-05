@@ -57,6 +57,10 @@ stoke: name it stoke; give structureId, a fire you stand beside or a hearth in t
 douse: name it douse; give x and y as two numbers for the burning thing beside you, with a full bucket in hand
 extinguish: name it extinguish; give structureId, the mark of the burning thing
 attack: name it attack; give targetId, the mark of the person you strike
+court: name it court; give targetId, the person at your side you would walk out with. They answer in their own time, and whoever is near may hear the answer
+propose: name it propose; give targetId, the person at your side you would take as your partner for good. Only they can say yes
+lie_with: name it lie_with; give targetId, the person beside you, under a roof that is yours or theirs, and only if they say yes. A child may come of it
+leave_partner: name it leave_partner; give targetId, the partner you are leaving. It needs no answer, and it is not forgotten
 experiment: name it experiment; give description, what you attempt
 
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
