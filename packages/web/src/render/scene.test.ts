@@ -296,8 +296,29 @@ describe('StageMount never leaves React holding a destroyed scene', () => {
 
   it('un-publishes the scene in the same teardown that destroys it', () => {
     const cleanup = /return \(\) => \{([\s\S]*?)\n {4}\}/.exec(src)?.[1] ?? ''
-    expect(cleanup).toContain('scene?.destroy()')
+    expect(cleanup).toContain('teardown()')
     expect(cleanup).toMatch(/onScene\?\.\(null\)/)
+  })
+
+  // ★ A remount destroys the Scene and then awaits `createScene` again. For the length of that
+  // promise the div is mounted and focusable, and a keypress drove the destroyed one.
+  it('★ drops the ref in the same teardown that destroys the scene', () => {
+    const teardown = /const teardown = \(\): void => \{([\s\S]*?)\n {4}\}/.exec(src)?.[1] ?? ''
+    expect(teardown).toContain('scene?.destroy()')
+    expect(teardown, 'onKeyDown reads this ref and only guards on null').toContain(
+      'sceneRef.current = null',
+    )
+    expect(teardown).toContain('interiorRef.current = null')
+  })
+
+  // ★ The layers built before the throw were never destroyed, and their tickers went with the app.
+  it('★ the failed-build path tears down every layer the good path does', () => {
+    const teardown = /const teardown = \(\): void => \{([\s\S]*?)\n {4}\}/.exec(src)?.[1] ?? ''
+    for (const layer of ['landmarks', 'toponyms', 'chars', 'bubbles', 'acts', 'moments'])
+      expect(teardown, layer).toContain(`${layer}?.destroy()`)
+    const caught = src.slice(src.indexOf('.catch('), src.indexOf('return () => {'))
+    expect(caught).toContain('teardown()')
+    expect(caught, 'a half-built stack was left alive').not.toContain('scene?.destroy()')
   })
 
   it('types the handback so a caller cannot forget the null', () => {
@@ -308,7 +329,7 @@ describe('StageMount never leaves React holding a destroyed scene', () => {
   it('★ says why the town will not be drawn, and drops the half-built scene', () => {
     const caught = src.slice(src.indexOf('.catch('), src.indexOf('return () => {'))
     expect(caught).toContain('firstFrameStuck(FIRST_FRAME_COPY.blind)')
-    expect(caught).toContain('scene?.destroy()')
+    expect(caught).toContain('teardown()')
   })
 
   // ★ Bubbles stopped for good on the two-hundredth thought: the log is spliced from the head,
