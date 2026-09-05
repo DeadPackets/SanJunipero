@@ -27,13 +27,17 @@ const VERB_BONDS: Readonly<Record<string, BondKind>> = {
 /** What a close writes about one pair. The minds' own reading, not an act the world witnessed. */
 type SceneTieDelta = { agentId: string; personId: string; kind: string; settled?: true }
 
-/** The whole of what `buildBonds` folds; every other type falls through its chain untouched. */
+/** The whole of what `buildBonds` folds; every other type falls through its chain untouched.
+ *  `co_slept` is not here: a shared roof is a roof, and the partnership is its own act now. */
 export const BOND_TYPES: readonly string[] = [
   'agent_spoke',
   'action_started',
   'action_completed',
-  'co_slept',
   'agent_born',
+  'invitation_accepted',
+  'invitation_refused',
+  'partnership_formed',
+  'partnership_dissolved',
   'scene_closed',
   'tie_let_go',
 ]
@@ -102,9 +106,21 @@ function makeBondsFold(earshot: number): BondsFold {
         if (kind === undefined) continue
         const targetId = started.get(`${p.agentId}\n${p.verb}`)?.targetId
         if (typeof targetId === 'string') tie(p.agentId, targetId, kind, ev.tick)
-      } else if (ev.type === 'co_slept') {
+      } else if (ev.type === 'partnership_formed') {
         const p = ev.payload as { aId: string; bId: string }
         tie(p.aId, p.bId, 'partner', ev.tick)
+      } else if (ev.type === 'partnership_dissolved') {
+        const p = ev.payload as { aId: string; bId: string }
+        between(p.aId, p.bId)?.part(ev.tick)
+      } else if (ev.type === 'invitation_accepted') {
+        // Walking out together is warmth. A proposal accepted is the partnership one event
+        // later, and a bedding is nobody's business but theirs.
+        const p = ev.payload as { agentId: string; byId: string; verb: string }
+        if (p.verb === 'court') between(p.byId, p.agentId)?.addTie('attraction', ev.tick)
+      } else if (ev.type === 'invitation_refused') {
+        // A no said in private costs nothing; a no said in front of people is a slight.
+        const p = ev.payload as { agentId: string; byId: string; witnesses: readonly string[] }
+        if (p.witnesses.length > 0) between(p.byId, p.agentId)?.addTie('slight', ev.tick)
       } else if (ev.type === 'agent_born') {
         const p = ev.payload as { id: string; motherId: string; fatherId: string }
         for (const parent of [p.motherId, p.fatherId]) tie(parent, p.id, 'kin', ev.tick)

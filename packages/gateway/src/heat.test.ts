@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { HeatWindow, SimEvent } from '@sj/shared'
+import {
+  InvitationAccepted,
+  InvitationRefused,
+  Invited,
+  PartnershipDissolved,
+  PartnershipFormed,
+} from '@sj/engine'
 import { FOLD_TYPES } from './api.js'
 import {
   HEAT_WEIGHTS,
@@ -41,18 +48,23 @@ describe('heat stub', () => {
     expect(HEAT_WINDOW_TICKS).toBe(60)
     expect(HEAT_WEIGHTS).toEqual({
       agent_died: 20,
+      partnership_dissolved: 14,
       discovery_made: 12,
       fire_ignited: 12,
       law_ratified: 12,
+      partnership_formed: 12,
       fire_spread: 10,
+      invitation_refused: 10,
       law_broken: 9,
       agent_injured: 8,
-      co_slept: 8,
+      invitation_accepted: 8,
+      invited: 6,
       structure_completed: 6,
       agent_collapsed: 6,
       agent_spoke: 6,
       agent_expressed: 4,
       crop_harvested: 3,
+      co_slept: 2,
       item_moved: 1,
     })
   })
@@ -187,6 +199,50 @@ describe('heat stub', () => {
     for (const type of Object.keys(HEAT_WEIGHTS)) expect(FOLD_TYPES).toContain(type)
   })
 
+  // Every payload is the engine's own, parsed, so the keys `dramatis` reaches for are the keys
+  // the engine writes.
+  describe('★ a parting is the loudest thing that can happen short of a death', () => {
+    let seq = 0
+    const rel = (tick: number, type: string, schema: { parse(v: unknown): unknown }, p: unknown) =>
+      ev(++seq, tick, type, schema.parse(p) as Record<string, unknown>)
+
+    it('outranks a fire, and a shared roof no longer outranks a harvest by much', () => {
+      expect(HEAT_WEIGHTS.partnership_dissolved!).toBeGreaterThan(HEAT_WEIGHTS.fire_ignited!)
+      expect(HEAT_WEIGHTS.partnership_dissolved!).toBeLessThan(HEAT_WEIGHTS.agent_died!)
+      expect(HEAT_WEIGHTS.co_slept!).toBeLessThan(HEAT_WEIGHTS.invited!)
+    })
+
+    it('points the camera at one face of a pair, and at the one who was asked', () => {
+      expect(
+        score([
+          rel(1, 'partnership_formed', PartnershipFormed, { aId: 'ana', bId: 'omar' }),
+          rel(2, 'partnership_dissolved', PartnershipDissolved, {
+            aId: 'ana',
+            bId: 'omar',
+            byId: 'omar',
+          }),
+        ]),
+      ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'ana', score: 12 + 14 }])
+
+      expect(
+        score([
+          rel(1, 'invited', Invited, { agentId: 'ana', byId: 'omar', verb: 'court' }),
+          rel(2, 'invitation_accepted', InvitationAccepted, {
+            agentId: 'ana',
+            byId: 'omar',
+            verb: 'court',
+          }),
+          rel(3, 'invitation_refused', InvitationRefused, {
+            agentId: 'ana',
+            byId: 'omar',
+            verb: 'propose',
+            witnesses: [],
+          }),
+        ]),
+      ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'ana', score: 6 + 8 + 10 }])
+    })
+  })
+
   it('returns [] for no events', () => {
     expect(score([])).toEqual([])
   })
@@ -276,7 +332,7 @@ describe('heat stub', () => {
           ev(4, 4, 'law_ratified', { agentId: 'ana', lawId: 'l1' }),
           ev(5, 5, 'law_broken', { agentId: 'ana', lawId: 'l1', verb: 'take' }),
         ]),
-      ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'ana', score: 12 + 4 + 8 + 12 + 9 }])
+      ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'ana', score: 12 + 4 + 2 + 12 + 9 }])
     })
   })
 })

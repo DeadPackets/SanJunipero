@@ -70,7 +70,7 @@ export const BOND_NOTES: Readonly<Record<string, string>> = {
   give: 'gave something away',
   teach: 'taught something',
   attack: 'came to blows',
-  co_slept: 'kept house together',
+  partnership_formed: 'took each other as partners',
   born: 'parent and child',
 }
 
@@ -80,7 +80,7 @@ export const BOND_ACT_OF_KIND: Readonly<Record<BondKind, string>> = {
   friend: 'spoke',
   work: 'teach',
   owe: 'give',
-  partner: 'co_slept',
+  partner: 'partnership_formed',
   kin: 'born',
   rival: 'attack',
 }
@@ -123,7 +123,14 @@ export const BOND_VALENCE: Readonly<Record<BondKind, number>> = {
 
 /** What a tie the minds themselves wrote is worth to a pair. Apart from `BOND_VALENCE` because a
  *  tie is not one of the six acts the panel names: it moves warmth and joins no act window. */
-export const TIE_ACTS = ['slight', 'promise_kept', 'promise_broken', 'attraction', 'kin'] as const
+export const TIE_ACTS = [
+  'slight',
+  'promise_kept',
+  'promise_broken',
+  'attraction',
+  'kin',
+  'parted',
+] as const
 export type TieAct = (typeof TIE_ACTS)[number]
 
 export const TIE_VALENCE: Readonly<Record<TieAct, number>> = {
@@ -132,6 +139,7 @@ export const TIE_VALENCE: Readonly<Record<TieAct, number>> = {
   promise_broken: -6,
   attraction: 2,
   kin: 0,
+  parted: -6,
 }
 
 /** Which of those a scene's tie delta is, or null where it says nothing about warmth: a promise
@@ -219,6 +227,9 @@ export type BondFold = {
   /** A tie the minds wrote, weighed into warmth alone. It counts toward no act and names no
    *  bond kind, so the served window and its ceiling are what they were. */
   addTie(act: TieAct, tick: number): void
+  /** The partnership ended. Weighs the parting and drops the served kind back to whatever else
+   *  the pair are to each other; a later `add('partner')` takes it up again. */
+  part(tick: number): void
   /** Move the "as of" the prior half of the reading is measured against. Only forward, and only
    *  so a fold kept alive across rebuilds answers what a fresh one would. */
   advanceTo(asOfTick: number): void
@@ -233,7 +244,10 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   const id = bondId(aId, bId)
   let priorAt = Math.max(0, asOfTick - WARMTH_HALF_LIFE_TICKS)
 
-  let kind: BondKind = 'friend'
+  // Partnership is held apart from the rest because it is the one kind that can be undone:
+  // folding it into `strongerBondKind` made it permanent the first time it landed.
+  let partnered = false
+  let otherKind: BondKind | null = null
   let first = true
   const rolls = new Map<BondKind, { count: number; firstTick: number; lastTick: number }>()
   const recent: BondAct[] = []
@@ -280,7 +294,8 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
 
   return {
     add(k, tick) {
-      kind = first ? k : strongerBondKind(kind, k)
+      if (k === 'partner') partnered = true
+      else otherKind = otherKind === null ? k : strongerBondKind(otherKind, k)
       weigh(BOND_VALENCE[k], tick)
 
       const roll = rolls.get(k)
@@ -296,6 +311,10 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     },
     addTie(act, tick) {
       weigh(TIE_VALENCE[act], tick)
+    },
+    part(tick) {
+      partnered = false
+      weigh(TIE_VALENCE.parted, tick)
     },
     advanceTo(at) {
       const moved = Math.max(0, at - WARMTH_HALF_LIFE_TICKS)
@@ -314,7 +333,7 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
         id,
         aId: lo,
         bId: hi,
-        kind,
+        kind: partnered ? 'partner' : (otherKind ?? 'friend'),
         strength: count,
         formedTick,
         lastUpdatedTick: lastTick,
