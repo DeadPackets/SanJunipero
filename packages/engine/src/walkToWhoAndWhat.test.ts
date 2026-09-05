@@ -135,6 +135,15 @@ describe('★ a walk that names a person', () => {
     expect(chaseStep(begun, CFG, ME)).toBe(null)
   })
 
+  it('ends beside them and never on top of them, though their own tile is the nearest one', () => {
+    const s = world({ x: 10, y: 12 }, { x: 12, y: 12 })
+    const terrain = s.terrain.map((row) => [...row])
+    for (const y of [11, 12, 13]) terrain[y]![11] = 2
+    const to = walkDestination({ ...s, terrain }, CFG, ME, { targetId: YOU })
+    expect(to).not.toEqual({ x: 12, y: 12 })
+    expect(to).toMatchObject({ x: 12 })
+  })
+
   it('refuses a person this body cannot see, and itself', () => {
     // Night, so the same two bodies at the same two tiles are out of each other's sight.
     const dark = { ...world({ x: 2, y: 2 }, { x: 14, y: 2 }), tick: 0 }

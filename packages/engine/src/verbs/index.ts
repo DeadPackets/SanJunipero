@@ -362,6 +362,7 @@ function personDestination(
     for (let dx = -1; dx <= 1; dx++) {
       const p = { x: target.x + dx, y: target.y + dy }
       if (p.x === a.x && p.y === a.y) return p
+      if (dx === 0 && dy === 0) continue
       if (isPassable(state, p.x, p.y, ctx)) ring.push(p)
     }
   }
