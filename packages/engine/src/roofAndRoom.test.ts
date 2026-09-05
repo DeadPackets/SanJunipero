@@ -17,6 +17,7 @@ import { doorTile, occupantsOf, roomCapacity, roomIsFull, shelterLedger } from '
 import { makeGenesisWorld } from './genesis/world.js'
 import { buildableRecipe } from './verbs/index.js'
 import { FOUNDER_IDS } from '@sj/shared'
+import { runAct } from './testutil/world.js'
 
 // Two abundance defects measured on a live night: the valley's cabins, cottages and farmhouses
 // were buildings nobody could get into, and `enter` had no cap, so one roof sheltered the town.
@@ -251,6 +252,20 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     expect(enter(s, 'a3').ok).toBe(false)
     s = fold(s, ev(22, 'agent_exited', { agentId: 'a1', structureId: 'structure_1' }))
     expect(enter(s, 'a3').ok).toBe(true)
+  })
+
+  it('lets one of two bodies through a last slot in the same tick, and leaves the other out', () => {
+    let s = withBuilding(world(), 'house')
+    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    for (const id of ['a2', 'a3']) {
+      const r = enter(s, id)
+      if (!r.ok) throw new Error(r.reason)
+      for (const e of r.events) s = fold(s, ev(30, e.type, e.payload))
+    }
+    const out = runAct(s, CFG, 'a2')
+    expect(occupantsOf(out.state, 'structure_1')).toEqual(['a1', 'a2'])
+    expect(out.state.agents.a3!.insideId).toBeUndefined()
   })
 
   it('gives the floor back when a body dies indoors', () => {

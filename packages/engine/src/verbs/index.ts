@@ -759,7 +759,8 @@ const enter: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = EnterParams.parse(params)
     const s = state.structures[p.structureId]
-    const door = s ? doorTile(state, s) : null
+    if (!s || roomIsFull(state, s)) return []
+    const door = doorTile(state, s)
     if (!door) return []
     return [
       { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
