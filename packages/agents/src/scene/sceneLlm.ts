@@ -152,7 +152,7 @@ function renderInvitation(
   agentId: string,
   nameOf: (id: string) => string,
 ): string {
-  if (invitation === undefined || invitation.to !== agentId) return ''
+  if (invitation?.to !== agentId) return ''
   return askPhrase(invitation.verb, nameOf(invitation.from))
 }
 

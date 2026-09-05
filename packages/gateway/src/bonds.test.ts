@@ -531,8 +531,12 @@ describe('★ a relationship is the acts two people chose', () => {
   // Every payload is parsed by the engine's own schema before it is folded, so a fixture that
   // drifts from the event the engine writes fails here rather than passing quietly.
   let seq = 0
-  const rel = <T>(tick: number, type: string, schema: { parse(v: unknown): T }, payload: unknown) =>
-    ({ seq: ++seq, tick, type, payload: schema.parse(payload) }) as SimEvent
+  const rel = (
+    tick: number,
+    type: string,
+    schema: { parse(v: unknown): unknown },
+    payload: unknown,
+  ): SimEvent => ({ seq: ++seq, tick, type, payload: schema.parse(payload) })
   const only = (events: SimEvent[], a: string, b: string, at: number): Bond | undefined =>
     buildBonds(events, DEFAULT_CONFIG.movement.earshotRadius, at).bonds.find(
       (x) => x.id === bondId(a, b),

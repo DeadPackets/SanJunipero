@@ -659,7 +659,7 @@ export class SceneCoordinator {
    *  judges the second consent at the moment it is given; no is a fact with no verb to it. */
   #answer(scene: Scene, agentId: string, turn: SceneTurn, tick: number): boolean {
     const invitation = scene.invitation
-    if (invitation === undefined || invitation.to !== agentId || turn.answer === null) return false
+    if (invitation?.to !== agentId || turn.answer === null) return false
     delete scene.invitation
     const { from, verb } = invitation
     if (turn.answer === 'refuse') {

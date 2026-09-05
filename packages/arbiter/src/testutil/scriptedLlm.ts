@@ -73,7 +73,7 @@ export class ScriptedLlm {
 
   /** The real client hands back another of itself under a second name; the script, the counters
    *  and the prompt log are the same either way. */
-  forCaller(): ScriptedLlm {
+  forCaller(): this {
     return this
   }
 

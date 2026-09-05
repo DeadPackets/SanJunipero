@@ -60,7 +60,7 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
     const grounds = Object.values(TILE_COLORS)
     const clear = grounds.filter((g) => bandRatios(LANDMARK_INK, g).night >= AA_RATIO)
     expect(clear.length).toBeLessThanOrEqual(1)
-    expect(bandRatios(LANDMARK_INK, TILE_COLORS[0]!).night).toBeLessThan(AA_RATIO)
+    expect(bandRatios(LANDMARK_INK, TILE_COLORS[0]).night).toBeLessThan(AA_RATIO)
   })
 
   it('keeps speech and thought on different PAPER, both of which hold the ink after dark', () => {

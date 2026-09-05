@@ -158,7 +158,11 @@ export type Soundscape = {
   destroy(): void
 }
 
-const SILENT: Soundscape = { setMuted: () => {}, play: () => {}, destroy: () => {} }
+const SILENT: Soundscape = {
+  setMuted: () => undefined,
+  play: () => undefined,
+  destroy: () => undefined,
+}
 
 /** How fast a voice comes up or goes away. Long enough that a cue flickering on a frame
  *  boundary is a swell rather than a click. */

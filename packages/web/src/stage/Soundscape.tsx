@@ -88,7 +88,7 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
       }
     const held = store.getScene()
     let voicesInView = 0
-    if (held !== null && held.open)
+    if (held?.open)
       for (const id of held.participants) {
         const a = state.agents[id]
         if (a === undefined) continue
@@ -101,7 +101,8 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
       firesInView,
       firefliesInView,
       voicesInView,
-      bellAgeMs: bellAt === null ? null : performance.now() - bellAt,
+      // The strike is the synth's to shape; the render only says whether a bell is ringing.
+      bellAgeMs: bellAt === null ? null : 0,
     }
     return soundCues(world)
   }, [state, scene, store, seeds, bellAt])

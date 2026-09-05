@@ -485,15 +485,29 @@ def report(src, tmp):
                   'join scenes s on s.id=h.scene_id order by h.total desc limit 5')
     moment_ticks = [t for t, ty, _ in ev if ty in MOMENTS]
     hit5 = sum(1 for _, t0, t1 in top5 if any(t0 <= t <= t1 for t in moment_ticks))
+    # A line that names a villager who is not in the room is gossip, which the town is meant to
+    # do; a hallucination is a person the town does not have. Both are counted, only the second
+    # is the gate. The unknown-name test is a heuristic: a capitalised word that is not the start
+    # of a sentence, not a roster name and not on a short list of ordinary capitalised words.
     halluc = 0
+    gossip = 0
+    town = {n.lower() for n in roster}
+    ordinary = {'i', 'god', 'sun', 'moon', 'day', 'night', 'north', 'south', 'east', 'west',
+                'river', 'square', 'hearth', 'storehouse', 'well', 'ford', 'valley', 'spring',
+                'summer', 'autumn', 'winter', 'lord', 'mother', 'father', 'aye', 'no', 'yes'}
+    cap_re = re.compile(r"(?<![.!?\"'\n]\s)(?<!^)\b([A-Z][a-z]{2,})\b")
     scene_parts = {}
     for _, ty, p in ev:
         if ty == 'scene_opened':
             scene_parts[p.get('id')] = {m for m in (p.get('participants') or [])}
         elif ty == 'scene_line':
+            text = p.get('text', '')
             cast = scene_parts.get(p.get('id'), set()) | {p.get('agentId')}
-            named = {m.lower() for m in name_re.findall(p.get('text', ''))}
+            named = {m.lower() for m in name_re.findall(text)}
             if named - {c for c in cast if c}:
+                gossip += 1
+            unknown = {w.lower() for w in cap_re.findall(text)} - town - ordinary
+            if unknown:
                 halluc += 1
     idle_h = hours['i']
     pw = 100 * people_wonder / n if n else 0
@@ -522,8 +536,11 @@ def report(src, tmp):
          f'${per12:.2f} (${watched:.2f} per watched day)' if mind_days else 'n/a',
          COST_TARGET, mark(mind_days and total, per12 < 0.30),
          COST_TARGET, mark(mind_days and total, per12 < 0.30)],
-        ['cast hallucinations per 100 scene lines', f'{halluc_100:.1f}' if scene_lines else 'n/a', '0',
+        ['cast hallucinations per 100 scene lines (a name the town does not have)',
+         f'{halluc_100:.1f}' if scene_lines else 'n/a', '0',
          mark(scene_lines, halluc == 0), '0', mark(scene_lines, halluc == 0)],
+        ['gossip: lines naming a villager not in the room, per 100', f'{100 * gossip / scene_lines:.1f}' if scene_lines else 'n/a',
+         '-', '-', '-', '-'],
     ]
     print(table(rows, ['target', 'measured', 'phase 2', 'p2', 'phase 4', 'p4']))
     return 0

@@ -190,7 +190,7 @@ const memo = new WeakMap<TileId[][], Memo>()
 function search(state: WorldState, from: Point, to: Point, config: SimConfig): SearchOut {
   const key = `${from.x},${from.y}|${to.x},${to.y}`
   let hit = memo.get(state.terrain)
-  if (hit === undefined || hit.structures !== state.structures || hit.config !== config) {
+  if (hit?.structures !== state.structures || hit.config !== config) {
     hit = { structures: state.structures, config, out: new Map() }
     memo.set(state.terrain, hit)
   }

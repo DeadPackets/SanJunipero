@@ -1224,7 +1224,7 @@ describe('what the town has agreed', () => {
   })
 
   it('renders no line longer than a rule is allowed to be', () => {
-    const system = said([`${'x'.repeat(400)}`])
+    const system = said(['x'.repeat(400)])
     for (const line of system.split('\n').filter((l) => l.startsWith('"'))) {
       expect(line.length).toBeLessThanOrEqual(LAW_TEXT_MAX + 2)
     }

@@ -1196,7 +1196,7 @@ describe('an ask opens a scene of its own', () => {
       bridge: h.bridge,
       mindFor: (id) => (id === NADIA ? h.minds.get(id)! : null),
     })
-    h.bridge.submit(NADIA, { verb: 'court', params: { targetId: OMAR } })
+    void h.bridge.submit(NADIA, { verb: 'court', params: { targetId: OMAR } })
     h.loop.step()
     await flush()
     deaf.onTick(h.loop.tick)
