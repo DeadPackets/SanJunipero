@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import sharp from 'sharp'
-import { MINUTES_PER_DAY, type Moment, momentToTick } from '@sj/shared'
+import { MINUTES_PER_DAY, type Moment, momentToTick, personAt } from '@sj/shared'
 // The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
 // SDK, which the scripted stream must never load (town/src/liveSeam.test.ts).
 import { renderShareCard } from '@sj/narrator/shareCard'
@@ -82,7 +82,7 @@ function readHeat(deps: ShareCardDeps, day: number): number {
 }
 
 function readAgent(deps: ShareCardDeps, id: string): AgentRead | null {
-  const person = AGENT_ID.test(id) ? deps.mirror.state().agents[id] : undefined
+  const person = AGENT_ID.test(id) ? personAt(deps.mirror.state().agents, id) : undefined
   if (person === undefined) return null
   const life = one(
     deps.narratorDb,

@@ -7,6 +7,7 @@ import {
   DEFAULT_CONFIG,
   PROTOCOL_VERSION,
   TICK_REAL_MS,
+  personAt,
   type AssetRecord,
   type SimConfig,
 } from '@sj/shared'
@@ -118,7 +119,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   mountAssetRoutes(router, {
     getCodex,
-    knowsAgent: (id) => mirror.state().agents[id] !== undefined,
+    knowsAgent: (id) => personAt(mirror.state().agents, id) !== undefined,
   })
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })

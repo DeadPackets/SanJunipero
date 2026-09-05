@@ -348,6 +348,18 @@ describe('the card route and the tags the app is served with', () => {
     }
   })
 
+  /** `state.agents` carries `Object.prototype`, so a bare read gave the town a person called
+   *  `constructor` and named them "Object". */
+  it('★ has no person by a name every plain object answers to', async () => {
+    for (const id of ['constructor', 'toString', 'hasOwnProperty']) {
+      const card = await fetch(`${base}/card/agent/${id}.png`)
+      expect(card.status, id).toBe(404)
+      await card.text()
+      const html = await (await fetch(`${base}/agent/${id}`)).text()
+      expect(html, id).toContain('Someone the town no longer has')
+    }
+  })
+
   it('keeps the living day’s card on a short lease — it is rewritten as the day is lived', async () => {
     const live = await fetch(`${base}/card/moment/2/06:00.svg`)
     expect(live.headers.get('cache-control')).toBe('public, max-age=300')
