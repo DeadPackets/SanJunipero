@@ -412,9 +412,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
   /** A row whose answer named no back end books at the ceiling for ever otherwise; asking
    *  OpenRouter who served it is the only way back to a real price. */
+  const unclaimable = new Set<string>()
   const sweepUnattributed = async (): Promise<void> => {
     if (openRouterKey === '') return
-    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey })
+    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey, unclaimable })
     if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
   }
 

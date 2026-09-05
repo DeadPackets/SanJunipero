@@ -29,6 +29,9 @@ export type BackfillOpts = {
   fetchFn?: typeof fetch
   now?: number
   delayMs?: number
+  /** Generation ids this run has already been refused, ADDED TO as more are. A 404 here is
+   *  permanent, and re-asking holds every newer row out of the window until it ages out. */
+  unclaimable?: Set<string>
 }
 
 export type BackfillResult = { attempted: number; backfilled: number }
@@ -70,12 +73,14 @@ export async function backfillUnattributed(
     from: now - BACKFILL_GIVE_UP_MS,
     until: now - (opts.delayMs ?? BACKFILL_DELAY_MS),
     limit: BACKFILL_LIMIT,
+    skip: opts.unclaimable === undefined ? [] : [...opts.unclaimable],
   })
   const named: { call: UnattributedCall; facts: GenerationFacts }[] = []
   for (const call of rows) {
     const facts = await fetchGeneration(call.generationId, opts)
     // A failed backfill leaves the ceiling price and its alert exactly where they were.
     if (facts !== null) named.push({ call, facts })
+    else opts.unclaimable?.add(call.generationId)
   }
   // One transaction for the sweep: better-sqlite3 fsyncs per statement, and this runs on the
   // same thread as the world tick.
@@ -94,6 +99,7 @@ export async function backfillUnattributed(
         reported: facts.costUsd,
         served: call.model,
         provider: facts.provider,
+        alertCeiling: false,
       })
       updateCallPricing(db, call.id, {
         provider: facts.provider,
