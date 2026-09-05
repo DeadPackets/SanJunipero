@@ -23,9 +23,10 @@ export type MindConfig = {
 export const DEFAULT_MIND_CONFIG: MindConfig = {
   idleGapTicks: 30,
   boredomTicks: 60,
-  // Thirst rings with hunger; any named affliction rings at its first severity. Hunger and
-  // energy ring late (D1): a body turn should be rare enough to read as an emergency.
-  bodyAlarm: { hunger: 15, energy: 10, warmth: 20, thirst: 25, affliction: 1 },
+  // Thirst rings with hunger; any named affliction rings at its first severity. Hunger rings
+  // late (D1). Energy rings at 25: at 10 the bell came an hour before the body dropped, and r18
+  // lost ten of its eleven collapses to minds still up and talking at 23:00 with no way to a bed.
+  bodyAlarm: { hunger: 15, energy: 25, warmth: 20, thirst: 25, affliction: 1 },
   alarmHysteresis: 10,
   journalTicks: 10,
   dozeTicks: 60,
