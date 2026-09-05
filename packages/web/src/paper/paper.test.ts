@@ -128,6 +128,14 @@ describe('the signpost', () => {
     expect(KEY_MAP_ID).toBe('key-map-sheet')
   })
 
+  // React may re-invoke a pending updater, and Safari allows 100 history writes per 30 s: an
+  // address written from inside one is written more times than the viewer navigated.
+  it('★ writes the address bar outside the state updater, never inside it', () => {
+    const app = src('../App.tsx')
+    expect(app).not.toMatch(/setRoute\(\([\s\S]{0,200}?writeAddress/)
+    expect(app.match(/writeAddress\(/g)).toHaveLength(3) // the definition and its two callers
+  })
+
   it('★ is what the app mounts, with the arm’s wiring kept', () => {
     const app = src('../App.tsx')
     expect(app).toMatch(/<HelpButton\s+open=\{keysOpen\}/)
