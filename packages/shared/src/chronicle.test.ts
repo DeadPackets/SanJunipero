@@ -730,6 +730,13 @@ describe('every weighted type has words to print', () => {
     discovery_made: { name: 'a thing', kind: 'craft', byId: 'a1' },
     agent_born: { id: 'a3', name: 'Mira', motherId: 'a1' },
     law_ratified: { lawId: 'l1', agentId: 'a1', text: 'no fires indoors' },
+    law_tabled: {
+      lawId: 'l1',
+      agentId: 'a1',
+      text: 'no fires indoors',
+      votes: { for: ['a1'], against: [] },
+    },
+    law_dropped: { lawId: 'l1', text: 'no fires indoors', why: 'rejected' },
     partnership_formed: { aId: 'a1', bId: 'a2' },
     world_grown: {},
     partnership_dissolved: { aId: 'a1', bId: 'a2', byId: 'a1' },

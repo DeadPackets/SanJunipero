@@ -31,6 +31,7 @@ export const CUE_TYPES: readonly string[] = [
   ARRIVAL_TYPE,
   'agent_departed',
   'law_proposed',
+  'law_tabled',
   'law_ratified',
   'law_broken',
   'law_repealed',

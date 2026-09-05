@@ -18,6 +18,7 @@ import {
   type TileId,
   type WorldState,
 } from './state.js'
+import type { TabledLaw } from './lawShapes.js'
 import {
   ActionCompleted,
   ActionInterrupted,
@@ -85,6 +86,8 @@ import {
   LawProposed,
   LawRatified,
   LawRepealed,
+  LawTabled,
+  LawDropped,
   Marked,
   PartnershipDissolved,
   PartnershipFormed,
@@ -177,6 +180,12 @@ function refuseOccupied(state: WorldState, structureId: string): void {
       `structure ${structureId} destroyed with occupant(s) ${occupants.join(', ')} still inside`,
     )
   }
+}
+
+/** The record without one key. An empty record stays a record: absent means never tabled. */
+function withoutKey<T>(rec: Record<string, T> | undefined, key: string): Record<string, T> {
+  const { [key]: _gone, ...rest } = rec ?? {}
+  return rest
 }
 
 export function fold(
@@ -318,6 +327,22 @@ export function fold(
       LawBroken.parse(event.payload)
       return state
     }
+    case 'law_tabled': {
+      const p = LawTabled.parse(event.payload)
+      const tabled: TabledLaw = {
+        id: p.lawId,
+        text: p.text,
+        proposedBy: p.agentId,
+        tabledTick: event.tick,
+        votes: p.votes,
+      }
+      return { ...state, tabledLaws: { ...state.tabledLaws, [p.lawId]: tabled } }
+    }
+    case 'law_dropped': {
+      const p = LawDropped.parse(event.payload)
+      if (!state.tabledLaws?.[p.lawId]) throw new Error(`law_dropped for unknown law ${p.lawId}`)
+      return { ...state, tabledLaws: withoutKey(state.tabledLaws, p.lawId) }
+    }
     case 'law_ratified': {
       const p = LawRatified.parse(event.payload)
       if (state.socialLaws?.[p.lawId]) throw new Error(`law_ratified twice for ${p.lawId}`)
@@ -333,7 +358,15 @@ export function fold(
         repealedTick: null,
         why: p.why,
       }
-      return { ...state, socialLaws: { ...socialLaws, [p.lawId]: law } }
+      const tabledLaws =
+        state.tabledLaws?.[p.lawId] === undefined
+          ? state.tabledLaws
+          : withoutKey(state.tabledLaws, p.lawId)
+      return {
+        ...state,
+        socialLaws: { ...socialLaws, [p.lawId]: law },
+        ...(tabledLaws === undefined ? {} : { tabledLaws }),
+      }
     }
     case 'law_repealed': {
       const p = LawRepealed.parse(event.payload)

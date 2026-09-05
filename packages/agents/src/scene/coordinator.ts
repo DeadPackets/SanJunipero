@@ -1,5 +1,5 @@
 import { dayPhaseFromTick, MINUTES_PER_DAY, sanitizeSpokenText, STAKES_BY_KIND } from '@sj/shared'
-import { LAW_TEXT_MAX, type LawPredicate } from '@sj/engine'
+import { LAW_TABLED_DAYS, LAW_TEXT_MAX, type LawPredicate } from '@sj/engine'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
 import type { LawSeam } from '../runtime/arbiterSeam.js'
 import type { Tie, TieStore } from '../memory/ties.js'
@@ -12,6 +12,7 @@ import {
   FLOOR_TIMEOUT_MS,
   idNamed,
   lawIdOf,
+  roomForACouncil,
   lineCapOf,
   nextFloor,
   openQuarrelTie,
@@ -121,6 +122,7 @@ export class SceneCoordinator {
   readonly #mindFor: (agentId: string) => SceneMind | null
   readonly #everyone: () => readonly string[]
   readonly #laws: LawSeam | null
+  readonly #lapsed = new Set<string>()
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
@@ -233,7 +235,9 @@ export class SceneCoordinator {
     scene.kind = this.#kindAfter(scene, said, tick)
     this.#tellingIfStranger(scene)
     scene.stakes = this.#stakesOf(scene)
-    if (scene.kind === 'council') this.#propose(scene, agentId, said)
+    // A rule still waiting for its vote comes before any new one this room might put.
+    const voting = this.#voteIfTabled(scene, tick)
+    if (!voting && scene.kind === 'council') this.#propose(scene, agentId, said)
     this.#scenes.set(scene.id, scene)
     this.#announced.set(scene.id, this.#mark(scene))
     this.#bridge.announce('scene_opened', {
@@ -280,8 +284,44 @@ export class SceneCoordinator {
     this.#tellingIfStranger(scene)
     this.#standStill(agentId)
     appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
+    if (scene.kind !== 'council') this.#voteIfTabled(scene, tick)
     scene.stakes = this.#stakesOf(scene)
     this.#turned(scene)
+  }
+
+  /** A rule an earlier council was for is voted on by the first room big enough on a later day.
+   *  One that waited too long lapses instead. A talk with a fresh rule in it is not the place: the
+   *  tabled one comes first, and the new one can be put again another time. */
+  #voteIfTabled(scene: Scene, tick: number): boolean {
+    if (!roomForACouncil(scene)) return false
+    const today = Math.floor(tick / MINUTES_PER_DAY)
+    const underVote = new Set(
+      [...this.#scenes.values()].map((s) => s.proposal?.tabledId).filter((id) => id !== undefined),
+    )
+    for (const law of this.#bridge.tabledLaws()) {
+      if (underVote.has(law.id)) continue
+      const day = Math.floor(law.tabledTick / MINUTES_PER_DAY)
+      if (day >= today) continue
+      if (today - day > LAW_TABLED_DAYS) {
+        // Announced once: the event folds on the next step, and two rooms can open before it.
+        if (!this.#lapsed.has(law.id)) {
+          this.#lapsed.add(law.id)
+          this.#bridge.announce('law_dropped', { lawId: law.id, text: law.text, why: 'lapsed' })
+        }
+        continue
+      }
+      scene.kind = 'council'
+      scene.proposal = {
+        lawText: law.text,
+        proposedBy: law.proposedBy,
+        stances: {},
+        predicate: { kind: 'none' },
+        tabledId: law.id,
+      }
+      scene.stakes = this.#stakesOf(scene)
+      return true
+    }
+    return false
   }
 
   /** One body out of the talk, and the talk goes on without them. The anchor and the floor both
@@ -617,8 +657,26 @@ export class SceneCoordinator {
     const proposal = scene.proposal
     if (scene.kind !== 'council' || proposal === undefined) return
     const tally = tallyCouncil(scene)
-    if (!tally.passed) return
-    const { lawText, proposedBy } = proposal
+    const { lawText, proposedBy, tabledId } = proposal
+    const votes = { for: tally.for, against: tally.against }
+    if (tabledId === undefined) {
+      // A rule the room was for waits for a vote on a later day: a law is two councils, not one.
+      if (tally.passed) {
+        this.#bridge.announce('law_tabled', {
+          lawId: lawIdOf(scene),
+          agentId: proposedBy,
+          text: lawText,
+          votes,
+        })
+      }
+      return
+    }
+    if (!tally.passed) {
+      // Nobody answering leaves it on the table for the next room; a room against it drops it.
+      if (tally.for.length + tally.against.length > 1)
+        this.#bridge.announce('law_dropped', { lawId: tabledId, text: lawText, why: 'rejected' })
+      return
+    }
     const answer = await this.#compile(lawText, tick)
     const letGo =
       answer.repeals === null
@@ -634,12 +692,12 @@ export class SceneCoordinator {
     }
     proposal.predicate = answer.predicate
     this.#bridge.announce('law_ratified', {
-      lawId: lawIdOf(scene),
+      lawId: tabledId,
       agentId: proposedBy,
       text: lawText,
       why: answer.why,
       predicate: answer.predicate,
-      votes: { for: tally.for, against: tally.against },
+      votes,
     })
   }
 

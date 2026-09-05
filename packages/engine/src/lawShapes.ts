@@ -48,6 +48,15 @@ export const LawPredicateSchema = z.discriminatedUnion('kind', [
 ])
 export type LawPredicate = z.infer<typeof LawPredicateSchema>
 
+/** A rule the room was for, waiting for a council on a later day to make it law. */
+export type TabledLaw = {
+  id: string
+  text: string
+  proposedBy: string
+  tabledTick: number
+  votes: { for: string[]; against: string[] }
+}
+
 export type Law = {
   id: string
   ordinal: number

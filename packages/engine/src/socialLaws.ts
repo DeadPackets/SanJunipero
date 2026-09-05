@@ -9,7 +9,9 @@ import {
   type SimConfig,
 } from '@sj/shared'
 import { insideOf } from './interiors.js'
-import { type Law, type LawPredicate } from './lawShapes.js'
+import { type Law, type LawPredicate, type TabledLaw } from './lawShapes.js'
+
+export type { TabledLaw }
 import type { WorldState } from './state.js'
 import { SQUARE_RADIUS, townSquareOf } from './town.js'
 import { heldQty } from './verbs/common.js'
@@ -35,6 +37,15 @@ export function standingLaws(state: WorldState): Law[] {
   return Object.values(state.socialLaws ?? {})
     .filter((l) => l.repealedTick === null)
     .sort((a, b) => a.ordinal - b.ordinal)
+}
+
+/** How many days a tabled rule waits for its vote before it lapses. Three: long enough that a
+ *  quiet day does not kill it, short enough that the town remembers what it was for. */
+export const LAW_TABLED_DAYS = 3
+
+/** Rules waiting for a vote, oldest first. */
+export function tabledLaws(state: WorldState): TabledLaw[] {
+  return Object.values(state.tabledLaws ?? {}).sort((a, b) => a.tabledTick - b.tabledTick)
 }
 
 export type LawJudgement = { refusal: string } | { broken: string[] } | null

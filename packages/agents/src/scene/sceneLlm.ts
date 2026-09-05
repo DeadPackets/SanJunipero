@@ -186,17 +186,24 @@ function renderTelling(scene: Scene, agentId: string, nameOf: (id: string) => st
 function renderProposal(scene: Scene, agentId: string, nameOf: (id: string) => string): string {
   const proposal = scene.proposal
   if (scene.kind !== 'council' || proposal === undefined) return ''
+  const stand =
+    'Say where you stand in "stance": for, against, or unsure. The talk ends when ' +
+    'everybody has answered.'
+  if (proposal.tabledId !== undefined) {
+    const whose = proposal.proposedBy === agentId ? 'you' : nameOf(proposal.proposedBy)
+    return (
+      `Today the town votes on the rule ${whose} put to it on an earlier day: "${proposal.lawText}" ` +
+      "If more are for it than against, it becomes the town's rule from now on. " +
+      (proposal.proposedBy === agentId ? 'Hear them out.' : stand)
+    )
+  }
   if (proposal.proposedBy === agentId) {
     return (
       `You have proposed a rule to everyone here: "${proposal.lawText}" Hear them out. ` +
-      'It passes if more are for it than against, and it means nothing if nobody answers.'
+      'If more are for it than against, the town votes on it another day; it means nothing if nobody answers.'
     )
   }
-  return (
-    `${nameOf(proposal.proposedBy)} has proposed a rule to everyone here: "${proposal.lawText}" ` +
-    'Say where you stand in "stance": for, against, or unsure. The talk ends when ' +
-    'everybody has answered.'
-  )
+  return `${nameOf(proposal.proposedBy)} has proposed a rule to everyone here: "${proposal.lawText}" ${stand}`
 }
 
 /** Who is here and whose turn it is, in one block AFTER the thread. It sits last because it is

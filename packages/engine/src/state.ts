@@ -14,7 +14,7 @@ import {
 } from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
-import type { Law } from './lawShapes.js'
+import type { Law, TabledLaw } from './lawShapes.js'
 
 export type { TileId }
 
@@ -218,6 +218,8 @@ export type WorldState = {
   // Every rule the town itself has agreed on, by id. Absent until the first one passes, so a
   // town that has never held a council hashes exactly as it always did.
   socialLaws?: Record<string, Law>
+  // Rules a council was for, each waiting for a vote on a later day. Absent until the first.
+  tabledLaws?: Record<string, TabledLaw>
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number

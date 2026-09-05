@@ -38,6 +38,7 @@ export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
   partnership_dissolved: 'anger',
   discovery_made: 'idea',
   law_proposed: 'idea',
+  law_tabled: 'idea',
   law_ratified: 'idea',
   law_broken: 'exclaim',
   law_repealed: 'exclaim',

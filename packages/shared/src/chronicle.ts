@@ -35,6 +35,8 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   law_broken: 8,
   fire_spread: 7,
   law_proposed: 6,
+  law_tabled: 10,
+  law_dropped: 5,
   structure_inscribed: 6,
   affliction_recovered: 6,
   affliction_worsened: 5,
@@ -56,6 +58,8 @@ export const CHRONICLE_ICONS: Record<string, string> = {
   agent_arrived: 'star',
   agent_departed: 'flame',
   law_proposed: 'quill',
+  law_tabled: 'quill',
+  law_dropped: 'quill',
   law_ratified: 'quill',
   law_broken: 'flame',
   law_repealed: 'quill',
@@ -429,6 +433,12 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
     // under is ours, and the breach names the deed rather than the clause it fell under.
     case 'law_proposed':
       return `${look.agentName(str(p.agentId))} put a rule to the room: “${str(p.text)}”`
+    case 'law_tabled':
+      return `The room was for it, and the town votes another day: “${str(p.text)}”`
+    case 'law_dropped':
+      return p.why === 'lapsed'
+        ? `Nobody came back to vote on it, and it lapsed: “${str(p.text)}”`
+        : `The town voted a rule down: “${str(p.text)}”`
     case 'law_ratified':
       return `The town agreed: “${str(p.text)}”`
     case 'law_repealed':

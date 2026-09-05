@@ -17,6 +17,7 @@ import {
   type SimConfig,
   type SimEvent,
   type TileId,
+  MINUTES_PER_DAY,
 } from '@sj/shared'
 import { SCENE_CORPUS, SCENE_CORPUS_LINES } from '@sj/shared/testutil'
 import { EngineBridge } from '../runtime/bridge.js'
@@ -883,6 +884,19 @@ async function council(h: Harness, tick: number, said = PROPOSAL): Promise<void>
   }
 }
 
+/** The next day's first room of three: it votes on whatever the last council tabled. */
+async function vote(h: Harness, tick: number): Promise<void> {
+  await council(h, tick, 'Morning, all.')
+}
+
+/** A whole rule, start to finish: put and tabled one day, voted through the next. */
+async function lawPassed(h: Harness, tick: number, said = PROPOSAL): Promise<void> {
+  await council(h, tick, said)
+  h.loop.step()
+  await vote(h, tick + MINUTES_PER_DAY)
+  h.loop.step()
+}
+
 /** Every mind answers with the stance the test gave it, and says something while it does. */
 const stanced =
   (stances: Record<string, Stance | null>, to: Record<string, string> = {}) =>
@@ -948,7 +962,9 @@ describe('a town writes its own rule', () => {
     expect(scene.proposal?.stances).toEqual({ [OMAR]: 'against' })
   })
 
-  it('closes the talk and ratifies with the court’s own reading once everybody has answered', async () => {
+  // The owner's ruling: a law is built over days. The room that hears a rule tables it; the
+  // first room of three on a later day votes it in or out.
+  it('★ closes the talk and tables the rule the room was for, asking the court nothing yet', async () => {
     const { seam, asks } = court()
     const h = harness({
       who: THREE,
@@ -957,9 +973,35 @@ describe('a town writes its own rule', () => {
     })
     await council(h, NOON)
     expect(closeReasonOf(h)).toBe('ended')
+    h.loop.step()
+    const types = lawEvents(h.engineDb).map((e) => e.type)
+    expect(types).toEqual(['law_proposed', 'law_tabled'])
+    expect(lawEvents(h.engineDb)[1]!.payload).toMatchObject({
+      agentId: NADIA,
+      text: PROPOSAL,
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    expect(asks).toHaveLength(0)
+    expect(h.bridge.socialLaws()).toHaveLength(0)
+    expect(h.bridge.tabledLines()[0]).toContain(`"${PROPOSAL}"`)
+  })
+
+  it('★ the same day’s next room does not vote; the next day’s first room ratifies with the court’s reading', async () => {
+    const { seam, asks } = court()
+    const h = harness({
+      who: THREE,
+      script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }),
+      laws: seam,
+    })
+    await council(h, NOON)
+    h.loop.step()
+    await vote(h, NOON + MINUTES_PER_DAY)
+    h.loop.step()
     const ratified = lawEvents(h.engineDb).filter((e) => e.type === 'law_ratified')
     expect(ratified).toHaveLength(1)
+    const tabledId = (lawEvents(h.engineDb)[1]!.payload as { lawId: string }).lawId
     expect(ratified[0]!.payload).toMatchObject({
+      lawId: tabledId,
       agentId: NADIA,
       text: PROPOSAL,
       why: READING.why,
@@ -968,6 +1010,55 @@ describe('a town writes its own rule', () => {
     })
     expect(asks, 'one call, and only for the vote that passed').toHaveLength(1)
     expect(asks[0]!.text).toBe(PROPOSAL)
+    expect(h.bridge.tabledLaws()).toHaveLength(0)
+  })
+
+  it('★ a room that gathers the same day is only a talk: the vote waits for tomorrow', async () => {
+    const h = harness({
+      who: THREE,
+      script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }),
+      laws: court().seam,
+    })
+    await council(h, NOON)
+    h.loop.step()
+    h.coordinator.noteSpoken(NADIA, 'Morning, all.', NOON + 60)
+    expect(h.coordinator.open().map((s) => s.kind)).toEqual(['talk'])
+    expect(h.bridge.tabledLaws()).toHaveLength(1)
+  })
+
+  it('★ a room against it on the vote drops it, and a rule nobody comes back to lapses', async () => {
+    const h = harness({
+      who: THREE,
+      script: stanced({ [OMAR]: 'against', [SALMA]: 'against' }, { [OMAR]: 'Salma' }),
+      laws: court().seam,
+    })
+    // The script answers 'against', so the tabling itself is written by hand.
+    h.emitNext('law_tabled', {
+      lawId: 'law_put',
+      agentId: NADIA,
+      text: PROPOSAL,
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    h.loop.step()
+    await vote(h, NOON + MINUTES_PER_DAY)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).map((e) => e.type)).toEqual(['law_tabled', 'law_dropped'])
+    expect(lawEvents(h.engineDb)[1]!.payload).toMatchObject({ lawId: 'law_put', why: 'rejected' })
+
+    h.emitNext('law_tabled', {
+      lawId: 'law_forgotten',
+      agentId: NADIA,
+      text: 'From now on we sing at dusk.',
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    h.loop.step()
+    await vote(h, NOON + 5 * MINUTES_PER_DAY)
+    h.loop.step()
+    expect(lawEvents(h.engineDb).at(-1)!.payload).toMatchObject({
+      lawId: 'law_forgotten',
+      why: 'lapsed',
+    })
+    expect(h.bridge.tabledLaws()).toHaveLength(0)
   })
 
   it('folds the rule into the world the town now lives under', async () => {
@@ -976,8 +1067,7 @@ describe('a town writes its own rule', () => {
       script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }),
       laws: court().seam,
     })
-    await council(h, NOON)
-    h.loop.step()
+    await lawPassed(h, NOON)
     const standing = h.bridge.socialLaws()
     expect(standing).toHaveLength(1)
     expect(standing[0]).toMatchObject({ ordinal: 1, text: PROPOSAL, predicate: NIGHT_TAKE })
@@ -1017,8 +1107,7 @@ describe('a rule the room did not pass', () => {
 describe('a rule with no court behind it', () => {
   it('still passes, kept in words only', async () => {
     const h = harness({ who: THREE, script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }) })
-    await council(h, NOON)
-    h.loop.step()
+    await lawPassed(h, NOON)
     expect(lawEvents(h.engineDb).find((e) => e.type === 'law_ratified')?.payload).toMatchObject({
       predicate: { kind: 'none' },
       why: 'kept in words only',
@@ -1033,8 +1122,7 @@ describe('a rule with no court behind it', () => {
       laws: () => Promise.reject(new Error('the court is out')),
       onError: (kind) => errors.push(kind),
     })
-    await council(h, NOON)
-    h.loop.step()
+    await lawPassed(h, NOON)
     expect(lawEvents(h.engineDb).find((e) => e.type === 'law_ratified')?.payload).toMatchObject({
       predicate: { kind: 'none' },
       why: 'kept in words only',
@@ -1051,6 +1139,10 @@ describe('a rule with no court behind it', () => {
     })
     for (let i = 0; i < MAX_COMPILES_PER_DAY + 1; i++) await council(h, NOON + i)
     h.loop.step()
+    for (let i = 0; i < MAX_COMPILES_PER_DAY + 1; i++) {
+      await vote(h, NOON + MINUTES_PER_DAY + i)
+      h.loop.step()
+    }
     expect(asks).toHaveLength(MAX_COMPILES_PER_DAY)
     const ratified = lawEvents(h.engineDb).filter((e) => e.type === 'law_ratified')
     expect(ratified, 'the seventh still passed; it is only held to in words').toHaveLength(
@@ -1072,13 +1164,11 @@ describe('letting a rule go', () => {
         return Promise.resolve(answer)
       },
     })
-    await council(h, NOON)
-    h.loop.step()
+    await lawPassed(h, NOON)
     const first = h.bridge.socialLaws()[0]!
 
     answer = { predicate: { kind: 'none' }, repeals: 1, why: 'the town has had enough of it' }
-    await council(h, NOON + 1, 'We let go of the rule about the store.')
-    h.loop.step()
+    await lawPassed(h, NOON + MINUTES_PER_DAY + 1, 'We let go of the rule about the store.')
 
     expect(asks[1]!.standing).toEqual([{ ordinal: 1, text: PROPOSAL }])
     const types = lawEvents(h.engineDb).map((e) => e.type)
@@ -1135,17 +1225,15 @@ describe('the log', () => {
       script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }),
       laws: () => Promise.resolve(answer),
     })
-    await council(h, NOON)
-    h.loop.step()
+    await lawPassed(h, NOON)
     const lawId = h.bridge.socialLaws()[0]!.id
     h.emitNext('law_broken', { lawId, agentId: OMAR, verb: 'take', witnesses: [NADIA] })
     h.loop.step()
     answer = { predicate: { kind: 'none' }, repeals: 1, why: 'the town has had enough of it' }
-    await council(h, NOON + 1, 'We let go of the rule about the store.')
-    h.loop.step()
+    await lawPassed(h, NOON + MINUTES_PER_DAY + 1, 'We let go of the rule about the store.')
 
     expect(new Set(lawEvents(h.engineDb).map((e) => e.type))).toEqual(
-      new Set(['law_proposed', 'law_ratified', 'law_broken', 'law_repealed']),
+      new Set(['law_proposed', 'law_tabled', 'law_ratified', 'law_broken', 'law_repealed']),
     )
     const replayed = replayFromGenesis(h.store, h.config, h.terrain)
     expect(stateHash(replayed)).toBe(stateHash(h.loop.state))

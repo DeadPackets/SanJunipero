@@ -28,6 +28,8 @@ import {
   recipeTileKind,
   SQUARE_RADIUS,
   standingLaws,
+  tabledLaws,
+  type TabledLaw,
   submitIntent,
   waterWithinReach,
   WELL_KIND,
@@ -44,6 +46,7 @@ import {
   RELATIONSHIP_EVENT_TYPES,
   type SimConfig,
   type SimEvent,
+  weekdayFromTick,
 } from '@sj/shared'
 import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
@@ -302,6 +305,19 @@ export class EngineBridge {
     return this.socialLaws()
       .slice(-LAWS_SHOWN)
       .map((l) => l.text)
+  }
+
+  /** Rules a council was for, each waiting for a vote on a later day, oldest first. */
+  tabledLaws(): TabledLaw[] {
+    return tabledLaws(this.#loop.state)
+  }
+
+  /** The same, as a mind reads them: who put it, on what day, and the words. */
+  tabledLines(): string[] {
+    return this.tabledLaws().map((law) => {
+      const by = this.#loop.state.agents[law.proposedBy]?.name ?? 'somebody'
+      return `${by} put this to the town on ${weekdayFromTick(law.tabledTick)}, and the room was for it: "${law.text}" It becomes the rule if the next gathering votes for it.`
+    })
   }
 
   /** The roofs the whole town uses: everything standing that nobody owns. What a rule may point

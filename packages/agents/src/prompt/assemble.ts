@@ -41,6 +41,7 @@ export type PromptBlocks = {
   // What the town has agreed and holds each other to, in the words somebody actually said.
   // Texts alone: a rule has an id and a number, and a mind may hear neither.
   laws?: readonly string[]
+  tabled?: readonly string[]
   frontier?: readonly string[]
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
@@ -186,10 +187,12 @@ function renderFrontier(names: readonly string[]): string {
   )
 }
 
-function renderLaws(texts: readonly string[]): string {
+function renderLaws(texts: readonly string[], tabled: readonly string[]): string {
   const said = texts.slice(-LAWS_SHOWN).map((t) => `"${t.slice(0, LAW_TEXT_MAX)}"`)
-  if (said.length === 0) return ''
-  return ['The town has agreed on these and holds each other to them:', ...said].join('\n')
+  const agreed =
+    said.length === 0 ? [] : ['The town has agreed on these and holds each other to them:', ...said]
+  const waiting = tabled.length === 0 ? [] : ['Waiting for a vote:', ...tabled]
+  return [...agreed, ...waiting].join('\n')
 }
 
 function renderCustoms(names: readonly string[]): string {
@@ -214,7 +217,7 @@ export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const shared = renderShared(blocks.rulesOfBeing)
   const roster = renderRoster(blocks.roster ?? [])
   const customs = renderCustoms(blocks.customs ?? [])
-  const laws = renderLaws(blocks.laws ?? [])
+  const laws = renderLaws(blocks.laws ?? [], blocks.tabled ?? [])
   const frontier = renderFrontier(blocks.frontier ?? [])
   const identity = renderIdentity(blocks.identity)
   const personality = renderPersonality(blocks.personality)
