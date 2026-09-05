@@ -444,6 +444,51 @@ describe('every way a scene ends', () => {
     expect(closeReasonOf(h)).toBe('left')
   })
 
+  it('★ a goodbye is said before the leaver goes, and the other remembers it as one', async () => {
+    const h = harness({
+      script: () => () => fromCorpus(0, { speech: 'Right. I am off to the nets.', leave: true }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON)
+    expect(closeReasonOf(h)).toBe('left')
+    h.loop.step()
+    const said = sceneEvents(h.engineDb)
+      .filter((e) => e.type === 'scene_line')
+      .map((e) => (e.payload as { text: string }).text)
+    expect(said).toContain('Right. I am off to the nets.')
+    expect(memoriesOf(h, NADIA)).toContain('Omar said goodbye and left the talk.')
+    expect(memoriesOf(h, NADIA)).not.toContain('Omar walked off while you were still talking.')
+  })
+
+  it('★ a leave without a word is walking off, and both sides remember it', async () => {
+    const h = harness({ script: () => () => fromCorpus(0, { speech: null, leave: true }) })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON)
+    expect(closeReasonOf(h)).toBe('left')
+    expect(memoriesOf(h, NADIA)).toContain('Omar walked off while you were still talking.')
+    expect(memoriesOf(h, OMAR)).toContain('You walked off from Nadia mid-talk.')
+  })
+
+  it('★ in a room of three, one leaving leaves two talking', async () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: SALMA, name: 'Salma', x: 5 },
+      ],
+      script: (agentId) => (_a, n) =>
+        fromCorpus(n, { speech: `Line ${n}.`, to: 'Salma', leave: agentId === SALMA }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    h.coordinator.noteSpoken(SALMA, 'And me.', NOON)
+    expect(h.coordinator.open()[0]!.participants).toEqual([NADIA, OMAR, SALMA].sort())
+    for (let i = 0; i < 8 && h.coordinator.open()[0]?.participants.includes(SALMA); i++)
+      await play(h, NOON, 1)
+    expect(h.coordinator.open(), 'the talk goes on without her').toHaveLength(1)
+    expect(h.coordinator.open()[0]!.participants).toEqual([NADIA, OMAR].sort())
+    expect(memoriesOf(h, NADIA)).toContain('Salma said goodbye and left the talk.')
+  })
+
   it('walking out of earshot ends it once nobody is left, after the length of a doorway', async () => {
     const h = harness({})
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)

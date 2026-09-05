@@ -73,7 +73,7 @@ export function sceneWordUsual(voice: IdentityCore['voiceCard']): number {
 // one place that has to say so.
 export const SCENE_ANSWER = `Your turn to talk. Your hands are not doing anything right now, so this is not an act.
 
-Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
+Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true when you are leaving: say your goodbye in speech in the same answer, or leave speech empty to walk off without a word; the others remember which. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
 
 move says what this line is doing. tell: bring up something new, like news, a plan, or a thing you noticed. ask: a real question you want the answer to. joke: make light of it, even if the moment is not light. agree: you are with them. shift: change the subject. press: push your point. give_way: let them have it. deflect: dodge. tease: needle them. none: plain talk.
 

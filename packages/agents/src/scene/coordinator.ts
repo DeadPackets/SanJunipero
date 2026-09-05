@@ -393,11 +393,23 @@ export class SceneCoordinator {
     // earshot. Saying the line now would wake a sleeper with its own words.
     if (scene.closedTick !== null || !scene.participants.includes(agentId)) return
 
+    const said = turn.speech === null ? '' : sanitizeSpokenText(turn.speech)
+    // One mouth leaving takes itself out, not the whole talk: a goodbye is said and remembered as
+    // one, a leave without a word is remembered as walking off. r18 closed 52 of 92 talks here.
     if (turn.leave) {
-      await this.#close(scene, 'left', tick)
+      if (said.length > 0) {
+        void this.#bridge
+          .submit(agentId, { verb: 'speak', params: { text: said } })
+          .catch(this.#sink)
+        this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick, turn.stance)
+        this.#saidLately(agentId, said)
+        this.#noteGoodbye(scene, agentId, tick)
+      } else this.#noteWalkedOff(scene, agentId, tick)
+      this.#leaving.delete(agentId)
+      this.#part(scene, agentId, tick)
+      if (scene.participants.length < TALKERS_NEEDED) await this.#close(scene, 'left', tick)
       return
     }
-    const said = turn.speech === null ? '' : sanitizeSpokenText(turn.speech)
     // An answer given and an invitation put are both things done: a mouth that did one of them
     // and said nothing has not passed.
     const answered = this.#answer(scene, agentId, turn, tick)
@@ -439,15 +451,25 @@ export class SceneCoordinator {
   #gone(scene: Scene, agentId: string, tick: number): void {
     const chose = this.#leaving.get(agentId)
     this.#leaving.delete(agentId)
-    if (chose !== undefined && tick - chose <= WALK_OFF_WINDOW_TICKS) {
-      const name = this.#nameOf(agentId) ?? agentId
-      const others = scene.participants.filter((id) => id !== agentId)
-      for (const id of others)
-        this.#tell(id, `${name} walked off while you were still talking.`, 5, tick)
-      const them = others.map((id) => this.#nameOf(id) ?? id).join(' and ')
-      if (them.length > 0) this.#tell(agentId, `You walked off from ${them} mid-talk.`, 3, tick)
-    }
+    if (chose !== undefined && tick - chose <= WALK_OFF_WINDOW_TICKS)
+      this.#noteWalkedOff(scene, agentId, tick)
     this.#part(scene, agentId, tick)
+  }
+
+  #noteWalkedOff(scene: Scene, agentId: string, tick: number): void {
+    const name = this.#nameOf(agentId) ?? agentId
+    const others = scene.participants.filter((id) => id !== agentId)
+    for (const id of others)
+      this.#tell(id, `${name} walked off while you were still talking.`, 5, tick)
+    const them = others.map((id) => this.#nameOf(id) ?? id).join(' and ')
+    if (them.length > 0) this.#tell(agentId, `You walked off from ${them} mid-talk.`, 3, tick)
+  }
+
+  #noteGoodbye(scene: Scene, agentId: string, tick: number): void {
+    const name = this.#nameOf(agentId) ?? agentId
+    for (const id of scene.participants) {
+      if (id !== agentId) this.#tell(id, `${name} said goodbye and left the talk.`, 3, tick)
+    }
   }
 
   /** Every tick, once, whoever calls first: the ones who walked away or went to bed, and the
@@ -627,7 +649,9 @@ export class SceneCoordinator {
    *  same rule thins the audience. The floor moves off them the tick they lie down, so no scene
    *  waits on a sleeper. Presence lines are not speech, so they never become the ear. */
   #dropAbsent(scene: Scene, tick: number): void {
-    const spoke = scene.thread.filter((l) => l.presence === undefined)
+    const spoke = scene.thread.filter(
+      (l) => l.presence === undefined && scene.participants.includes(l.agentId),
+    )
     const ear = spoke[spoke.length - 1]?.agentId ?? scene.anchor
     const within = new Set([ear, ...this.#bridge.earshot(ear)])
     const here = (id: string): boolean => within.has(id) && this.#canTalk(id)
