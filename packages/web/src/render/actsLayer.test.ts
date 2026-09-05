@@ -84,7 +84,9 @@ function harness(view: Rect = WHOLE_WORLD): {
     getZoom: () => 1,
     wantsMotion: () => false,
     viewRect: () => view,
-    anchorOf: () => null, // the layer falls back to the record's tile, which is where a body IS
+    // no sprite built yet: the layer falls back to the record's tile. An INDOOR body is a
+    // different null — the character layer took its sprite down — and gets no chip at all.
+    anchorOf: () => null,
     tags: {
       occupied: () => [],
       setOccupied: (_owner: string, b: readonly Rect[]) => {
@@ -126,6 +128,27 @@ describe('a chip appears on the person doing the work', () => {
     const h = harness()
     h.set(body('nadia', { verb: 'walk', ticksRemaining: 12 }))
     h.noteStart('nadia', 'walk', 12)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(0)
+  })
+
+  it('★ says nothing about a person at work INSIDE a building', () => {
+    const h = harness()
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 30 }, { insideId: 'smithy' }))
+    h.noteStart('amara', 'forge', 30)
+    h.layer.tick()
+    expect(h.chips(), 'a chip over the roof has nobody under it').toHaveLength(0)
+    expect(h.occupied()).toEqual([])
+  })
+
+  it('★ takes the chip away when they carry the work indoors', () => {
+    const h = harness()
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 30 }))
+    h.noteStart('amara', 'forge', 30)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(1)
+
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 20 }, { insideId: 'smithy' }))
     h.layer.tick()
     expect(h.chips()).toHaveLength(0)
   })

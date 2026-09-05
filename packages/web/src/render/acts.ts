@@ -13,6 +13,7 @@ import {
 } from './textFaces.js'
 import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles } from './bubbles.js'
 import { tileToScreen } from './iso.js'
+import { rendersOnMap } from './characters.js'
 import { fadeArtIn } from './textures.js'
 import { stateWord, statusOf, type AgentView } from '../ui/status.js'
 import type { Rect } from './tooltip.js'
@@ -205,7 +206,9 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
           seed?.verb === act.verb ? seed.duration : undefined,
         )
         runs.set(a.id, run)
-        if (actShown(a, run, nowTick)) live.add(a.id)
+        // Indoors is off the map: the character layer has taken the body down, and a chip at
+        // the record's tile would hang over the roof they are under.
+        if (rendersOnMap(a) && actShown(a, run, nowTick)) live.add(a.id)
       }
       atWork = live
       for (const id of [...chips.keys()]) if (!live.has(id)) drop(id)

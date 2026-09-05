@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BUBBLE_FADE_MS,
   bubbleAlpha,
@@ -22,6 +22,7 @@ import {
   inViewSpeakers,
   placeBubbles,
   speakerWash,
+  createBubbleLayer,
   wrapBubble,
 } from './bubbles.js'
 import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
@@ -30,6 +31,9 @@ import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
 import { fateOfPriorLine, typedChars, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
+import { Container } from 'pixi.js'
+import type { Scene } from './scene.js'
+import type { WorldStore } from '../state/worldStore.js'
 
 // ★ D3 — 240 characters took 8.6s to type and died 13.1s in, leaving 4.5 seconds to read them:
 // 53 characters a second, where a person reads about 18. The window is bought, not left over.
@@ -523,5 +527,87 @@ describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
     expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeLessThan(1)
     expect(bubbleAlpha(0)).toBe(0)
     expect(bubbleAlpha(-40)).toBe(0)
+  })
+})
+
+// The layer, driven the way the ticker drives it. Pixi measures labels through
+// `document.createElement('canvas')` and these tests run with no DOM, so a label needs the
+// smallest stub that lets one build.
+describe('★ a mind under a roof is not on the map, and neither is what it says', () => {
+  beforeAll(() => {
+    if (typeof globalThis.document !== 'undefined') return
+    const ctx = {
+      font: '',
+      measureText: (t: string) => ({
+        width: t.length * 8,
+        actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: t.length * 8,
+        actualBoundingBoxAscent: 8,
+        actualBoundingBoxDescent: 2,
+      }),
+      fillText: () => {},
+      clearRect: () => {},
+      getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+      scale: () => {},
+      translate: () => {},
+      save: () => {},
+      restore: () => {},
+      setTransform: () => {},
+    }
+    const canvas = { width: 1, height: 1, getContext: () => ctx, style: {} }
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => canvas, body: { appendChild: () => {} } },
+    })
+    Object.defineProperty(globalThis, 'CanvasRenderingContext2D', {
+      configurable: true,
+      value: class {
+        letterSpacing = ''
+      },
+    })
+  })
+
+  function harness(): {
+    layer: ReturnType<typeof createBubbleLayer>
+    amara: { x: number; y: number; alive: boolean; insideId?: string }
+    said: () => Container[]
+  } {
+    const bubbleLayer = new Container()
+    const amara: { x: number; y: number; alive: boolean; insideId?: string } = {
+      x: 4,
+      y: 4,
+      alive: true,
+    }
+    const scene = {
+      layers: { bubbles: bubbleLayer },
+      textScale: 1,
+      getZoom: () => 1,
+      wantsMotion: () => false,
+      viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+      anchorOf: () => null,
+      tags: { occupied: () => [], setOccupied: () => {} },
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ agents: { amara } }),
+      assetRecords: () => [],
+    } as unknown as WorldStore
+    return { layer: createBubbleLayer(scene, store), amara, said: () => bubbleLayer.children }
+  }
+
+  it('★ a line spoken indoors is not drawn over the roof', () => {
+    const h = harness()
+    h.amara.insideId = 'smithy'
+    h.layer.spawnSpeech('amara', 'the iron is hot')
+    expect(h.said()).toHaveLength(0)
+  })
+
+  it('★ a line spoken outside leaves with the speaker when they step inside', () => {
+    const h = harness()
+    h.layer.spawnSpeech('amara', 'the iron is hot')
+    expect(h.said()).toHaveLength(1)
+
+    h.amara.insideId = 'smithy'
+    h.layer.tick(performance.now())
+    expect(h.said()).toHaveLength(0)
   })
 })

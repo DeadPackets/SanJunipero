@@ -3,6 +3,7 @@ import type { SimEvent } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { bodiesOf } from '../ui/stageCue.js'
 import { CHAR_TARGET_PX, EMOTE_KINDS, type EmoteKind } from './charAnim.js'
+import { rendersOnMap } from './characters.js'
 import { GLYPH_PX, SLOT_ABOVE_HEAD_PX, SLOT_PX } from './overhead.js'
 import { artOptional, type TextureBook } from './textures.js'
 import { worldTextScale } from './textFaces.js'
@@ -117,7 +118,7 @@ export function createMomentEmotes(
         const m = marks[i]!
         const at = emoteRise(nowMs - m.bornMs)
         const a = state?.agents[m.agentId]
-        if (at === null || a === undefined) {
+        if (at === null || a === undefined || !rendersOnMap(a)) {
           m.sprite.destroy()
           marks.splice(i, 1)
           continue
