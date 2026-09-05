@@ -39,6 +39,7 @@ services:
       - SJ_IDLE_PACING
       - SJ_IDLE_AFTER_MS
       - SJ_IDLE_SPEED
+      - SJ_NIGHT_FACTOR
       # Sim-minutes a mind waits between turns with nothing happening to it. Every call the town
       # makes scales roughly inversely with it, so this is the dial that trades money for life.
       - SJ_IDLE_GAP
