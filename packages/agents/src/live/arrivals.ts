@@ -50,7 +50,7 @@ export const needsArrival = (spec: MindSpec, db: Database.Database): boolean =>
 const arrivalTag = (seq: number): string => `event:${seq}`
 
 /** Idempotent by the arrival it was made from, so a boot after a crash writes it once. */
-export async function ensureArrival(
+async function ensureArrival(
   deps: { db: Database.Database; embedder: { embed(t: string): Promise<Float32Array> } },
   arrived: AgentArrivedPayload,
   at: { seq: number; tick: number },

@@ -11,24 +11,23 @@ import { createWorldStore, type WorldStore } from '../state/worldStore.js'
 const SRC = readFileSync(new URL('./SceneCard.tsx', import.meta.url), 'utf8')
 
 const N = 8
-const body = (id: string, name: string, x: number, y: number): AgentBody =>
-  ({
-    id,
-    name,
-    x,
-    y,
-    alive: true,
-    asleep: false,
-    needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
-    hp: 100,
-    injuries: [],
-    ill: false,
-    ageDays: 30 * DAYS_PER_YEAR,
-    skills: {},
-    activity: null,
-    collapsedSinceTick: null,
-    zeroHungerSinceTick: null,
-  }) as unknown as AgentBody
+const body = (id: string, name: string, x: number, y: number): AgentBody => ({
+  id,
+  name,
+  x,
+  y,
+  alive: true,
+  asleep: false,
+  needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
+  hp: 100,
+  injuries: [],
+  ill: false,
+  ageDays: 30 * DAYS_PER_YEAR,
+  skills: {},
+  activity: null,
+  collapsedSinceTick: null,
+  zeroHungerSinceTick: null,
+})
 
 const FIRE: Structure = {
   id: 'structure_fire_pit_3_3',
@@ -100,7 +99,7 @@ describe('★ the card a cut opens with: where the camera is, and who is in it',
   })
 
   it('★ never prints a machine id, a slug or a tile', () => {
-    for (const world of [WORLD, NOWHERE, { ...WORLD, agents: {} } as WorldState]) {
+    for (const world of [WORLD, NOWHERE, { ...WORLD, agents: {} }]) {
       const card = sceneCardOf(world, ['nadia', 'yusuf'], 'sc_1', scene())
       if (card === null) continue
       for (const text of [card.where, card.title ?? '']) {

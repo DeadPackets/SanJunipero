@@ -51,7 +51,7 @@ async function sheetOf(id: string): Promise<{ cell: (name: string) => RawImage }
 }
 
 /** The cell a candidate key is asking for. `master-*` is the pair; the rest are one figure. */
-function cellFor(key: string): string | 'pair' {
+function cellFor(key: string): string {
   if (key.startsWith('master-')) return 'pair'
   if (key.startsWith('sleep-')) return 'sleep-se'
   const [, , facing, ...rest] = key.split('-')

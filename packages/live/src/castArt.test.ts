@@ -115,8 +115,7 @@ describe('★ a face for a person the town made, out of the minds’ own wallet'
     // reply; `fetch` does not, and the picture it gets back is art that once passed these gates.
     const { cell } = await fixtureProvider('mira')
     fakeFetch = async (_url, init) => {
-      const prompt = (JSON.parse(String((init as { body: string }).body)) as { prompt: string })
-        .prompt
+      const prompt = (JSON.parse((init as { body: string }).body) as { prompt: string }).prompt
       bought.push(cellAsked(prompt))
       const png = prompt.includes('Exactly TWO figures')
         ? await pairPng(cell)

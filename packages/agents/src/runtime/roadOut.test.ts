@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import type Database from 'better-sqlite3'
 import { MockLanguageModelV4 } from 'ai/test'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
@@ -179,7 +178,7 @@ async function mind(opts: {
         await new Promise((r) => setImmediate(r))
       }
     },
-    db: db as Database.Database,
+    db: db,
   }
 }
 
@@ -232,7 +231,9 @@ describe('★ the road out is offered only where something stands behind it', ()
   it('names the partner who took it first, inside seven days and not past them', async () => {
     const near = await mind({
       day: 3,
-      before: (put) => partedAndGone(put, 2 * DAY),
+      before: (put) => {
+        partedAndGone(put, 2 * DAY)
+      },
     })
     try {
       expect(near.said).toContain('Amara went down the valley road')
@@ -241,7 +242,9 @@ describe('★ the road out is offered only where something stands behind it', ()
     }
     const far = await mind({
       day: 9,
-      before: (put) => partedAndGone(put, DAY),
+      before: (put) => {
+        partedAndGone(put, DAY)
+      },
     })
     try {
       expect(far.said).not.toContain('Amara went down the valley road')
@@ -251,13 +254,23 @@ describe('★ the road out is offered only where something stands behind it', ()
   })
 
   it('says it after three breaches the town watched, and not after two', async () => {
-    const three = await mind({ day: 2, before: (put) => breach(put, DAY, 3) })
+    const three = await mind({
+      day: 2,
+      before: (put) => {
+        breach(put, DAY, 3)
+      },
+    })
     try {
       expect(three.said).toContain('times now the town has watched you')
     } finally {
       three.stop()
     }
-    const two = await mind({ day: 2, before: (put) => breach(put, DAY, 2) })
+    const two = await mind({
+      day: 2,
+      before: (put) => {
+        breach(put, DAY, 2)
+      },
+    })
     try {
       expect(two.said).not.toContain('times now the town has watched you')
     } finally {

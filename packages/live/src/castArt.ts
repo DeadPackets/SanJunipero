@@ -61,7 +61,10 @@ export function watchCastArt(deps: {
     const mine: Promise<unknown> = queue
       .then(async () => {
         // Read inside the queue, not when the person walked in: the person ahead has spent by now.
-        if (deps.artSpendableUsd() <= 0) return give()
+        if (deps.artSpendableUsd() <= 0) {
+          give()
+          return
+        }
         await deps.draw(p)
       })
       .catch((err: unknown) => {
