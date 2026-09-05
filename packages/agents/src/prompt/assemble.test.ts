@@ -1340,6 +1340,14 @@ describe('the hours a body keeps', () => {
     expect(system).toContain('Hours: up around 5, abed by 20.')
     expect(assemblePrompt({ ...base, identity }).system).toBe(system)
   })
+
+  it('calls the turn of the day midnight, not an hour that is not on the clock', () => {
+    const base = fixtureBlocks()
+    const identity = { ...base.identity, hours: { rise: 9, bed: 24 } }
+    expect(assemblePrompt({ ...base, identity }).system).toContain(
+      'Hours: up around 9, abed by midnight.',
+    )
+  })
 })
 
 describe('blockTokens', () => {

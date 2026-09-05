@@ -97,6 +97,8 @@ const JOURNAL_MAX_CHARS = 1200
  *  rut four turns wide, and a page of them is the mind talking to itself instead of to the town. */
 export const OWN_WORDS_SHOWN = 4
 
+const hourWord = (h: number): string => (h % 24 === 0 ? 'midnight' : String(h))
+
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard
   const hands = ownSkillWords(id.skills ?? {})
@@ -108,7 +110,7 @@ function renderIdentity(id: IdentityCore): string {
     ...(hands.length === 0 ? [] : [`Your hands: ${hands.join('; ')}.`]),
     ...(id.hours === undefined
       ? []
-      : [`Hours: up around ${id.hours.rise}, abed by ${id.hours.bed}.`]),
+      : [`Hours: up around ${id.hours.rise}, abed by ${hourWord(id.hours.bed)}.`]),
     `Voice: ${v.register} ${v.rhythm}`,
     `Habits: ${v.tics.join('; ')}`,
     `Never says: ${v.neverSays.join('; ')}`,
