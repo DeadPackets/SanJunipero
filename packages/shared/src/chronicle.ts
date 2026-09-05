@@ -15,9 +15,12 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   partnership_formed: 16,
   world_grown: 15,
   partnership_dissolved: 15,
+  // The only entry made of what people said to each other: the summary IS the line.
+  scene_closed: 14,
   law_repealed: 13,
   grave_placed: 12,
   invitation_accepted: 12,
+  agent_spawned: 12,
   structure_completed: 10,
   invitation_refused: 10,
   fire_ignited: 9,
@@ -42,6 +45,8 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
 
 export const CHRONICLE_ICONS: Record<string, string> = {
   agent_died: 'cross',
+  scene_closed: 'spark',
+  agent_spawned: 'star',
   discovery_made: 'key',
   agent_born: 'spark',
   law_proposed: 'quill',
@@ -108,13 +113,11 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_exited',
   'agent_aged',
   'agent_collapsed',
-  'agent_spawned',
   'agent_spoke',
   'agent_conceived',
-  // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.
+  // A scene reaches the chronicle as the summary it closed on; the bookkeeping around it does not.
   'scene_opened',
   'scene_line',
-  'scene_closed',
   // The mind already remembers letting go; the feed does not need to watch it happen.
   'tie_let_go',
   // Superseded by the mortality events above, which say the same things better.
@@ -180,7 +183,10 @@ export const CHRONICLE_CAST_MAX = 4
  *  a person, so a new event type is covered without a second list of payload keys to maintain. */
 export function chronicleCast(ev: SimEvent, isAgent: (id: string) => boolean): string[] {
   const out: string[] = []
-  for (const v of Object.values(ev.payload as Record<string, unknown>)) {
+  const p = ev.payload as Record<string, unknown>
+  // A scene keeps its cast in one list; every other line names its people a key at a time.
+  const named = Array.isArray(p.participants) ? p.participants : Object.values(p)
+  for (const v of named) {
     if (typeof v !== 'string' || out.includes(v) || !isAgent(v)) continue
     out.push(v)
     if (out.length === CHRONICLE_CAST_MAX) break
@@ -299,6 +305,14 @@ function invitationLine(type: string, verb: string, asker: string, invitee: stri
   return verb === 'propose' ? `${invitee} refused ${asker} a life together.` : null
 }
 
+/** A reason is a thing somebody said, not a paragraph; past this the feed is a transcript. */
+export const SAYING_MAX = 120
+
+function clipSaying(saying: string): string {
+  const said = saying.trim()
+  return said.length <= SAYING_MAX ? said : `${said.slice(0, SAYING_MAX - 1).trimEnd()}…`
+}
+
 // Human-framed, one sentence, never mechanics. null means "this type has no line yet",
 // which is how a future event type stays harmless.
 export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | null {
@@ -354,19 +368,29 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const forWhom = typeof p.targetId === 'string' ? ` for ${look.agentName(p.targetId)}` : ''
       return verb === '' ? null : `${who} ${witness} to ${verb}${forWhom}.`
     }
-    // Who and what, never the words they used: the intent is free text a mind wrote. The archive
-    // keeps the quote (gateway /api/discoveries), and no agent can reach the archive.
+    // Who, what, and the reason in the words it was said in. The `intent` — the free text the
+    // mind wrote to the court — stays out; the archive keeps that (gateway /api/discoveries).
     case 'discovery_made': {
       const name = str(p.name)
       const kind = str(p.kind)
       if (name === '' || (kind !== 'craft' && kind !== 'word')) return null
       const who = look.agentName(str(p.byId))
-      return kind === 'word'
-        ? `${who} gave the town a word for it — ${name}.`
-        : `${who} found the way of it — ${name}.`
+      const line =
+        kind === 'word'
+          ? `${who} gave the town a word for it — ${name}.`
+          : `${who} found the way of it — ${name}.`
+      const saying = clipSaying(str(p.saying))
+      return saying === '' ? line : `${line} “${saying}”`
     }
     case 'agent_born':
       return `${str(p.name)} was born.`
+    // The founding is nobody's arrival: the town began with them. Anybody after it walked in.
+    case 'agent_spawned':
+      return ev.tick === 0 ? null : `${look.agentName(str(p.id))} came to the town.`
+    case 'scene_closed': {
+      const summary = str(p.summary).trim()
+      return summary === '' ? null : summary
+    }
     case 'co_slept':
       return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} kept house together.`
     case 'invited':
