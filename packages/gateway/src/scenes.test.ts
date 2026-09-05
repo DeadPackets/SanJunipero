@@ -53,7 +53,7 @@ describe('the scene frame', () => {
       id: OPENED.id,
       summary: 's',
       deltas: [],
-      closeReason: 'night',
+      closeReason: 'ended',
     })
     expect(relay([close])).toEqual([])
     relay([ev('scene_opened', OPENED)])
