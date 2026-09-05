@@ -67,6 +67,11 @@ export const CHRONICLE_ICONS: Record<string, string> = {
 // Every type the fold knows is either weighted above or named here on purpose, so a future event
 // cannot be silently dropped. Routine bodily and housekeeping acts stay out of the feed.
 export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
+  // The town's laws are folded now and told nowhere yet; the laws surface lane gives them lines.
+  'law_proposed',
+  'law_ratified',
+  'law_broken',
+  'law_repealed',
   // The quiet acts, named one by one (addendum §12).
   // A chase re-aims at whoever it follows every tick it runs: the walk is the story, not the
   // legs correcting themselves inside it.
