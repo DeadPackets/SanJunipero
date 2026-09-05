@@ -23,7 +23,7 @@ export type Forge = {
   onAssetReady(cb: (rec: AssetRecord) => void): void
 }
 
-/** The codex `attempts` column accepts 1..3, so the eye never gets a longer leash than that. */
+/** The codex `attempts` column accepts 1..3, and ForgeConfig's maxRetries is bounded to match. */
 const MAX_ATTEMPTS = 3
 /** Separate from the eye's retries: a generation the chain cannot cut is worth one more roll. */
 const DRAW_TRIES = 2
@@ -34,14 +34,7 @@ export function createForge(deps: {
   codex: AssetCodex
   refs: Buffer[]
 }): Forge {
-  const asked = loadForgeConfig()
-  const config: ForgeConfig = {
-    ...asked,
-    visionQa: {
-      ...asked.visionQa,
-      maxRetries: Math.min(asked.visionQa.maxRetries, MAX_ATTEMPTS - 1),
-    },
-  }
+  const config: ForgeConfig = loadForgeConfig()
 
   async function commission(
     desc: string,
