@@ -154,6 +154,9 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'item_qty_changed',
   'item_text_changed',
   'item_taken',
+  // The eating and the stoking are already in the feed; who to thank for the loaf is the
+  // maker's news, not the paper's.
+  'item_used_by_another',
   // What a minted verb leaves behind is the town's to read off the thing, not the record's.
   'marked',
   'place_named',

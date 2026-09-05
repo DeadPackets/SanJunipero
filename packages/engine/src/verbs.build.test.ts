@@ -397,7 +397,14 @@ describe('verb: craft', () => {
     })
     expect(t.events).toContainEqual({
       type: 'item_spawned',
-      payload: { id: 'item_2', kind: 'plank', qty: 2, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
+      payload: {
+        id: 'item_2',
+        kind: 'plank',
+        qty: 2,
+        loc: { t: 'agent', id: 'a1' },
+        owner: 'a1',
+        madeBy: 'a1',
+      },
     })
     expect(t.events).toContainEqual({
       type: 'skill_gained',

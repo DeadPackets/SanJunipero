@@ -28,6 +28,7 @@ export const FED_BY = {
   taught: 'esteem',
   praised: 'esteem',
   discovery_credit: 'esteem',
+  relied_on: 'esteem',
   new_place: 'curiosity',
   discovery_witnessed: 'curiosity',
   slight: 'rivalry',
@@ -74,6 +75,7 @@ export function occasionsInPacket(packet: PerceptionPacket, selfName: string): W
     if (s.kind === 'law_broken' && !s.self) found.add('law_broken')
   }
   if (packet.feltEvents.includes('you_were_attacked')) found.add('slight')
+  if (packet.feltEvents.some((e) => e.startsWith('your_work_used_'))) found.add('relied_on')
   return [...found]
 }
 

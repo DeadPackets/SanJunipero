@@ -88,6 +88,7 @@ export const ItemSpawned = z
     loc: ItemLoc,
     text: z.string().optional(),
     owner: z.string().optional(),
+    madeBy: z.string().optional(),
     crafterMark: z.string().optional(),
     spoilage: z.object({ spawnDay: z.number(), days: z.number() }).strict().optional(),
     durability: z.number().int().positive().optional(),
@@ -112,6 +113,17 @@ export const ItemTaken = z
     ownerId: z.string(),
     x: z.number(),
     y: z.number(),
+  })
+  .strict()
+// Somebody put to use what another pair of hands made. Folds to nothing: it exists so the maker
+// hears about it, and the maker is `madeBy`, not `agentId`.
+export const ItemUsedByAnother = z
+  .object({
+    agentId: z.string(),
+    itemId: z.string(),
+    kind: z.string(),
+    madeBy: z.string(),
+    how: z.enum(['ate', 'drank', 'burned']),
   })
   .strict()
 // Clothing. One slot in v1, and the slot rides the event so a second one costs a schema

@@ -92,6 +92,7 @@ describe('verb: fish', () => {
         qty: 1,
         loc: { t: 'agent', id: 'a1' },
         owner: 'a1',
+        madeBy: 'a1',
         spoilage: { spawnDay: 0, days: 2 },
       },
     })
@@ -163,6 +164,7 @@ describe('verb: forage', () => {
         qty: 2,
         loc: { t: 'agent', id: 'a1' },
         owner: 'a1',
+        madeBy: 'a1',
         spoilage: { spawnDay: 0, days: 3 },
       },
     })
