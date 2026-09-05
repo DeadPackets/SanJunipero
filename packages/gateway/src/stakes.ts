@@ -121,6 +121,8 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 const BODY_TERM_OF_TYPE: Readonly<Record<string, StakeTerm>> = {
   agent_died: 'agent_died',
   agent_born: 'agent_born',
+  agent_arrived: 'agent_arrived',
+  agent_departed: 'agent_departed',
   partnership_formed: 'partnership_formed',
   partnership_dissolved: 'partnership_dissolved',
   law_ratified: 'law_ratified',
@@ -346,12 +348,17 @@ export function makeDirector(
         return
       }
       case 'agent_died':
+      case 'agent_departed':
       case 'law_broken':
       case 'law_repealed':
         payEvent([str(p.agentId) ?? ''], BODY_TERM_OF_TYPE[ev.type]!, ev.tick)
         return
       case 'discovery_made':
         payEvent([str(p.byId) ?? ''], 'discovery_made', ev.tick)
+        return
+      // A stranger's own id: the body has no roster row until the fold makes one.
+      case 'agent_arrived':
+        payEvent([str(p.id) ?? ''], 'agent_arrived', ev.tick)
         return
       case 'agent_born':
         payEvent([str(p.motherId) ?? '', str(p.fatherId) ?? ''], 'agent_born', ev.tick)

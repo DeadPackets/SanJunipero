@@ -12,7 +12,11 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   discovery_made: 19,
   agent_born: 18,
   law_ratified: 17,
+  // The road, both ways: a stranger walking in is news the founding never was, and somebody
+  // choosing to walk out is the one departure the town watches happen.
+  agent_arrived: 16,
   partnership_formed: 16,
+  agent_departed: 15,
   world_grown: 15,
   partnership_dissolved: 15,
   // The only entry made of what people said to each other: the summary IS the line.
@@ -49,6 +53,8 @@ export const CHRONICLE_ICONS: Record<string, string> = {
   agent_spawned: 'star',
   discovery_made: 'key',
   agent_born: 'spark',
+  agent_arrived: 'star',
+  agent_departed: 'flame',
   law_proposed: 'quill',
   law_ratified: 'quill',
   law_broken: 'flame',
@@ -396,6 +402,11 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const summary = str(p.summary).trim()
       return summary === '' ? null : summary
     }
+    // The arrival carries its own name: the body is a stranger, so the roster has nobody to look up.
+    case 'agent_arrived':
+      return str(p.name) === '' ? null : `${str(p.name)} came up the valley road.`
+    case 'agent_departed':
+      return `${look.agentName(str(p.agentId))} went down the valley road.`
     case 'co_slept':
       return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} kept house together.`
     case 'invited':

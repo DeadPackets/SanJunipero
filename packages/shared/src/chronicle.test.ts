@@ -738,6 +738,8 @@ describe('every weighted type has words to print', () => {
     grave_placed: { name: 'Rahel' },
     invitation_accepted: { byId: 'a1', agentId: 'a2', verb: 'court' },
     agent_spawned: { id: 'a1', name: 'Rahel' },
+    agent_arrived: { id: 'a9', name: 'Mira' },
+    agent_departed: { agentId: 'a1' },
     structure_completed: { id: 's1' },
     invitation_refused: { byId: 'a1', agentId: 'a2', verb: 'propose' },
     fire_ignited: { structureId: 's1' },
@@ -766,5 +768,46 @@ describe('every weighted type has words to print', () => {
       expect(line, `${type} has no line`).not.toBeNull()
       expect(line, type).not.toMatch(/\ba[0-9]\b|_/)
     }
+  })
+})
+
+// Payload shapes from the arrivals design §2; the zod schemas land with the engine's own lane.
+describe('the road, both ways', () => {
+  const arrived = ev('agent_arrived', {
+    id: 'a9',
+    name: 'Mira',
+    sex: 'f',
+    ageDays: 11_315,
+    x: 65,
+    y: 127,
+  })
+  const departed = ev('agent_departed', { agentId: 'a1' })
+
+  it('says who came up the road and who went down it', () => {
+    expect(chronicleLine(arrived, look)).toBe('Mira came up the valley road.')
+    expect(chronicleLine(departed, look)).toBe('Rahel went down the valley road.')
+  })
+
+  it('names the arrival off its own payload, because the roster has no stranger in it', () => {
+    // `a9` is nobody `look` knows; the line still reads as a person, not as an id.
+    expect(chronicleLine(arrived, look)).not.toContain('a9')
+    expect(chronicleLine(ev('agent_arrived', { id: 'a9' }), look)).toBeNull()
+  })
+
+  it('marks an arrival like a star and a leaving like a flame', () => {
+    expect(chronicleIcon('agent_arrived')).toBe('star')
+    expect(chronicleIcon('agent_departed')).toBe('flame')
+  })
+
+  it('weighs an arrival above a leaving, and both under a death', () => {
+    expect(CHRONICLE_WEIGHTS.agent_arrived!).toBeGreaterThan(CHRONICLE_WEIGHTS.agent_departed!)
+    expect(CHRONICLE_WEIGHTS.agent_departed!).toBeGreaterThan(CHRONICLE_WEIGHTS.law_broken!)
+    expect(CHRONICLE_WEIGHTS.agent_arrived!).toBeLessThan(CHRONICLE_WEIGHTS.agent_died!)
+  })
+
+  it('frames the two people it is about', () => {
+    const isAgent = (id: string): boolean => id === 'a1' || id === 'a9'
+    expect(chronicleCast(arrived, isAgent)).toEqual(['a9'])
+    expect(chronicleCast(departed, isAgent)).toEqual(['a1'])
   })
 })

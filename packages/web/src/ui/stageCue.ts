@@ -11,9 +11,9 @@ export const CUE_HOLD_MS = 6000
 /** The glyph is 8×8 drawn at two screen pixels a drawn one, like every pixel mark in the sheet. */
 export const CUE_ICON_PX = 16
 
-/** A person appearing who was not born here. `chronicleLine` leaves `agent_spawned` out — the
- *  founding is not news to the town — but a replay of the day somebody walked in is exactly that. */
-const ARRIVAL_TYPE = 'agent_spawned'
+/** A person coming up the valley road. The founding (`agent_spawned`) is not news to the town;
+ *  the day a stranger walks in is. */
+const ARRIVAL_TYPE = 'agent_arrived'
 
 /** Everything the stage says out loud. A custom is missing on purpose: the arbiter keeps customs
  *  as rows and emits no event for one, so nothing reaches this slot to print (see the report). */
@@ -29,6 +29,7 @@ export const CUE_TYPES: readonly string[] = [
   'partnership_formed',
   'partnership_dissolved',
   ARRIVAL_TYPE,
+  'agent_departed',
   'law_proposed',
   'law_ratified',
   'law_broken',
@@ -58,11 +59,6 @@ export function bodiesOf(ev: SimEvent): string[] {
 export function cueFor(ev: SimEvent, state: Parameters<typeof chronicleLabel>[1]): StageCue | null {
   if (!CUE_TYPES.includes(ev.type)) return null
   const bodies = bodiesOf(ev)
-  if (ev.type === ARRIVAL_TYPE) {
-    const name = (ev.payload as { name?: unknown }).name
-    if (typeof name !== 'string' || name === '') return null
-    return { text: `${name} came to the town.`, icon: 'star', bodies }
-  }
   const text = chronicleLabel(ev, state)
   return text === null ? null : { text, icon: chronicleIcon(ev.type), bodies }
 }

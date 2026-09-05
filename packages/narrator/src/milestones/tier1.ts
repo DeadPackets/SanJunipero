@@ -271,6 +271,22 @@ export const TIER1_DEFS: MilestoneDef[] = [
     agentIds: one('id'),
   },
   {
+    kind: 'first_arrival',
+    label: 'the first stranger to come up the valley road',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'agent_arrived',
+    agentIds: one('id'),
+  },
+  {
+    kind: 'first_leaving',
+    label: 'the first to go down the valley road for good',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'agent_departed',
+    agentIds: one('agentId'),
+  },
+  {
     kind: 'first_grave',
     label: 'the first stone set for the dead',
     tier: 1,

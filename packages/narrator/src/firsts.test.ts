@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
-import { detectFirsts } from './firsts.js'
+import { detectFirsts, populationDelta } from './firsts.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
@@ -122,5 +122,44 @@ describe('detectFirsts', () => {
     expect(
       detectFirsts(speechAndTrade, { seenKinds: store.milestoneKinds(), rulebookCount: 0 }),
     ).toEqual([])
+  })
+})
+
+// Payload shapes from the arrivals design §2; the engine's own lane lands the zod schemas.
+describe('the valley road counts both ways', () => {
+  const arrived = ev(1, 600, 'agent_arrived', {
+    id: 'mira',
+    name: 'Mira',
+    sex: 'f',
+    ageDays: 11_315,
+    x: 65,
+    y: 127,
+  })
+  const departed = ev(2, 700, 'agent_departed', { agentId: 'reza' })
+
+  it('adds the person the road brought and takes away the one it took', () => {
+    expect(populationDelta(arrived)).toBe(1)
+    expect(populationDelta(departed)).toBe(-1)
+  })
+
+  it('fires the first coming and the first going once each, naming the body', () => {
+    const firsts = detectFirsts([arrived, arrived, departed, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })
+    expect(firsts.filter((m) => m.kind === 'first_arrival')).toHaveLength(1)
+    expect(firsts.filter((m) => m.kind === 'first_leaving')).toHaveLength(1)
+    expect(firsts.find((m) => m.kind === 'first_arrival')?.agentIds).toEqual(['mira'])
+    expect(firsts.find((m) => m.kind === 'first_leaving')?.agentIds).toEqual(['reza'])
+  })
+
+  it('and neither label names a number or a machine', () => {
+    for (const m of detectFirsts([arrived, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })) {
+      expect(m.label).not.toMatch(/\d/)
+      expect(m.label).not.toMatch(/\b(agent|id|event|model)\b/i)
+    }
   })
 })

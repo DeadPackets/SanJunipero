@@ -8,7 +8,7 @@ import { SpendLedger } from '../src/spendLedger.js'
 import { listCommittedCast } from '../src/castArt.js'
 import { decodePng, type RawImage } from '../src/post/raw.js'
 import { makeVisionJudge } from '../src/visionQa/visionJudge.js'
-import { CAST_V5 } from './cast-v5.js'
+import { CAST_V5 } from '../src/castLooks.js'
 import { scratch } from './scratch.js'
 
 const KEY = process.env.OPENROUTER_API_KEY

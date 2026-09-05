@@ -49,12 +49,14 @@ export const CHRONICLE_MAX = 200
 /** The record grows one row a day forever and every open panel refetches it. */
 const DISPATCH_MAX = 30
 
-/** The five things the world's own log records that the town would remember. Anything else is
- *  the everyday, and a scrub bar covered in the everyday points nowhere. */
+/** The six things the world's own log records that the town would remember. Anything else is
+ *  the everyday, and a scrub bar covered in the everyday points nowhere. The founding is not one
+ *  of them — `agent_spawned` is the town starting, not a day anybody would scrub back to. */
 const MARK_EVENT_TYPES: readonly string[] = [
   'agent_died',
   'agent_born',
-  'agent_spawned',
+  'agent_arrived',
+  'agent_departed',
   'agent_injured',
   'structure_completed',
 ]

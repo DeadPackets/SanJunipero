@@ -47,7 +47,8 @@ const MATURE = {
     { tick: 2 * DAY + 900, type: 'agent_injured' },
     { tick: 3 * DAY + 30, type: 'agent_died' },
     { tick: 4 * DAY + 200, type: 'agent_born' },
-    { tick: 0, type: 'agent_spawned' },
+    { tick: 0, type: 'agent_arrived' },
+    { tick: 5 * DAY + 200, type: 'agent_departed' },
     { tick: 5 * DAY, type: 'agent_moved' }, // noise: nothing the town would remember
   ],
   discoveries: [{ tick: 2 * DAY + 400, words: 'Maret worked out stitch a waterskin' }],

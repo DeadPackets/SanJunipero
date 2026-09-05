@@ -450,13 +450,12 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
       events: { tick: number; type: string }[]
     }
     expect(body.events).toEqual([
-      { tick: 1, type: 'agent_spawned' },
-      { tick: 1, type: 'agent_spawned' },
-      { tick: 1, type: 'agent_spawned' },
       { tick: 20, type: 'structure_completed' },
       { tick: 50, type: 'agent_died' },
     ])
+    // The founding is the town starting, not a day anybody would scrub back to; the road is.
     for (const noise of [
+      'agent_spawned',
       'agent_spoke',
       'agent_moved',
       'structure_planned',
