@@ -45,7 +45,15 @@ vi.mock('pixi.js', () => {
     }
   }
   class ColorMatrixFilter {
-    matrix: number[] = []
+    static writes = 0
+    #m: number[] = []
+    get matrix(): number[] {
+      return this.#m
+    }
+    set matrix(v: number[]) {
+      ColorMatrixFilter.writes++
+      this.#m = v
+    }
   }
   return { ColorMatrixFilter, Container, Graphics, Point, Sprite, Texture: { WHITE: {} } }
 })
@@ -133,6 +141,22 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     const src = readFileSync(new URL('./atmosphere.ts', import.meta.url), 'utf8')
     expect(src).not.toContain('scene.world.filters')
     expect(src).not.toContain('ticker.add') // the tint is computed once a frame, by `update`
+  })
+
+  // ★ `update` runs once a frame. The matrix is a pure function of the weather kind, and
+  // assigning it dirties the filter's uniform group — an 80-byte re-upload at 60 fps.
+  it('★ writes the grading matrix when the weather changes, not on every frame', async () => {
+    const { ColorMatrixFilter } = (await import('pixi.js')) as unknown as {
+      ColorMatrixFilter: { writes: number }
+    }
+    const { atm, state } = drive()
+    atm.update(state(720, 'rain'))
+    const written = ColorMatrixFilter.writes
+    for (let i = 1; i <= 30; i++) atm.update(state(720 + i, 'rain'))
+    expect(ColorMatrixFilter.writes, 'a frame of rain is not new weather').toBe(written)
+
+    atm.update(state(760, 'storm'))
+    expect(ColorMatrixFilter.writes).toBe(written + 1)
   })
 
   it('tints the quad from the clock and the sky from the quad', () => {
