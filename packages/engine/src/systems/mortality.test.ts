@@ -392,6 +392,19 @@ describe('a grave where the life ended', () => {
     expect({ x: g.x, y: g.y }).toEqual({ x: 3, y: 3 })
   })
 
+  it('is never cut into the way itself: a body that falls on the road is buried beside it', () => {
+    const paved = map()
+    for (let y = 0; y < paved.length; y++) paved[y]![2] = 7
+    paved[4]![3] = 8
+    const s = fold(
+      genesisState(CFG, paved),
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 4, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
+    const at = graveTile(s, 2, 4)!
+    expect(paved[at.y]![at.x]).toBe(0)
+  })
+
   it('places none when the world says graves are off, and buries the old just the same', () => {
     const off = tickOnce(nearlyDead(afflict(body(NO_GRAVE), 'illness', 2, 0)), NO_GRAVE)
     expect(off.events.map((e) => e.type)).not.toContain('grave_placed')

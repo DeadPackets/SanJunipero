@@ -1,6 +1,6 @@
 import { mintId, thirstOf, type WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
-import type { SimConfig } from '@sj/shared'
+import { isTravelled, type SimConfig } from '@sj/shared'
 import { perimeter } from '../interiors.js'
 import { bridgeAt, isPassable, type Point } from '../path.js'
 
@@ -119,10 +119,10 @@ export function graveTile(state: WorldState, x: number, y: number): Point | null
   return null
 }
 
-// A stone goes IN the ground, and a bridge deck is not ground: `isPassable` says yes to a deck,
-// and `grave_placed` throws on a stone that overlaps the bridge under it.
+// A stone goes IN the ground and never closes the way: `isPassable` says yes to a bridge deck,
+// and a grave in the street would block it exactly as `roadBlockRefusal` says a post would.
 const buriable = (state: WorldState, x: number, y: number): boolean =>
-  isPassable(state, x, y) && !bridgeAt(state, x, y)
+  isPassable(state, x, y) && !bridgeAt(state, x, y) && !isTravelled(state.terrain[y]![x]!)
 
 // Death would otherwise strand held items: drop them on the death tile first.
 export function dropHeldItems(ctx: TickCtx, agentId: string): void {
