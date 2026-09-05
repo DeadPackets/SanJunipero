@@ -1,48 +1,37 @@
-import type { HeatWindow } from '@sj/shared'
+import { sceneCast } from '../render/sceneFraming.js'
+import type { StakeScore } from '../state/worldStore.js'
 
 export const CUT_MIN_MS = 8000 // never cut faster — letterboxed TV pacing
-const RECENT_TICKS = 120
-export const STICKY_FACTOR = 1.25
 
-// hottest window overlapping [nowTick−120, nowTick]; sticky toward the current agent
-export function pickCut(
-  heat: HeatWindow[],
-  currentAgent: string | null,
-  nowTick: number,
-): string | null {
-  const recent = heat.filter((w) => w.toTick >= nowTick - RECENT_TICKS && w.fromTick <= nowTick)
-  if (recent.length === 0) return null
-
-  const best = new Map<string, number>() // agentId → best recent score
-  for (const w of recent) best.set(w.agentId, Math.max(best.get(w.agentId) ?? 0, w.score))
-
-  let hottest: string | null = null
-  let hottestScore = -1
-  for (const [agentId, score] of [...best.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (score > hottestScore) {
-      hottest = agentId
-      hottestScore = score
-    }
-  }
-
-  const currentScore = currentAgent !== null ? best.get(currentAgent) : undefined
-  if (currentAgent !== null && currentScore !== undefined && hottest !== currentAgent) {
-    return hottestScore >= currentScore * STICKY_FACTOR ? hottest : currentAgent
-  }
-  return hottest
-}
-
-/** One turn of the quiet round, matching the gateway's own 60-tick heat window so a cut and a
- *  turn are the same length of town time. `CUT_MIN_MS` still gates how fast either can land. */
+/** One turn of the quiet round, matching the gateway's own scoring window so a cut and a turn
+ *  are the same length of town time. `CUT_MIN_MS` still gates how fast either can land. */
 export const QUIET_TURN_TICKS = 60
 
-/** `pickCut` answers null when nothing has scored — right for a lens a person is steering, an
- *  empty frame for an unattended stream. The round turns over one heat window at a time, so the
- *  caption always has a name in it. */
+/** The gateway answers null when nothing has scored — right for a lens a person is steering, an
+ *  empty frame for an unattended stream. The round turns one window at a time, so the caption
+ *  always has a name in it. */
 export function quietSubject(people: readonly string[], nowTick: number): string | null {
   if (people.length === 0) return null
   const tick = Number.isFinite(nowTick) ? Math.max(0, nowTick) : 0
   return people[Math.floor(tick / QUIET_TURN_TICKS) % people.length]!
+}
+
+/** Every living body asleep — the town's own night, not the clock's, so a mind still up at
+ *  02:00 keeps the camera. Written without an allocation: it runs on the store's notify, which
+ *  is once an animation frame while the town moves. */
+export function townAsleep(
+  agents: Readonly<Record<string, { alive: boolean; asleep: boolean }>> | undefined,
+): boolean {
+  if (agents === undefined) return false
+  let living = 0
+  for (const id in agents) {
+    if (!Object.hasOwn(agents, id)) continue
+    const a = agents[id]
+    if (a?.alive !== true) continue
+    living++
+    if (!a.asleep) return false
+  }
+  return living > 0
 }
 
 /** ★ A MIND INDOORS IS AN EMPTY STREET. The exterior view does not draw interiors, so cutting to
@@ -50,17 +39,44 @@ export function quietSubject(people: readonly string[], nowTick: number): string
  *  outside is a reason to HOLD the shot, never to cut to nobody. */
 const NOBODY_INSIDE: ReadonlySet<string> = new Set()
 
-/** Who the camera is on: the hottest agent, or — when the town is quiet — one of its people.
- *  Heat is scored for whatever acted, the scripted runner included; only a body the exterior
- *  view actually draws can be followed. */
-export function subjectFor(
-  heat: HeatWindow[],
-  currentAgent: string | null,
-  nowTick: number,
-  people: readonly string[],
+/** Who the camera answers to, closest claim first. A viewer who asked to follow somebody always
+ *  wins: automation never overrules a hand on the lens. Below that a replayed moment is ABOUT
+ *  its cast, a sleeping town is a picture of a sleeping town, and then the gateway's own cut. */
+export type CameraClaim =
+  | { by: 'pinned'; agentId: string }
+  | { by: 'moment'; cast: readonly string[] }
+  /** the gateway's cut: the people the shot is scored FOR, framed together */
+  | { by: 'cut'; cast: readonly string[] }
+  /** nothing scored: one face at a time, so an unattended stream is never empty */
+  | { by: 'round'; agentId: string }
+  /** a claim the map cannot show: the director stands down, and the shot HOLDS */
+  | { by: 'hold' }
+  | { by: 'town' }
+
+export function cameraClaim(
+  pinned: string | null,
+  moment: readonly string[],
   indoors: ReadonlySet<string> = NOBODY_INSIDE,
-): string | null {
-  const outdoors = people.filter((id) => !indoors.has(id))
-  const embodied = heat.filter((w) => outdoors.includes(w.agentId))
-  return pickCut(embodied, currentAgent, nowTick) ?? quietSubject(outdoors, nowTick)
+  director: { readonly cut: StakeScore | null; readonly quiet?: boolean } | null = null,
+  asleep = false,
+  roundSubject: string | null = null,
+): CameraClaim {
+  if (pinned !== null) return { by: 'pinned', agentId: pinned }
+  // A moment whose cast is all indoors HOLDS rather than handing the camera to a gateway that
+  // is scoring the live tick, not this one.
+  if (moment.length > 0) {
+    const played = sceneCast(moment, indoors)
+    return played.length === 0 ? { by: 'hold' } : { by: 'moment', cast: played }
+  }
+  // The sleep card says the town is asleep; cutting to a body under it would call it a liar.
+  if (asleep) return { by: 'town' }
+  const cut = director?.cut ?? null
+  if (cut !== null) {
+    const cast = sceneCast(cut.agentIds, indoors)
+    return cast.length === 0 ? { by: 'hold' } : { by: 'cut', cast }
+  }
+  // The beat after a peak is a HELD shot: the round may not turn under it, and a cast that has
+  // walked indoors mid-beat is not a reason to go looking for somebody else either.
+  if (director?.quiet === true) return { by: 'hold' }
+  return roundSubject === null ? { by: 'town' } : { by: 'round', agentId: roundSubject }
 }

@@ -1,16 +1,13 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { AgentBody } from '@sj/engine/state'
-import type { WorldStore } from '../state/worldStore.js'
+import type { StakeScore, WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { rendersOnMap } from '../render/characters.js'
-import { agentName, type HeatWindow } from '@sj/shared'
-import { sceneCast, sceneShot } from '../render/sceneFraming.js'
-import { CUT_MIN_MS, subjectFor } from './directorCut.js'
-import type { SceneStage } from './stageCue.js'
-import { useEndpointFor, useFeed } from './useEndpoint.js'
+import { agentName } from '@sj/shared'
+import { sceneShot } from '../render/sceneFraming.js'
+import { CUT_MIN_MS, cameraClaim, quietSubject, townAsleep } from './directorCut.js'
 
-export const HEAT_POLL_MS = 5000
 export const DIRECTOR_ZOOM = 3 as const
 /** Two speakers two tiles apart are 156 world px apart, which a 1280-wide frame holds at 2×
  *  and no frame holds at 3× — and a two-person exchange is what the director exists to find.
@@ -23,9 +20,6 @@ export function directorZoom(width: number): typeof DIRECTOR_ZOOM | typeof DIREC
   return width >= WIDE_VIEWPORT_PX ? DIRECTOR_ZOOM_WIDE : DIRECTOR_ZOOM
 }
 
-/** A heat read the gateway refused reads as "no window scored", so the quiet round keeps turning
- *  while it is down. The broadcast path has no operator to notice a caption stuck on one face. */
-const NO_HEAT: HeatWindow[] = []
 const NO_CAST: readonly string[] = []
 
 /** Who is alive and has no body on the town map — indoors, where the exterior view draws
@@ -38,128 +32,112 @@ function indoorsIn(state: { agents: Record<string, AgentBody> } | null): Set<str
   return out
 }
 
-/** Who the camera answers to, closest claim first. A viewer who asked to follow somebody always
- *  wins: automation never overrules a hand on the lens. Below that a scene owns the shot — it is
- *  the thing the town is doing — and the heat director only gets what is left. */
-export type CameraClaim =
-  | { by: 'pinned'; agentId: string }
-  /** A replayed moment: it is ABOUT these people, and /api/heat scores the live tick only. */
-  | { by: 'moment'; cast: readonly string[] }
-  | { by: 'scene'; cast: readonly string[] }
-  | { by: 'cut'; agentId: string }
-  /** A scene the map cannot show: the director still stands down, and the shot HOLDS. */
-  | { by: 'hold' }
-  | { by: 'town' }
-
-export function cameraClaim(
-  pinned: string | null,
-  stage: SceneStage | null,
+/** Whom the quiet round may turn over: alive, and drawn on the street. Sorted, so the round is
+ *  the same order for every viewer and a rename cannot reshuffle it. */
+function outdoorLiving(
+  state: { agents: Record<string, AgentBody> } | null,
   indoors: ReadonlySet<string>,
-  cut: string | null,
-  moment: readonly string[] = [],
-): CameraClaim {
-  if (pinned !== null) return { by: 'pinned', agentId: pinned }
-  // A moment with a cast owns the shot outright, and one whose cast is all indoors HOLDS rather
-  // than handing the camera to a heat round that is scoring the live tick, not this one.
-  if (moment.length > 0) {
-    const played = sceneCast(moment, indoors)
-    return played.length === 0 ? { by: 'hold' } : { by: 'moment', cast: played }
+): string[] {
+  const out: string[] = []
+  for (const a of Object.values(state?.agents ?? {})) {
+    if (a.alive && !indoors.has(a.id)) out.push(a.id)
   }
-  if (stage !== null) {
-    const cast = sceneCast(stage.scene.participants, indoors)
-    return cast.length === 0 ? { by: 'hold' } : { by: 'scene', cast }
-  }
-  return cut === null ? { by: 'town' } : { by: 'cut', agentId: cut }
+  return out.sort()
+}
+
+/** The one string that says which shot is on screen. A cut whose people are the same people is
+ *  the same shot, however the score under it moved. */
+const keyOf = (cut: StakeScore | null): string => (cut === null ? '' : cut.agentIds.join(' '))
+
+/** The first name in a shot key, without cutting the whole key into an array for it. */
+function firstOf(key: string): string | null {
+  if (key === '') return null
+  const at = key.indexOf(' ')
+  return at === -1 ? key : key.slice(0, at)
 }
 
 /** `autoCut` is the live town being televised; `pinned` is a viewer who asked to follow one
- *  person, which outranks the heat. It draws nothing — `DirectorCue` prints the word. */
+ *  person, which outranks the gateway. It draws nothing — `DirectorCue` prints the words. */
 export function DirectorMode({
   store,
   scene,
-  stage = null,
   autoCut,
   pinned = null,
   moment = NO_CAST,
   onCue,
+  onWhy,
+  onShot,
 }: {
   store: WorldStore
   scene: Scene | null
-  /** the scene the town is holding, while it is open and while its summary is still up */
-  stage?: SceneStage | null
   autoCut: boolean
   pinned?: string | null
   /** the cast of the moment being replayed, which the shot is FOR */
   moment?: readonly string[]
   onCue?: (text: string | null) => void
+  /** the gateway's sentence for the shot it scored, in the town's own words */
+  onWhy?: (why: string | null) => void
+  /** who is in frame, and the scene it is of — what the card and the caption follow */
+  onShot?: (cast: readonly string[], sceneId: string | null) => void
 }) {
-  const [cut, setCut] = useState<string | null>(null)
-  const followedRef = useRef<string | null>(null)
-  const lastCutRef = useRef(0)
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  const frame = useSyncExternalStore(store.subscribe, store.getDirector)
   // The overview is OF a town, so it has to wait for one: an empty world has no centre but
   // whatever corner of the ground the camera was created over.
   const awake = useSyncExternalStore(store.subscribe, () => store.getState() !== null)
-
-  const feed = useEndpointFor<HeatWindow[]>(
-    autoCut && pinned === null && moment.length === 0 ? '/api/heat' : null,
-    undefined,
-    HEAT_POLL_MS,
-  )
-  const heat = useFeed(feed)
-  // The round turns on the POLL, not on the answer changing: an unchanged heat body hands back
-  // the same read, and a director that only cut when the numbers moved would freeze on one face.
-  const beat = useSyncExternalStore(feed.subscribe, feed.beat)
-
-  // `autoCut` is also the hands-off-the-camera signal: it drops for twenty seconds after a pan
-  // or a zoom, and a scene must not take a camera the viewer has just steered either.
-  // A replayed moment is not automation: the viewer asked for these people, so it is read
-  // whether or not the director has the camera.
-  const claim = cameraClaim(
-    pinned,
-    autoCut ? stage : null,
-    indoorsIn(state),
-    autoCut ? cut : null,
-    moment,
-  )
-  const claimBy = claim.by
-  const castKey = claim.by === 'scene' || claim.by === 'moment' ? claim.cast.join(' ') : ''
-  const followed = claim.by === 'pinned' || claim.by === 'cut' ? claim.agentId : null
+  // The cut the camera is actually on. The gateway may change its mind faster than a viewer can
+  // read a face, so the eight-second floor is kept here, over frames, not over polls.
+  const [held, setHeld] = useState<StakeScore | null>(null)
+  const lastCutRef = useRef(0)
 
   useEffect(() => {
-    if (!autoCut) {
-      followedRef.current = null
+    const next = autoCut ? (frame?.cut ?? null) : null
+    if (next === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the socket IS the external system this synchronises; the frame arrives as a store snapshot and the wall clock decides when it may land.
+      setHeld(null)
       return
     }
-    // A scene owns the shot while it runs, so the round waits rather than cutting away from it.
-    if (claimBy === 'scene' || claimBy === 'moment' || claimBy === 'hold') return
-    if (!heat.loaded) return
-    // read here, never subscribed to — the town changing must not turn the round
-    const living = Object.values(store.getState()?.agents ?? {}).filter((a) => a.alive)
-    const people = living.map((a) => a.id).sort()
-    const next = subjectFor(
-      heat.data ?? NO_HEAT,
-      followedRef.current,
-      store.getTick(),
-      people,
-      // the character layer's own answer to "does the exterior view draw this body"
-      indoorsIn(store.getState()),
-    )
-    const now = performance.now()
-    if (next !== null && next !== followedRef.current && now - lastCutRef.current >= CUT_MIN_MS) {
-      followedRef.current = next
-      lastCutRef.current = now
-      setCut(next)
+    // The same people, a fresher sentence: not a cut, so it lands whatever the clock says.
+    if (keyOf(next) === keyOf(held)) {
+      setHeld(next)
+      return
     }
-  }, [store, autoCut, claimBy, heat, beat])
+    // No bypass for the first one: arming the director must not yank the camera the instant a
+    // frame lands, and toggling it off and on again must not do it every time.
+    const now = performance.now()
+    if (now - lastCutRef.current >= CUT_MIN_MS) {
+      lastCutRef.current = now
+      setHeld(next)
+    }
+  }, [frame, autoCut, held])
+
+  // One object per cut rather than one per render: the ladder reads a frame, and every render
+  // that built a fresh literal would re-run the camera effect under it.
+  const quiet = autoCut && frame?.quiet === true
+  const shotFrame = useMemo(() => ({ cut: held, quiet }), [held, quiet])
+  const indoors = indoorsIn(state)
+  const asleep = townAsleep(state?.agents)
+  const claim = cameraClaim(
+    pinned,
+    moment,
+    indoors,
+    shotFrame,
+    asleep,
+    // A hand on the camera stands the round down with the director, for the same twenty seconds.
+    autoCut ? quietSubject(outdoorLiving(state, indoors), store.getTick()) : null,
+  )
+  const claimBy = claim.by
+  const castKey = claim.by === 'cut' || claim.by === 'moment' ? claim.cast.join(' ') : ''
+  const followed = claim.by === 'pinned' || claim.by === 'round' ? claim.agentId : null
+  const sceneId = claim.by === 'cut' ? (held?.sceneId ?? null) : null
 
   // Centre BEFORE the stop changes: the zoom eases about whatever the middle of the screen holds.
   useEffect(() => {
     if (scene === null) return
-    // A scene the exterior view cannot show takes nobody, and the shot HOLDS where it is: a
-    // camera that cut away would be showing three closed doors while the room talks behind them.
+    // A shot the exterior view cannot show takes nobody, and it HOLDS where it is: a camera that
+    // cut away would be showing three closed doors while the room talks behind them.
     if (claimBy === 'hold') return
-    if (claimBy === 'scene' || claimBy === 'moment') {
+    if (castKey !== '') {
       const cast = castKey.split(' ')
       const stageBox = { w: scene.app.screen.width, h: scene.app.screen.height }
       const where = (): ReturnType<typeof sceneShot> =>
@@ -173,7 +151,7 @@ export function DirectorMode({
       if (opening === null) return
       scene.setZoom(opening.stop)
       // The room, every frame: the shot is cut to where they are standing NOW, not to where
-      // they were when the coordinator opened it.
+      // they were when the gateway scored it.
       scene.setFollow(() => {
         const shot = where()
         return shot === null ? null : { x: shot.sx, y: shot.sy }
@@ -204,18 +182,32 @@ export function DirectorMode({
     }
   }, [scene, store, claimBy, castKey, followed, awake])
 
+  // Who is in frame, for the marks that follow the shot. Split from the key rather than passed
+  // as the claim's own array: a fresh array every render would re-run this on every tick.
+  useEffect(() => {
+    onShot?.(castKey === '' ? NO_CAST : castKey.split(' '), sceneId)
+  }, [castKey, sceneId, onShot])
+
   // Who the camera is on, for the layers that live in the Pixi closure — the thought gate keeps
   // every wisp of the subject, and on a broadcast nobody has picked anybody.
+  const subject = followed ?? firstOf(castKey)
   useEffect(() => {
     if (scene === null) return
     // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
-    scene.cameraSubject = followed
-  }, [scene, followed])
+    scene.cameraSubject = subject
+  }, [scene, subject])
 
   const name = followed === null ? null : agentName(state?.agents, followed)
   useEffect(() => {
     onCue?.(name === null ? null : `${pinned === null ? 'DIRECTOR' : 'FOLLOWING'} · ${name}`)
   }, [name, pinned, onCue])
+
+  // The sentence belongs to the shot the camera is HOLDING, never to a frame it has not taken:
+  // a caption that named the newer cut would describe people who are not in the picture.
+  const why = claimBy === 'cut' ? (held?.why ?? null) : null
+  useEffect(() => {
+    onWhy?.(why)
+  }, [why, onWhy])
 
   return null
 }

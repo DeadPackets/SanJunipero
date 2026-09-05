@@ -70,7 +70,7 @@ draws with it on the canvas).
 Self-hosted through `@fontsource`, never a CDN link. **Nothing renders below 12 CSS px** —
 `ui/chromeType.test.ts` is the law, and it outranks any smaller number a sketch asks for.
 
-## The six marks on the stage
+## The marks on the stage
 
 `packages/web/src/stage/`. Each is DOM, absolutely positioned inside `.app`, placed against the
 camera every frame by **one** rAF loop (`stage/anchor.ts`, `joinStageLoop`) that writes
@@ -84,10 +84,22 @@ overlay sixty times a second.
 | `ThoughtsButton` | one 44px pixel wisp, shown or hidden; a switch, so `aria-pressed`, and off empties the silhouette the way `.legend-chip.off` strikes a chip — never a darker ground, which is what a pressed arm means | bottom-left, stacked over the help button |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
-| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
-| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
+| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` and, once the day has one, `· ACT I\|II\|III` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
+| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case; or, while the gateway's own cut owns the shot, **why the camera is here** in the same sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
+| `SceneCard` | a struck stamp for what the town calls the scene, and `At the fire pit · Nadia & Yusuf` under it; written at the cut and gone 6s later | top-left, level with `.stage-live` across the picture |
+| `LowerThird` | the speaker's 28px bust (96 on the stream), their name on an ink slab, and their line typing in at 28 characters a second over a hidden ghost that holds the width | bottom-centre, directly over the cue; only while its speaker is in the shot |
+| `SleepCard` | `The town sleeps until 06:00.` on a slab, and one quieter line under it | dead centre; only when EVERY living body is asleep |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
 | `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
+
+**The three story marks all read one answer.** The gateway scores the town and pushes one
+`{ t: 'director' }` frame — a cut, a quiet beat and the day's act — and `ui/DirectorMode.tsx` is
+its only reader. It holds the cut for `CUT_MIN_MS` (8s) so a gateway that changes its mind is not
+a cut, then hands the same shot to the card, the caption and the camera. Nothing on the stage
+gets a second opinion about who is in frame, so nothing on the stage can name somebody the camera
+is not on. The two lines a visitor arrives to (`ui/firstFrame.ts`, `#first-frame-lines` in
+`index.html`) are the fourth: they stand over the town until the first cut, the first hand on the
+camera, or twenty seconds.
 
 **The sun arc is the one permanent mark.** `ui/skyModel.ts` puts one traveller on one curve —
 the sun from 05:00 to 21:00, then the moon over the same road — and the boundary is

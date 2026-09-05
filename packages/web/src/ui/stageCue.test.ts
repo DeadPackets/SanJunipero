@@ -340,10 +340,13 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     expect(CSS).toMatch(/@media \(forced-colors: active\)[\s\S]*?\.stage-scene-stamp/)
   })
 
-  it('★ the App feeds the slot from the one hold the camera also reads', () => {
+  it('★ the App feeds the slot from the one hold that owns the summary', () => {
     const APP = src('../App.tsx')
     expect(APP).toContain('useSceneStage(store)')
     expect(APP).toContain('sceneCueFor(stage,')
-    expect(APP).toContain('stage={stage}')
+    // The camera no longer takes a claim off this hold — the gateway scores the scene and the
+    // shot arrives on the socket — so the slot is the hold's ONLY reader.
+    expect(APP).not.toContain('stage={stage}')
+    expect(src('./DirectorMode.tsx')).not.toContain('SceneStage')
   })
 })

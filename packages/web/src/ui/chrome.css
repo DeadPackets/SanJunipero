@@ -1266,6 +1266,146 @@ body {
    summary has none left. */
 .stage-scene-stamp[data-stakes='warm'] { color: var(--honey); }
 .stage-scene-stamp[data-stakes='hot'] { color: var(--ember); }
+/* The reason the camera is here is a sentence the town could have said, so it keeps the scene
+   line's own case rather than the shot caption's capitals. */
+.stage-cue[data-why='on'] { letter-spacing: 0.04em; text-transform: none; }
+
+/* ── the scene card: who and where, for six seconds after a cut ─────────────────────────────
+   The stamp's opposite corner and the stamp's own material — a struck slab for what the town
+   calls the scene, a body line for the place and the people. It is a TITLE, not a readout: it
+   is written at the cut and stands still while the people in it walk. */
+.scene-card {
+  position: absolute; z-index: 21;
+  /* the second row of the top-left corner, level with `.stage-live` across the picture */
+  top: calc(
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+  );
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3);
+  max-width: min(38ch, calc(100% - 2 * var(--mark-inset)));
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  /* the arc is gone below 900px, and the card clears one chip row like the stamp does */
+  .scene-card { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+}
+.scene-card-title {
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cream-quiet); background: var(--deep);
+  box-shadow: var(--frame); text-shadow: none;
+}
+.scene-card-where {
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  letter-spacing: 0.02em; text-wrap: pretty;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
+}
+
+/* ── the sleep card: the one honest empty frame ─────────────────────────────────────────────
+   A town where every living body is asleep has nothing to cut to. Saying so, and saying when it
+   ends, is the difference between a quiet hour and a broken stream. */
+.sleep-card {
+  position: absolute; z-index: 22; inset: 0;
+  display: grid; place-content: center; justify-items: center;
+  gap: var(--s-5);
+  padding: var(--mark-inset);
+  text-align: center;
+  pointer-events: none;
+}
+.sleep-card-line {
+  margin: 0;
+  padding: var(--s-4) var(--s-6);
+  font-family: var(--font-px); font-size: var(--f-4); line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--cream); background: var(--deep);
+  box-shadow: var(--frame);
+}
+.sleep-card-note {
+  margin: 0; max-width: 34ch;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  color: var(--cream-quiet); text-wrap: pretty;
+  text-shadow: var(--halo-deep);
+}
+
+/* ── the lower third at the desk ────────────────────────────────────────────────────────────
+   The same slab the stream frame carries, at a quarter of its size, and only while somebody the
+   camera is on is talking. The ghost holds the box at the width of the finished line so the
+   slab does not grow a letter at a time under the words arriving in it. */
+.lower-third {
+  position: absolute; z-index: 26;
+  /* A WIDTH, not an offset — the cue's own trick. It sits directly over the cue rather than in
+     the bottom-left corner, which already carries three 44px slabs and the sound cues stacking
+     upward off them. */
+  left: 0; right: 0; margin: 0 auto; width: fit-content;
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--s-8));
+  display: flex; align-items: stretch; gap: var(--s-3);
+  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  padding: var(--s-3);
+  pointer-events: none;
+  background: var(--parchment); color: var(--ink);
+  box-shadow: var(--frame);
+  border-bottom: var(--s-2) solid var(--honey);
+}
+.lower-third-bust {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;   /* the bust IS world art */
+  box-shadow: var(--frame-tight);
+}
+.lower-third-bust.none { background-color: var(--sand); }
+.lower-third-body {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--s-2); min-width: 0;
+}
+.lower-third-name {
+  align-self: flex-start; padding: var(--s-1) var(--s-3);
+  font-family: var(--font-px); font-size: var(--f-1); line-height: 1.1;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+}
+.lower-third-words {
+  position: relative; display: block;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600; line-height: 1.35;
+  color: var(--ink);
+}
+/* Once the signpost has a corner, the caption may not reach it — the cue's own rule. */
+@media (min-width: 700px) {
+  .lower-third { max-width: min(46ch, calc(100% - 320px)); }
+}
+/* Reserves the finished line's box; `visibility` rather than a colour, so it takes no ink. */
+.lower-third-ghost { visibility: hidden; }
+.lower-third-typed { position: absolute; inset: 0; }
+
+/* ── the first two lines a visitor reads ────────────────────────────────────────────────────
+   Fixed, not absolute: this mark stands outside `.app`, so React clearing `#root` cannot take
+   it. It goes on the first cut, the first hand on the camera, or twenty seconds. */
+.first-lines {
+  position: fixed; inset: 0; z-index: 30;
+  display: grid; place-content: center; justify-items: center;
+  gap: var(--s-5);
+  padding: var(--mark-inset);
+  text-align: center;
+  pointer-events: none;
+  opacity: 1;
+}
+/* An author `display` beats the UA's `[hidden]` rule whatever the specificity says, so the
+   attribute the static file ships with has to be honoured here or the lines paint on load. */
+.first-lines[hidden] { display: none; }
+.first-lines p { margin: 0; max-width: 34ch; }
+.first-lines-head {
+  font-family: var(--font-body); font-size: var(--f-6); font-weight: 600;
+  letter-spacing: -0.01em; text-wrap: balance;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
+}
+.first-lines-note {
+  font-family: var(--font-body); font-size: var(--f-3); font-weight: 400;
+  text-wrap: pretty;
+  color: var(--cream-quiet);
+  text-shadow: var(--halo-deep);
+}
+.first-lines.gone { opacity: 0; }
 
 .stage-exit, .stage-live {
   position: absolute; z-index: 25;
@@ -1314,6 +1454,10 @@ body {
   }
   /* A sound chip is the cue mark's own news, in the corner rather than the middle: same fade. */
   .sound-cue { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
+  /* A cut's card and the night's card arrive the same way the cue does — a fade, nothing else:
+     a mark that slid in would be moving the picture the camera just settled. */
+  .scene-card, .sleep-card { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
+  .first-lines { transition: opacity var(--t-slow) var(--ease-enter); }
   @keyframes cue-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -1401,7 +1545,9 @@ body {
   .signpost[data-open='yes'] .signpost-post { display: none; }
   /* Three marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline
      carries the day, the season and the clock while it is up. */
-  .app[data-paper='on'] :is(.sky-bar, .stage-stamp) { display: none; }
+  .app[data-paper='on'] :is(.sky-bar, .stage-stamp, .scene-card, .lower-third, .sleep-card) {
+    display: none;
+  }
 }
 @media (min-width: 641px) and (max-height: 620px) {
   .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
@@ -1812,7 +1958,8 @@ body {
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
   .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
-  .thoughts-button, .sound-button {
+  .thoughts-button, .sound-button, .scene-card-title, .sleep-card-line, .lower-third,
+  .lower-third-bust {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }
@@ -1981,8 +2128,20 @@ body {
 }
 [data-broadcast='on'] .stage-cue { font-size: 24px; bottom: 88px; }
 
+/* The sky bar is gone on the stream, so the card takes the corner itself. */
+[data-broadcast='on'] .scene-card {
+  top: max(var(--mark-inset), env(safe-area-inset-top));
+  gap: 12px;
+  max-width: 44%;
+}
+[data-broadcast='on'] .scene-card-title { font-size: 24px; padding: 8px 12px; }
+[data-broadcast='on'] .scene-card-where { font-size: 28px; }
+[data-broadcast='on'] .sleep-card { gap: 24px; }
+[data-broadcast='on'] .sleep-card-line { font-size: 40px; padding: 20px 32px; }
+[data-broadcast='on'] .sleep-card-note { font-size: 24px; }
+
 [data-broadcast='on'] .lower-third {
-  position: absolute; left: 4%; bottom: 88px; z-index: 26;
+  position: absolute; left: 4%; right: auto; margin: 0; width: auto; bottom: 88px; z-index: 26;
   display: flex; align-items: stretch; gap: 12px;
   max-width: 64%;
   padding: 12px;
@@ -2123,6 +2282,9 @@ body {
 [data-replay='on'] .stage-cue {
   bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
 }
+/* A replay already names itself — its own dateline card, its own cue and the transport bar.
+   The live director's three marks would be three more slabs in the same two corners. */
+[data-replay='on'] :is(.lower-third, .scene-card, .sleep-card) { display: none; }
 
 /* The grade carries no transition: the curtain is fully black at the midpoint of the dip, so
    the grade arrives behind it and there is nothing to ease. */

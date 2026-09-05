@@ -17,6 +17,8 @@ export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 export const DAWN_HOUR = 5
 // The hour `SimTime.isNight` turns over on, which is the hour every sleeping mind's night begins.
 const NIGHT_HOUR = 20
+/** The other end of that night: the hour the town gets up, and the hour the sleep card counts to. */
+export const WAKE_HOUR = 6
 
 // The only phase derivation in the codebase. `SimTime.isNight` is the older two-way
 // clock and every landed caller keeps it — the two disagree at dusk on purpose.
@@ -67,6 +69,6 @@ export function simTimeFromTick(tick: number): SimTime {
   const dayOfSeason = (dayOfYear % DAYS_PER_SEASON) + 1
   const hour = Math.floor(minuteOfDay / 60)
   const minute = minuteOfDay % 60
-  const isNight = hour >= NIGHT_HOUR || hour < 6
+  const isNight = hour >= NIGHT_HOUR || hour < WAKE_HOUR
   return { tick, year, season, dayOfSeason, dayOfYear, hour, minute, isNight }
 }

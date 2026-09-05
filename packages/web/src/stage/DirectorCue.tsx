@@ -43,15 +43,19 @@ function SceneStamp({ kind, stakes, band }: SceneCue) {
 }
 
 /** The slot says what just HAPPENED while there is something, what the town is DOING while a
- *  scene runs, and what the shot is otherwise. There is only ever one line here. */
+ *  scene runs, WHY the camera is here when it is on a cut of its own, and what the shot is
+ *  otherwise. There is only ever one line here. */
 export function DirectorCue({
   text,
   moment,
   scene,
+  why = null,
 }: {
   text: string | null
   moment: StageCue | null
   scene: SceneCue | null
+  /** the director's own sentence for the shot it took, in the town's words */
+  why?: string | null
 }) {
   if (moment !== null) {
     return (
@@ -66,6 +70,15 @@ export function DirectorCue({
       <p className="stage-cue" data-scene="on">
         <SceneStamp {...scene} />
         {scene.text}
+      </p>
+    )
+  }
+  // Sentence case, on the scene's own rule: the reason the camera is here is a sentence the
+  // town could have said, not a caption shouted in capitals for as long as the shot lasts.
+  if (why !== null && why.trim() !== '') {
+    return (
+      <p className="stage-cue" data-why="on">
+        {why}
       </p>
     )
   }

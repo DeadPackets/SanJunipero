@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import type { SimEvent } from '@sj/shared'
 import { NO_SHUTTERS, SHUTTERED_GLOW, foldShutters, isShuttered } from './shuttered.js'
-import { subjectFor } from '../ui/directorCut.js'
+import { cameraClaim } from '../ui/directorCut.js'
 import { rendersOnMap } from './characters.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
@@ -98,12 +98,16 @@ describe('★ a house with the door shut', () => {
   // and a body with one is already off the map and off the director's list.
   it('★ the director is already looking elsewhere: a body under a roof is not a subject', () => {
     expect(rendersOnMap({ alive: true, insideId: 'house_1' })).toBe(false)
-    const hot = [
-      { fromTick: 940, toTick: 999, agentId: 'amara', score: 40 },
-      { fromTick: 940, toTick: 999, agentId: 'omar', score: 3 },
-    ]
-    const town = ['amara', 'omar', 'yusuf']
-    expect(subjectFor(hot, null, 1000, town)).toBe('amara')
-    expect(subjectFor(hot, null, 1000, town, new Set(['amara', 'yusuf']))).toBe('omar')
+    const cut = { sceneId: 'sc_1', agentIds: ['amara', 'omar'], score: 40, why: 'talking' }
+    expect(cameraClaim(null, [], new Set(), { cut })).toEqual({
+      by: 'cut',
+      cast: ['amara', 'omar'],
+    })
+    expect(cameraClaim(null, [], new Set(['amara']), { cut })).toEqual({
+      by: 'cut',
+      cast: ['omar'],
+    })
+    // and a room where BOTH are under a roof holds the shot rather than cutting to a door
+    expect(cameraClaim(null, [], new Set(['amara', 'omar']), { cut })).toEqual({ by: 'hold' })
   })
 })
