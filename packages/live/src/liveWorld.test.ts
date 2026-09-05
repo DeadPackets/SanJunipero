@@ -622,6 +622,10 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now() - 60 * 60 * 1000, 0.06)
     await run(world, 10)
     expect(stops).toHaveLength(1)
+    // The pair the DAY was judged on, not the lifetime one: $40 of yesterday is in neither.
+    expect(stops[0]!.cap, 'the daily stop reported the lifetime cap').toBe(0.05)
+    expect(stops[0]!.spent).toBeGreaterThanOrEqual(0.06)
+    expect(stops[0]!.spent, 'the daily stop reported the lifetime total').toBeLessThan(40)
     expect(ledgerTotalUsd(opsDb), 'and the lifetime total was never the trigger').toBeLessThan(50)
 
     const atStop = eventsOf(dir, 'agent_spoke').length

@@ -926,7 +926,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (today >= dailyBudget) {
           console.error(dailyStopMessage(today, dailyBudget))
           stopMinds()
-          opts.onSpendStop?.(spent, cap)
+          // The day's figures, not the lifetime pair: this is the line that was crossed.
+          opts.onSpendStop?.(today, dailyBudget)
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
