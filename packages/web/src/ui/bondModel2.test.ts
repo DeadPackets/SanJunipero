@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   bondFrom,
@@ -23,6 +24,8 @@ import {
   bondArc,
   bondLevel,
   bondTypeOf,
+  peopleFromSignature,
+  peopleSignature,
   partnerEvidence,
   relationLine,
   type BondLevel,
@@ -294,5 +297,34 @@ describe('relationLine is total over BondType × BondLevel', () => {
     const line = relationLine('none', 'friendly', warming, ['Amara', 'Yusuf'])
     expect(line).toContain('Warming since Day 4.')
     expect(line.match(/\d+/g)).toEqual(['4'])
+  })
+})
+
+// A bond outlives the body: the graph is a picture of who this town was, so a person who died
+// keeps her slab and her lines, drawn as gone.
+describe('the index the bonds picture is drawn from', () => {
+  const AGENTS = {
+    yusuf: { id: 'yusuf', name: 'Yusuf', alive: false },
+    amara: { id: 'amara', name: 'Amara', alive: true },
+  }
+
+  it('keeps the dead, with the flag that draws them as gone', () => {
+    const people = peopleFromSignature(peopleSignature(AGENTS))
+    expect(people).toEqual({
+      amara: { name: 'Amara', alive: true },
+      yusuf: { name: 'Yusuf', alive: false },
+    })
+  })
+
+  it('changes when a person dies, so the picture is redrawn once and not every tick', () => {
+    const before = peopleSignature({ ...AGENTS, yusuf: { ...AGENTS.yusuf, alive: true } })
+    expect(peopleSignature(AGENTS)).not.toBe(before)
+    expect(peopleSignature({ ...AGENTS })).toBe(peopleSignature(AGENTS))
+  })
+
+  it('is what the page actually builds its index from', () => {
+    const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('peopleSignature(state?.agents)')
+    expect(source).toContain('peopleFromSignature(nameSig)')
   })
 })

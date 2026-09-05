@@ -50,6 +50,28 @@ export const NODE_DEAD = '#857D75'
 export type PeopleIndex = Readonly<Record<string, { name: string; alive: boolean }>>
 export type BondNode = { id: string; name: string; size: number; color: string; alive: boolean }
 
+/** Who the picture is of, as one string. A fold lands every tick and remakes `state`, so the
+ *  force layout is re-seeded off this and not off the world. */
+export function peopleSignature(
+  agents: Readonly<Record<string, { id: string; name: string; alive: boolean }>> | undefined,
+): string {
+  const out: string[] = []
+  for (const a of Object.values(agents ?? {}))
+    out.push(`${a.id}\t${a.alive ? '1' : '0'}\t${a.name}`)
+  return out.sort().join('\n')
+}
+
+/** The index that signature stands for. A bond outlives the body, so the dead keep their slab. */
+export function peopleFromSignature(sig: string): PeopleIndex {
+  const out: Record<string, { name: string; alive: boolean }> = {}
+  for (const line of sig === '' ? [] : sig.split('\n')) {
+    const [id, alive, name] = line.split('\t')
+    if (id === undefined || name === undefined) continue
+    out[id] = { name, alive: alive === '1' }
+  }
+  return out
+}
+
 /** What the lineage endpoint returns. Structural, so the viewer needs no import from the
  *  gateway (P1) and a typed empty is a perfectly good answer. */
 export type LineageLike = {

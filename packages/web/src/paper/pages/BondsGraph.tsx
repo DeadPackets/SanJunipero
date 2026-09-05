@@ -6,7 +6,13 @@ import type { Subject } from '../../stage/index.js'
 import { TEXT_MIN_PX } from '../../textFloor.js'
 import { LegendChip } from '../../ui/LegendChip.js'
 import { BondDetail, FadedBond } from './BondDetail.js'
-import { EMPTY_LINEAGE, type BondNode, type PeopleIndex } from '../../ui/bondModel2.js'
+import {
+  EMPTY_LINEAGE,
+  peopleFromSignature,
+  peopleSignature,
+  type BondNode,
+  type PeopleIndex,
+} from '../../ui/bondModel2.js'
 import {
   keyOpensBy,
   relationLegend,
@@ -163,22 +169,9 @@ export function BondsGraph({
     }
   }, [])
 
-  // A fold lands every tick and remakes `state`; keying on who is alive and what they are called
-  // is what stops the force layout being re-seeded from scratch every tick.
-  const nameSig = useMemo(() => {
-    const out: string[] = []
-    for (const a of Object.values(state?.agents ?? {})) if (a.alive) out.push(`${a.id}\t${a.name}`)
-    return out.sort().join('\n')
-  }, [state])
+  const nameSig = useMemo(() => peopleSignature(state?.agents), [state])
 
-  const people: PeopleIndex = useMemo(() => {
-    const out: Record<string, { name: string; alive: boolean }> = {}
-    for (const line of nameSig === '' ? [] : nameSig.split('\n')) {
-      const at = line.indexOf('\t')
-      out[line.slice(0, at)] = { name: line.slice(at + 1), alive: true }
-    }
-    return out
-  }, [nameSig])
+  const people: PeopleIndex = useMemo(() => peopleFromSignature(nameSig), [nameSig])
 
   const ties = useMemo(
     () => toRelationGraph(api ?? EMPTY_API, lineage, people, api?.asOfTick ?? 0),
