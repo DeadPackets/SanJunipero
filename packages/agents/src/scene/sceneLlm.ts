@@ -70,7 +70,6 @@ Leave your speech empty when you have nothing left to add, and the talk ends the
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what there was to say.',
   left: 'It ended because somebody walked away.',
-  night: 'It ended because the night came down on it.',
   capped: 'It ended still running, with more in it than either of them said.',
   timeout: 'It ended in a silence neither of them filled.',
 }

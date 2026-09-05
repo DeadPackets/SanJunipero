@@ -1455,8 +1455,6 @@ export class AgentRuntime {
     return out
   }
 
-  // A sentence the mind is already carrying is not written again: nine texts in eighty-seven
-  // rows is eight-odd copies competing in retrieval for one thing that happened.
   /** Bookkeeping around a turn the town has already been billed for. A method the client never
    *  grew is a type error now, so what is left here is a database too busy to write. */
   #book(write: () => void): void {

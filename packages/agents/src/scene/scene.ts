@@ -40,7 +40,7 @@ export type Scene = {
   passes: number
   timeouts: number
   closedTick: number | null
-  closeReason?: 'ended' | 'left' | 'night' | 'capped' | 'timeout'
+  closeReason?: 'ended' | 'left' | 'capped' | 'timeout'
 }
 
 export const SceneTurnSchema = z
