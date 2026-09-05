@@ -159,7 +159,7 @@ export function defaultExtraBody(
 
 /** OpenRouter's sticky-routing key, sent top level. One per mind and not per caller, so a mind's
  *  turn and its scene line land on the same back end and share the one prefix they both carry. */
-export function sessionIdFor(agentId: string | null): string | undefined {
+function sessionIdFor(agentId: string | null): string | undefined {
   return agentId === null ? undefined : `sj-${agentId}`
 }
 
