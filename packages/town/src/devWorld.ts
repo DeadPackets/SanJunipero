@@ -39,6 +39,7 @@ import {
   assertSameWorld,
   ensureWorldMetaTable,
   readWorldMeta,
+  unstampedWorldRefusal,
   writeWorldMeta,
 } from './worldMeta.js'
 
@@ -192,7 +193,9 @@ export async function startDevWorld(
     try {
       ensureWorldMetaTable(probe)
       const stored = readWorldMeta(probe)
-      if (stored && new EventStore(probe).lastSeq() > 0) assertSameWorld(stored, identity)
+      const lived = new EventStore(probe).lastSeq() > 0
+      if (lived && stored === null) throw new Error(unstampedWorldRefusal(identity))
+      if (stored && lived) assertSameWorld(stored, identity)
     } finally {
       probe.close()
     }
