@@ -60,7 +60,7 @@ export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   [route(MIND_MODEL, 'DeepInfra')]: { input: 0.075, output: 0.25, cacheRead: 0.016 },
   [route(PROSE_MODEL, 'DeepInfra')]: { input: 0.08, output: 0.18, cacheRead: 0.016 },
   [route(PROSE_MODEL, 'Inceptron')]: { input: 0.13, output: 0.28, cacheRead: 0.03 },
-  [route(PROSE_MODEL, 'Baidu')]: { input: 0.0494, output: 0.0987, cacheRead: 0.0099 },
+  [route(PROSE_MODEL, 'Baidu')]: { input: 0.065, output: 0.1299, cacheRead: 0.013 },
   // The same back end on the other fleet model, at more than twice the price. Dropped from the
   // mind path, kept so old ledger rows still reconcile; it tripled overnight 2026-08-31 (was
   // 0.04494/0.08988/0.008988) and that was confirmed against a real bill.

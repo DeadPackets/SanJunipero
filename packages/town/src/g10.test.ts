@@ -287,11 +287,9 @@ describe('GATE G10 — automated half, gateway side', () => {
       for (const e of entries) expect(e.label.length).toBeGreaterThan(0)
     })
 
-    it('reads the pair who kept house as a partnership, and nobody else', async () => {
+    it('reads no partnership from a shared roof: a partnership is two consents, never a bed count', async () => {
       const body = BondsResponseSchema.parse(await get('/api/bonds'))
-      const partners = body.bonds.filter((b) => b.kind === 'partner')
-      expect(partners).toHaveLength(1)
-      expect([partners[0]!.aId, partners[0]!.bId].sort()).toEqual(['amara', 'yusuf'])
+      expect(body.bonds.filter((b) => b.kind === 'partner')).toHaveLength(0)
       expect(body.bonds.every((b) => b.aId < b.bId)).toBe(true) // one bond per pair, ordered
       expect(body.asOfTick).toBeGreaterThan(0)
     })
