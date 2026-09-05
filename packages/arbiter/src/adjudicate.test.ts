@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
@@ -18,8 +18,8 @@ import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { CodexStore } from './codex.js'
 import { RulingsStore } from './rulings.js'
-import { makeArbiterRig, ScriptedLlm, TAMAR_CTX } from './testutil/scriptedLlm.js'
-import type { Recipe, Verdict } from './verdict.js'
+import { makeArbiterRig, ScriptedLlm, strictDialect, TAMAR_CTX } from './testutil/scriptedLlm.js'
+import { readRuling, type Recipe, type Verdict } from './verdict.js'
 
 // A credit for a test that is not about the credit; the two-argument codify is required so
 // an uncredited discovery cannot be minted in silence.
@@ -503,7 +503,10 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
   })
 
   it('a hallucinated map verb is never returned or recorded; retry then diegetic impossible', async () => {
-    const llm = new ScriptedLlm(() => ({ kind: 'map', verb: 'recipe:ghost_dance', params: {} }))
+    const wire = { kind: 'map', verb: 'recipe:ghost_dance', params: NO_PARAMS }
+    // In the dialect, so the guard under test is the unregistered verb and not the shape.
+    expect(readRuling({ verdict: strictDialect(wire) })).not.toBeNull()
+    const llm = new ScriptedLlm(() => wire)
     const { db, arbiter } = await makeArbiterRig({ llm })
 
     const verdict = await arbiter.adjudicate('I dance the ghost dance', TAMAR_CTX)
@@ -903,6 +906,24 @@ describe('FORBIDDEN_FRAMING enforced over live LLM output', () => {
     const row = db.prepare('SELECT verdict_json FROM rulings').get() as { verdict_json: string }
     expect(FORBIDDEN_FRAMING.test(row.verdict_json)).toBe(false)
   })
+
+  // Live ruling 11 of the last rehearsal, which a mind read back to itself word for word.
+  it('a refusal that reports on the request is replaced by one a person would say', async () => {
+    const llm = new ScriptedLlm(() => ({
+      kind: 'impossible',
+      reason:
+        "Tariq's location is not given as coordinates, so the requested destination cannot be resolved to a walk action.",
+      class: 'physically_impossible',
+    }))
+    const { arbiter } = await makeArbiterRig({ llm })
+
+    const verdict = await arbiter.adjudicate('I go to where Tariq is', TAMAR_CTX)
+    expect(verdict.kind).toBe('impossible')
+    if (verdict.kind === 'impossible') {
+      expect(verdict.reason).not.toMatch(/coordinates|resolved|action|requested/i)
+      expect(verdict.reason).toBe('nothing in the town lends itself to this')
+    }
+  })
 })
 
 // The ground the asker can see is shown to the arbiter, so the ground the asker can see is
@@ -1078,6 +1099,28 @@ describe('the roster the town is told', () => {
     expect(arbiter.roster().map((e) => e.id)).toEqual(['express:toast'])
     unregisterVerb('express:toast')
   })
+
+  it('reads each row once, however many turns ask for the roster', async () => {
+    const llm = new ScriptedLlm(() => basketVerdict)
+    const { arbiter } = await makeArbiterRig({ llm })
+    arbiter.codify(
+      {
+        recipe: { ...basketRecipe, id: 'recipe:parse_once', name: 'Parse Once' },
+        summary: 'Weave reeds into a basket.',
+      },
+      CODIFY_CREDIT,
+    )
+    const first = arbiter.roster()
+
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      for (let i = 0; i < 12; i++) expect(arbiter.roster()).toEqual(first)
+      expect(parse).not.toHaveBeenCalled()
+    } finally {
+      parse.mockRestore()
+    }
+    unregisterVerb('recipe:parse_once')
+  })
 })
 
 describe('rulebook rehydration on construction', () => {
@@ -1111,5 +1154,29 @@ describe('rulebook rehydration on construction', () => {
     expect(VERBS['recipe:rehydrate_gone']).toBeUndefined()
 
     unregisterVerb('recipe:rehydrate_basket')
+  })
+
+  it('leaves a row it cannot read out of the registry, and says which one', async () => {
+    const llm = new ScriptedLlm(() => basketVerdict)
+    const { db, embedder } = await makeArbiterRig({ llm })
+    // A row from an older shape: no `reads`, no `takes`. Registered, it throws at act time.
+    const drifted = {
+      id: 'recipe:old_shape',
+      name: 'Old Shape',
+      gloss: 'shapes a thing',
+      requires: [],
+      costs: [],
+      outcomes: [{ weight: 1, success: true, label: 'It is shaped.', effects: [{ op: 'none' }] }],
+      inventor: { agentId: 'a1', saying: '' },
+      canon: ['fire'],
+    }
+    new RulebookStore(db).insert(drifted, 100)
+
+    makeArbiter({ db, llm: llm as unknown as LlmClient, embedder, tick: () => 200 })
+
+    expect(VERBS['recipe:old_shape']).toBeUndefined()
+    const said = llm.alerts.find((a) => a.kind === 'rulebook_row_unreadable')
+    expect(said, JSON.stringify(llm.alerts)).toBeDefined()
+    expect(said!.detail).toContain('recipe:old_shape')
   })
 })
