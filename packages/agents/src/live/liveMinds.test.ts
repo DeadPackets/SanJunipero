@@ -331,3 +331,75 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
     expect(stateHash(replayed)).toBe(stateHash(h.loop.state))
   })
 })
+
+const SCENE_TURN = {
+  thought: 'Say it plainly.',
+  speech: 'The well gate holds.',
+  to: null,
+  gesture: null,
+  move: 'none',
+  stance: null,
+  answer: null,
+  leave: false,
+  importance: 4,
+}
+
+describe('a town that is closing waits on the talk it is paying for', () => {
+  it('holds `busy` from the ask until the line comes back', async () => {
+    const { bridge } = buildWorld()
+    const opsDb = openAgentDb(':memory:')
+    migrateLlmTables(opsDb)
+    const mindDb = openAgentDb(':memory:')
+    let release = (): void => {}
+    const held = new Promise<void>((r) => {
+      release = r
+    })
+    const slow = new MockLanguageModelV4({
+      doGenerate: async () => {
+        await held
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(SCENE_TURN) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: ZERO_USAGE,
+          warnings: [],
+        }
+      },
+    })
+    const client = (model: MockLanguageModelV4, caller: string, agentId: string): LlmClient =>
+      new LlmClient({ model, db: opsDb, caller, agentId, maxRetries: 0 })
+    const booted = bootMinds({
+      minds: [SPEC],
+      bridge,
+      embedder: await FakeEmbedder.create(),
+      dbFor: () => mindDb,
+      turnLlm: (id) => client(scriptedModel(), 'turn', id),
+      sceneClient: (id) => client(slow, 'scene.line', id),
+    })
+
+    expect(booted.busy()).toBe(false)
+    booted.scenes!.adopt({
+      id: 'scene_1200_feedface',
+      kind: 'talk',
+      openedTick: DUSK_DAY_0,
+      lastLineTick: DUSK_DAY_0,
+      participants: [AGENT],
+      audience: [],
+      anchor: AGENT,
+      floor: AGENT,
+      thread: [],
+      topic: null,
+      stakes: 1,
+      passes: 0,
+      timeouts: 0,
+      closedTick: null,
+    })
+    const line = booted.scenes!.takeFloor(AGENT, DUSK_DAY_0 + 1)
+    await flush()
+    expect(booted.busy()).toBe(true)
+
+    release()
+    await line
+    expect(booted.busy()).toBe(false)
+    booted.stop()
+  })
+})

@@ -977,6 +977,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         REFLECTION_SETTLE_MS,
       )
       if (!settled) log('stream: a night was still being reflected on when the town closed')
+      // A line still with a back end writes to its mind's db when it lands, so it gets the
+      // same wait the last unclaimed prices get, and no longer.
+      if (!(await settle(() => booted?.busy() === true, STOP_SWEEP_MS))) {
+        log('stream: somebody was still mid-sentence when the town closed')
+      }
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try {
