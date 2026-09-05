@@ -66,19 +66,11 @@ describe('the ops plane may not name itself to a mind', () => {
     expect(scanPromptForGlassLeak('no verdict allows this')).toEqual(['verdict'])
   })
 
-  it('flags a raw id, whatever the log named it', () => {
-    expect(scanPromptForGlassLeak('structure_fire_pit_39_39 is warm')).toEqual([
-      'structure_fire_pit_39_39',
-    ])
-    expect(scanPromptForGlassLeak('you hold item_wood_3')).toEqual(['item_wood_3'])
-    // A raw id no person writes is cut out mid-run as well, the way an ops key is.
-    const leaks: string[][] = []
-    expect(
-      assertNoGlassLeak('You stand at structure_fire_pit_39_39.', 'turn', (l) =>
-        leaks.push([...l]),
-      ),
-    ).toBe('You stand at [redacted].')
-    expect(leaks).toEqual([['structure_fire_pit_39_39']])
+  it("leaves a thing's own id alone: a mind must write it into structureId or itemId", () => {
+    expect(scanPromptForGlassLeak('the storehouse (structure_fire_pit_39_39) is warm')).toEqual([])
+    expect(assertNoGlassLeak('you hold 2 bread (item_wood_3)', 'turn')).toBe(
+      'you hold 2 bread (item_wood_3)',
+    )
   })
 
   it('leaves ordinary prose that merely contains a word alone', () => {

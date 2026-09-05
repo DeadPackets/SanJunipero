@@ -71,12 +71,9 @@ const opsKeyShape = (term: string): boolean => /[_ ]/.test(term)
 // a kind invented next year is caught the day it is written.
 const MILESTONE_KIND = /\bfirst_\w+/giu
 
-// The log's own name for a thing — `structure_fire_pit_39_39`, `item_wood_3`: a kind, then
-// what it is, then the number that makes it that one. The number is what tells an id from an
-// event type (`item_owner_changed`), which the narrator's own digests carry.
-const RAW_ID = /\b(?:structure|item|agent|crop|node|fauna)(?:_[a-z0-9]+)*_\d+\b/giu
-
-const SHAPES: readonly RegExp[] = [MILESTONE_KIND, RAW_ID]
+// A thing's own id (`structure_fire_pit_39_39`) is NOT a shape here: the prose hands a mind the
+// ids it must write into structureId and itemId, and the viewer's own scan keeps them off the page.
+const SHAPES: readonly RegExp[] = [MILESTONE_KIND]
 
 // Cyrillic and Greek letters that render as their Latin twin. Only the ones that can spell a
 // roster word; a longer table would be a Unicode confusables copy nobody maintains.
