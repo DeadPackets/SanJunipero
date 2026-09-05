@@ -75,8 +75,8 @@ import { createDiscoveryArt } from './discoveryCommission.js'
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
  *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
 const LIVE_SPEND_DAILY_USD = 3
-/** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
- *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
+/** Dollars over the town's whole life; 0 is none. Reaching it stops every mind and leaves the
+ *  town serving: the operator hears it on the ops surface, and the viewer is never dark for it. */
 const LIVE_SPEND_STOP_USD = 50
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's tick this is every 20 s

@@ -164,20 +164,20 @@ read it before you change it. There are 975 of them.
 
 ## The standing laws
 
-A live town runs under five guards. Two kill the process, one stops the minds and leaves
-the town serving, and two only speak.
+A live town runs under five guards. Three stop the minds and leave the town serving, and
+two only speak. None of them takes the viewer down.
 
 | Guard | Set at | What it does |
 |---|---|---|
-| Daily budget | `SJ_SPEND_DAILY_USD`, $3.00 per rolling 24 h | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | `SJ_SPEND_CAP_USD`, $50 over the town's life; 0 turns it off | Kills the process. The town on disk is intact. |
-| Rate tripwire | 8 calls/mind/sim-hour over 15 min | A runaway, never a price. Stops every mind; the town keeps serving. |
+| Daily budget | `SJ_SPEND_DAILY_USD`, $3.00 per rolling 24 h | Stops every mind; the town keeps serving, and a restart boots it scripted until the window rolls. |
+| Anomaly stop | `SJ_SPEND_CAP_USD`, $50 over the town's life; 0 turns it off | Stops every mind; the town keeps serving. The town on disk is intact. |
+| Rate tripwire | 22 calls/mind/sim-hour over 15 min | A runaway, never a price. Stops every mind; the town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | Prints and files an alert. Stops nothing. |
 | Provider mix | >70% of mind calls off the pinned provider | Prints and files an alert. Never stops. |
 
 Both dollar guards are per town, not per process: the ledger resumes with the world, so a
-restart resets nothing, and a town already over a line refuses to boot live before the
-preflight spends anything.
+restart resets nothing, and a town already over a line boots scripted before the preflight
+spends anything, saying which line it is over.
 
 The operator's channel is one loopback port behind a bearer token (`SJ_ADMIN_TOKEN` —
 unset, **no write path into the world exists at all**, which is the default): pause,

@@ -228,13 +228,15 @@ OpenRouter reports is booked at that bill. The dashboards and this page are the 
 
 ### The five guards, and where they trip
 
-Two kill the process, one stops the minds and leaves the town serving, and two only speak.
+Three stop the minds and leave the town serving, and two only speak. None of them takes the
+viewer down: a budget event is not a fault, and a container that exits on one restarts into the
+same refusal until the window rolls.
 
 | Guard | Set at | Reached, at the expected 5-mind rate | What it does |
 |---|---|---|---|
-| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $1.77 | Kills the process; a restart refuses until the window rolls. |
-| Anomaly stop | $50 total | ~675 real hours, so 28 days | Kills the process. The town on disk is intact. |
-| Rate tripwire | **14 calls/mind/sim-hour** over 15 min | 1.7x rehearsal 4's measured 4.7 — a runaway, never a price | Stops every mind. The town keeps serving. |
+| Daily budget | $3.00 per rolling 24 h | **never, at this rate** — 24 h costs $1.77 | Stops every mind; the town keeps serving, and a restart boots it scripted until the window rolls. |
+| Anomaly stop | $50 total | ~675 real hours, so 28 days | Stops every mind; the town keeps serving. The town on disk is intact. |
+| Rate tripwire | **22 calls/mind/sim-hour** over 15 min | 3x the measured 7.3 with the scene lines counted — a runaway, never a price | Stops every mind. The town keeps serving. |
 | Operator alert | $0.40/sim-day over 15 min | 21x the expected 5-mind rate | Prints and files an alert. Stops nothing. |
 | Provider mix | >70% of mind calls off `PROVIDER_ORDER[0]` | only when the pin is shut out — 52/48 is the measured normal | Prints and files an alert. **Never stops.** |
 
@@ -244,9 +246,9 @@ fired because 63% of the window had gone to the dearer back end. Calls are what 
 controls, so calls are what the wire measures; the dollars are the two money guards' job.
 
 **Only mind callers count against the wire**: `turn`, `reflection`, `reflection.edit`, `dream`,
-`recall`. The narrator, the arbiter, the tier-2.5 pass and the forge are town work that costs
-the same however many minds are alive, so they are the operator alert's business, not the
-tripwire's.
+`scene`, `recall` — read off the pins, so a caller put on the mind's route cannot slip past it.
+The narrator, the arbiter, the tier-2.5 pass and the forge are town work that costs the same
+however many minds are alive, so they are the operator alert's business, not the tripwire's.
 
 **The two dollar guards were set against a bill 20x this one** and were not re-derived with it,
 so at the expected rate they are disaster ceilings. Lower `SJ_SPEND_DAILY_USD` if you want the
@@ -255,7 +257,7 @@ daily budget back as a working limit.
 Both dollar guards are **per town, not per process**: the ledger lives in `_ops.db` and resumes
 with the world, so restarting does not reset either. The daily budget is the one an operator sets;
 the lifetime cap is the disaster ceiling, and `SJ_SPEND_CAP_USD=0` removes it. A town over either
-line refuses to boot live, before the pre-flight spends anything, and says which line it is over.
+line boots SCRIPTED, before the pre-flight spends anything, and says which line it is over.
 That is the intent — but it is also why `_ops.db` must be in your backup.
 
 **Every call is bounded at 30 s, with one retry.** Run C's single arbiter call sat for 45 s,
