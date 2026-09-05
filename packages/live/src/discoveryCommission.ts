@@ -79,7 +79,11 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       onCharge: book,
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
-    const sheet = await (refs ??= loadReferenceSheet())
+    // A rejected sheet must not be memoised: one bad encode would draw nothing ever again.
+    const sheet = await (refs ??= loadReferenceSheet().catch((e: unknown) => {
+      refs = null
+      throw e
+    }))
     // The eye draws the retry-vs-blocked line, so it reads the operator's config, not the defaults.
     const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet, config: loadForgeConfig() })
     return createForge({

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
@@ -18,6 +18,18 @@ import {
 import { FORGE_CALLER, createDiscoveryArt } from './discoveryCommission.js'
 import { ledgerTotalUsd } from './liveWorld.js'
 import { createGateway } from '@sj/gateway'
+
+const refsFail = vi.hoisted(() => ({ value: false }))
+vi.mock('@sj/forge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@sj/forge')>()
+  return {
+    ...actual,
+    loadReferenceSheet: async (): Promise<Buffer[]> => {
+      if (refsFail.value) throw new Error('the reference sheet could not be encoded')
+      return actual.loadReferenceSheet()
+    },
+  }
+})
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const WATERSKIN = { name: 'stitch a waterskin', makes: ['waterskin'] }
@@ -107,6 +119,7 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     migrateLlmTables(opsDb)
   })
   afterEach(() => {
+    refsFail.value = false
     opsDb.close()
     rmSync(dir, { recursive: true, force: true })
   })
@@ -229,6 +242,29 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     art.onDiscovery(WATERSKIN)
     await art.settle()
     expect(codex.listSince(0).map((r) => r.kind)).toEqual(['waterskin'])
+  }, 30_000)
+
+  it('a reference sheet that fails once does not disable art for the whole process', async () => {
+    refsFail.value = true
+    const refused: string[] = []
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
+      apiKey: 'not-a-key',
+      fetchFn: fakeFetch,
+      judge,
+      onError: (kind) => refused.push(kind),
+    })
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+    expect(refused).toEqual(['waterskin'])
+    expect(codex.listSince(0)).toEqual([])
+
+    refsFail.value = false
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+    expect(codex.listSince(0).map((r) => [r.kind, r.status])).toEqual([['waterskin', 'ready']])
   }, 30_000)
 
   it('a run with no API key draws nothing at all', () => {
