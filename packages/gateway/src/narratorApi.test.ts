@@ -341,7 +341,9 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(body.papers.map((p) => p.title)).toContain('What the Night Left')
   })
 
-  it('reads the firsts ledger to its full width, JSON columns already parsed', async () => {
+  // ★ The ledger's own columns carry the construct's raw id and the id of whoever named it.
+  // Neither is anything a page can draw, and the wire is the far side of the glass.
+  it('reads the firsts ledger, without the ids the ledger keeps for itself', async () => {
     expect(await (await fetch(`${base}/api/milestones`)).json()).toEqual([
       {
         kind: 'first_death',
@@ -352,13 +354,11 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
         tier: 3,
         domain: 'ritual',
         agentIds: ['alice', 'bob'],
-        constructId: 'construct_7',
         nameProvenance: {
           name: 'the Long Sit',
           sourceKind: 'speech',
           eventSeq: 8999,
           quote: 'we should call it the Long Sit',
-          byId: 'alice',
         },
       },
     ])
