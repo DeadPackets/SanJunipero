@@ -160,7 +160,7 @@ function impossibleSelfContradicts(v: Verdict): boolean {
 
 // A refusal reporting on the ask rather than on the world. Live ruling 11 of the last rehearsal
 // told a mind a destination could not be resolved to a walk action; these are its words.
-const MACHINE_PROSE = /\b(?:coordinates?|parameters?|action|requested|resolved?|specified)\b/i
+const MACHINE_PROSE = /\bcoordinates?\b|\bparameters?\b|\bresolved to\b|\b\w+ action\b/i
 
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
