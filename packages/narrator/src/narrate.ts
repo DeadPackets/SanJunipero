@@ -191,8 +191,8 @@ export async function narrateDay(deps: {
   let semanticRan = false
   if (deps.semantic !== undefined) {
     semanticRan = true
+    // The pass writes each mark beside the row that says its concept is found, so nothing here.
     const semantic = await detectSemanticFirsts({ ...deps.semantic, store, day })
-    for (const m of semantic) store.insertMilestone(m)
     milestones.push(...semantic)
   }
 
