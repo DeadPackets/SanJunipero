@@ -79,6 +79,10 @@ export type SceneCoordinatorOpts = {
 
 // A scene opens as a talk and is worth what a talk is worth; the kind it turns into raises it.
 const OPENING_STAKES = STAKES_BY_KIND.talk
+/** How long a mind may spend in talks in one day before a casual one stops opening for it. Three
+ *  hours: r13 measured six hours a day in talks against a fifth of an hour of work, and a talk
+ *  somebody is named into, or an ask, a quarrel or a rule, still opens. */
+export const TALK_BUDGET_TICKS = 180
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
 // How many of its own last lines a mind is shown before it speaks again.
@@ -123,6 +127,7 @@ export class SceneCoordinator {
   readonly #everyone: () => readonly string[]
   readonly #laws: LawSeam | null
   readonly #lapsed = new Set<string>()
+  readonly #talked = new Map<string, { day: number; ticks: number }>()
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
@@ -221,8 +226,12 @@ export class SceneCoordinator {
       .earshot(agentId)
       .filter((id) => this.#mindFor(id) !== null && this.#canTalk(id))
     if (heard.length + 1 < TALKERS_NEEDED) return null
+    // A name opens a talk whatever the day has held; a remark to the air does not once the
+    // speaker, or everyone near enough to answer, has talked their fill today.
+    const named = addressedIn(said, heard, (id) => this.#nameOf(id))
+    const fresh = heard.filter((id) => !this.#talkedOut(id, tick))
     const answering =
-      addressedIn(said, heard, (id) => this.#nameOf(id)) ?? this.#bridge.nearestOf(agentId, heard)
+      named ?? (this.#talkedOut(agentId, tick) ? null : this.#bridge.nearestOf(agentId, fresh))
     if (answering === null) return null
     const scene = openScene({
       openedTick: tick,
@@ -417,6 +426,7 @@ export class SceneCoordinator {
     this.#lastTick = tick
     this.#readRelationshipEvents(tick)
     for (const scene of this.open()) {
+      for (const id of scene.participants) this.#countTalk(id, tick)
       this.#dropAbsent(scene, tick)
       if (scene.participants.length < TALKERS_NEEDED) {
         void this.#close(scene, 'left', tick).catch(this.#sink)
@@ -432,6 +442,18 @@ export class SceneCoordinator {
       this.#asked.delete(scene.id)
       void this.#timedOut(scene, tick).catch(this.#sink)
     }
+  }
+
+  #countTalk(agentId: string, tick: number): void {
+    const day = Math.floor(tick / MINUTES_PER_DAY)
+    const had = this.#talked.get(agentId)
+    const ticks = had?.day === day ? had.ticks + 1 : 1
+    this.#talked.set(agentId, { day, ticks })
+  }
+
+  #talkedOut(agentId: string, tick: number): boolean {
+    const had = this.#talked.get(agentId)
+    return had?.day === Math.floor(tick / MINUTES_PER_DAY) && had.ticks >= TALK_BUDGET_TICKS
   }
 
   #sink = (err: unknown): void => {

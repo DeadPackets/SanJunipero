@@ -105,6 +105,15 @@ const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
  *  measured as 15.9 idle hours of a 17.3-hour waking day. Every call the town makes scales
  *  roughly inversely with it. */
 export const DEFAULT_IDLE_GAP_TICKS = 15
+/** The physics a LIVE town runs on, laid down at Day 0 as laws so a replay carries them. The
+ *  defaults suit a scripted world; at 0.01 a meal lasts four days and a log burns eight hours, and
+ *  r13 measured the result: 25 meals and 5 chops in 37 mind-days. Here a meal lasts about eight
+ *  waking hours and a hearth wants feeding twice a night, so food and wood are work again. */
+export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
+  'needs.hungerDecayPerTick': 0.12,
+  'light.fuelBurnTicks': 240,
+}
+
 export function idleGapTicks(env: Record<string, string | undefined> = process.env): number {
   const raw = Number(env.SJ_IDLE_GAP)
   return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_IDLE_GAP_TICKS
@@ -549,6 +558,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // it, and a replay of this log reaches the same town. Announced only when it moved.
       if (loop.state.laws?.['population.maxMinds'] !== maxMinds)
         bridge.announce('config_changed', { path: 'population.maxMinds', value: maxMinds })
+      for (const [path, value] of Object.entries(LIVE_PHYSICS)) {
+        if (loop.state.laws?.[path] !== value) bridge.announce('config_changed', { path, value })
+      }
       const restoring = new Map<string, RuntimeSnapshot>()
       for (const m of cast) {
         const row = dbFor(m.id)

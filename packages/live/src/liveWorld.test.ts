@@ -28,6 +28,7 @@ import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
+  LIVE_PHYSICS,
   LIVE_ALLOW_PROVIDER_FALLBACKS,
   LIVE_OPS_DB,
   RATE_STOP_ALERT_KIND,
@@ -1075,6 +1076,24 @@ describe('★ the founding of twelve, under a flat cap of twenty', () => {
     // Every one of the twelve took a turn: a body with no mind behind it stands still for ever.
     expect([...thinkers(dir)].sort()).toEqual([...FOUNDER_IDS].sort())
   }, 60_000)
+})
+
+describe('★ the physics a live town runs on', () => {
+  it('lays down faster hunger and shorter fuel as laws at Day 0, once', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    const laid = (): Record<string, unknown>[] =>
+      eventsOf(dir, 'config_changed').filter(
+        (p) => typeof p.path === 'string' && p.path in LIVE_PHYSICS,
+      )
+    expect(laid()).toEqual(Object.entries(LIVE_PHYSICS).map(([path, value]) => ({ path, value })))
+    await world.stop()
+    worlds.pop()
+    const { world: again } = await liveWorld({ dir })
+    await run(again, 3)
+    expect(laid()).toHaveLength(Object.keys(LIVE_PHYSICS).length)
+  })
 })
 
 describe('★ the ceiling as a world law', () => {

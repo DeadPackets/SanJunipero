@@ -23,7 +23,12 @@ import { SCENE_CORPUS, SCENE_CORPUS_LINES } from '@sj/shared/testutil'
 import { EngineBridge } from '../runtime/bridge.js'
 import { openAgentDb } from '../memory/schema.js'
 import { TieStore } from '../memory/ties.js'
-import { MAX_COMPILES_PER_DAY, SceneCoordinator, type SceneMind } from './coordinator.js'
+import {
+  TALK_BUDGET_TICKS,
+  MAX_COMPILES_PER_DAY,
+  SceneCoordinator,
+  type SceneMind,
+} from './coordinator.js'
 import { INVITATION_STAKES } from './invitations.js'
 import {
   FLOOR_TIMEOUT_MS,
@@ -915,6 +920,37 @@ const THREE: readonly Who[] = [
   { id: OMAR, name: 'Omar', x: 4 },
   { id: SALMA, name: 'Salma', x: 5 },
 ]
+
+// r13: six hours a day in talks, a fifth of an hour of work. A day has a talk budget; a name,
+// an ask, a quarrel or a rule still opens a talk after it is spent.
+describe('a day’s talk budget', () => {
+  it('★ opens no casual talk for a mind that has talked its fill today, but an addressed one still opens', () => {
+    const h = harness({ who: THREE })
+    expect(h.coordinator.noteSpoken(NADIA, 'Morning, all.', NOON)).not.toBeNull()
+    let t = NOON
+    for (let i = 0; i < TALK_BUDGET_TICKS; i++) h.coordinator.onTick(++t)
+    h.coordinator.leave(NADIA, t)
+    h.coordinator.leave(OMAR, t)
+    expect(h.coordinator.open()).toEqual([])
+
+    expect(h.coordinator.noteSpoken(NADIA, 'Nice weather for it.', ++t)).toBeNull()
+    // Salma has not talked today, but everyone near her has: nobody answers a remark to the air.
+    expect(h.coordinator.noteSpoken(SALMA, 'Anyone seen the bucket?', ++t)).toBeNull()
+    const named = h.coordinator.noteSpoken(NADIA, 'Salma, come and look at this.', ++t)
+    expect(named?.participants).toEqual([NADIA, SALMA].sort())
+  })
+
+  it('starts the budget again with the day', () => {
+    const h = harness({ who: THREE })
+    h.coordinator.noteSpoken(NADIA, 'Morning, all.', NOON)
+    let t = NOON
+    for (let i = 0; i < TALK_BUDGET_TICKS; i++) h.coordinator.onTick(++t)
+    h.coordinator.leave(NADIA, t)
+    h.coordinator.leave(OMAR, t)
+    expect(h.coordinator.noteSpoken(NADIA, 'Nice weather for it.', t + 1)).toBeNull()
+    expect(h.coordinator.noteSpoken(NADIA, 'Morning again.', t + MINUTES_PER_DAY)).not.toBeNull()
+  })
+})
 
 describe('a town writes its own rule', () => {
   it('tells the world a rule was put the moment somebody says it', async () => {
