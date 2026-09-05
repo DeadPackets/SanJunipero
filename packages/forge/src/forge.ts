@@ -75,7 +75,8 @@ export function createForge(deps: {
         try {
           const out = await deps.client.generateCandidates(prompt, deps.refs, 1)
           cand = out[0]
-        } catch {
+        } catch (e) {
+          if (e instanceof BudgetExceededError || e instanceof AnomalyStopError) throw e
           continue
         }
         if (cand === undefined) continue
