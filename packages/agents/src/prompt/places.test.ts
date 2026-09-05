@@ -189,7 +189,7 @@ describe('★ how far the ground goes', () => {
   // were never there, and only a refusal ever told her the map stopped at 75.
   it('names the whole valley in map numbers, once', () => {
     expect(valleyExtentLine({ extent: () => ({ w: 76, h: 76 }) })).toBe(
-      'The valley runs from (0, 0) to (75, 75); past its edges there is nothing to find.',
+      'The valley runs from (0, 0) to (75, 75); past its edges there is only the road out of it.',
     )
   })
 
@@ -204,7 +204,7 @@ describe('★ how far the ground goes', () => {
     const said = (p: PerceptionPacket): string => perceptionToProse(p, undefined, {})
     expect(said(quietMeadowPacket)).not.toContain("valley's edge")
     expect(said({ ...quietMeadowPacket, atRim: true })).toContain(
-      "You are standing at the valley's edge; nothing lies beyond.",
+      "You are standing at the valley's edge, where the road comes in; the town lies up the road.",
     )
   })
 })
