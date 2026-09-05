@@ -2553,19 +2553,18 @@ function askable(
     if (target.partnerId !== undefined) return 'they already have a partner'
     return null
   }
-  if (verb === 'lie_with') {
-    const roof = me.insideId === undefined ? undefined : state.structures[me.insideId]
-    const own =
-      roof !== undefined &&
-      me.insideId === target.insideId &&
-      config.structures.privateKinds.includes(roof.kind) &&
-      (roof.owner === undefined || roof.owner === agentId || roof.owner === target.id)
-    if (!own) return 'not under a roof of your own'
-    // Only the answer needs two free pairs of hands: the ask itself is a word, and words are free.
-    if (isAcceptance(state, agentId, target.id, verb)) {
-      if (me.activity) return 'your hands are full'
-      if (target.activity) return 'their hands are full'
-    }
+  // lie_with, the only ask left
+  const roof = me.insideId === undefined ? undefined : state.structures[me.insideId]
+  const own =
+    roof !== undefined &&
+    me.insideId === target.insideId &&
+    config.structures.privateKinds.includes(roof.kind) &&
+    (roof.owner === undefined || roof.owner === agentId || roof.owner === target.id)
+  if (!own) return 'not under a roof of your own'
+  // Only the answer needs two free pairs of hands: the ask itself is a word, and words are free.
+  if (isAcceptance(state, agentId, target.id, verb)) {
+    if (me.activity) return 'your hands are full'
+    if (target.activity) return 'their hands are full'
   }
   return null
 }
