@@ -30,7 +30,7 @@ export type CommittedCharacter = {
 }
 
 /** Every committed character sheet, in id order. A missing file, or a manifest short of the 24
- *  cells, throws: a sheet with 23 cells draws nothing at all for the pose it is missing. */
+ *  cells, is loud and skipped: one unreadable sheet must not cost the whole cast its faces. */
 export function listCommittedCast(root: string = CAST_CONTENT_DIR): CommittedCharacter[] {
   if (!existsSync(root)) return []
   const out: CommittedCharacter[] = []
@@ -41,16 +41,19 @@ export function listCommittedCast(root: string = CAST_CONTENT_DIR): CommittedCha
     const base = join(root, id)
     const manifestPath = join(base, 'manifest.json'),
       atlasPath = join(base, 'atlas.webp')
-    for (const p of [manifestPath, atlasPath]) {
-      if (!existsSync(p)) throw new Error(`cast/${id}: ${p.split('/').at(-1)} is missing`)
+    try {
+      for (const p of [manifestPath, atlasPath]) {
+        if (!existsSync(p)) throw new Error(`${p.split('/').at(-1)} is missing`)
+      }
+      const manifest = CharacterAtlasManifestSchema.parse(
+        JSON.parse(readFileSync(manifestPath, 'utf8')),
+      )
+      const absent = CELL_NAMES_V4.filter((n) => manifest.cells[n] === undefined)
+      if (absent.length) throw new Error(`manifest addresses no cell ${absent.join(', ')}`)
+      out.push({ id, codexKind: characterKind(id), manifest, atlas: readFileSync(atlasPath) })
+    } catch (err) {
+      console.warn(`cast/${id}: NO ART — ${err instanceof Error ? err.message : String(err)}`)
     }
-    const manifest = CharacterAtlasManifestSchema.parse(
-      JSON.parse(readFileSync(manifestPath, 'utf8')),
-    )
-    const absent = CELL_NAMES_V4.filter((n) => manifest.cells[n] === undefined)
-    if (absent.length)
-      throw new Error(`cast/${id}: manifest addresses no cell ${absent.join(', ')}`)
-    out.push({ id, codexKind: characterKind(id), manifest, atlas: readFileSync(atlasPath) })
   }
   return out
 }
