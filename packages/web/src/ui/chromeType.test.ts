@@ -24,13 +24,18 @@ const PROSE = [
 
 type Decl = { selectors: string; px: number; raw: string }
 
-/** The type scale, read off `:root` — the sheet names its sizes, so the reader resolves them. */
+/** Every named size in `:root` — the seven reading steps and the few that are drawn to a grid
+ *  instead. Naming them all is what puts the broadcast frame and the signpost under this law. */
 function scale(css: string): Readonly<Record<string, number>> {
   const root = /:root\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? ''
   const out: Record<string, number> = {}
-  for (const [, name, px] of root.matchAll(/--(f-\d+):\s*(\d+)px/g)) out[name!] = Number(px)
+  for (const [, name, px] of root.matchAll(/--(f-[a-z\d-]+):\s*(\d+)px/g)) out[name!] = Number(px)
   return out
 }
+
+/** The reading ladder alone: `--f-1` through `--f-7`. */
+const readingSteps = (css: string): Readonly<Record<string, number>> =>
+  Object.fromEntries(Object.entries(scale(css)).filter(([k]) => /^f-\d+$/.test(k)))
 
 /** Every size the sheet sets, from `font-size` or from the `font` shorthand, resolved to px. */
 export function fontSizes(css: string): Decl[] {
@@ -41,7 +46,7 @@ export function fontSizes(css: string): Decl[] {
       /font-size:\s*([^;}]+)/.exec(body ?? '')?.[1]?.trim() ??
       /(?:^|;)\s*font:\s*([\d.]+(?:rem|px))/.exec(body ?? '')?.[1]?.trim()
     if (raw === undefined) continue
-    const token = /^var\(--(f-\d+)\)$/.exec(raw)?.[1]
+    const token = /^var\(--(f-[a-z\d-]+)\)$/.exec(raw)?.[1]
     const num = Number.parseFloat(raw)
     const px =
       token !== undefined
@@ -61,7 +66,7 @@ export function fontSizes(css: string): Decl[] {
 
 describe('the type scale the reader resolves against', () => {
   it('finds all seven steps in the sheet’s own :root', () => {
-    expect(scale(CSS)).toEqual({
+    expect(readingSteps(CSS)).toEqual({
       'f-1': 12,
       'f-2': 13,
       'f-3': 14,
@@ -69,6 +74,18 @@ describe('the type scale the reader resolves against', () => {
       'f-5': 18,
       'f-6': 22,
       'f-7': 28,
+    })
+  })
+
+  // Two mediums the reading ladder does not govern: the sign face lands on its own 8px grid,
+  // and the stream is read at quarter scale. Named in `:root` all the same, so the floor and
+  // the resolvability checks below cover them rather than skipping them.
+  it('names the drawn sizes too, so no size in the sheet is a bare literal', () => {
+    expect(scale(CSS)).toMatchObject({
+      'f-sign': 16,
+      'f-sign-wide': 24,
+      'f-bcast': 24,
+      'f-bcast-lead': 32,
     })
   })
 })

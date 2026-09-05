@@ -324,7 +324,10 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
   })
 
   it('staggers one way, at the table’s own 30ms, capped rather than truncated', () => {
-    expect(BARE).toMatch(/animation-delay: calc\(var\(--stagger-i, 6\) \* 30ms\)/)
+    // The step is a token now, so the literal lives in `:root` beside every other duration
+    // and `MOTION.enter.stagger` is the one number it may be.
+    expect(BARE).toMatch(/--stagger:\s*30ms/)
+    expect(BARE).toMatch(/animation-delay: calc\(var\(--stagger-i, 6\) \* var\(--stagger\)\)/)
     expect(BARE).not.toMatch(/animation-delay: \d+ms/)
   })
 
