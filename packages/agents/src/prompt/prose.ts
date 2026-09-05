@@ -823,6 +823,92 @@ export function wantLine(want: WantKind | null): string {
   return want === null ? '' : `Today the thing you want most is ${want}. Who could give you that?`
 }
 
+// #region work as a social want
+
+/** What the whole valley is holding, counted off the world and not off one pair of eyes. */
+export type TownStock = { wood: number; food: number; hearths: number; mouths: number }
+
+// A hearth burns about two logs a night at the live physics, so this is what a stocked town has.
+const LOGS_PER_HEARTH = 2
+
+/** The work each material comes out of, and how a body doing it is said. */
+const WORK_SAID: Readonly<Record<'wood' | 'food', Readonly<Record<string, string>>>> = {
+  wood: { chop: 'chopping' },
+  food: { fish: 'fishing', forage: 'foraging', harvest: 'harvesting' },
+}
+
+const countOf = (n: number, word: string): string => `${n} ${n === 1 ? word : `${word}s`}`
+
+const woodSaid = (s: TownStock): string =>
+  `${countOf(s.wood, 'log')} for ${countOf(s.hearths, 'hearth')}`
+const foodSaid = (s: TownStock): string =>
+  `${countOf(s.food, 'meal')} for ${countOf(s.mouths, 'mouth')}`
+
+const woodIsShort = (s: TownStock): boolean => s.wood < LOGS_PER_HEARTH * s.hearths
+const foodIsShort = (s: TownStock): boolean => s.food < s.mouths
+
+/** What the town is running out of, said flat to everybody in the morning and nowhere else.
+ *  Only the short side, no urgency and nothing to do about it: r24 ran out on day 3 unseen. */
+export function stockLine(stock: TownStock): string {
+  const said: string[] = []
+  if (woodIsShort(stock)) said.push(woodSaid(stock))
+  if (foodIsShort(stock)) said.push(foodSaid(stock))
+  return said.length === 0 ? '' : `The town has ${said.join(' and ')}.`
+}
+
+/** Whoever the eyes can already see at this work: nearest first, then by name so a tie is stable. */
+function workerAtLine(packet: PerceptionPacket, short: 'wood' | 'food'): string {
+  const said = WORK_SAID[short]
+  const away = (p: { x: number; y: number }): number =>
+    Math.abs(p.x - packet.self.x) + Math.abs(p.y - packet.self.y)
+  const at = packet.visible.agents
+    .map((a) => ({ a, doing: a.activityVerb === null ? undefined : said[a.activityVerb] }))
+    .filter((w): w is { a: PerceptionAgent; doing: string } => w.doing !== undefined)
+    .sort((p, q) => away(p.a) - away(q.a) || (p.a.name < q.a.name ? -1 : 1))[0]
+  return at === undefined ? '' : `${at.a.name} is ${at.doing} at (${at.a.x}, ${at.a.y}).`
+}
+
+/** Who is at the work, or where the stuff stands when nobody is. */
+function workRoadLine(
+  short: 'wood' | 'food',
+  packet: PerceptionPacket,
+  world?: ProseWorld,
+): string {
+  const worker = workerAtLine(packet, short)
+  if (worker.length > 0) return worker
+  const { x, y } = packet.self
+  if (short === 'wood') {
+    const at = world?.nearestSource?.(FUEL_ITEM, x, y) ?? null
+    return at === null
+      ? ''
+      : `The nearest ${sourcePhrase(at.from, FUEL_ITEM)} is at (${at.x}, ${at.y}).`
+  }
+  const at = world?.nearestFood?.(x, y) ?? null
+  return at === null ? '' : `The nearest food you know of is ${at.kind} at (${at.x}, ${at.y}).`
+}
+
+/** Where the town is thin, and the road to it, for a mind that wants to be counted on. Never a
+ *  quota and never an order: what the town is short of is a fact, what to do about it is yours. */
+export function usefulLine(
+  want: WantKind | null,
+  stock: TownStock,
+  packet: PerceptionPacket,
+  world?: ProseWorld,
+): string {
+  if (want !== 'esteem') return ''
+  const head = 'Today the thing you want most is to be counted on.'
+  const wood = woodIsShort(stock)
+  const food = foodIsShort(stock)
+  if (!wood && !food) return `${head} Nobody is short of anything; who have you not helped lately?`
+  const thinner =
+    stock.wood / (LOGS_PER_HEARTH * stock.hearths) <= stock.food / stock.mouths ? 'wood' : 'food'
+  const short = wood && food ? thinner : wood ? 'wood' : 'food'
+  const said = `The town has ${short === 'wood' ? woodSaid(stock) : foodSaid(stock)}.`
+  return [head, said, workRoadLine(short, packet, world)].filter((p) => p.length > 0).join(' ')
+}
+
+// #endregion
+
 /** Said on every turn a mind is in a talk. The turn and the talk are two asks of the same mind,
  *  and r13 closed 49 of 106 talks because the turn walked off or went to bed without knowing. */
 export function inTalkLine(withNames: readonly string[]): string {

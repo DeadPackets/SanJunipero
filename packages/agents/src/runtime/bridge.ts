@@ -41,6 +41,7 @@ import {
 } from '@sj/engine'
 import type { Law, Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
 import {
+  isHearthKind,
   isWet,
   isWoody,
   MINUTES_PER_DAY,
@@ -50,7 +51,13 @@ import {
   type SimEvent,
   weekdayFromTick,
 } from '@sj/shared'
-import type { KnownPlace, PerceptionPacket, SourceKind, WalkMark } from '../prompt/prose.js'
+import type {
+  KnownPlace,
+  PerceptionPacket,
+  SourceKind,
+  TownStock,
+  WalkMark,
+} from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // How far off a body still picks water out of the middle distance.
@@ -700,6 +707,29 @@ export class EngineBridge {
    *  measured against, wherever it is measured. */
   headcount(): number {
     return headcount(this.#loop.state)
+  }
+
+  /** What the valley is holding: the wood and the food on its shelves and its ground, the fires
+   *  that burn one and the mouths that eat the other. Hands are not stock, a carried log is
+   *  already somebody's. */
+  townStock(): TownStock {
+    const state = this.#loop.state
+    let wood = 0
+    let food = 0
+    for (const item of Object.values(state.items)) {
+      if (item.loc.t === 'agent') continue
+      if (item.kind === FUEL_KIND) wood += item.qty
+      else if (isFoodKind(this.#simConfig, item.kind)) food += item.qty
+    }
+    let hearths = 0
+    for (const s of Object.values(state.structures)) {
+      if (s.stage === 'complete' && isHearthKind(this.#simConfig, s.kind)) hearths++
+    }
+    let mouths = 0
+    for (const a of Object.values(state.agents)) {
+      if (a.alive && a.departed === undefined) mouths++
+    }
+    return { wood, food, hearths, mouths }
   }
 
   /** The ceiling as the world's own laws have it now, which is what an operator's change moved. */
