@@ -624,6 +624,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
               roster: () => built.roster(),
               customs: () => built.customs(),
+              habits: () => built.habits(),
               frontier: () => built.frontier(),
               compileLaw: (ask) => built.compileLaw(ask),
             })

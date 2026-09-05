@@ -29,6 +29,7 @@ export type SceneVoice = {
   roster?: () => readonly RosterEntry[]
   /** The town's own names for its habits, from the same seam the ordinary turn reads. */
   customs?: () => readonly string[]
+  habits?: () => readonly string[]
   /** What the town has agreed and holds each other to. One more block of the shared prefix, so
    *  a rule reaches a scene line and an ordinary turn as the same bytes. */
   laws?: () => readonly string[]
@@ -294,6 +295,7 @@ function sceneSystem(voice: SceneVoice): string {
     rulesOfBeing: RULES_OF_BEING,
     ...(voice.roster === undefined ? {} : { roster: voice.roster() }),
     ...(voice.customs === undefined ? {} : { customs: voice.customs() }),
+    ...(voice.habits === undefined ? {} : { habits: voice.habits() }),
     ...(voice.laws === undefined ? {} : { laws: voice.laws() }),
     ...(voice.frontier === undefined ? {} : { frontier: voice.frontier() }),
     identity: voice.identity,

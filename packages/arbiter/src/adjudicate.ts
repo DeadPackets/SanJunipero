@@ -17,7 +17,7 @@ import { CANON } from './canon.js'
 import { makeCouncil, type LawCompileAnswer, type LawCompileAsk } from './council.js'
 import { isCharterRow, type AttemptVerdict, type VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
-import { namedCustoms } from './constructs.js'
+import { habitLines, namedCustoms } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { codify as codifyAttempt, verbFromCharter } from './codify.js'
 import {
@@ -221,6 +221,8 @@ export type Arbiter = {
   roster(): RosterEntry[]
   // The names the town gave its own recurrences. Names only — see `namedCustoms`.
   customs(): string[]
+  // What keeps happening, named or not: gatherings that came back on enough separate days.
+  habits(): string[]
   // The rungs one step out, in the codex's own words. What the court has always been shown and
   // no mind ever was, which is why no mind ever reached for one.
   frontier(): string[]
@@ -558,6 +560,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
     customs() {
       return namedCustoms(constructs.all())
+    },
+
+    habits() {
+      return habitLines(constructs.all())
     },
 
     frontier() {

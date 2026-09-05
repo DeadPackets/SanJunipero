@@ -38,6 +38,7 @@ export type PromptBlocks = {
   // What the town has named, on the same terms and beside it: shared by every mind, and rewritten
   // only on the day somebody gives a habit a word.
   customs?: readonly string[]
+  habits?: readonly string[]
   // What the town has agreed and holds each other to, in the words somebody actually said.
   // Texts alone: a rule has an id and a number, and a mind may hear neither.
   laws?: readonly string[]
@@ -195,12 +196,16 @@ function renderLaws(texts: readonly string[], tabled: readonly string[]): string
   return [...agreed, ...waiting].join('\n')
 }
 
-function renderCustoms(names: readonly string[]): string {
-  if (names.length === 0) return ''
-  const said = names.map((n) => `the ${n}`)
-  const head = said.slice(0, -1).join(', ')
-  const tail = said.slice(-1).join('')
-  return `The town has taken to ${head === '' ? tail : `${head} and ${tail}`}.`
+function renderCustoms(names: readonly string[], habits: readonly string[]): string {
+  const lines: string[] = []
+  if (names.length > 0) {
+    const said = names.map((n) => `the ${n}`)
+    const head = said.slice(0, -1).join(', ')
+    const tail = said.slice(-1).join('')
+    lines.push(`The town has taken to ${head === '' ? tail : `${head} and ${tail}`}.`)
+  }
+  if (habits.length > 0) lines.push(...habits)
+  return lines.join('\n')
 }
 
 // Rules of being + capabilities are static and identical for every agent, and the cache keeps
@@ -216,7 +221,7 @@ function estTokens(text: string): number {
 export function assemblePrompt(blocks: PromptBlocks): AssembledPrompt {
   const shared = renderShared(blocks.rulesOfBeing)
   const roster = renderRoster(blocks.roster ?? [])
-  const customs = renderCustoms(blocks.customs ?? [])
+  const customs = renderCustoms(blocks.customs ?? [], blocks.habits ?? [])
   const laws = renderLaws(blocks.laws ?? [], blocks.tabled ?? [])
   const frontier = renderFrontier(blocks.frontier ?? [])
   const identity = renderIdentity(blocks.identity)

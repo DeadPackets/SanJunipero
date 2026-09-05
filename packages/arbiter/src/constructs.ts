@@ -341,6 +341,48 @@ export const NAMED_CUSTOMS_SHOWN = 6
 /** The only thing about a construct a mind may ever be told: the name the town gave it, out of
  *  its own mouth. The glass stops OUR words reaching a mind, and a name quoted verbatim from a
  *  mind's own speech is the town's word already — `council` is a word a town will use. */
+/** How many separate days a gathering has to come back on before the town is told it has a
+ *  habit, and how many before that habit is called a tradition. Days, not gatherings: three
+ *  market mornings in one day are one morning. */
+export const HABIT_DAYS = 3
+export const TRADITION_DAYS = 7
+export const HABITS_SHOWN = 4
+
+const daysOf = (c: Construct): number =>
+  new Set(
+    [c.firstTick, ...c.recurrences.map((r) => r.tick)].map((t) => Math.floor(t / MINUTES_PER_DAY)),
+  ).size
+
+/** What the town keeps doing, said to every mind in plain words: how many of them, where, and on
+ *  how many days. What kind of thing the recognizer decided it is stays behind the glass; a name
+ *  is said only when the town gave one. Oldest habit first. */
+export function habitLines(constructs: readonly Construct[]): string[] {
+  return constructs
+    .map((c) => ({ c, days: daysOf(c) }))
+    .filter(({ days }) => days >= HABIT_DAYS)
+    .sort((a, b) => a.c.firstTick - b.c.firstTick || (a.c.id < b.c.id ? -1 : 1))
+    .slice(0, HABITS_SHOWN)
+    .map(({ c, days }) => {
+      const people = new Set([...c.participants, ...c.recurrences.flatMap((r) => r.participants)])
+      const where =
+        c.anchor === null
+          ? ''
+          : typeof c.anchor === 'string'
+            ? ` at the ${c.anchor}`
+            : ` at the same spot near (${c.anchor.x}, ${c.anchor.y})`
+      const named =
+        c.name === null ? 'Nobody has given it a name yet.' : `You call it the ${c.name}.`
+      const standing = days >= TRADITION_DAYS ? 'It is a tradition by now.' : ''
+      return [
+        `${people.size} of you have gathered${where} on ${days} different days.`,
+        named,
+        standing,
+      ]
+        .filter((s) => s.length > 0)
+        .join(' ')
+    })
+}
+
 export function namedCustoms(constructs: readonly Construct[]): string[] {
   return constructs
     .filter((c) => c.nameProvenance?.sourceKind === 'speech')

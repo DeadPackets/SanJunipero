@@ -366,6 +366,7 @@ export class AgentRuntime {
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
   #customs: (() => readonly string[]) | null = null
+  #habits: (() => readonly string[]) | null = null
   #frontier: (() => readonly string[]) | null = null
 
   #agentId = ''
@@ -579,6 +580,7 @@ export class AgentRuntime {
     this.#codify = arbiter.codify
     this.#roster = arbiter.roster ?? null
     this.#customs = arbiter.customs ?? null
+    this.#habits = arbiter.habits ?? null
     this.#frontier = arbiter.frontier ?? null
   }
 
@@ -1165,6 +1167,7 @@ export class AgentRuntime {
       rulesOfBeing: RULES_OF_BEING,
       ...(this.#roster === null ? {} : { roster: this.#roster() }),
       ...(this.#customs === null ? {} : { customs: this.#customs() }),
+      ...(this.#habits === null ? {} : { habits: this.#habits() }),
       laws: this.#bridge.lawTexts(),
       tabled: this.#bridge.tabledLines(),
       ...(this.#frontier === null ? {} : { frontier: this.#frontier() }),

@@ -14,6 +14,7 @@ import {
   ConstructSchema,
   CONSTRUCT_TYPE_INSTRUCTION,
   detectCandidates,
+  habitLines,
   namedCustoms,
   NAMED_CUSTOMS_SHOWN,
   runConstructPass,
@@ -281,6 +282,59 @@ describe('the daily pass', () => {
 })
 
 // The one thing that crosses the glass, and the whole of it: a name the town said out loud.
+// The owner's ruling: traditions build over days. A habit is told once it has come back on
+// three separate days, named or not; a week of days makes it a tradition.
+describe('habitLines', () => {
+  const day = (n: number, minute = 600): number => n * MINUTES_PER_DAY + minute
+  const habit = (over: Partial<Construct> = {}): Construct => ({
+    id: 'construct_30_30',
+    type: 'custom',
+    name: null,
+    nameProvenance: null,
+    anchor: { x: 30, y: 30 },
+    participants: ['ada', 'bex'],
+    firstTick: day(0),
+    recurrences: [
+      { tick: day(1), participants: ['ada', 'bex', 'cal'] },
+      { tick: day(2), participants: ['ada', 'bex'] },
+    ],
+    ...over,
+  })
+
+  it('says a habit that came back on three separate days, counting people and days, no name', () => {
+    expect(habitLines([habit()])).toEqual([
+      '3 of you have gathered at the same spot near (30, 30) on 3 different days. Nobody has given it a name yet.',
+    ])
+  })
+
+  it('counts days, not gatherings: three in one day is one day', () => {
+    const same = habit({
+      recurrences: [
+        { tick: day(0, 700), participants: ['ada'] },
+        { tick: day(0, 800), participants: ['bex'] },
+      ],
+    })
+    expect(habitLines([same])).toEqual([])
+  })
+
+  it('calls a week of days a tradition, and says the name the town gave', () => {
+    const week = habit({
+      name: 'Long Turning',
+      recurrences: [1, 2, 3, 4, 5, 6].map((d) => ({ tick: day(d), participants: ['ada', 'bex'] })),
+    })
+    expect(habitLines([week])).toEqual([
+      '2 of you have gathered at the same spot near (30, 30) on 7 different days. You call it the Long Turning. It is a tradition by now.',
+    ])
+  })
+
+  it('never says what kind of thing we decided it was', () => {
+    for (const type of ['festival', 'faith', 'council', 'market', 'custom'] as const) {
+      const said = habitLines([habit({ type })]).join(' ')
+      expect(said.toLowerCase(), type).not.toContain(type)
+    }
+  })
+})
+
 describe('namedCustoms', () => {
   const construct = (over: Partial<Construct> = {}): Construct => ({
     id: 'construct_30_30',

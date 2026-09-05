@@ -1119,6 +1119,17 @@ describe('the refusal the next turn is actually told about', () => {
 describe('what the town has named', () => {
   const said = (customs: string[]): string => assemblePrompt(fixtureBlocks({ customs })).system
 
+  it('★ says the town’s habits after its names, in the same town-wide block, and leaks nothing', () => {
+    const habit =
+      '3 of you have gathered at the same spot near (30, 30) on 3 different days. Nobody has given it a name yet.'
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], habits: [habit] }),
+    ).system
+    expect(system).toContain(`The town has taken to the Long Turning.\n${habit}`)
+    expect(scanPromptForGlassLeak(system)).toEqual([])
+    expect(assemblePrompt(fixtureBlocks({ habits: [habit] })).system).toContain(habit)
+  })
+
   it('says the names the town gave, and nothing when it gave none', () => {
     expect(said(['Long Turning'])).toContain('The town has taken to the Long Turning.')
     expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)

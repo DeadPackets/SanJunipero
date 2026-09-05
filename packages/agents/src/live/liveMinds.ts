@@ -149,6 +149,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   }
   const roster = opts.arbiter?.roster
   const customs = opts.arbiter?.customs
+  const habits = opts.arbiter?.habits
   const frontier = opts.arbiter?.frontier
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
@@ -167,6 +168,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         }),
         ...(roster === undefined ? {} : { roster }),
         ...(customs === undefined ? {} : { customs }),
+        ...(habits === undefined ? {} : { habits }),
         laws: () => opts.bridge.lawTexts(),
         ...(frontier === undefined ? {} : { frontier }),
         livingCast,
