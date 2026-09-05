@@ -397,6 +397,20 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
   })
 
+  // ★ Pixi v8's Texture registers a `resize` listener on its source through the constructor's
+  // own setter, and only `destroy()` takes it off. An uncached slice therefore leaves a
+  // permanent listener AND a strong reference on the long-lived atlas, per kind change.
+  it('★ cuts an emote frame once for the layer, not once per kind change', () => {
+    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    const setGlyph = /const setGlyph = [\s\S]*?\n  \}/.exec(src)![0]
+    expect(setGlyph).toContain('cached(')
+    // there are only EMOTE_KINDS.length distinct frames in the whole atlas
+    expect(setGlyph).toContain('`emote:${kind}`')
+    expect(setGlyph, 'a bare Texture here is one that is never freed').not.toMatch(
+      /=\s*new Texture\(/,
+    )
+  })
+
   it('removing an agent destroys its 4 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>

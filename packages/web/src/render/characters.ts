@@ -307,8 +307,8 @@ export function createCharacterLayer(
     }
   }
 
-  /** The atlas cell for the row the slot is showing. Cut once per kind per person: a new
-   *  Texture every frame is a new texture every frame. */
+  /** The atlas cell for the row the slot is showing. Cut once per kind for the whole layer:
+   *  Pixi's Texture holds a listener on its source that only `destroy()` takes off again. */
   const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
     if (e.glyphKind === kind) return
     e.glyphKind = kind
@@ -319,10 +319,16 @@ export function createCharacterLayer(
       e.overhead.glyph.texture = Texture.EMPTY
       return
     }
-    e.overhead.glyph.texture = new Texture({
-      source: emoteAtlas.source,
-      frame: new Rectangle(cell * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
-    })
+    const atlas = emoteAtlas
+    e.overhead.glyph.texture = cached(
+      atlas,
+      `emote:${kind}`,
+      () =>
+        new Texture({
+          source: atlas.source,
+          frame: new Rectangle(cell * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+        }),
+    )
     e.overhead.glyph.width = EMOTE_PX
     e.overhead.glyph.height = EMOTE_PX
   }
