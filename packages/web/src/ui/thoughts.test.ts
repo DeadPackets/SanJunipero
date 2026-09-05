@@ -147,7 +147,7 @@ describe('the thoughts button', () => {
   // The post's four arms are the town's four sections; how the town is SHOWN is not a fifth.
   it('★ stands in the corner cluster, off the signpost', () => {
     expect(src('../paper/Signpost.tsx')).not.toContain('thoughts')
-    expect(src('./chrome.css')).toContain('.help-button, .thoughts-button {')
+    expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')
   })
 
   // ★ `--deep-l` was used here and declared nowhere: an unresolved var makes the declaration

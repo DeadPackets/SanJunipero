@@ -26,6 +26,7 @@ import { ReplayScene } from './stage/ReplayScene.js'
 import { Transport } from './stage/Transport.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { ThoughtsButton } from './stage/ThoughtsButton.js'
+import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
@@ -415,6 +416,7 @@ export function App() {
         }}
       />
       <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
+      <Soundscape store={store} scene={scene} />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}
