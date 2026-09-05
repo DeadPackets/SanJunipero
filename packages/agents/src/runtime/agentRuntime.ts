@@ -1386,22 +1386,28 @@ export class AgentRuntime {
       this.#noteAccepted(said, await this.#bridge.submit(this.#agentId, said))
     }
 
-    if (turn.action) {
+    // Words given as speech and again as a speak act are one line, not two: r16 opened 6 of
+    // its 122 talks with the same line twice.
+    const action =
+      turn.speech && turn.action && !('freeform' in turn.action) && turn.action.verb === 'speak'
+        ? null
+        : turn.action
+    if (action) {
       // `experiment {description}` is the same door as freeform said the other
       // way round — CAPABILITIES offers both, so both reach the arbiter.
       const attempt =
-        'freeform' in turn.action
-          ? turn.action.freeform
-          : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
-            ? turn.action.params.description
+        'freeform' in action
+          ? action.freeform
+          : action.verb === 'experiment' && typeof action.params.description === 'string'
+            ? action.params.description
             : null
       if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
         await this.#adjudicateFreeform(attempt, true)
       } else {
         const intent: Intent =
-          'freeform' in turn.action
-            ? { verb: 'experiment', params: { description: turn.action.freeform } }
-            : { verb: turn.action.verb, params: turn.action.params }
+          'freeform' in action
+            ? { verb: 'experiment', params: { description: action.freeform } }
+            : { verb: action.verb, params: action.params }
         await this.#holdIntent(intent)
       }
     }

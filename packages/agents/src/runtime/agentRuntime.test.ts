@@ -844,6 +844,23 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(second).toContain('Answer wait and it carries on.')
   })
 
+  it('words given as speech and again as a speak act are said once', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'They should know.',
+          speech: 'The storehouse is stocked.',
+          action: { verb: 'speak', params: { text: 'The storehouse is stocked.' } },
+          importance: 3,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => spokeTexts(world.engineDb).length >= 1, 100)
+    await stepUntil(loop, () => false, 20)
+    expect(spokeTexts(world.engineDb)).toEqual(['The storehouse is stocked.'])
+  })
+
   it('submits speech and records a thought memory with its importance', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([
