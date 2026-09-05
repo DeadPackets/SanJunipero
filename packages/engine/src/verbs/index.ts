@@ -1361,6 +1361,8 @@ const plant: VerbDef = makeVerb({
   },
   onComplete(state, _config, _agentId, params) {
     const p = PlantParams.parse(params)
+    if (tileAt(state, p.x, p.y) !== 6) return []
+    if (Object.values(state.crops).some((c) => !c.withered && c.x === p.x && c.y === p.y)) return []
     const plantedDay = Math.floor(state.tick / MINUTES_PER_DAY)
     return [
       {

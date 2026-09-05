@@ -186,6 +186,31 @@ describe('verb: plant', () => {
     expect(t.state.crops.crop_1!.stage).toBe(0)
     expect(submitIntent(t.state, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' }).ok).toBe(false)
   })
+
+  it('two sowers over one plot leave one crop, and a plot that stopped being farmland gets none', () => {
+    let s = fold(
+      makeWorld(),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      FAST,
+    )
+    for (const id of ['a1', 'a2']) {
+      const r = submitIntent(s, FAST, id, 'plant', { x: 1, y: 0, kind: 'wheat' })
+      if (!r.ok) throw new Error(r.reason)
+      s = applyAll(s, r.events)
+    }
+    const out = runAct(s, FAST)
+    expect(out.events.filter((e) => e.type === 'crop_planted')).toHaveLength(1)
+    expect(Object.values(out.state.crops).filter((c) => c.x === 1 && c.y === 0)).toHaveLength(1)
+
+    let paved = makeWorld()
+    const r = submitIntent(paved, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' })
+    if (!r.ok) throw new Error(r.reason)
+    paved = applyAll(paved, r.events)
+    paved = applyAll(paved, [
+      { type: 'tile_changed', payload: { x: 1, y: 0, from: 6, to: 8, reason: 'paved' } },
+    ])
+    expect(runAct(paved, FAST).events.filter((e) => e.type === 'crop_planted')).toHaveLength(0)
+  })
 })
 
 describe('worldTick: crop growth at dawn', () => {
