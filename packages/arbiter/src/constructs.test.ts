@@ -35,14 +35,14 @@ const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
 const THREE = ['ada', 'bex', 'cass']
 
 // One coming-together at (30, 30) on a given day: three bodies walk in, one dances.
-function gathering(day: number, who: readonly string[] = THREE): SimEvent[] {
+function gathering(day: number, who: readonly string[] = THREE, x0 = 30): SimEvent[] {
   const at = day * MINUTES_PER_DAY + 19 * 60
   return [
-    ...who.map((id, i) => ev(at, 'agent_moved', { id, x: 30 + i, y: 30 })),
+    ...who.map((id, i) => ev(at, 'agent_moved', { id, x: x0 + i, y: 30 })),
     ev(at + 1, 'agent_expressed', {
       agentId: who[0]!,
       verb: 'dance',
-      x: 30,
+      x: x0,
       y: 30,
       sense: 'sight',
     }),
@@ -229,6 +229,30 @@ describe('the daily pass', () => {
     const at = (day: number): number => day * MINUTES_PER_DAY + 19 * 60
     expect(row!.recurrences.map((r) => r.tick)).toEqual([at(3), at(5), at(20)])
     expect(store.events().filter((e) => e.type === 'construct_recurred')).toHaveLength(3)
+  })
+
+  it('keeps a site its id when the window drops the gatherings that founded it', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const run = (events: SimEvent[]) =>
+      runConstructPass({
+        events,
+        baseConfig: DEFAULT_CONFIG,
+        store,
+        llm: llm as unknown as LlmClient,
+      })
+    const drifted = [
+      ...gathering(20, THREE, 33),
+      ...gathering(22, THREE, 33),
+      ...gathering(24, THREE, 33),
+    ]
+    const [founded] = await run([...threeNights(), ...drifted])
+    const [again] = await run(drifted)
+
+    expect(again!.id).toBe(founded!.id)
+    expect(store.all()).toHaveLength(1)
+    expect(store.events().filter((e) => e.type === 'construct_recognized')).toHaveLength(1)
   })
 
   it('asks the classifier only about the sites it has never typed', async () => {
