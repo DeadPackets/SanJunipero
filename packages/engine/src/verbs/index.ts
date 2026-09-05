@@ -411,12 +411,8 @@ export function walkDestination(
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
   const a = state.agents[agentId]!
-  // ★ A MARK BEATS A GUESS. Two thirds of the walks that named somebody also carried the two
-  // numbers the mind had estimated for them, and the coordinate branch read first — so the guess
-  // decided where the legs went and the name was never used. A mark the mind chose wins, and so
-  // does its refusal: it asked for the river, and "there is no river" is the true answer.
-  // Each schema is strict, so a mark handed over WITH the mind's guessed numbers parsed as none
-  // of them and fell to the coordinates. The mark is read off on its own.
+  // A mark the mind named beats the numbers it guessed, and so does that mark's refusal. Each
+  // schema is strict, so a mark handed over WITH guessed numbers parses as neither: read it alone.
   const person = WalkToPerson.safeParse({ targetId: params.targetId })
   if (person.success) return personDestination(state, config, agentId, person.data.targetId)
   const thing = WalkToThing.safeParse({ itemId: params.itemId })

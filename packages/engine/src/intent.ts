@@ -42,9 +42,7 @@ const carrying = (go: IntentResult, verb: string, params: Record<string, unknown
       }
 
 /** An act refused for nothing but the way to it becomes the act that opens the way — the door
- *  out, or the walk over — with the act itself hung on the end of that one. What the world holds
- *  against the act rather than the ground is refused as it always was, and so is a mark no road
- *  reaches. */
+ *  out, or the walk over — with the act itself hung on the end of that one. */
 function walkFirst(
   state: WorldState,
   config: SimConfig,
