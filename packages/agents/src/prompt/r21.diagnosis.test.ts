@@ -243,7 +243,8 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     }
     const prose = proseFor(inside, 'nadia')
     // R21-A. No line said she was under a roof, and the roof line sent her to its own doorway.
-    expect(prose).toContain(`You stand inside the house (${house.id}) at (79, 99).`)
+    // Whose roof, not just which: the `lie_with` gate reads the owner and nothing said it.
+    expect(prose).toContain(`You stand inside your own house (${house.id}) at (79, 99).`)
     expect(prose).toContain('While you are in here you cannot walk anywhere')
     // ★ THE ONE DOOR TILE THAT STAYS. Walking is refused indoors and `exit` takes no mark, so no
     // walk can be aimed at this pair: it says where the body comes out, and the roof line, which

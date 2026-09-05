@@ -10,7 +10,8 @@ import {
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, perceptionToProse } from './prose.js'
-import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
+import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES, WORKED_TURN } from './rulesOfBeing.js'
+import { readMindTurn, StrictTurnSchema } from '../turn.js'
 import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
 // Block 1 is the cache-stable prefix of every prompt.
@@ -99,13 +100,28 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   })
 
   // Nothing in the prompt said "you may invent"; the old closing line said the opposite.
-  it('closes with the invitation, not the old promise of a lesson', () => {
-    expect(
-      CAPABILITIES.endsWith(
-        'Anything you can name, you can try; the world tells you what it cost.',
-      ),
-    ).toBe(true)
+  it('carries the invitation, not the old promise of a lesson', () => {
+    expect(CAPABILITIES).toContain(
+      'Anything you can name, you can try; the world tells you what it cost.\n',
+    )
     expect(CAPABILITIES).not.toContain('the world will show you')
+  })
+
+  // ★ The one worked answer. It has to be the last bytes of the block or every mind's cached
+  // prefix moves, and it has to parse as the very thing the mind is asked for or it teaches
+  // the wrong shape.
+  it('closes on one whole answer that the turn schema itself accepts', () => {
+    expect(CAPABILITIES.endsWith(WORKED_TURN)).toBe(true)
+    const read = StrictTurnSchema.safeParse(JSON.parse(WORKED_TURN))
+    expect(read.error?.issues ?? []).toEqual([])
+    expect(readMindTurn(JSON.parse(WORKED_TURN)).data?.action).toEqual({
+      verb: 'stoke',
+      params: { structureId: 'structure_4' },
+    })
+  })
+
+  it('keeps the example short enough to be worth its bytes', () => {
+    expect(Math.ceil(WORKED_TURN.length / 4)).toBeLessThan(150)
   })
 
   // A shared block that hands every mind the same example makes five copies of one actor.
@@ -349,6 +365,15 @@ describe('CAPABILITIES — the four acts that need another person to agree', () 
     expect(CAPABILITIES).toMatch(/propose: [^\n]*Only they can say yes/)
     expect(CAPABILITIES).toMatch(/lie_with: [^\n]*only if they say yes/)
     expect(CAPABILITIES).toMatch(/leave_partner: [^\n]*needs no answer/)
+  })
+
+  // The roof gate is the whole of it: 31 of rehearsal 13's 42 ask refusals read "not under a
+  // roof of your own", and the line never said the rule before the mind spent the turn.
+  it('says the roof rule on the line it gates, before the ask', () => {
+    expect(CAPABILITIES).toMatch(
+      /lie_with: [^\n]*a house that is yours or theirs, with the two of you inside it/,
+    )
+    expect(CAPABILITIES).toMatch(/lie_with: [^\n]*neither will standing outside one/)
   })
 
   it('warns that a child may come of one of them, and names no dial behind it', () => {

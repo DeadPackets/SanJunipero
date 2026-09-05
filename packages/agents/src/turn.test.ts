@@ -16,6 +16,7 @@ import {
   readMindTurn,
   reconsiderTick,
 } from './turn.js'
+import { SCENE_ANSWER } from './scene/sceneLlm.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',
@@ -119,6 +120,13 @@ describe('TurnSchema', () => {
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
   })
+
+  // A turn's output tokens bill 15 to 20 times a cached input token, and the field with no
+  // bound at all was the one the mind writes most freely in. The scene path already said it.
+  it('bounds the length of a thought, as the scene prompt already does', () => {
+    expect((TurnSchema.shape.thought as z.ZodType).description).toContain('one or two sentences')
+    expect(SCENE_ANSWER).toContain('thought is one short line')
+  })
 })
 
 // Every parameter shape a registered Tier-1 verb reads. `ExpressiveParams` is not reachable
@@ -175,7 +183,7 @@ const allNull = (): Record<string, unknown> => Object.fromEntries(PARAM_KEYS.map
 const strictTurn = (verb: string, params: Record<string, unknown>): Record<string, unknown> => ({
   thought: 'the well is low; I should fetch water before noon',
   speech: null,
-  action: { verb, params },
+  action: { verb, params, freeform: null },
   plan: null,
   journal: null,
   recall: null,
@@ -237,6 +245,83 @@ describe('the closed turn a strict json_schema decoder can be handed', () => {
     const read = readMindTurn(answer)
     expect(read.success).toBe(true)
     expect(read.data?.action).toEqual({ verb: 'walk', params: { x: 4, y: 9 } })
+  })
+})
+
+// ★ A union of two object shapes and a regex are the two schema features a grammar-constrained
+// back end is likeliest to drop or refuse. The turn had one of each; neither is asked for now,
+// and `fromClosed` hands the runtime the shapes it always read.
+describe('the flattened ask, and the normalizer that reads it back', () => {
+  const shapeUnions = (node: unknown): number => {
+    if (Array.isArray(node)) return node.reduce<number>((n, v) => n + shapeUnions(v), 0)
+    if (node === null || typeof node !== 'object') return 0
+    const o = node as Record<string, unknown>
+    const here =
+      Array.isArray(o.anyOf) &&
+      (o.anyOf as Record<string, unknown>[]).filter((b) => b.type !== 'null').length > 1
+        ? 1
+        : 0
+    return Object.values(o).reduce<number>((n, v) => n + shapeUnions(v), here)
+  }
+
+  it('asks for no choice between two shapes, and holds no string to a pattern', () => {
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(StrictTurnSchema, { io })
+      expect(shapeUnions(emitted), io).toBe(0)
+      expect(JSON.stringify(emitted), io).not.toContain('pattern')
+    }
+    // The shape it replaced, for the measurement: the runtime's own turn still holds both.
+    expect(shapeUnions(z.toJSONSchema(TurnSchema, { io: 'input' }))).toBeGreaterThan(0)
+    expect(JSON.stringify(z.toJSONSchema(TurnSchema, { io: 'input' }))).toContain('pattern')
+  })
+
+  const flat = (over: Record<string, unknown>): Record<string, unknown> => ({
+    ...strictTurn('wait', allNull()),
+    ...over,
+  })
+
+  it('reads a named verb back as the act the world takes, freeform and all', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: 'eat', params: { ...allNull(), itemId: 'i1' }, freeform: null } }),
+    )
+    expect(read.data?.action).toEqual({ verb: 'eat', params: { itemId: 'i1' } })
+  })
+
+  it('reads words of its own back as the freeform try it always was', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: null, params: allNull(), freeform: 'weave a basket' } }),
+    )
+    expect(read.data?.action).toEqual({ freeform: 'weave a basket' })
+  })
+
+  it('lets the named verb win when a mind fills in both', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: 'sleep', params: allNull(), freeform: 'lie down' } }),
+    )
+    expect(read.data?.action).toEqual({ verb: 'sleep', params: {} })
+  })
+
+  it('an act that named neither is the null the runtime has always read', () => {
+    expect(fromClosed(flat({ action: { verb: null, params: allNull(), freeform: null } }))).toEqual(
+      expect.objectContaining({ action: null }),
+    )
+  })
+
+  it('reads a clock time back as the string, and pads the loose hour a decoder no longer holds', () => {
+    const at = (over: Record<string, unknown>): unknown =>
+      readMindTurn(flat({ reconsider_at: { time: null, day: null, phase: null, ...over } })).data
+        ?.reconsider_at
+    expect(at({ time: '08:30' })).toBe('08:30')
+    expect(at({ time: '9:30' })).toBe('09:30')
+    expect(at({ day: 12, phase: 'dusk' })).toEqual({ day: 12, phase: 'dusk' })
+    expect(at({})).toBeNull()
+  })
+
+  it('leaves an answer in the older two-shape dialect exactly as it found it', () => {
+    expect(readMindTurn(validTurn).data?.reconsider_at).toBe('14:30')
+    expect(readMindTurn({ ...validTurn, action: { freeform: 'whittle' } }).data?.action).toEqual({
+      freeform: 'whittle',
+    })
   })
 })
 

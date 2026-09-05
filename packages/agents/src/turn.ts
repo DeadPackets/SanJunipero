@@ -41,7 +41,7 @@ export const TurnSchema = z
       .string()
       .min(1)
       .describe(
-        'What is going through your head this moment. Yours alone; nobody else ever hears it.',
+        'What is going through your head this moment, in one or two sentences. Yours alone; nobody else ever hears it.',
       ),
     speech: z
       .string()
@@ -81,13 +81,61 @@ export const TurnSchemaActionRequired = TurnSchema.extend({
     .describe(`${ACT_NOW} If you truly do nothing this turn, answer { verb: 'wait', params: {} }.`),
 })
 
+// ★ ONE OBJECT, NOT A CHOICE OF TWO. A grammar-constrained back end handles a union of object
+// shapes worst of everything a schema can hold, and this was one of the two the turn had. The
+// keys are the same keys; `fromClosed` puts the answer back into the shape the world reads.
+const StrictActionSchema = z
+  .object({
+    verb: ClosedIntentSchema.shape.verb
+      .nullable()
+      .describe(
+        'The exact word of the act, such as walk or eat. Null only when no word on the list fits and you are saying it in your own words instead.',
+      ),
+    params: ClosedIntentParams.describe(
+      'Exactly what the act asks for, named by its keys; every other key is null.',
+    ),
+    freeform: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe(
+        'What you are trying to do, in your own words, when no word on the list fits. Null whenever you named a verb.',
+      ),
+  })
+  .strict()
+
+// ★ The other one, and the turn's only regex with it: a clock time and an appointment are now
+// three keys of one object rather than a string held to a shape or an object.
+const StrictReconsiderAt = z
+  .object({
+    time: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe('A clock time today, written as 08:30. Null when you mean another day.'),
+    day: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .describe('The day you mean, when it is not today. Null when you named a time.'),
+    phase: z
+      .enum(['day', 'dusk', 'night'])
+      .nullable()
+      .describe('Which part of that day: day, dusk or night. Null when you named a time.'),
+  })
+  .strict()
+
 // The turn every mind is asked for: no key left out, no key it has never heard of. Absence is
 // written as null, and `fromClosed` below takes it back out for the world.
 export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
-  action: z
-    .union([ClosedIntentSchema, FreeformSchema])
-    .describe(`${ACT_NOW} If you truly do nothing this turn, answer verb 'wait' and no params.`),
+  action: StrictActionSchema.describe(
+    `${ACT_NOW} If you truly do nothing this turn, answer verb 'wait' and no params.`,
+  ),
   plan: z.array(ClosedIntentSchema).max(PLAN_MAX_STEPS).nullable().describe(A_PLAN),
+  reconsider_at: StrictReconsiderAt.nullable().describe(
+    'When you mean to think again: a clock time today such as 08:30, or a day and a part of that day. The parts of a day are day, dusk and night.',
+  ),
 })
 
 /** The turn's own field names. A mind reaches for these as verbs — four of the phase 1 gate's
@@ -102,13 +150,41 @@ const askedFor = (step: unknown): unknown => {
   return { ...rest, params: namedParams(params as Record<string, unknown>) }
 }
 
+const said = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0
+
+/** The flat act read back as the one the world takes: a named verb wins over words in the
+ *  margin, and an act that named neither is the null the runtime has always understood. An
+ *  answer in the older two-shape dialect has no `freeform` key and comes through untouched. */
+const oneAct = (raw: unknown): unknown => {
+  if (raw === null || typeof raw !== 'object' || !('freeform' in raw)) return askedFor(raw)
+  const { freeform, ...named } = raw as { freeform?: unknown; verb?: unknown }
+  if (said(named.verb)) return askedFor(named)
+  return said(freeform) ? { freeform } : null
+}
+
+// A decoder no longer holds the clock to a shape, so the one loose form a mind writes is read
+// here rather than costing a whole second turn.
+const CLOCK = /^(\d{1,2}):(\d{2})$/
+
+/** The flat "when" read back as the one shape or the other. */
+const whenAgain = (raw: unknown): unknown => {
+  if (raw === null || typeof raw !== 'object' || !('time' in raw)) return raw
+  const { time, day, phase } = raw as { time?: unknown; day?: unknown; phase?: unknown }
+  if (said(time)) {
+    const hhmm = CLOCK.exec(time.trim())
+    return hhmm === null ? time : `${hhmm[1]!.padStart(2, '0')}:${hhmm[2]!}`
+  }
+  return typeof day === 'number' && said(phase) ? { day, phase } : null
+}
+
 // With `namedParams` on a map verdict, the only place a closed answer's nulls come off: each
 // verb's `validate` parses a `.strict()` schema of its own keys, which a null-filled one fails.
 export function fromClosed(raw: unknown): unknown {
   if (raw === null || typeof raw !== 'object') return raw
-  const turn = { ...raw } as { action?: unknown; plan?: unknown }
-  if ('action' in turn) turn.action = askedFor(turn.action)
+  const turn = { ...raw } as { action?: unknown; plan?: unknown; reconsider_at?: unknown }
+  if ('action' in turn) turn.action = oneAct(turn.action)
   if (Array.isArray(turn.plan)) turn.plan = turn.plan.map(askedFor)
+  if ('reconsider_at' in turn) turn.reconsider_at = whenAgain(turn.reconsider_at)
   return turn
 }
 

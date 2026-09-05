@@ -15,7 +15,7 @@ const BREAD = 'item_bread'
 
 type Town = { bridge: EngineBridge; step: () => void; door: { x: number; y: number } }
 
-function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
+function town(opts: { indoors?: boolean; sheds?: number; owner?: string } = {}): Town {
   const config = DEFAULT_CONFIG
   const terrain: TileId[][] = Array.from({ length: 16 }, () =>
     Array.from({ length: 16 }, (): TileId => 0),
@@ -26,6 +26,7 @@ function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
   put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 14, y: 14, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: HOUSE,
     kind: 'house',
@@ -36,6 +37,7 @@ function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
     maxHp: 50,
     flammable: true,
     builderId: AGENT,
+    ...(opts.owner === undefined ? {} : { owner: opts.owner }),
   })
   put('structure_completed', { id: HOUSE })
   put('item_spawned', { id: BREAD, kind: 'bread', qty: 1, loc: { t: 'tile', x: 10, y: 11 } })
@@ -156,6 +158,20 @@ describe('the affordance block says what the validators would otherwise refuse',
     expect(block).toHaveLength(2)
     const barred = /Wall or water covers ([^.]+), so you cannot walk there\./.exec(said)![1]!
     expect(barred.match(/\(\d+, \d+\)/g)).toHaveLength(4)
+  })
+
+  // 31 of rehearsal 13's 42 `You could not ask:` refusals were the one reason "not under a roof
+  // of your own", and no line ever said whose roof this was.
+  it('names whose roof the body is under, both ways round, and says nothing of unowned walls', () => {
+    expect(proseFor(town({ indoors: true, owner: AGENT }).bridge)).toContain(
+      `You stand inside your own house (${HOUSE}) at`,
+    )
+    expect(proseFor(town({ indoors: true, owner: 'yusuf' }).bridge)).toContain(
+      `You stand inside Yusuf's house (${HOUSE}) at`,
+    )
+    expect(proseFor(town({ indoors: true }).bridge)).toContain(
+      `You stand inside the house (${HOUSE}) at`,
+    )
   })
 
   it('every fixture reads clean through the one-way glass', () => {

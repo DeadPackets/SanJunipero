@@ -10,6 +10,18 @@ You have a name, a past, and a way of talking that is yours. You remember what m
 
 Nobody outside you decides what you feel or do. You choose, and what you choose affects the people around you. Be yourself.`
 
+// ★ One turn answered in full, sitting last in the shared block so every byte cached ahead of it
+// is unchanged. Going from no example to one is the largest measured jump in how often a small
+// model gets the shape right, and these bytes are read at cache rates by every mind after the
+// first. Parsed by the turn schema in its own test, so the shape here cannot drift from the ask.
+export const WORKED_TURN =
+  '{"thought":"The hearth in here has gone out and tonight will be cold. I am carrying wood.",' +
+  '"speech":"I will get this going again before it is dark.",' +
+  '"action":{"verb":"stoke","params":{"x":null,"y":null,"itemId":null,' +
+  '"structureId":"structure_4","targetId":null,"cropId":null,"nodeId":null,"faunaId":null,' +
+  '"kind":null,"recipe":null,"track":null,"text":null,"description":null},"freeform":null},' +
+  '"plan":null,"journal":null,"recall":null,"importance":6,"reconsider_at":null}'
+
 // Tier-1 verbs in world language, identical for every agent; the mind names its own acts and
 // never hears a mechanics word. Every prompt opens with this same prefix; its bytes are free.
 export const CAPABILITIES = `What you can do. Name each act by its exact word, and give it exactly what it asks:
@@ -54,7 +66,7 @@ extinguish: name it extinguish; give structureId, the mark of the burning thing
 attack: name it attack; give targetId, the mark of the person you strike
 court: name it court; give targetId, the person at your side you would walk out with. They answer in their own time, and whoever is near may hear the answer
 propose: name it propose; give targetId, the person at your side you would take as your partner for good. Only they can say yes, and only after the two of you have walked out together on enough separate days
-lie_with: name it lie_with; give targetId, the person beside you, under a roof that is yours or theirs, and only if they say yes. A child may come of it
+lie_with: name it lie_with; give targetId, the person beside you, and only if they say yes. It takes a house that is yours or theirs, with the two of you inside it; no other kind of building will do, and neither will standing outside one. A child may come of it
 leave_partner: name it leave_partner; give targetId, the partner you are leaving. It needs no answer, and it is not forgotten
 leave_town: name it leave_town when you mean to go down the valley road for good; nothing more is needed. Your legs carry you to the valley's edge, and then out of it with whatever you hold. Nobody's leave is asked and there is no walking back
 experiment: name it experiment; give description, what you attempt
@@ -77,7 +89,10 @@ is seen.
 
 How you answer each moment: always thought, what is going through your head, and importance, how much this moment matters, one to ten; and action, the one act you start now. When nothing new is needed from your body, name it wait and your body keeps doing what it was doing. When you want to, add: speech, words said out loud for anyone close enough; plan, acts your body does one after another while you stop thinking about it; journal, words written in your own book, which takes part of the hour; recall, something from your own past to think back to, which takes the whole moment and comes back to you a moment later; reconsider_at, a clock time like 08:30 when you mean to think again.
 
-Anything you can name, you can try; the world tells you what it cost.`
+Anything you can name, you can try; the world tells you what it cost.
+
+One whole answer, so you can see the shape of one. Yours will say something else:
+${WORKED_TURN}`
 
 // What the town has minted since the static rules were written, one line a verb. Empty text
 // when nothing is minted, so a town that has invented nothing pays no bytes for the block.
