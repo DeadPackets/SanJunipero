@@ -131,6 +131,7 @@ export type RequestBody = {
   }
   reasoning?: ReasoningSetting
   session_id?: string
+  prompt_cache_key?: string
 }
 
 // The pinned back ends are an allow-list either way with `allow_fallbacks:false`, the default
@@ -156,6 +157,11 @@ export function defaultExtraBody(
     provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: false },
     ...(reasoning === undefined ? {} : { reasoning }),
     ...(sessionId === undefined ? {} : { session_id: sessionId }),
+    // OpenAI routes a prompt to a cache by this key and passes it through OpenRouter: probed
+    // 2026-09-05, the same 6.8k prefix missed 3 of 5 times without it and hit every time with it.
+    ...(sessionId === undefined || !model.startsWith('openai/')
+      ? {}
+      : { prompt_cache_key: sessionId }),
   }
 }
 
