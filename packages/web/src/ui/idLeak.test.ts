@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import {
   DAYS_PER_YEAR,
   CHRONICLE_TYPES,
@@ -12,6 +14,7 @@ import { chronicleLabel } from './importantFeed.js'
 import { hoverPlate, itemCropDetail } from './interaction.js'
 import { placeOf, structureWords } from './place.js'
 import { thumbLabel } from './momentThumb.js'
+import { PersonLedgerView } from '../paper/pages/Person.js'
 
 // The machine's own words, exactly as the live town writes them: `item_78`,
 // `item_structure_house_44_51_wood`, `structure_farmhouse_63_32`, `fauna_64`, `recipe:drink_rain`.
@@ -80,7 +83,18 @@ const WORLD: WorldState = {
       owner: 'amara',
     },
   } as unknown as WorldState['items'],
-  crops: {},
+  // A crop kind is operator config, so an underscore in one is a live possibility, not a fiction.
+  crops: {
+    crop_9: {
+      id: 'crop_9',
+      kind: 'winter_wheat',
+      x: 1,
+      y: 1,
+      plantedDay: 0,
+      stage: 3,
+      withered: false,
+    },
+  },
   wildlife: { fish: 1, deer: 1 },
   counters: { nextEntityId: 1 },
 }
@@ -101,6 +115,7 @@ const payloadFor = (type: string): Record<string, unknown> => ({
   structureId: 'structure_house_44_51',
   toId: 'structure_house_44_51',
   cause: 'doused',
+  cropId: 'crop_9',
   kind: 'herb_bundle',
   reason: 'paved',
   verb: 'recipe:drink_rain',
@@ -109,9 +124,14 @@ const payloadFor = (type: string): Record<string, unknown> => ({
 })
 
 const eventsOfEveryType = (): SimEvent[] =>
-  [...CHRONICLE_TYPES, 'item_moved', 'item_spawned', 'structure_damaged', 'fauna_moved'].map(
-    (type, i) => ({ seq: i + 1, tick: 10, type, payload: payloadFor(type) }),
-  )
+  [
+    ...CHRONICLE_TYPES,
+    'item_moved',
+    'item_spawned',
+    'structure_damaged',
+    'fauna_moved',
+    'crop_harvested',
+  ].map((type, i) => ({ seq: i + 1, tick: 10, type, payload: payloadFor(type) }))
 
 describe('no viewer-facing string prints a machine id', () => {
   it('the shared chronicle line never says an id, named world or empty', () => {
@@ -155,6 +175,26 @@ describe('no viewer-facing string prints a machine id', () => {
   it('a place is words or nothing, never a tile', () => {
     clean(placeOf(WORLD, 'yusuf').words, 'placeOf')
     clean(placeOf(EMPTY, 'yusuf').words, 'placeOf missing')
+  })
+
+  // The helpers above are only half the surface: a page interpolates its own values into JSX,
+  // and that text is what a viewer actually reads.
+  it('a page’s own JSX prints no kind the town has no word for', () => {
+    const carrier = {
+      ...WORLD.agents.yusuf!,
+      skills: {},
+      activity: null,
+      injuries: [{ kind: 'sprained_ankle', day: 3 }],
+    }
+    const html = renderToStaticMarkup(
+      createElement(PersonLedgerView, {
+        agent: carrier,
+        tick: 10,
+        carrying: [{ id: 'item_78', kind: 'rabbit_meat', qty: 2 }],
+        ledger: [],
+      }),
+    )
+    clean(html.replace(/<[^>]*>/g, ' '), 'PersonLedgerView')
   })
 
   it('a moment card names its cast and never a coordinate', () => {

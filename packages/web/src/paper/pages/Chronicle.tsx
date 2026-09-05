@@ -10,14 +10,20 @@ import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
-import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
+import {
+  chaptersFeed,
+  chronicleFeed,
+  dispatchesFeed,
+  milestonesFeed,
+  type Chapter,
+} from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { lastVisitTick } from '../../ui/storage.js'
 import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
-import { useFeed, usePolled, type Read } from '../../ui/useEndpoint.js'
+import { useFeed, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
@@ -42,7 +48,6 @@ const NO_RECORDS: AssetRecord[] = []
 const BUST_PX = 40
 const NO_EDITIONS: Edition[] = []
 
-type Chapter = { day: number; title: string; text: string }
 const NO_CHAPTERS: Chapter[] = []
 
 // Decorative: the sentence beside it carries the meaning, so the glyph stays out of the
@@ -387,7 +392,7 @@ function Firsts({ store, onPlay }: PageProps) {
 }
 
 function Chapters() {
-  const chapters = usePolled<Chapter[]>('/api/chapters').data ?? NO_CHAPTERS
+  const chapters = useFeed(chaptersFeed).data ?? NO_CHAPTERS
   const paper = useFeed(dispatchesFeed)
   const days = useMemo(
     () => (paper.data === null ? NO_EDITIONS : editions(paper.data)),

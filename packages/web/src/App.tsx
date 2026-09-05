@@ -58,6 +58,8 @@ function writeAddress(next: Route, now: boolean): void {
 export function App() {
   const [store] = useState(createWorldStore)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
+  // The address is written outside the updater, so two navigations in one frame still compose.
+  const routeRef = useRef(route)
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
   const [link, setLink] = useState<LinkStatus>('connecting')
@@ -129,7 +131,8 @@ export function App() {
     // The canvas picks a figure by writing the person into the address and firing popstate
     // (render/StageMount).
     const onPop = (): void => {
-      setRoute(parseRoute(location.pathname, location.search))
+      routeRef.current = parseRoute(location.pathname, location.search)
+      setRoute(routeRef.current)
     }
     window.addEventListener('popstate', onPop)
     return () => {
@@ -169,11 +172,13 @@ export function App() {
 
   // Every viewed moment is shareable: a link copied mid-playback reopens that minute.
   const address = useCallback((tick: number | null): void => {
-    setRoute((prev) => {
-      const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
-      writeAddress(next, tick === null)
-      return next
-    })
+    const next: Route = {
+      ...routeRef.current,
+      moment: tick === null ? null : tickToMoment(tick),
+    }
+    routeRef.current = next
+    writeAddress(next, tick === null)
+    setRoute(next)
   }, [])
 
   // SCRUB IS FOR DRAGGING, REPLAY IS FOR CLICKING. A still frame is what a finger on the
@@ -213,11 +218,10 @@ export function App() {
   useMomentEnd(store, play, onMomentEnd)
 
   const onMoment = useCallback((id: number | null) => {
-    setRoute((prev) => {
-      const next: Route = { ...prev, momentId: id }
-      writeAddress(next, true)
-      return next
-    })
+    const next: Route = { ...routeRef.current, momentId: id }
+    routeRef.current = next
+    writeAddress(next, true)
+    setRoute(next)
   }, [])
 
   const openPage = (page: PageKey, tab?: string): void => {

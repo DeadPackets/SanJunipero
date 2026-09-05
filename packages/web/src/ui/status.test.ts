@@ -181,6 +181,12 @@ describe('STATES — one state per person, and the array IS the priority', () =>
     expect(stateWord(body({ activity: { verb: 'walk' } }))).toBe('Walking')
     expect(stateWord(body())).toBe('Between things')
   })
+
+  it('a slug is spent before it is said, so no separator reaches the word', () => {
+    expect(stateWord(body({ activity: { verb: 'dig_channel' } }))).toBe('Digging channel')
+    expect(stateWord(body({ activity: { verb: 'recipe:plank' } }))).toBe('Making plank')
+    expect(stateWord(body({ activity: { verb: 'express:mourn' } }))).toBe('Mourning')
+  })
 })
 
 describe('the two vocabularies can never become synonyms of each other', () => {

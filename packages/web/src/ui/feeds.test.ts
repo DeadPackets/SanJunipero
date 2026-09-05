@@ -28,4 +28,20 @@ describe('one feed per endpoint', () => {
   it('keeps the measured beat', () => {
     expect(BONDS_REFETCH_MS).toBe(30_000)
   })
+
+  // An endpoint declared with no beat loads once per 0→1 subscription and never again: a tab
+  // left open across a sim-day boundary shows the town as it was before the day turned.
+  it('★ every shared feed is given a beat, so a tab left open keeps up with the town', () => {
+    const src = readFileSync(new URL('./feeds.ts', import.meta.url), 'utf8')
+    for (const m of src.matchAll(/= endpoint\(([\s\S]*?)\)\n/g)) {
+      const args = m[1] ?? ''
+      expect(args.split(',').length, args).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('★ the chapters are read through that one feed, not fetched by the page', () => {
+    const src = readFileSync(new URL('../paper/pages/Chronicle.tsx', import.meta.url), 'utf8')
+    expect(src).toContain('useFeed(chaptersFeed)')
+    expect(src).not.toContain("'/api/chapters'")
+  })
 })

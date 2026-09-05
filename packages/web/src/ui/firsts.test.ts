@@ -18,7 +18,6 @@ const first = (over: Partial<MilestoneRead> = {}): MilestoneRead => ({
   tier: 1,
   domain: 'engine',
   agentIds: [],
-  constructId: null,
   nameProvenance: null,
   ...over,
 })

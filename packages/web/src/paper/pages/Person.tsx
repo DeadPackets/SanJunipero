@@ -1,10 +1,18 @@
 import { useSyncExternalStore } from 'react'
-import { DAYS_PER_YEAR, SOMEONE, agentName, bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  SOMEONE,
+  agentName,
+  bondLevel,
+  bondWarmth,
+  kindWords,
+  tickToMoment,
+} from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
-import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import {
   CONDITION_WORD,
   conditionsOf,
@@ -18,11 +26,12 @@ import {
   THOUGHT_EMPTY,
   changeLog,
   hasChanged,
+  personalityRows,
   type ChangeEntry,
-  type PersonalityRow,
 } from '../../ui/becoming.js'
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
@@ -31,6 +40,10 @@ const NEED_LOW = 30
 export type LedgerRow = { personId: string; doc: string; updatedDay: number }
 export type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
 
+/** What the wire is doing with one document. A section with no wire news can only be quiet;
+ *  one whose read was refused says so instead. */
+type Wire = { failed: boolean; retry: () => void }
+
 const docUrl = (agentId: string | null, doc: string): string | null =>
   agentId === null ? null : `/api/agent/${encodeURIComponent(agentId)}/${doc}`
 
@@ -38,8 +51,6 @@ const journalRows = (b: unknown): JournalRow[] | null =>
   Array.isArray(b) ? (b as JournalRow[]) : null
 const ledgerRows = (b: unknown): LedgerRow[] | null =>
   Array.isArray(b) ? (b as LedgerRow[]) : null
-const changeRows = (b: unknown): PersonalityRow[] | null =>
-  Array.isArray(b) ? (b as PersonalityRow[]) : null
 
 /** A dream is the mind's, but it is not something the mind wrote down — say which is which. */
 const journalStamp = (row: JournalRow): string =>
@@ -79,12 +90,16 @@ export function PersonStoryView({
   thought,
   journal,
   changes,
+  journalWire,
+  changesWire,
   biography = null,
 }: {
   thought: { text: string } | null
   /** `null` while the read is still out — which is not the same thing as an empty journal */
   journal: readonly JournalRow[] | null
   changes: readonly ChangeEntry[] | null
+  journalWire?: Wire
+  changesWire?: Wire
   /** The chronicler's write-up, from the PUBLIC record alone. Null until one is written. */
   biography?: { day: number; title: string; body: string } | null
 }) {
@@ -97,7 +112,9 @@ export function PersonStoryView({
 
       <section className="block">
         <h3 className="feed-head">Journal</h3>
-        {journal === null ? (
+        {journal === null && journalWire?.failed === true ? (
+          <OutOfReach onRetry={journalWire.retry} />
+        ) : journal === null ? (
           <Skeleton />
         ) : journal.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.written}</p>
@@ -130,7 +147,9 @@ export function PersonStoryView({
           has moved nothing yet and is told so, rather than handed v1 as a character sheet. */}
       <section className="block">
         <h3 className="feed-head">How they have changed</h3>
-        {changes === null ? (
+        {changes === null && changesWire?.failed === true ? (
+          <OutOfReach onRetry={changesWire.retry} />
+        ) : changes === null ? (
           <Skeleton />
         ) : !hasChanged(changes) ? (
           <p className="doc">{CHANGE_EMPTY}</p>
@@ -141,7 +160,7 @@ export function PersonStoryView({
                 <span className="stamp">Day {e.day}</span> {e.edit}
               </p>
               {e.diff.length > 0 && (
-                <pre className="diff">
+                <pre className="diff" tabIndex={0} role="region" aria-label="What changed">
                   {e.diff.map((l, i) => (
                     <div key={i} className={`diff-line ${l.kind}`}>
                       {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}
@@ -167,12 +186,14 @@ export function PersonLedgerView({
   tick,
   carrying,
   ledger,
+  ledgerWire,
   nameOf = () => SOMEONE,
 }: {
   agent: LedgerAgent
   tick: number
   carrying: readonly { id: string; kind: string; qty: number }[]
   ledger: readonly LedgerRow[] | null
+  ledgerWire?: Wire
   nameOf?: (id: string) => string
 }) {
   return (
@@ -185,7 +206,9 @@ export function PersonLedgerView({
         <NeedBar label="Company" value={agent.needs.social} />
         <NeedBar label="Health" value={agent.hp} />
         {agent.injuries.length > 0 && (
-          <p>{agent.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}</p>
+          <p>
+            {agent.injuries.map((i) => `${kindWords(i.kind)} injury (day ${i.day})`).join(', ')}
+          </p>
         )}
         {/* The page header already prints the state, so this line carries only what the
             header cannot: how long there is left to go. */}
@@ -200,7 +223,7 @@ export function PersonLedgerView({
           <ul>
             {carrying.map((it) => (
               <li key={it.id}>
-                {it.kind} × {it.qty}
+                {kindWords(it.kind)} × {it.qty}
               </li>
             ))}
           </ul>
@@ -222,7 +245,9 @@ export function PersonLedgerView({
 
       <section className="block">
         <h3 className="feed-head">What they make of people</h3>
-        {ledger === null ? (
+        {ledger === null && ledgerWire?.failed === true ? (
+          <OutOfReach onRetry={ledgerWire.retry} />
+        ) : ledger === null ? (
           <Skeleton />
         ) : ledger.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.written}</p>
@@ -247,9 +272,18 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   // A changed URL is a new read, so the page can never show the previous person's documents,
   // and a tab nobody opened reads `null` — the endpoint layer's own "do not read".
   const story = tab !== 'Bonds' && tab !== 'Ledger'
-  const journal = usePolled(story ? docUrl(agentId, 'journal') : null, journalRows)
-  const personality = usePolled(story ? docUrl(agentId, 'personality') : null, changeRows)
-  const ledger = usePolled(tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null, ledgerRows)
+  const journalRead = useEndpointFor(story ? docUrl(agentId, 'journal') : null, journalRows)
+  const personalityRead = useEndpointFor(
+    story ? docUrl(agentId, 'personality') : null,
+    personalityRows,
+  )
+  const ledgerRead = useEndpointFor(
+    tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null,
+    ledgerRows,
+  )
+  const journal = useFeed(journalRead)
+  const personality = useFeed(personalityRead)
+  const ledger = useFeed(ledgerRead)
 
   const a = agentId === null ? undefined : state?.agents[agentId]
   if (a === undefined) return <p className="feed-empty">{EMPTY_COPY.noPerson}</p>
@@ -293,6 +327,7 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           tick={tick}
           carrying={carrying}
           ledger={ledger.data}
+          ledgerWire={{ failed: ledger.failed, retry: ledgerRead.retry }}
           nameOf={(id) => agentName(state?.agents, id)}
         />
       ) : (
@@ -300,6 +335,8 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           thought={store.latestThought(a.id)}
           journal={journal.data}
           changes={personality.data === null ? null : changeLog(personality.data)}
+          journalWire={{ failed: journal.failed, retry: journalRead.retry }}
+          changesWire={{ failed: personality.failed, retry: personalityRead.retry }}
           biography={biographyOf(dispatches ?? EMPTY_DISPATCHES, a.id)}
         />
       )}

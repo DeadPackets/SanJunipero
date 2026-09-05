@@ -1,13 +1,15 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createWorldStore } from '../../state/worldStore.js'
 import { LawsPage } from './Laws.js'
 import {
   ClockView,
   RulingsView,
   SPEED_STOPS,
+  SAVE_HOLD_MS,
   SpendView,
+  handToBrowser,
   pct,
   usd,
   type CostReport,
@@ -152,6 +154,7 @@ describe('★ the whole page is the operator’s, and a viewer without a key see
         onPlay: () => {},
         onLive: () => {},
         onMoment: () => {},
+        onNotice: () => {},
       }),
     )
 
@@ -174,5 +177,52 @@ describe('★ the whole page is the operator’s, and a viewer without a key see
     expect(open.indexOf('Download'), 'the laws stay last').toBeLessThan(
       open.indexOf('laws-edit-list'),
     )
+  })
+})
+
+// WHAT A REVOKE ON THE SAME TURN COSTS: a run export is hundreds of megabytes, and the browser
+// is still reading the blob when the next statement takes the URL away — the file arrives empty
+// and nothing is said about it.
+describe('handing a packed run to the browser', () => {
+  const fakeDoc = () => {
+    const order: string[] = []
+    const anchor = {
+      href: '',
+      download: '',
+      click: () => order.push('click'),
+      remove: () => order.push('remove'),
+    }
+    const doc = {
+      createElement: () => anchor,
+      body: {
+        append: () => order.push('append'),
+      },
+    } as unknown as Document
+    return { doc, anchor, order }
+  }
+
+  it('puts the anchor in the document before it clicks it, and takes it out after', () => {
+    const { doc, anchor, order } = fakeDoc()
+    handToBrowser(doc, 'blob:run', 'san-junipero-run.tar')
+    expect(order).toEqual(['append', 'click', 'remove'])
+    expect(anchor.download).toBe('san-junipero-run.tar')
+    expect(anchor.href).toBe('blob:run')
+  })
+
+  it('holds the url open long enough for the save to read it', () => {
+    vi.useFakeTimers()
+    const revoke = vi.fn()
+    const before = globalThis.URL.revokeObjectURL
+    globalThis.URL.revokeObjectURL = revoke
+    try {
+      handToBrowser(fakeDoc().doc, 'blob:run', 'san-junipero-run.tar')
+      vi.advanceTimersByTime(SAVE_HOLD_MS - 1)
+      expect(revoke).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(1)
+      expect(revoke).toHaveBeenCalledWith('blob:run')
+    } finally {
+      globalThis.URL.revokeObjectURL = before
+      vi.useRealTimers()
+    }
   })
 })

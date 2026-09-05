@@ -128,6 +128,14 @@ describe('the signpost', () => {
     expect(KEY_MAP_ID).toBe('key-map-sheet')
   })
 
+  // React may re-invoke a pending updater, and Safari allows 100 history writes per 30 s: an
+  // address written from inside one is written more times than the viewer navigated.
+  it('★ writes the address bar outside the state updater, never inside it', () => {
+    const app = src('../App.tsx')
+    expect(app).not.toMatch(/setRoute\(\([\s\S]{0,200}?writeAddress/)
+    expect(app.match(/writeAddress\(/g)).toHaveLength(3) // the definition and its two callers
+  })
+
   it('★ is what the app mounts, with the arm’s wiring kept', () => {
     const app = src('../App.tsx')
     expect(app).toMatch(/<HelpButton\s+open=\{keysOpen\}/)
@@ -377,6 +385,8 @@ describe('★ every page that can be quiet can also be out of reach', () => {
     './pages/Chronicle.tsx',
     './pages/Moments.tsx',
     './pages/BondsGraph.tsx',
+    './pages/Person.tsx',
+    './pages/Building.tsx',
   ]
 
   it.each(PAGES)('%s branches on the read failing, and offers it again', (page) => {
@@ -391,6 +401,24 @@ describe('★ every page that can be quiet can also be out of reach', () => {
   it('never swaps the copy while there is still an answer to show', () => {
     expect(src('./pages/Moments.tsx')).toContain('read.failed && moments === null')
     expect(src('./pages/Chronicle.tsx')).toContain('entries.length === 0 && record.failed')
+  })
+})
+
+// An operator can press Set and shut the sheet in the same breath, and the paper unmounts its
+// body on close: an answer held in the body is an answer nobody ever reads.
+describe('★ the operator’s answer outlives the page it was asked from', () => {
+  it('is the paper’s state, and the page only hands it over', () => {
+    const paper = src('./Paper.tsx')
+    expect(paper).toContain('useState<PaperNotice | null>(null)')
+    expect(paper).toContain('className="laws-notice"')
+    expect(paper).toContain('onNotice={setNotice}')
+  })
+
+  it('is written by both operator write paths and held by neither', () => {
+    const laws = src('./pages/Laws.tsx')
+    expect(laws, 'the page keeps no answer of its own').not.toContain('setNotice')
+    expect(laws).toContain('onNotice({')
+    expect(laws).toContain('<ExportLink token={operatorToken} onNotice={refused} />')
   })
 })
 

@@ -205,6 +205,13 @@ describe('★ the two views a reader gets', () => {
     expect(plot.match(/class="orbit-mark(?: above)?"/g)).toHaveLength(3)
   })
 
+  // The ring radii are layout, in pixels. Printed beside the word they read as a score.
+  it('★ says what each ring means and never how wide it is', () => {
+    const key = /<p class="orbit-key">([\s\S]*?)<\/p>/.exec(plot)?.[1] ?? ''
+    expect(key).toContain('close')
+    expect(key.replace(/<[^>]*>/g, ' ')).not.toMatch(/\d/)
+  })
+
   it('★ names the picture for a reader who cannot see it, and gives them a way through it', () => {
     expect(plot).toContain('role="img"')
     expect(plot).toContain('nearer meaning closer')

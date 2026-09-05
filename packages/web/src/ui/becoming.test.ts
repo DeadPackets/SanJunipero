@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { GAMIFICATION_BAN } from './townStats.js'
+import { GAMIFICATION_BAN, OUT_OF_REACH } from './townStats.js'
 import { diffLines } from './diffLines.js'
 import { PersonLedgerView, PersonStoryView } from '../paper/pages/Person.js'
 import { DAYS_PER_YEAR } from '@sj/shared'
@@ -18,6 +18,7 @@ import {
   THOUGHT_EMPTY,
   authoredIdentityOffenders,
   changeLog,
+  personalityRows,
   substanceOf,
   type SubstanceInput,
 } from './becoming.js'
@@ -315,6 +316,34 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(text).not.toMatch(/\b(trait|background|backstory|archetype|persona|bio|origin)\b/i)
   })
 
+  // A refused read is news about the wire, so a section with nothing to show says so and offers
+  // the read again, rather than turning forever.
+  it('says a document is out of reach rather than loading it forever', () => {
+    const down = { failed: true, retry: () => {} }
+    const story = renderToStaticMarkup(
+      createElement(PersonStoryView, {
+        thought: null,
+        journal: null,
+        changes: null,
+        journalWire: down,
+        changesWire: down,
+      }),
+    )
+    expect(story.split(OUT_OF_REACH.says).length - 1).toBe(2)
+    expect(story).not.toContain('skeleton')
+    const led = renderToStaticMarkup(
+      createElement(PersonLedgerView, {
+        agent: a,
+        tick: 0,
+        carrying: [],
+        ledger: null,
+        ledgerWire: down,
+      }),
+    )
+    expect(led).toContain(OUT_OF_REACH.says)
+    expect(led).not.toContain('skeleton')
+  })
+
   it('leads with the LATEST document and the most recent edit once there is one', () => {
     const rich = renderToStaticMarkup(
       createElement(PersonStoryView, {
@@ -329,5 +358,36 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(rich).toContain('after the flood')
     expect(rich).not.toContain(CHANGE_EMPTY)
     expect(rich.indexOf('after the flood')).toBeLessThan(rich.indexOf('first written'))
+  })
+
+  // `feedFor` keys its reader cache on the URL alone, so two parsers for one document means
+  // whichever page mounted first decides what a malformed body means for both.
+  it('reads a personality document through one parser, wherever it is read from', () => {
+    expect(personalityRows([{ version: 1, day: 0, doc: 'a', edit: 'written' }])).toHaveLength(1)
+    // not `[]`: a body the parser rejects is not an answer, and the reader keeps the last good one
+    expect(personalityRows({ oops: true })).toBeNull()
+    for (const f of ['../paper/pages/Folk.tsx', '../paper/pages/Person.tsx']) {
+      const source = readFileSync(new URL(f, import.meta.url), 'utf8')
+      expect(source, f).toContain('personalityRows')
+      expect(source, f).not.toMatch(/const \w+ *= *\(b(?:ody)?: unknown\): PersonalityRow/)
+    }
+  })
+
+  // A block that scrolls sideways and holds nothing focusable is text a keyboard cannot reach.
+  it('lets a keyboard reach the part of a diff that scrolled off the sheet', () => {
+    const rich = renderToStaticMarkup(
+      createElement(PersonStoryView, {
+        thought: null,
+        journal: [],
+        changes: changeLog([
+          { version: 1, day: 0, doc: 'a wall of a line', edit: 'first written' },
+          { version: 2, day: 4, doc: 'another wall of a line', edit: 'after the flood' },
+        ]),
+      }),
+    )
+    const tag = /<pre class="diff"([^>]*)>/.exec(rich)?.[1] ?? ''
+    expect(tag).toContain('tabindex="0"')
+    expect(tag).toContain('role="region"')
+    expect(tag).toContain('aria-label="')
   })
 })

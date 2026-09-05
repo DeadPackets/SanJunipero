@@ -26,9 +26,9 @@ const parseLineage = (body: unknown): LineageLike | null => {
 /** One read of the ties for the whole page: the Bonds lens and the roster share it. */
 export const bondsFeed = endpoint('/api/bonds', parseBonds, BONDS_REFETCH_MS)
 
-/** Who came from whom, read once: a town gains a parent only when a child is born, and a
- *  childless town answers with a typed empty. */
-export const lineageFeed = endpoint('/api/lineage', parseLineage)
+/** Who came from whom. A birth is rare and the answer is small, so the beat is slow — but it
+ *  is a beat: a town gains a parent while the tab is open. */
+export const lineageFeed = endpoint('/api/lineage', parseLineage, BONDS_REFETCH_MS)
 
 /** The narrator publishes once a sim-day, every 48 real minutes, so a minute is generous. */
 const DISPATCHES_REFETCH_MS = 60_000
@@ -49,6 +49,13 @@ const parseChronicle = (body: unknown): ChronicleEntry[] | null => {
 /** The town's own record, read once for the whole page: the Chronicle's Today tab and the
  *  broadcast frame's ticker are looking at the same list. */
 export const chronicleFeed = endpoint('/api/chronicle', parseChronicle, CHRONICLE_REFETCH_MS)
+
+/** The narrator writes a chapter once a sim-day; the Chronicle's tab and the replay caption
+ *  read the same list. */
+export type Chapter = { day: number; title: string; text: string }
+const parseChapters = (body: unknown): Chapter[] | null =>
+  Array.isArray(body) ? (body as Chapter[]) : null
+export const chaptersFeed = endpoint('/api/chapters', parseChapters, DISPATCHES_REFETCH_MS)
 
 const FIRSTS_REFETCH_MS = 30_000
 

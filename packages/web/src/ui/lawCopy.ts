@@ -85,8 +85,8 @@ const perFood = (value: unknown): LawRow[] => {
   return rows.length === 0 ? UNKNOWN : rows
 }
 
-/** Total over `TOGGLABLE_PATHS` by construction: a law added to the engine with no copy is a
- *  compile error here, not a machine path leaking onto a screen. */
+/** Total over `TOGGLABLE_PATHS`, and `lawCopy.test.ts` is what says so: the engine widens its own
+ *  key type to `string`, so the compiler cannot, and an uncopied law would print its dotted path. */
 export const LAW_COPY: Readonly<Record<keyof typeof TOGGLABLE_PATHS, LawCopy>> = {
   'aging.deathOfOldAgeEnabled': {
     title: 'Dying of old age',

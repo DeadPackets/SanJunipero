@@ -1205,8 +1205,9 @@ body {
 }
 .stage-stamp.shown { opacity: 1; }
 
+/* A WIDTH, not only a cap: an offset with no `right` leaves shrink-to-fit half the stage. */
 .stage-cue {
-  position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
+  position: absolute; z-index: 21; left: 0; right: 0; margin: 0 auto; width: fit-content;
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
   /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
      room that thing takes, so the reading width is the same line to line. */
@@ -2027,13 +2028,13 @@ body {
    Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
    Ranged left, not centred: the plate carries a paragraph more often than a title. */
 .replay-card {
-  position: absolute; z-index: 24; left: 50%; translate: -50% 0;
+  position: absolute; z-index: 24; left: 0; right: 0; width: fit-content;
   bottom: calc(
     max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h) + var(--cue-h)
   );
   max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
   text-align: start;
-  margin: 0; padding: var(--s-4) var(--s-5);
+  margin: 0 auto; padding: var(--s-4) var(--s-5);
   pointer-events: none;
   background: var(--deep); box-shadow: var(--frame);
   opacity: 0;

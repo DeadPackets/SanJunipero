@@ -1,4 +1,4 @@
-import { type AssetRecord, agentName, kindWords, tickToMoment } from '@sj/shared'
+import { type AssetRecord, agentName, kindWords, tickToMoment, verbPhraseGerund } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { interiorOf } from '../render/interiors.js'
 import { resolveAssetId } from '../render/textures.js'
@@ -18,13 +18,11 @@ export const ROOM_STATE_ASLEEP = 'Asleep'
 /** The ratified answer to "awake with nothing to do" (C12 ruling R7, Q6). */
 export const ROOM_STATE_IDLE = 'Between things'
 
-// t7 gerund ruling: drop a trailing 'e', append 'ing'; no other morphology
-const gerund = (verb: string): string => `${verb.endsWith('e') ? verb.slice(0, -1) : verb}ing`
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 export function roomStateOf(a: { asleep: boolean; activity: { verb: string } | null }): string {
   if (a.asleep) return ROOM_STATE_ASLEEP
-  return a.activity === null ? ROOM_STATE_IDLE : sentenceCase(gerund(a.activity.verb))
+  return a.activity === null ? ROOM_STATE_IDLE : sentenceCase(verbPhraseGerund(a.activity.verb))
 }
 
 export type Provenance = {

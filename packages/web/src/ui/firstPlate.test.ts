@@ -87,7 +87,6 @@ describe('★ a first is a plate, and the plate keeps no score', () => {
       tier: 3,
       domain: 'engine',
       agentIds: ['a1'],
-      constructId: null,
       nameProvenance: null,
     }
     expect(firstPlate(row, 100)).toEqual({
