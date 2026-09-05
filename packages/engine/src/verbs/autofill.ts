@@ -72,12 +72,8 @@ function readingsOf(
 // is not the sort of thing I take", and a real mark answered the same way is no reading either.
 const NO_SUCH_MARK = 'no_such_mark'
 
-/** What is actually in the way, when the act left its object blank and nothing fit. "Name the
- *  thing" is true and useless — 83 of 139 refusal episodes were a mind sent looking for a word
- *  when the obstacle was no water, or no wood. Every candidate the table offers is put to the
- *  verb, and where the ones that could be meant agree on why they were turned away, that is the
- *  sentence to send back instead. Several answers means several obstacles, and the mind is told
- *  to name one after all. */
+/** What is actually in the way, when the act left its object blank and nothing fit: every
+ *  candidate is put to the verb, and one shared reason for the refusals is the answer to send. */
 export function soleObstacle(
   state: WorldState,
   config: SimConfig,

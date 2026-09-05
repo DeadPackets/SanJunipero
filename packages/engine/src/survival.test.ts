@@ -208,6 +208,9 @@ describe('a collapse has a road out of it', () => {
     expect(after.agents.a1!.collapsedSinceTick).toBeNull()
     // The loaf went into the body, not into its hands: nothing was transferred.
     expect(after.items.item_1?.qty ?? 0).toBe(0)
+    // And it was a meal, whichever hand held it out: the collapse ladder starts over.
+    expect(s.agents.a1!.collapsesWithoutRecovery).toBe(1)
+    expect(after.agents.a1!.collapsesWithoutRecovery).toBeUndefined()
   })
 
   it('a body down with hp gone mends by the tick when it is fed and out of the cold', () => {

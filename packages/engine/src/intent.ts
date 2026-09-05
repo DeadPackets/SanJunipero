@@ -16,7 +16,14 @@ export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; r
 
 // The road out of a collapse. World one closed every one of these: Amara died ten feet from a
 // neighbour's door having tried fifteen times to shout, and been refused each time.
-const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
+const DOWNED_VERBS: ReadonlySet<string> = new Set([
+  'drink',
+  'eat',
+  'exit',
+  'sleep',
+  'speak',
+  'walk',
+])
 
 // The same act, hung on the end of the one that makes it possible.
 const carrying = (go: IntentResult, verb: string, params: Record<string, unknown>): IntentResult =>
@@ -35,9 +42,7 @@ const carrying = (go: IntentResult, verb: string, params: Record<string, unknown
       }
 
 /** An act refused for nothing but the way to it becomes the act that opens the way — the door
- *  out, or the walk over — with the act itself hung on the end of that one. What the world holds
- *  against the act rather than the ground is refused as it always was, and so is a mark no road
- *  reaches. */
+ *  out, or the walk over — with the act itself hung on the end of that one. */
 function walkFirst(
   state: WorldState,
   config: SimConfig,
@@ -55,6 +60,17 @@ function walkFirst(
   }
   const to = approachFor(state, config, agentId, verb, params)
   if (to === null) return { ok: false, reason: refusal }
+  // A person walks off while the legs are going. Naming them makes the leg a chase, which
+  // re-aims itself and has a clock; a coordinate leg lands short and is composed again forever.
+  const after = params.targetId
+  if (typeof after === 'string' && state.agents[after]?.alive === true) {
+    const chase = carrying(
+      submitIntent(state, config, agentId, 'walk', { targetId: after }),
+      verb,
+      params,
+    )
+    if (chase.ok) return chase
+  }
   const go = carrying(submitIntent(state, config, agentId, 'walk', to), verb, params)
   return go.ok ? go : { ok: false, reason: refusal }
 }

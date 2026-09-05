@@ -20,7 +20,15 @@ import {
   roomIsFull,
   sameInterior,
 } from '../interiors.js'
-import { findPath, isPassable, pathCtx, searchToward, type PathCtx, type Point } from '../path.js'
+import {
+  findPath,
+  firstReachable,
+  isPassable,
+  pathCtx,
+  searchToward,
+  type PathCtx,
+  type Point,
+} from '../path.js'
 import { type RngStream } from '../rng.js'
 import {
   mintId,
@@ -267,8 +275,7 @@ function nearestReachable(
   const sorted = [...tiles].sort(
     (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
   )
-  for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
-  return { refusal: 'no path to that spot' }
+  return firstReachable(state, a, sorted, config) ?? { refusal: 'no path to that spot' }
 }
 
 // What the world says when the legs cannot start at all. Said in the place where it is true:
@@ -362,6 +369,7 @@ function personDestination(
     for (let dx = -1; dx <= 1; dx++) {
       const p = { x: target.x + dx, y: target.y + dy }
       if (p.x === a.x && p.y === a.y) return p
+      if (dx === 0 && dy === 0) continue
       if (isPassable(state, p.x, p.y, ctx)) ring.push(p)
     }
   }
@@ -403,12 +411,8 @@ export function walkDestination(
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
   const a = state.agents[agentId]!
-  // ★ A MARK BEATS A GUESS. Two thirds of the walks that named somebody also carried the two
-  // numbers the mind had estimated for them, and the coordinate branch read first — so the guess
-  // decided where the legs went and the name was never used. A mark the mind chose wins, and so
-  // does its refusal: it asked for the river, and "there is no river" is the true answer.
-  // Each schema is strict, so a mark handed over WITH the mind's guessed numbers parsed as none
-  // of them and fell to the coordinates. The mark is read off on its own.
+  // A mark the mind named beats the numbers it guessed, and so does that mark's refusal. Each
+  // schema is strict, so a mark handed over WITH guessed numbers parses as neither: read it alone.
   const person = WalkToPerson.safeParse({ targetId: params.targetId })
   if (person.success) return personDestination(state, config, agentId, person.data.targetId)
   const thing = WalkToThing.safeParse({ itemId: params.itemId })
@@ -759,7 +763,8 @@ const enter: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = EnterParams.parse(params)
     const s = state.structures[p.structureId]
-    const door = s ? doorTile(state, s) : null
+    if (!s || roomIsFull(state, s)) return []
+    const door = doorTile(state, s)
     if (!door) return []
     return [
       { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
@@ -872,7 +877,13 @@ function swallowEvents(
       type: 'needs_changed',
       payload: {
         id: eaterId,
-        changes: [{ need: 'hunger', delta: mealRestore(state, config, eaterId, item.kind) }],
+        changes: [
+          {
+            need: 'hunger',
+            delta: mealRestore(state, config, eaterId, item.kind),
+            reason: 'meal',
+          },
+        ],
       },
     },
   ]
@@ -1361,6 +1372,8 @@ const plant: VerbDef = makeVerb({
   },
   onComplete(state, _config, _agentId, params) {
     const p = PlantParams.parse(params)
+    if (tileAt(state, p.x, p.y) !== 6) return []
+    if (Object.values(state.crops).some((c) => !c.withered && c.x === p.x && c.y === p.y)) return []
     const plantedDay = Math.floor(state.tick / MINUTES_PER_DAY)
     return [
       {
@@ -1389,8 +1402,10 @@ const harvest: VerbDef = makeVerb({
   },
   onComplete(state, config, agentId, params) {
     const p = HarvestParams.parse(params)
-    const crop = state.crops[p.cropId]!
-    const def = config.crops[crop.kind]!
+    const crop = state.crops[p.cropId]
+    if (!crop || crop.withered) return []
+    const def = config.crops[crop.kind]
+    if (!def) return []
     // Water near the roots is worth more than skill at the sickle: the ground decides the number.
     const qty = Math.floor(def.yield * fertilityAt(state.terrain, crop.x, crop.y, config))
     return [

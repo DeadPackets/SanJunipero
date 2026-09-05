@@ -6,7 +6,7 @@ import {
   stateHash,
   type SimEvent,
 } from '@sj/shared'
-import { genesisState, type WorldState } from './state.js'
+import { AFFLICTION_KINDS, genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
 
 const ev = (seq: number, type: string, payload: unknown, tick = 0): SimEvent => ({
@@ -156,6 +156,17 @@ describe('fold', () => {
     expect(s.agents.a1!.injuries).toEqual([{ kind: 'serious', day: 2 }])
     s = fold(s, ev(5, 'agent_aged', { agentId: 'a1' }, 5 * DAY))
     expect(s.agents.a1!.injuries).toEqual([])
+  })
+
+  it('orders afflictions by code point, whatever order they arrived in', () => {
+    const afflict = (w: WorldState, kind: string, seq: number): WorldState =>
+      fold(w, ev(seq, 'agent_afflicted', { agentId: 'a1', kind, severity: 1 }))
+    const start = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    const kinds = [...AFFLICTION_KINDS]
+    const forwards = kinds.reduce((w, k, i) => afflict(w, k, i + 2), start)
+    const backwards = [...kinds].reverse().reduce((w, k, i) => afflict(w, k, i + 2), start)
+    expect(forwards.agents.a1!.afflictions!.map((x) => x.kind)).toEqual([...kinds].sort())
+    expect(stateHash(backwards)).toBe(stateHash(forwards))
   })
 
   it('bumps counters.nextEntityId on spawn and never lowers it', () => {
