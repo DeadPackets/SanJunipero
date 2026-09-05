@@ -156,7 +156,6 @@ describe('the Firsts tab', () => {
         sourceKind: 'speech',
         eventSeq: 9,
         quote: 'we should call it Emberfall',
-        byId: 'amara',
       },
     })
     const html = view({ data: [named, first()], loaded: true, failed: false })
