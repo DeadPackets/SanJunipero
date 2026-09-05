@@ -759,9 +759,10 @@ describe('★ the money, inside the served world', () => {
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     // Run C's measured 4.7 calls a mind a sim-hour, for two minds over a 12-sim-hour window,
-    // and a nightly reflection burst on top of it.
+    // a nightly reflection burst on top of it, and the ledger's share of lines said out loud.
     callsTo(opsDb, 'turn', 113)
     callsTo(opsDb, 'reflection', 12)
+    callsTo(opsDb, 'scene', 70)
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)

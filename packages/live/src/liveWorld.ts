@@ -210,8 +210,9 @@ export async function settle(
 
 /** A per-call cap cannot see a slow leak; this bounds CALLS per unit time, PER MIND. Calls, not
  *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
- *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 14 is 3x, per ruling 25. */
-const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 14
+ *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours) over the callers the
+ *  monitor then counted; the scene lines it did not are 735 of 1,307 more, so 7.3, and 22 is 3x. */
+const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 22
 // A rate needs a span to be a rate: two sim-hours is four real minutes at 1x and a burst of
 // night reflections spread thin enough not to read as a runaway.
 const LIVE_RATE_MIN_SPAN_SIM_HOURS = 2

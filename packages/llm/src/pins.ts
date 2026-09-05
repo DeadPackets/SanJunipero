@@ -207,6 +207,10 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   constructs: { ...ON_DEEPSEEK, reasoning: { enabled: false }, maxOutputTokens: 500 },
 }
 
+/** Every caller with a pin of its own, in declaration order. The rate monitor reads this so a
+ *  new caller on the mind's route cannot be added without the per-mind ceiling seeing it. */
+export const PINNED_CALLERS: string[] = Object.keys(SETTINGS_BY_CALLER)
+
 const NO_SETTINGS: CallSettings = {}
 
 export function callSettingsFor(caller: string): CallSettings {

@@ -88,10 +88,13 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     expect(r).toEqual({ callsPerMindSimHour: 8, sampledCalls: 16 })
   })
 
-  it('counts only what a mind spends its own calls on', () => {
+  // ★ A line said out loud is a mind's own call — a third of them, by the ledger. Counted
+  // anywhere but here, a conversation loop can hold the floor at any rate the day's budget allows.
+  it('counts only what a mind spends its own calls on, the words it says among them', () => {
     const db = openDb()
-    expect(MIND_CALLERS).toEqual(['turn', 'reflection', 'reflection.edit', 'dream', 'recall'])
-    for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'recall']) {
+    const mind = ['turn', 'reflection', 'reflection.edit', 'dream', 'scene', 'recall']
+    expect(MIND_CALLERS).toEqual(mind)
+    for (const caller of mind) {
       seedProviderCall(db, { agoMinutes: 1, caller, provider: 'Baidu' })
     }
     for (const caller of ['narrator', 'arbiter', 'semantic', 'forge', 'preflight', 'constructs']) {
@@ -99,7 +102,7 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     }
 
     const r = projectCallRate(db, { minds: 1, windowRealMinutes: 15, now: NOW })
-    expect(r.sampledCalls, 'town work was billed to the cast').toBe(5)
+    expect(r.sampledCalls, 'town work was billed to the cast').toBe(6)
   })
 
   it('leaves a call older than the window out of the flow', () => {
