@@ -20,7 +20,7 @@ import {
 } from './chronicle.js'
 import type { SimEvent } from './events.js'
 
-const NAMES: Record<string, string> = { a1: 'Rahel', a2: 'Tomas' }
+const NAMES: Record<string, string> = { a1: 'Rahel', a2: 'Tomas', a3: 'Mira' }
 const KINDS: Record<string, string> = { s1: 'house', s2: 'storehouse' }
 const look: ChronicleLookup = {
   agentName: (id) => NAMES[id] ?? id,
@@ -196,6 +196,75 @@ const DEATH_CAUSES = [
 // The four ways a body can be afflicted (engine state.ts AFFLICTION_KINDS), held here for the
 // same reason DEATH_CAUSES is: shared sits under the engine and cannot import it.
 const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison']
+
+describe('the rules the town writes for itself', () => {
+  it('reads the keys the engine actually writes on the four law events', () => {
+    const defs = readFileSync(new URL('../../engine/src/events.def.ts', import.meta.url), 'utf8')
+    const keysOf = (name: string): string[] => {
+      const at = defs.indexOf(`export const ${name} = z`)
+      expect(at, name).toBeGreaterThan(-1)
+      const body = defs.slice(at, defs.indexOf('.strict()', at))
+      return [...body.matchAll(/(\w+):\s*(?:z\.|[A-Z])/g)].map((m) => m[1]!).sort()
+    }
+    expect(keysOf('LawProposed')).toEqual(['agentId', 'lawId', 'text'])
+    expect(keysOf('LawBroken')).toEqual(['agentId', 'lawId', 'verb', 'witnesses'])
+    expect(keysOf('LawRepealed')).toEqual(['agentId', 'lawId', 'text'])
+  })
+
+  // The wording of a rule is the town's, quoted; ours is only the frame around it.
+  it('quotes the sentence the town said, and never the id it was filed under', () => {
+    const text = 'Nobody takes from the store after dark.'
+    expect(chronicleLine(ev('law_proposed', { lawId: 'law_1', agentId: 'a1', text }), look)).toBe(
+      `Rahel put a rule to the room: “${text}”`,
+    )
+    expect(
+      chronicleLine(
+        ev('law_ratified', {
+          lawId: 'law_1',
+          agentId: 'a1',
+          text,
+          why: 'the store is a place and the night is a clock',
+          predicate: { kind: 'forbid', verb: 'take' },
+          votes: { for: ['a1'], against: [] },
+        }),
+        look,
+      ),
+    ).toBe(`The town agreed: “${text}”`)
+    expect(chronicleLine(ev('law_repealed', { lawId: 'law_1', agentId: 'a2', text }), look)).toBe(
+      `The town let a rule go: “${text}”`,
+    )
+    for (const type of ['law_proposed', 'law_ratified', 'law_repealed', 'law_broken']) {
+      const line = chronicleLine(
+        ev(type, { lawId: 'law_1', agentId: 'a1', text, verb: 'take', witnesses: ['a2'] }),
+        look,
+      )
+      expect(line, type).not.toMatch(/law_|_id|\ba1\b|\ba2\b/)
+    }
+  })
+
+  it('names who saw a rule broken, and says nothing about eyes that were not there', () => {
+    const broke = (witnesses: string[]): string | null =>
+      chronicleLine(
+        ev('law_broken', { lawId: 'law_1', agentId: 'a1', verb: 'take', witnesses }),
+        look,
+      )
+    expect(broke([])).toBe('Rahel did what the town agreed against.')
+    expect(broke(['a2'])).toBe('Rahel did what the town agreed against, and Tomas saw.')
+    expect(broke(['a2', 'a3'])).toBe(
+      'Rahel did what the town agreed against, and Tomas and Mira saw.',
+    )
+  })
+
+  it('weighs a rule passing above the roof it is written under, and a proposal below both', () => {
+    expect(CHRONICLE_WEIGHTS.law_ratified!).toBeGreaterThan(CHRONICLE_WEIGHTS.structure_completed!)
+    expect(CHRONICLE_WEIGHTS.law_repealed!).toBeLessThan(CHRONICLE_WEIGHTS.law_ratified!)
+    expect(CHRONICLE_WEIGHTS.law_proposed!).toBeLessThan(CHRONICLE_WEIGHTS.law_broken!)
+    for (const type of ['law_proposed', 'law_ratified', 'law_broken', 'law_repealed'])
+      expect(NOT_CHRONICLED.has(type), type).toBe(false)
+    expect(chronicleIcon('law_ratified')).toBe('quill')
+    expect(chronicleIcon('law_broken')).toBe('flame')
+  })
+})
 
 describe('the acts two people choose', () => {
   // Shared sits under the engine, so the schemas cannot be imported here: the guard below reads
