@@ -1,13 +1,18 @@
 // LUT reuses forge's calibrated atmosphere TINTS — the palette was locked under these.
+
+/** How dark the town is ever allowed to get. The forge's own night was 0.45/0.52 and a roof
+ *  under it kept 0.536 of its luma, which is a hole in the picture rather than a night. */
+export const NIGHT_FLOOR: [number, number, number] = [0.5, 0.58, 0.95]
+
 export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] = [
-  { minute: 0, tint: [0.45, 0.52, 0.95] }, // deep night   (forge TINTS.night)
-  { minute: 300, tint: [0.45, 0.52, 0.95] }, // 05:00 still night
+  { minute: 0, tint: NIGHT_FLOOR }, // deep night
+  { minute: 300, tint: NIGHT_FLOOR }, // 05:00 still night
   { minute: 390, tint: [1.0, 0.94, 0.78] }, // 06:30 golden dawn (TINTS.dawn clamped ≤1)
   { minute: 480, tint: [1.0, 1.0, 1.0] }, // 08:00 full day
   { minute: 1050, tint: [1.0, 1.0, 1.0] }, // 17:30 day holds
   { minute: 1140, tint: [1.0, 0.94, 0.78] }, // 19:00 golden dusk
-  { minute: 1230, tint: [0.45, 0.52, 0.95] }, // 20:30 night
-  { minute: 1440, tint: [0.45, 0.52, 0.95] },
+  { minute: 1230, tint: NIGHT_FLOOR }, // 20:30 night
+  { minute: 1440, tint: NIGHT_FLOOR },
 ]
 
 /** Blue held at 1.00, red pulled: a blue cast instead of the grey-green one, at the same luma.

@@ -258,6 +258,7 @@ function showcaseTownAtTick1(): WorldState {
   const events: { type: string; payload: unknown }[] = []
   const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
     structures: SHOWCASE_STRUCTURES,
+    founders: foundersFor(SHOWCASE_STRUCTURES),
   })
   onTick({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
   let seq = 0
@@ -268,11 +269,14 @@ function showcaseTownAtTick1(): WorldState {
 describe('homeOf', () => {
   const town = showcaseTownAtTick1()
 
-  it('gives each of the five founders a different roof', () => {
+  // Eight roofs for twelve: a couple shares a house, and the cottage holds three.
+  it('gives each of the twelve founders a roof, eight roofs between them', () => {
     const homes = FOUNDER_IDS.map((id) => homeOf(town, id))
     for (const h of homes) expect(h).not.toBeNull()
-    expect(new Set(homes.map((h) => h!.id)).size).toBe(5)
-    expect(new Set(homes.map((h) => h!.kind))).toEqual(new Set(['house']))
+    expect(new Set(homes.map((h) => h!.id)).size).toBe(8)
+    expect(new Set(homes.map((h) => h!.kind))).toEqual(new Set(['house', 'cottage']))
+    expect(homeOf(town, 'bashir')!.id).toBe(homeOf(town, 'farida')!.id)
+    expect(homeOf(town, 'tariq')!.name).toBe('the old cottage')
   })
 
   it('says nothing about someone who owns nothing', () => {
@@ -290,12 +294,13 @@ describe('homeOf', () => {
 })
 
 describe('U25 — the humans were all sleeping inside one house', () => {
-  // Every founder is kept spent so home is the only errand; the run ends when all five are indoors.
-  it('puts five tired founders under five different roofs', () => {
+  // Every founder is kept spent so home is the only errand; the run ends when all twelve are indoors.
+  it('puts twelve tired founders under eight different roofs', () => {
     let state = showcaseTownAtTick1()
     const onTick = makeFoundersOnTick(SHOWCASE_CONFIG, new RngStreams('u25'), () => state, {
       interiors: true,
       structures: SHOWCASE_STRUCTURES,
+      founders: foundersFor(SHOWCASE_STRUCTURES),
     })
     let seq = 1000
     for (let tick = 2; tick <= 400; tick++) {
@@ -308,8 +313,8 @@ describe('U25 — the humans were all sleeping inside one house', () => {
       if (FOUNDER_IDS.every((id) => state.agents[id]?.insideId !== undefined)) break
     }
     const inside = FOUNDER_IDS.map((id) => state.agents[id]!.insideId)
-    expect(inside.filter((i) => i !== undefined)).toHaveLength(5)
-    expect(new Set(inside).size).toBe(5)
+    expect(inside.filter((i) => i !== undefined)).toHaveLength(12)
+    expect(new Set(inside).size).toBe(8)
   })
 })
 
@@ -327,7 +332,7 @@ describe('homeIntent routes an owner to their own door', () => {
       })
     }
     const doors = FOUNDER_IDS.map((id) => doorTile(town, homeOf(town, id)!)!)
-    expect(new Set(doors.map((d) => `${d.x},${d.y}`)).size).toBe(5)
+    expect(new Set(doors.map((d) => `${d.x},${d.y}`)).size).toBe(8)
   })
 
   it('enters their OWN house from one tile away', () => {
@@ -359,16 +364,16 @@ describe('foundersFor', () => {
   const town = showcaseTownAtTick1()
 
   it('spawns every founder on their own doorstep', () => {
-    expect(defs).toHaveLength(5)
+    expect(defs).toHaveLength(12)
     for (const d of defs) {
       const door = doorTile(town, homeOf(town, d.id)!)!
       expect(d.spawn).toEqual({ x: door.x, y: door.y })
     }
   })
 
-  it('gives five distinct, walkable spawns', () => {
+  it('gives eight distinct, walkable spawns — one per roof', () => {
     const keys = defs.map((d) => `${d.spawn.x},${d.spawn.y}`)
-    expect(new Set(keys).size).toBe(5)
+    expect(new Set(keys).size).toBe(8)
     const terrain = showcaseTerrain()
     for (const d of defs) expect(terrain[d.spawn.y]![d.spawn.x]).not.toBe(2) // never in the river
   })

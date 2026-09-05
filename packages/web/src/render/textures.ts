@@ -119,9 +119,12 @@ export function bakeTexture(
   return tex
 }
 
+/** The url every artless kind of a class shares, so it belongs to no one entity. */
+const PLACEHOLDER_PREFIX = '/assets/placeholder/'
+
 export function textureUrlFor(records: AssetRecord[], klass: AssetClass, kind: string): string {
   const id = resolveAssetId(records, klass, kind)
-  return id !== null ? `/assets/${id}.png` : `/assets/placeholder/${klass}.png`
+  return id !== null ? `/assets/${id}.png` : `${PLACEHOLDER_PREFIX}${klass}.png`
 }
 
 /** Art is optional: a load that failed leaves the placeholder standing, and the book will ask
@@ -160,10 +163,15 @@ export class TextureBook {
   }
 
   /** NOT `Assets.unload`: that destroys the texture, and the artless kinds all share one
-   *  placeholder url — every sibling still on it would then render a null source. */
+   *  placeholder url — every sibling still on it would then render a null source. A placeholder
+   *  is not even softly freed: its siblings would pay a re-upload once per kind that finds art. */
   async swap(oldUrl: string, newUrl: string): Promise<Texture> {
     const next = await this.get(newUrl) // free the old source only once the new one is in hand
-    if (oldUrl !== newUrl) this.#ready.get(oldUrl)?.source.unload()
+    if (oldUrl !== newUrl && !oldUrl.startsWith(PLACEHOLDER_PREFIX)) {
+      this.#ready.get(oldUrl)?.source.unload()
+      this.#ready.delete(oldUrl)
+      this.#cache.delete(oldUrl)
+    }
     return next
   }
 }

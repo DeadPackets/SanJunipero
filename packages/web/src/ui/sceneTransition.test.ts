@@ -162,7 +162,7 @@ describe('entering a room is a camera going in, not a card appearing', () => {
 
 describe('following someone eases the zoom', () => {
   it("goes through the camera's own stop machine, which eases — never a raw scale write", () => {
-    expect(DIRECTOR).toContain('scene.setZoom(DIRECTOR_ZOOM)')
+    expect(DIRECTOR).toContain('scene.setZoom(directorZoom(')
     expect(DIRECTOR).not.toMatch(/world\.scale/)
   })
 })

@@ -6,7 +6,8 @@ import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
 import { dateline } from './stamp.js'
 import { PageBody } from './pages/index.js'
-import type { Thing } from './pages/types.js'
+import type { PaperNotice, Thing } from './pages/types.js'
+import type { MomentPlay } from '../ui/replayRun.js'
 import {
   PAGE_TABS,
   PAGE_TITLE,
@@ -37,7 +38,8 @@ export function Paper({
   onClose,
   onSubject,
   onInside,
-  onJump,
+  onScrub,
+  onPlay,
   onLive,
   onMoment,
 }: {
@@ -55,7 +57,8 @@ export function Paper({
   onClose: () => void
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
-  onJump: (tick: number) => void
+  onScrub: (tick: number) => void
+  onPlay: (play: MomentPlay) => void
   onLive: () => void
   onMoment: (id: number | null) => void
 }) {
@@ -68,6 +71,7 @@ export function Paper({
   if (page !== null && page !== shown) setShown(page)
 
   const key = shown ?? 'folk'
+  const [notice, setNotice] = useState<PaperNotice | null>(null)
 
   // [open, key]: switching arms unmounts the focused tab, and focus would fall to <body>.
   useEffect(() => {
@@ -232,6 +236,11 @@ export function Paper({
             </div>
           </div>
         </header>
+        {key === 'laws' && notice !== null && (
+          <p className="laws-notice" role="status" aria-live={notice.ok ? 'polite' : 'assertive'}>
+            {notice.words}
+          </p>
+        )}
         <div
           className="paper-sheet"
           id="paper-sheet"
@@ -256,9 +265,11 @@ export function Paper({
                 gapTicks={gapTicks}
                 onSubject={onSubject}
                 onInside={onInside}
-                onJump={onJump}
+                onScrub={onScrub}
+                onPlay={onPlay}
                 onLive={onLive}
                 onMoment={onMoment}
+                onNotice={setNotice}
               />
             </PageBoundary>
           ) : null}

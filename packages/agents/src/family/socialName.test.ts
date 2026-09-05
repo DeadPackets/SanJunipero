@@ -108,14 +108,14 @@ describe('promptBirthLine (T25)', () => {
     const line = promptBirthLine(BORN)
     expect(line).toContain('Mira')
     expect(line).toContain('daughter')
-    expect(line).toMatch(/what do you call her\?/)
+    expect(line).toMatch(/What do you call her\?/)
     expect(line).not.toMatch(FORBIDDEN_FRAMING)
   })
 
   it('a son is a son', () => {
     const line = promptBirthLine({ ...BORN, sex: 'm', name: 'Idris' })
     expect(line).toContain('son')
-    expect(line).toMatch(/what do you call him\?/)
+    expect(line).toMatch(/What do you call him\?/)
   })
 })
 

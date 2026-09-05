@@ -113,7 +113,7 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
 
   it('4. is the heaviest thing on the scrub bar', () => {
     const w = markWeights()
-    expect(Object.keys(w)).toHaveLength(9)
+    expect(Object.keys(w)).toHaveLength(10)
     expect(w.discovery).toBe(18)
     expect(Math.max(...Object.values(w))).toBe(18)
   })

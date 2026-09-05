@@ -1,6 +1,4 @@
 import { MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
-import { partnershipOf } from '@sj/engine'
-import type { WorldState } from '@sj/engine'
 import type { Milestone } from '../types.js'
 
 // Tier 2 — pattern firsts: a shape across several events. Deterministic rules only, and
@@ -16,9 +14,6 @@ const CONVERSATION_TICKS = 30
 export type Tier2Ctx = {
   seenKinds: Set<string>
   config: SimConfig
-  // The engine's own relationship rows. Absent for a pass with no world in reach, and the
-  // three detectors that need one simply do not run.
-  state?: WorldState | undefined
 }
 
 type Found = { kind: string; label: string; ev: SimEvent; agentIds: string[] }
@@ -88,99 +83,6 @@ function quarrelAndPeace(events: SimEvent[]): Found[] {
     }
   }
   return out
-}
-
-// A night kept often enough to be a partnership, counted off the nights themselves.
-function partnership(events: SimEvent[], config: SimConfig): Found | null {
-  const nights = new Map<string, number>()
-  for (const ev of events) {
-    if (ev.type !== 'co_slept') continue
-    const a = str(p(ev).aId)
-    const b = str(p(ev).bId)
-    if (a === null || b === null) continue
-    const key = pairKeyOf(a, b)
-    const n = (nights.get(key) ?? 0) + 1
-    nights.set(key, n)
-    if (n === config.reproduction.coSleepNightsToPartner) {
-      return {
-        kind: 'first_partnership',
-        label: 'the first two who chose each other',
-        ev,
-        agentIds: [a, b].sort(),
-      }
-    }
-  }
-  return null
-}
-
-// A night kept with somebody else while a partnership stands. The engine's rows say who is
-// partnered; this only reads them (`partnershipOf`, never `pairNights`).
-function affair(events: SimEvent[], ctx: Tier2Ctx): Found | null {
-  const state = ctx.state
-  if (state === undefined) return null
-  for (const ev of events) {
-    if (ev.type !== 'co_slept') continue
-    const a = str(p(ev).aId)
-    const b = str(p(ev).bId)
-    if (a === null || b === null) continue
-    for (const who of [a, b]) {
-      const other = who === a ? b : a
-      for (const third of Object.keys(state.agents).sort()) {
-        if (third === who || third === other) continue
-        const row = partnershipOf(state, who, third)
-        if (row?.formedTick === null || row === undefined) continue
-        if (row.dissolvedTick !== null) continue
-        return {
-          kind: 'first_affair',
-          label: 'the first night kept away from a partner',
-          ev,
-          agentIds: [a, b].sort(),
-        }
-      }
-    }
-  }
-  return null
-}
-
-// A partnership dissolves on a rolling window a brief separation can trip, so a breakup asks
-// for more: dissolved, and no speech and no shared roof for the whole window.
-function breakup(events: SimEvent[], ctx: Tier2Ctx): Found | null {
-  const state = ctx.state
-  if (state === undefined) return null
-  const windowTicks = ctx.config.reproduction.partnerWindowDays * MINUTES_PER_DAY
-  const earshot = ctx.config.movement.earshotRadius
-  const ids = Object.keys(state.agents).sort()
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const a = ids[i]!
-      const b = ids[j]!
-      const row = partnershipOf(state, a, b)
-      if (row === undefined) continue
-      if (row.formedTick === null || row.dissolvedTick === null) continue
-      const since = row.dissolvedTick - windowTicks
-      const spoke = events.some((ev) => {
-        if (ev.tick < since || ev.tick > row.dissolvedTick!) return false
-        if (ev.type === 'co_slept')
-          return pairKeyOf(String(p(ev).aId), String(p(ev).bId)) === pairKeyOf(a, b)
-        if (ev.type !== 'agent_spoke') return false
-        const who = str(p(ev).agentId)
-        if (who !== a && who !== b) return false
-        const heard = state.agents[who === a ? b : a]
-        if (heard === undefined) return false
-        return Math.hypot(Number(p(ev).x) - heard.x, Number(p(ev).y) - heard.y) <= earshot
-      })
-      if (spoke) continue
-      const last = events.filter((ev) => ev.tick <= row.dissolvedTick!).at(-1) ?? events.at(-1)
-      if (last === undefined) continue
-      return {
-        kind: 'first_breakup',
-        label: 'the first parting',
-        ev: last,
-        agentIds: [a, b].sort(),
-      }
-    }
-  }
-  return null
 }
 
 // A child with nobody left to raise it.
@@ -288,9 +190,6 @@ export function detectTier2(events: SimEvent[], ctx: Tier2Ctx): Milestone[] {
   const found: (Found | null)[] = [
     conversation(events, ctx.config),
     ...quarrelAndPeace(events),
-    partnership(events, ctx.config),
-    affair(events, ctx),
-    breakup(events, ctx),
     orphan(events, parents, new Set()),
     grandparent(events, parents),
     apprentice(events),

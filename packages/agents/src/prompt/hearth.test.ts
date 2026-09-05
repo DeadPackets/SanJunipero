@@ -11,7 +11,10 @@ import {
   type WorldState,
 } from '@sj/engine'
 import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
   DEFAULT_CONFIG,
+  DURATION_TICKS,
   type SimEvent,
   scanForDirective,
   scanForLayoutLeak,
@@ -47,7 +50,7 @@ function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId
       name: 'amara',
       x: door.x,
       y: door.y,
-      ageDays: 30 * 364,
+      ageDays: 30 * DAYS_PER_YEAR,
       sex: 'f',
     }),
     CFG,
@@ -80,8 +83,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     expect(proseFor(bridge)).toContain('The hearth here is cold.')
 
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     const lit = proseFor(bridge)
     expect(lit).toContain('A fire is burning in the hearth here.')
     expect(lit).not.toContain('The hearth here is cold.')
@@ -95,8 +97,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const before = warmthTargetFor(loop.state, CFG, 'amara')
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     // A spring night, so nothing here is shivering either way — the point is that the number
     // MOVES, which it never did: walls answered the cold and the fire answered nothing.
     expect(warmthTargetFor(loop.state, CFG, 'amara')).toBe(before + 2 * CFG.warmth.fireWarmth)
@@ -141,8 +142,7 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     loop.step()
     const cold = proseFor(bridge).toLowerCase()
     void bridge.submit('amara', { verb: 'stoke', params: { structureId: homeId } })
-    loop.step()
-    loop.step()
+    for (let i = 0; i <= DURATION_TICKS.minutes; i++) loop.step()
     const lit = proseFor(bridge).toLowerCase()
     for (const said of [cold, lit]) {
       expect(scanForDirective(said), said).toEqual([])
@@ -189,7 +189,10 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
       }),
     )
     if (stage === 'complete') s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }))
-    s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 4, ageDays: 7300 }))
+    s = fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 4, ageDays: ADULT_AGE_DAYS }),
+    )
     const db = openDb(':memory:')
     const store = new EventStore(db)
     const loop = new TickLoop({
@@ -211,7 +214,7 @@ describe('★ a roofless building has no inside yet, and the wall says so', () =
   it('★ VACUOUS GUARD: and the finished building does not say it', () => {
     const done = site('complete')
     expect(done).not.toContain('There is no inside to it yet.')
-    expect(done).toContain('stand there and you can go in')
+    expect(done).toContain('it has a doorway; walk to it and you can go in')
   })
 
   it('names no remedy: it is a fact about now and promises nothing later', () => {
@@ -229,7 +232,7 @@ describe('the one-way glass holds over every sentence this lane added', () => {
   const AUTHORED = [
     'The hearth here is cold.',
     'A fire is burning in the hearth here.',
-    'Firelight moves inside it.',
+    'There is firelight inside it.',
     'There are beds in here.',
     'There are beds in it.',
     'There is no inside to it yet.',

@@ -41,6 +41,18 @@ export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
   { what: 'the chronicle ticker', from: 'sheet', selector: "[data-broadcast='on'] .ticker-line" },
   { what: 'the quiet stamp', from: 'sheet', selector: "[data-broadcast='on'] .stage-stamp" },
   { what: 'the director’s cue', from: 'sheet', selector: "[data-broadcast='on'] .stage-cue" },
+  { what: 'the scene card', from: 'sheet', selector: "[data-broadcast='on'] .scene-card-where" },
+  {
+    what: 'the scene card’s stamp',
+    from: 'sheet',
+    selector: "[data-broadcast='on'] .scene-card-title",
+  },
+  { what: 'the sleep card', from: 'sheet', selector: "[data-broadcast='on'] .sleep-card-line" },
+  {
+    what: 'the sleep card’s note',
+    from: 'sheet',
+    selector: "[data-broadcast='on'] .sleep-card-note",
+  },
 ]
 
 export type SpokenLine = { agentId: string; name: string; words: string }
@@ -51,8 +63,9 @@ export type LowerThirdLine =
   | { kind: 'speech'; agentId: string; name: string; words: string }
   | { kind: 'dispatch'; name: string; words: string }
 
-/** Long enough to read a sentence at broadcast size, short enough not to outlive the shot.
- *  The hold is a timer the mark owns, not a clock this module reads. */
+/** Long enough to read a sentence at broadcast size, short enough not to outlive the shot. The
+ *  hold is a timer the mark owns, not a clock this module reads, and it is counted from the
+ *  moment the line has finished TYPING — otherwise a 140-character caption is read for a second. */
 export const CAPTION_HOLD_MS = 6000
 
 /** A caption is a caption, not a paragraph: what does not fit ends in an ellipsis. */

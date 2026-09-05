@@ -8,7 +8,7 @@ import type { Recipe } from './verdict.js'
 const base: Recipe = {
   id: 'recipe:waterskin',
   name: 'Sew a Waterskin',
-  durationTicks: 20,
+  takes: 'half_hour',
   costs: [{ kind: 'hide', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'hide', qty: 1 }],
   outcomeTable: [
@@ -16,7 +16,7 @@ const base: Recipe = {
       weight: 1,
       success: true,
       label: 'The seams hold water.',
-      effects: [{ op: 'spawn_item', kind: 'waterskin', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'waterskin', qty: 1 }],
     },
   ],
   rngStream: 'recipe:waterskin',
@@ -88,11 +88,30 @@ describe('the codification sanity gate', () => {
           weight: 1,
           success: true,
           label: 'It holds water.',
-          effects: [{ op: 'spawn_item', kind: 'waterskins', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'waterskins', qty: 1 }],
         },
       ],
     }
     expect(recipeSanityRefusal(rival, vocab)).toMatch(/already makes|second name/)
+  })
+
+  it('refuses a building made in the hand', () => {
+    const bridging: Recipe = {
+      ...base,
+      id: 'recipe:bridging',
+      name: 'Bridging',
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'A footbridge spans the water.',
+          effects: [{ op: 'spawn_item', kind: 'weir', qty: 1 }],
+        },
+      ],
+    }
+    expect(recipeSanityRefusal(bridging, vocab)).toMatch(/weir/)
+    // With no table shown there is nothing to check against and the check stands down.
+    expect(recipeSanityRefusal(bridging, { knownProducts: new Set() })).toBeNull()
   })
 
   it('knows a near-duplicate from two different things', () => {

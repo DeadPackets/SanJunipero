@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { PerceptionPacket } from './prompt/prose.js'
+import { openAgentDb } from './memory/schema.js'
+import { WantStore } from './memory/wants.js'
 import { quietMeadowPacket, conversationPacket } from './testutil/fixtures.js'
 import {
   decideWake,
   disarmBodyAlarm,
   rearmBodyAlarm,
-  rearmConversationWindow,
+  wakeReasons,
   DEFAULT_MIND_CONFIG,
+  type FloorState,
   type MindClock,
   type PlanState,
   type WakeReason,
@@ -33,10 +37,10 @@ function clk(overrides: Partial<MindClock> = {}): MindClock {
   return {
     lastTurnTick: 0,
     reconsiderAtTick: null,
-    conversationUntilTick: 0,
     dozeUntilTick: 0,
     alarmArmed: { hunger: true, energy: true, warmth: true },
     morningWokeDay: null,
+    gatheringDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
     ...overrides,
@@ -47,16 +51,32 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
   return { queue: [], lastResult: 'idle', ...overrides }
 }
 
+const HOLDS_FLOOR: FloorState = { inScene: true, holdsFloor: true }
+const LISTENS: FloorState = { inScene: true, holdsFloor: false }
+const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
+
 describe('decideWake — one case per reason', () => {
-  const cases: [string, PerceptionPacket, MindClock, number, PlanState, WakeReason | null][] = [
-    ['body_alarm', withNeeds(24, 78, 71), clk(), 10, pln(), 'body_alarm'],
+  // The sixth column is the reason that decides and always has; the seventh is every reason that
+  // was true, deciding one first. Nothing reads the seventh but the ledger.
+  const cases: [
+    string,
+    PerceptionPacket,
+    MindClock,
+    number,
+    PlanState,
+    WakeReason | null,
+    WakeReason[],
+    FloorState?,
+  ][] = [
+    ['body_alarm', withNeeds(14, 78, 71), clk(), 10, pln(), 'body_alarm', ['body_alarm']],
     [
-      'salient_perception (heard speech)',
+      'salient_perception (rain felt, with a voice and a face under it)',
       conversationPacket,
       clk(),
       10,
       pln(),
       'salient_perception',
+      ['salient_perception'],
     ],
     [
       'salient_perception (felt event only)',
@@ -65,22 +85,107 @@ describe('decideWake — one case per reason', () => {
       10,
       pln(),
       'salient_perception',
+      ['salient_perception'],
     ],
-    ['plan_blocked', pkt(), clk(), 10, pln({ lastResult: 'blocked' }), 'plan_blocked'],
-    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done'],
     [
-      'conversation_beat',
+      'plan_blocked',
       pkt(),
-      clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
-      105,
-      pln(),
-      'conversation_beat',
+      clk(),
+      10,
+      pln({ lastResult: 'blocked' }),
+      'plan_blocked',
+      ['plan_blocked'],
     ],
-    ['reconsider', pkt(), clk({ reconsiderAtTick: 100 }), 100, pln(), 'reconsider'],
-    ['boredom', pkt(), clk(), 130, pln(), 'boredom'],
+    ['plan_done', pkt(), clk(), 30, pln({ lastResult: 'done' }), 'plan_done', ['plan_done']],
+    ['floor', pkt(), clk({ lastTurnTick: 100 }), 105, pln(), 'floor', ['floor'], HOLDS_FLOOR],
+    [
+      'reconsider',
+      pkt(),
+      clk({ reconsiderAtTick: 100 }),
+      100,
+      pln(),
+      'reconsider',
+      ['reconsider', 'boredom'],
+    ],
+    ['boredom', pkt(), clk(), 130, pln(), 'boredom', ['boredom']],
   ]
-  it.each(cases)('%s', (_name, packet, clock, tick, plan, expected) => {
-    expect(decideWake(cfg, packet, clock, tick, plan)).toBe(expected)
+  it.each(cases)('%s', (_name, packet, clock, tick, plan, expected, every, floor) => {
+    // A clock apiece: the gate spends the felt latch on the ask, so asking twice is not one ask.
+    expect(decideWake(cfg, packet, { ...clock }, tick, plan, floor)).toBe(expected)
+    expect(wakeReasons(cfg, packet, { ...clock }, tick, plan, floor)).toEqual(every)
+  })
+})
+
+// 82.4% of the gate's 510 calls were charged to salient_perception, and the number was inflated:
+// an act lasts one sim-minute, so the plan was finished on nearly every one of those ticks too,
+// three lines below where the answer was already given.
+describe('wakeReasons — what else was true when the winner was recorded', () => {
+  const asleepHungry: PerceptionPacket = {
+    ...withNeeds(5, 78, 71),
+    self: { ...withNeeds(5, 78, 71).self, asleep: true },
+  }
+
+  it('sees the finished plan under the passer-by that bought the call', () => {
+    const clock = clk()
+    const plan = pln({ lastResult: 'done' })
+    expect(decideWake(cfg, conversationPacket, clock, 30, plan)).toBe('salient_perception')
+    expect(wakeReasons(cfg, conversationPacket, clock, 30, plan)).toEqual([
+      'salient_perception',
+      'plan_done',
+    ])
+  })
+
+  it('a sleeper woken by its body is often owed a morning as well', () => {
+    expect(wakeReasons(cfg, asleepHungry, clk(), 600, pln())).toEqual(['body_alarm', 'morning'])
+  })
+
+  it('ends the list where the ladder ends: a gate stops what it was always going to stop', () => {
+    // The doze answers nothing at all, the retry rung silences a body that is still failing, and
+    // the idle floor never let reconsider be reached. None of these is "true but outranked".
+    expect(wakeReasons(cfg, conversationPacket, clk({ dozeUntilTick: 50 }), 49, pln())).toEqual([])
+    expect(wakeReasons(cfg, asleepHungry, clk({ wakeRetryAtTick: 910 }), 900, pln())).toEqual([])
+    expect(wakeReasons(cfg, conversationPacket, clk({ reconsiderAtTick: 0 }), 10, pln())).toEqual([
+      'salient_perception',
+    ])
+  })
+
+  it('a scene reaches one reason and a listener none, whatever else the body is doing', () => {
+    const weary = withNeeds(60, 40, 71)
+    const plan = pln({ lastResult: 'blocked' })
+    expect(wakeReasons(cfg, weary, clk(), 10, plan, HOLDS_FLOOR)).toEqual(['floor'])
+    expect(wakeReasons(cfg, weary, clk(), 10, plan, LISTENS)).toEqual([])
+  })
+})
+
+// Nothing closes a talk for being late any more, so the body alarm is the only thing left that
+// can reach a mouth running down mid-sentence.
+describe('the body reaches a mind holding the floor', () => {
+  it('leaves a merely tired floor-holder talking', () => {
+    const tired = withNeeds(60, 40, 71)
+    expect(decideWake(cfg, tired, clk(), 10, pln(), HOLDS_FLOOR)).toBe('floor')
+  })
+
+  it('takes a failing one off the floor', () => {
+    const failing = withNeeds(60, 5, 71)
+    expect(decideWake(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toBe('body_alarm')
+    expect(wakeReasons(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toContain('body_alarm')
+  })
+
+  it('rings once and then gives the floor back, because a spent alarm is disarmed', () => {
+    const failing = withNeeds(60, 5, 71)
+    const clock = clk()
+    disarmBodyAlarm(cfg, failing.self.body, clock)
+    expect(decideWake(cfg, failing, clock, 10, pln(), HOLDS_FLOOR)).toBe('floor')
+  })
+
+  it('takes a failing listener out of the talk too', () => {
+    const failing = withNeeds(60, 5, 71)
+    expect(decideWake(cfg, failing, clk(), 10, pln(), LISTENS)).toBe('body_alarm')
+  })
+
+  it('keeps hearing free: a merely tired listener takes no turn', () => {
+    const tired = withNeeds(60, 40, 71)
+    expect(wakeReasons(cfg, tired, clk(), 10, pln(), LISTENS)).toEqual([])
   })
 })
 
@@ -92,7 +197,7 @@ describe('decideWake — priority and floor', () => {
         ...conversationPacket.self,
         body: {
           ...conversationPacket.self.body,
-          needs: { ...conversationPacket.self.body.needs, hunger: 20 },
+          needs: { ...conversationPacket.self.body.needs, hunger: 10 },
         },
       },
     }
@@ -110,18 +215,14 @@ describe('decideWake — priority and floor', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
   })
 
-  it('idle floor does not apply inside an open conversation window', () => {
-    // 5 ticks since the last turn: outside conversation the floor would block
-    // plan_done (idleGapTicks = 20), but the window is still open.
-    expect(
-      decideWake(
-        cfg,
-        pkt(),
-        clk({ lastTurnTick: 100, conversationUntilTick: 160 }),
-        105,
-        pln({ lastResult: 'done' }),
-      ),
-    ).toBe('plan_done')
+  it('a scene outranks every reason but a failing body, whoever holds the floor', () => {
+    const blocked = pln({ lastResult: 'blocked' })
+    const well = withNeeds(60, 78, 71)
+    const starving = withNeeds(5, 78, 71)
+    expect(decideWake(cfg, well, clk(), 10, blocked, HOLDS_FLOOR)).toBe('floor')
+    expect(decideWake(cfg, well, clk(), 10, blocked, LISTENS)).toBe(null)
+    expect(decideWake(cfg, starving, clk(), 10, blocked, HOLDS_FLOOR)).toBe('body_alarm')
+    expect(decideWake(cfg, starving, clk(), 10, blocked, LISTENS)).toBe('body_alarm')
   })
 
   it('salient_perception fires when the visible-agent set changes', () => {
@@ -142,10 +243,43 @@ describe('decideWake — priority and floor', () => {
         ],
       },
     }
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln())).toBe(
+    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 40, pln())).toBe(
       'salient_perception',
     )
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 10, pln())).toBe(null)
+    expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 40, pln())).toBe(null)
+    expect(
+      decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln()),
+      'a face arriving is noticed, and waits out the idle gap like anything else noticed',
+    ).toBe(null)
+  })
+})
+
+// A word said near a mind is not addressed to it. The scene machine answers speech now: whoever
+// was spoken to becomes a participant and holds the floor, which is gap-exempt. Leaving `heard`
+// above the gate as well made every bystander pay a full turn for every line it overheard.
+describe('hearing is not being spoken to', () => {
+  const overheard: PerceptionPacket = {
+    ...quietMeadowPacket,
+    heard: [{ speakerId: 'nadia', name: 'Nadia', text: 'Six planks, you said.', distance: 2 }],
+  }
+
+  it('buys no turn inside the idle gap, however much is said', () => {
+    expect(wakeReasons(cfg, overheard, clk(), 10, pln())).toEqual([])
+    expect(wakeReasons(cfg, overheard, clk(), 29, pln())).toEqual([])
+  })
+
+  it('costs a listener no more than the silence beside it', () => {
+    const silent = { ...quietMeadowPacket }
+    for (const tick of [5, 10, 20, 29]) {
+      expect(wakeReasons(cfg, overheard, clk(), tick, pln()), `tick ${tick}`).toEqual(
+        wakeReasons(cfg, silent, clk(), tick, pln()),
+      )
+    }
+  })
+
+  it('still reaches a mind that something happened TO, at once', () => {
+    const rained = { ...overheard, feltEvents: ['rain_started'] }
+    expect(wakeReasons(cfg, rained, clk(), 10, pln())).toEqual(['salient_perception'])
   })
 })
 
@@ -203,7 +337,7 @@ describe('decideWake — asleep gate', () => {
         ...asleep().self,
         body: {
           ...quietMeadowPacket.self.body,
-          needs: { ...quietMeadowPacket.self.body.needs, energy: 10 },
+          needs: { ...quietMeadowPacket.self.body.needs, energy: 9 },
         },
       },
     }
@@ -254,26 +388,26 @@ describe('decideWake — hysteresis', () => {
       return decideWake(cfg, withNeeds(hunger, 78, 71), clock, tick, pln())
     }
 
-    expect(run(24, 10)).toBe('body_alarm')
-    disarmBodyAlarm(cfg, { needs: { hunger: 24, energy: 78, warmth: 71 } }, clock)
+    expect(run(14, 10)).toBe('body_alarm')
+    disarmBodyAlarm(cfg, { needs: { hunger: 14, energy: 78, warmth: 71 } }, clock)
 
-    expect(run(24, 11)).toBe(null)
+    expect(run(14, 11)).toBe(null)
 
-    // 26 is above threshold but below the 35 re-arm point: still quiet.
-    expect(run(26, 12)).toBe(null)
-    expect(run(24, 13)).toBe(null)
+    // 16 is above threshold but below the 25 re-arm point: still quiet.
+    expect(run(16, 12)).toBe(null)
+    expect(run(14, 13)).toBe(null)
 
-    // 36 > 25 + 10: climbs past the re-arm point, but healthy → no wake.
-    expect(run(36, 14)).toBe(null)
-    expect(run(24, 15)).toBe('body_alarm')
+    // 26 > 15 + 10: climbs past the re-arm point, but healthy → no wake.
+    expect(run(26, 14)).toBe(null)
+    expect(run(14, 15)).toBe('body_alarm')
   })
 
   it('a turn at a level between threshold and re-arm point must not disarm the alarm', () => {
-    // Regression: hunger 30 lies in (25, 35]; a turn snapshot there used to
-    // permanently disarm body_alarm because 30 is not > threshold + hysteresis.
+    // Regression: hunger 20 lies in (15, 25]; a turn snapshot there used to
+    // permanently disarm body_alarm because 20 is not > threshold + hysteresis.
     const clock = clk()
-    disarmBodyAlarm(cfg, { needs: { hunger: 30, energy: 78, warmth: 71 } }, clock)
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 10, pln())).toBe('body_alarm')
+    disarmBodyAlarm(cfg, { needs: { hunger: 20, energy: 78, warmth: 71 } }, clock)
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 10, pln())).toBe('body_alarm')
   })
 })
 
@@ -346,24 +480,14 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
 describe('decideWake — doze backoff', () => {
   it('suppresses every reason, floor-exempt ones included, until dozeUntilTick', () => {
     const clock = clk({ dozeUntilTick: 50 })
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 49, pln())).toBe(null)
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 49, pln())).toBe(null)
     expect(decideWake(cfg, conversationPacket, clock, 49, pln())).toBe(null)
     expect(decideWake(cfg, pkt(), clock, 49, pln({ lastResult: 'blocked' }))).toBe(null)
-    expect(decideWake(cfg, withNeeds(24, 78, 71), clock, 50, pln())).toBe('body_alarm')
+    expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 50, pln())).toBe('body_alarm')
   })
 })
 
-describe('decideWake — conversation cadence and reconsider', () => {
-  it('conversation_beat follows its cadence then falls back to idle', () => {
-    const base = { lastTurnTick: 100, conversationUntilTick: 130 }
-    const packet = pkt()
-    const plan = pln()
-    expect(decideWake(cfg, packet, clk(base), 104, plan)).toBe(null)
-    expect(decideWake(cfg, packet, clk(base), 105, plan)).toBe('conversation_beat')
-    expect(decideWake(cfg, packet, clk(base), 107, plan)).toBe('conversation_beat')
-    expect(decideWake(cfg, packet, clk(base), 131, plan)).toBe(null)
-  })
-
+describe('decideWake — reconsider', () => {
   it('reconsider fires once at the scheduled tick; caller clears it after acting', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 100 }), 100, pln())).toBe('reconsider')
     expect(
@@ -385,88 +509,197 @@ describe('a mind that has never taken a turn', () => {
   })
 })
 
+// ★ One rainfall sat in the perception window for all 66 of its ticks, and the felt rung is
+// above the idle gate: every awake mind bought a turn on every one of them.
+
+describe('★ a felt event buys one turn, not one a tick', () => {
+  const rained = pkt({ feltEvents: ['rain_started'] })
+
+  it('wakes for the rain once and stays quiet while it is still in the window', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    for (const tick of [11, 20, 40, 70]) {
+      expect(wakeReasons(cfg, rained, clock, tick, pln()), `tick ${tick}`).not.toContain(
+        'salient_perception',
+      )
+    }
+  })
+
+  it('wakes again for a second thing felt under the first', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    const tended = pkt({ feltEvents: ['rain_started', 'you_were_tended'] })
+    expect(wakeReasons(cfg, tended, clock, 12, pln())).toEqual(['salient_perception'])
+  })
+
+  it('wakes again when the same thing happens after the first has aged out', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    expect(wakeReasons(cfg, pkt(), clock, 80, pln())).not.toContain('salient_perception')
+    expect(wakeReasons(cfg, rained, clock, 90, pln())).toContain('salient_perception')
+  })
+
+  it('holds nothing against a mind that was dozing when it happened', () => {
+    const clock = clk({ dozeUntilTick: 50 })
+    expect(wakeReasons(cfg, rained, clock, 40, pln())).toEqual([])
+    expect(wakeReasons(cfg, rained, clock, 50, pln())).toContain('salient_perception')
+  })
+})
+
 // ★ Two minds paraphrasing each other held each other in the 5-tick cadence for ever, because
 // any heard word bought another 60 ticks of it. An echo is heard; it is not news.
-describe('only novel speech re-arms the conversation window', () => {
-  const heard = (...texts: string[]): PerceptionPacket =>
-    pkt({
-      heard: texts.map((text) => ({ speakerId: 'nadia', name: 'Nadia', text, distance: 3 })),
-    })
 
-  const asleepHearing = (text: string): PerceptionPacket => ({
-    ...heard(text),
-    self: { ...quietMeadowPacket.self, asleep: true },
-  })
+describe('★ fire and a blow reach a listener, as they reach a sleeper', () => {
+  const rousing = (e: string) => pkt({ feltEvents: [e] })
 
-  it('a line the mind has not heard before buys a window', () => {
-    const clock = clk()
-    rearmConversationWindow(cfg, heard('The bridge washed out in the night'), clock, 10)
-    expect(clock.conversationUntilTick).toBe(10 + cfg.conversationWindowTicks)
-  })
-
-  it('a loop of the same line paraphrased buys exactly one', () => {
-    const clock = clk()
-    const loop = [
-      'Good morning, Nadia, the day looks fair',
-      'Good morning, Nadia, the day looks fair to me',
-      'Good morning Nadia — the day looks fair!',
-      'the day looks FAIR, good morning Nadia',
-    ]
-    let tick = 10
-    for (const line of loop) {
-      rearmConversationWindow(cfg, heard(line), clock, tick)
-      tick += 5
+  it('rouses a listener who is being attacked or burned', () => {
+    for (const e of ['you_were_attacked', 'fire_nearby']) {
+      expect(decideWake(cfg, rousing(e), clk(), 100, pln(), LISTENS)).toBe('salient_perception')
     }
-    expect(clock.conversationUntilTick, 'only the first line was news').toBe(70)
   })
 
-  it('a genuinely new sentence re-arms exactly as before', () => {
-    const clock = clk()
-    rearmConversationWindow(cfg, heard('Good morning, Nadia'), clock, 10)
-    rearmConversationWindow(cfg, heard('Good morning, Nadia, again'), clock, 15)
-    expect(clock.conversationUntilTick, 'the echo bought nothing').toBe(70)
-    rearmConversationWindow(cfg, heard('The bridge washed out in the night'), clock, 20)
-    expect(clock.conversationUntilTick).toBe(80)
+  it('still holds a listener still for anything less than that', () => {
+    expect(decideWake(cfg, rousing('someone_spoke'), clk(), 100, pln(), LISTENS)).toBeNull()
   })
+})
 
-  it('one novel line among echoes still re-arms', () => {
-    const clock = clk()
-    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 10)
-    rearmConversationWindow(
+// ★ Phase 2 took `salient_perception` off the ambient rung and the town went a third as
+// sociable: 78 scenes opened before it, 26 after. This is the designed replacement — one rung,
+// above the idle gate, that reads the one want a scene answers.
+
+describe('★ the dusk gathering: the rung that reads a want', () => {
+  const DUSK = 19 * 60
+  const NOON = 12 * 60
+  const LONELY = cfg.gatheringWant + 1
+  const day = (n: number, minuteOfDay: number): number => n * MINUTES_PER_DAY + minuteOfDay
+
+  // A mind that has just taken a turn, which is the mind this rung exists for: everything below
+  // the idle gate is silent, so what the ladder answers here is the want and nothing else.
+  const woke = (
+    tick: number,
+    belonging: number,
+    over: Partial<MindClock> = {},
+  ): WakeReason | null =>
+    decideWake(
       cfg,
-      heard('Are you well, friend, today', 'The goat is loose in the barley'),
-      clock,
-      15,
+      pkt(),
+      clk({ lastTurnTick: tick - 1, ...over }),
+      tick,
+      pln(),
+      NO_SCENE,
+      belonging,
     )
-    expect(clock.conversationUntilTick).toBe(75)
+
+  it('fires at dusk for a mind whose belonging is over the gate', () => {
+    expect(woke(DUSK, LONELY)).toBe('gathering')
   })
 
-  it('an echo is still heard, and still wakes the mind for it', () => {
-    const clock = clk({ lastTurnTick: 100 })
-    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 100)
-    const echo = heard('Are you well, friend, today')
-    rearmConversationWindow(cfg, echo, clock, 150)
-    expect(clock.conversationUntilTick, 'nobody was made deaf').toBe(160)
-    expect(decideWake(cfg, echo, clock, 150, pln())).toBe('salient_perception')
+  it('never fires for a mind at or under the gate, however long the dusk', () => {
+    for (const level of [0, 30, cfg.gatheringWant]) {
+      expect(woke(DUSK, level), `${level}`).toBeNull()
+    }
   })
 
-  it('forgets what it heard once the window has lapsed', () => {
-    const clock = clk()
-    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 10)
-    rearmConversationWindow(cfg, heard('Are you well, friend'), clock, 200)
-    expect(clock.conversationUntilTick, 'the same words a window later are news again').toBe(260)
+  it('is a dusk rung and nothing else: silent at noon and through the night', () => {
+    for (const t of [NOON, 6 * 60, 21 * 60, 3 * 60]) {
+      expect(woke(t, LONELY), `${t}`).toBeNull()
+    }
   })
 
-  it('a sleeper wakes with nothing to have heard before', () => {
-    const clock = clk()
-    rearmConversationWindow(cfg, heard('Wake up, the roof is burning'), clock, 10)
-    rearmConversationWindow(cfg, asleepHearing('Wake up, the roof is burning'), clock, 20)
-    expect(clock.conversationUntilTick).toBe(80)
+  // The whole point of the rung: a mind that has just taken a turn is idle-gated into silence,
+  // and loneliness is exactly the thing that gate must not swallow.
+  it('reaches a mind the idle gate would otherwise hold', () => {
+    const justSpoke = clk({ lastTurnTick: DUSK - 1 })
+    expect(wakeReasons(cfg, pkt(), justSpoke, DUSK, pln(), NO_SCENE, LONELY)).toEqual(['gathering'])
+    expect(wakeReasons(cfg, pkt(), justSpoke, DUSK, pln(), NO_SCENE, 0)).toEqual([])
   })
 
-  it('leaves the window expiry itself alone', () => {
-    const clock = clk({ lastTurnTick: 200, conversationUntilTick: 210 })
-    expect(decideWake(cfg, pkt(), clock, 209, pln())).toBe('conversation_beat')
-    expect(decideWake(cfg, pkt(), clock, 211, pln())).toBe(null)
+  it('waits behind the body: a starving mind eats before it seeks company', () => {
+    const starving = withNeeds(5, 78, 71)
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(decideWake(cfg, starving, clock, DUSK, pln(), NO_SCENE, LONELY)).toBe('body_alarm')
+    expect(wakeReasons(cfg, starving, clock, DUSK, pln(), NO_SCENE, LONELY)).toEqual([
+      'body_alarm',
+      'gathering',
+    ])
+  })
+
+  it('fires once per dusk, not once per tick of it', () => {
+    for (const t of [DUSK, DUSK + 1, DUSK + 119]) {
+      expect(woke(t, LONELY, { gatheringDay: 0 }), `${t}`).toBeNull()
+    }
+    expect(woke(day(1, DUSK), LONELY, { gatheringDay: 0 })).toBe('gathering')
+  })
+
+  it('leaves a sleeper asleep — the gate it beats is the idle gap, not the night', () => {
+    const asleep = pkt({ self: { ...quietMeadowPacket.self, asleep: true } })
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(wakeReasons(cfg, asleep, clock, DUSK, pln(), NO_SCENE, LONELY)).not.toContain(
+      'gathering',
+    )
+  })
+
+  it('never fires on a mind already in company, whichever end of the talk it is', () => {
+    const clock = clk({ lastTurnTick: DUSK - 1 })
+    expect(decideWake(cfg, pkt(), clock, DUSK, pln(), LISTENS, LONELY)).toBeNull()
+    expect(decideWake(cfg, pkt(), clock, DUSK, pln(), HOLDS_FLOOR, LONELY)).toBe('floor')
+  })
+
+  // What makes the rung affordable, said as arithmetic rather than as an intention: the want it
+  // reads is the one a scene zeroes, so company itself is what takes the mind off the ladder.
+  it('goes quiet for days after a scene, and comes back when the loneliness does', () => {
+    const db = openAgentDb(':memory:')
+    const wants = new WantStore(db, 'tamar')
+    wants.begin(0)
+    const at = (tick: number): WakeReason | null => woke(tick, wants.levelOf('belonging', tick))
+
+    expect(at(day(0, DUSK))).toBeNull() // 19.4 — nowhere near it
+    expect(at(day(1, DUSK))).toBe('gathering') // 43.9, the first dusk that clears 40
+
+    wants.feed(['scene'], day(1, DUSK))
+    expect(at(day(2, DUSK))).toBeNull() // 24.5 — one evening's company bought two days
+    expect(at(day(3, DUSK))).toBe('gathering') // 49.0
+    db.close()
+  })
+})
+
+describe('an hour lain with somebody', () => {
+  const lying = (): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    self: { ...quietMeadowPacket.self, activity: 'lie_with' },
+  })
+
+  it('buys no boredom turn and no plan turn, the way sleep buys none', () => {
+    expect(wakeReasons(cfg, lying(), clk(), 600, pln({ lastResult: 'done' }))).toEqual([])
+    expect(wakeReasons(cfg, lying(), clk(), 600, pln())).toEqual([])
+  })
+
+  it('is still pierced by a blow', () => {
+    const struck = { ...lying(), feltEvents: ['you_were_attacked'] }
+    expect(wakeReasons(cfg, struck, clk(), 600, pln())).toContain('salient_perception')
+  })
+
+  it('is still pierced by a body that is failing', () => {
+    const failing = {
+      ...lying(),
+      self: {
+        ...lying().self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 1 },
+        },
+      },
+    }
+    expect(wakeReasons(cfg, failing, clk(), 600, pln())).toContain('body_alarm')
+  })
+
+  it('holds nobody still whose hands are on ordinary work', () => {
+    const working = {
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, activity: 'craft' },
+    }
+    expect(wakeReasons(cfg, working, clk(), 600, pln({ lastResult: 'done' }))).toContain(
+      'plan_done',
+    )
   })
 })

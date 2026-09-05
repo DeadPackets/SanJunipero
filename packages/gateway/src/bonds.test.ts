@@ -2,19 +2,32 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   BOND_RECENT_ACTS,
   BondsResponseSchema,
   DEFAULT_CONFIG,
+  TIE_VALENCE,
   bondId,
   bondNote,
+  decayWarmth,
   type Bond,
   type BondsResponse,
   type SimEvent,
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
-import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
+import {
+  CoSlept,
+  InvitationAccepted,
+  InvitationRefused,
+  PartnershipDissolved,
+  PartnershipFormed,
+  RngStreams,
+  TickLoop,
+  genesisState,
+  type TileId,
+} from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { toEvent, type EventRow } from './http.js'
 import { BONDS_REBUILD_TICKS, BOND_TYPES, buildBonds, mountBondsApi } from './bonds.js'
@@ -40,11 +53,25 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300, sex: 'f' })
-          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 1, ageDays: 7300, sex: 'm' })
-          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: 7300 })
-          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 20, y: 21, ageDays: 7300 })
-          emit('agent_spawned', { id: 'eve', name: 'Eve', x: 8, y: 8, ageDays: 7300 })
+          emit('agent_spawned', {
+            id: 'alice',
+            name: 'Alice',
+            x: 0,
+            y: 0,
+            ageDays: ADULT_AGE_DAYS,
+            sex: 'f',
+          })
+          emit('agent_spawned', {
+            id: 'bob',
+            name: 'Bob',
+            x: 0,
+            y: 1,
+            ageDays: ADULT_AGE_DAYS,
+            sex: 'm',
+          })
+          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 20, y: 21, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'eve', name: 'Eve', x: 8, y: 8, ageDays: ADULT_AGE_DAYS })
         }
         // a talking pair, in earshot and inside the window → friend
         if (tick === 5)
@@ -77,9 +104,10 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
             duration: 1,
           })
         if (tick === 29) emit('action_completed', { agentId: 'eve', verb: 'attack' })
-        // two nights kept → partner, strength 2
-        if (tick === 30) emit('co_slept', { aId: 'alice', bId: 'bob', day: 0 })
-        if (tick === 40) emit('co_slept', { aId: 'alice', bId: 'bob', day: 0 })
+        // chosen, parted, chosen again → partner, strength 2
+        if (tick === 30) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
+        if (tick === 35) emit('partnership_dissolved', { aId: 'alice', bId: 'bob', byId: 'bob' })
+        if (tick === 40) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
         // a birth → kin on both sides
         if (tick === 50) {
           emit('agent_born', {
@@ -112,13 +140,13 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     expect(body.asOfTick).toBe(60)
   })
 
-  it('ties the couple who kept house, and counts the nights', () => {
+  it('ties the couple who chose each other, and the parting does not undo the history', () => {
     const b = find('alice', 'bob')
     expect(b?.kind).toBe('partner')
     expect(b?.strength).toBe(2)
     expect(b?.recent.map((h) => bondNote(h.kind))).toEqual([
-      'kept house together',
-      'kept house together',
+      'took each other as partners',
+      'took each other as partners',
     ])
     expect(b?.acts).toEqual([{ kind: 'partner', count: 2, firstTick: 30, lastTick: 40 }])
     expect(b?.formedTick).toBe(30)
@@ -191,7 +219,7 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
 
   /** `buildBonds` folds exactly `BOND_TYPES`; every other row falls through its chain, so the
    *  SELECT may drop them — `fauna_moved` alone carries 640 B payloads and dominates a real log. */
-  it('★ answers what the whole log answers, reading only the five types a bond is made of', () => {
+  it('★ answers what the whole log answers, reading only the types a bond is made of', () => {
     const rows = db
       .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
       .all() as EventRow[]
@@ -221,8 +249,8 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
       snapshotEveryTicks: 1000,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: 7300 })
-          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: 7300 })
+          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
         }
         emit('agent_spoke', { agentId: tick % 2 === 0 ? 'a' : 'b', text: 'w', x: 1, y: 1 })
       },
@@ -288,6 +316,168 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
   })
 })
 
+/** The cadence bounds how OFTEN the graph is folded; this is what bounds how MUCH. */
+describe('★ the graph is folded once and then only forward', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-bondsforward-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads only what is new, and still answers what a whole fold answers', () => {
+    const world = openDb(join(dir, 'w.db'))
+    const loop = new TickLoop({
+      store: new EventStore(world),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('forward'),
+      snapshotEveryTicks: 1000,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+        }
+        emit('agent_spoke', { agentId: tick % 2 === 0 ? 'a' : 'b', text: 'w', x: 1, y: 1 })
+        if (tick % 10 === 0) emit('co_slept', { aId: 'a', bId: 'b', day: 0 })
+      },
+    })
+
+    let read = 0
+    const real = world.prepare.bind(world)
+    Object.defineProperty(world, 'prepare', {
+      value: (sql: string) => {
+        const st = real(sql)
+        if (!sql.includes('FROM events')) return st
+        const iterate = st.iterate.bind(st)
+        st.iterate = function* (...a: unknown[]): IterableIterator<unknown> {
+          for (const row of iterate(...a) as Iterable<unknown>) {
+            read += 1
+            yield row
+          }
+        }
+        return st
+      },
+    })
+
+    let tick = 0
+    const routes = new Map<string, RouteHandler>()
+    mountBondsApi(
+      {
+        route: (m, p, fn) => {
+          routes.set(`${m} ${p}`, fn)
+        },
+      },
+      {
+        db: world,
+        config: DEFAULT_CONFIG,
+        mirror: { seq: () => tick, state: () => ({ tick }) } as unknown as WorldMirror,
+      },
+    )
+    const ask = (): BondsResponse => {
+      let out = ''
+      routes.get('GET /api/bonds')!(
+        { url: '/api/bonds' } as IncomingMessage,
+        {
+          writeHead: () => {},
+          end: (b: string) => {
+            out = b
+          },
+        } as unknown as ServerResponse,
+        {},
+      )
+      return JSON.parse(out) as BondsResponse
+    }
+    const wholeFold = (): BondsResponse => {
+      const rows = world
+        .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
+        .all() as EventRow[]
+      return buildBonds(rows.map(toEvent), DEFAULT_CONFIG.movement.earshotRadius, tick)
+    }
+
+    for (let i = 0; i < 200; i++) loop.step()
+    tick = 200
+    expect(ask()).toEqual(wholeFold())
+    const first = read
+
+    for (let i = 0; i < BONDS_REBUILD_TICKS; i++) loop.step()
+    tick = 200 + BONDS_REBUILD_TICKS
+    expect(ask()).toEqual(wholeFold())
+    expect(read - first, 'the second fold read only the new rows').toBeLessThan(first / 2)
+    world.close()
+  })
+})
+
+/** The one thing in the graph the minds wrote themselves. It moves how a pair stands without
+ *  claiming the world witnessed an act, so the window and its ceiling are untouched. */
+describe('★ a tie a scene left behind is worth something to the pair', () => {
+  const closed = (seq: number, tick: number, deltas: unknown[]): SimEvent => ({
+    seq,
+    tick,
+    type: 'scene_closed',
+    payload: { id: 's1', summary: 'They counted the planks.', deltas, closeReason: 'ended' },
+  })
+  const delta = (kind: string, settled?: true): unknown => ({
+    agentId: 'a',
+    personId: 'b',
+    kind,
+    text: 'the planks again',
+    ...(settled === undefined ? {} : { settled }),
+  })
+  const warmthOfClose = (deltas: unknown[]): number =>
+    buildBonds([closed(1, 100, deltas)], 5, 100).bonds[0]?.warmth ?? 0
+
+  it('folds a slight as three off, and a promise kept as three on', () => {
+    expect(warmthOfClose([delta('slight')])).toBe(-3)
+    expect(warmthOfClose([delta('promise', true)])).toBe(3)
+    expect(warmthOfClose([delta('attraction')])).toBe(2)
+    expect(warmthOfClose([delta('grudge')]), 'a grudge is a slight that stayed').toBe(-3)
+    const kin = buildBonds([closed(1, 100, [delta('kin')])], 5, 100).bonds
+    expect([kin.length, kin[0]?.warmth], 'kin is a claim, not a warmth').toEqual([1, 0])
+  })
+
+  it('says nothing about a promise merely made, and nothing about a secret', () => {
+    expect(buildBonds([closed(1, 100, [delta('promise')])], 5, 100).bonds).toEqual([])
+    expect(buildBonds([closed(1, 100, [delta('secret')])], 5, 100).bonds).toEqual([])
+  })
+
+  it('leaves the act window empty: a tie is nothing the world witnessed', () => {
+    const b = buildBonds([closed(1, 100, [delta('slight')])], 5, 100).bonds[0]!
+    expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
+    expect(b.id).toBe(bondId('a', 'b'))
+  })
+})
+
+/** A close can say a promise was kept; it has no way to say broken. The seven-day let-go is the
+ *  honest producer: a promise nobody ever settled, quietly lapsing, IS a promise broken. */
+describe('★ a promise nobody kept', () => {
+  const letGo = (kind: string, tick = 100): SimEvent => ({
+    seq: 1,
+    tick,
+    type: 'tie_let_go',
+    payload: { agentId: 'a', personId: 'b', kind },
+  })
+
+  it('weighs a lapsed promise as the strongest negative in the table', () => {
+    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
+    expect(b.warmth).toBe(TIE_VALENCE.promise_broken)
+    expect(b.warmth).toBe(-6)
+  })
+
+  it('weighs nothing at all when any other kind lets go', () => {
+    for (const kind of ['grudge', 'slight', 'debt', 'attraction', 'secret', 'alliance', 'kin']) {
+      expect(buildBonds([letGo(kind)], 5, 100).bonds, kind).toEqual([])
+    }
+  })
+
+  it('claims no act the world witnessed, the way every tie does not', () => {
+    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
+    expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
+    expect(b.id).toBe(bondId('a', 'b'))
+  })
+
+  it('is a type the graph actually reads off the log', () => {
+    expect(BOND_TYPES).toContain('tie_let_go')
+  })
+})
+
 /** A spoke older than `TALK_WINDOW_TICKS` can pair with nothing ever again, so dropping it is
  *  the same answer in bounded time; this proves the "same answer" half. */
 describe('★ the talk window is a window, not the whole log', () => {
@@ -318,19 +508,135 @@ describe('★ the talk window is a window, not the whole log', () => {
   })
 
   it('is linear in the log, not quadratic — 8× the speech is not 64× the work', () => {
-    const run = (n: number): number => {
+    // Every pair the fold weighs reaches exactly one distance check, so counting those counts the
+    // work itself; a wall clock would be counting whatever else the box is doing.
+    const distanceChecks = (n: number): number => {
       const events = Array.from({ length: n }, (_, i) => spoke(i + 1, i, `a${i % 8}`, 0))
-      const t0 = process.hrtime.bigint()
-      buildBonds(events, 5, n)
-      return Number(process.hrtime.bigint() - t0) / 1e6
+      const hypot = vi.spyOn(Math, 'hypot')
+      try {
+        buildBonds(events, 5, n)
+        return hypot.mock.calls.length
+      } finally {
+        hypot.mockRestore()
+      }
     }
-    run(4_000) // warm the jit so the ratio is the algorithm
-    const small = Math.max(run(8_000), 1)
-    const large = run(64_000)
+    const small = distanceChecks(1_000)
+    const large = distanceChecks(8_000)
     // quadratic would be ~64×; the bound makes it ~8×. Ten is the honest line between them.
-    expect(
-      large / small,
-      `8k took ${small.toFixed(1)} ms, 64k took ${large.toFixed(1)} ms`,
-    ).toBeLessThan(10)
+    expect(large / small, `1k weighed ${small} pairs, 8k weighed ${large}`).toBeLessThan(10)
+  })
+})
+
+describe('★ a relationship is the acts two people chose', () => {
+  // Every payload is parsed by the engine's own schema before it is folded, so a fixture that
+  // drifts from the event the engine writes fails here rather than passing quietly.
+  let seq = 0
+  const rel = (
+    tick: number,
+    type: string,
+    schema: { parse(v: unknown): unknown },
+    payload: unknown,
+  ): SimEvent => ({ seq: ++seq, tick, type, payload: schema.parse(payload) })
+  const only = (events: SimEvent[], a: string, b: string, at: number): Bond | undefined =>
+    buildBonds(events, DEFAULT_CONFIG.movement.earshotRadius, at).bonds.find(
+      (x) => x.id === bondId(a, b),
+    )
+
+  it('makes a partnership from the vow and nothing from a shared roof', () => {
+    const roof = [
+      rel(10, 'co_slept', CoSlept, { aId: 'ada', bId: 'bex', day: 0 }),
+      rel(20, 'co_slept', CoSlept, { aId: 'ada', bId: 'bex', day: 1 }),
+    ]
+    expect(BOND_TYPES).not.toContain('co_slept')
+    expect(only(roof, 'ada', 'bex', 30), 'a roof is a roof').toBeUndefined()
+
+    const vow = [rel(10, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' })]
+    const b = only(vow, 'ada', 'bex', 30)
+    expect(b?.kind).toBe('partner')
+    expect(b?.strength).toBe(1)
+  })
+
+  it('parts them: the kind falls back, the warmth drops six, and a second vow takes it up again', () => {
+    const formed = rel(10, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' })
+    const standing = only([formed], 'ada', 'bex', 10)!
+    const parted = only(
+      [
+        formed,
+        rel(20, 'partnership_dissolved', PartnershipDissolved, {
+          aId: 'ada',
+          bId: 'bex',
+          byId: 'bex',
+        }),
+      ],
+      'ada',
+      'bex',
+      20,
+    )!
+    expect(standing.kind).toBe('partner')
+    expect(parted.kind, 'the partnership is over and the record is not').not.toBe('partner')
+    expect(parted.warmth).toBeCloseTo(decayWarmth(standing.warmth, 10, 20) + TIE_VALENCE.parted, 10)
+    expect(parted.acts).toEqual([{ kind: 'partner', count: 1, firstTick: 10, lastTick: 10 }])
+
+    const remarried = only(
+      [
+        formed,
+        rel(20, 'partnership_dissolved', PartnershipDissolved, {
+          aId: 'ada',
+          bId: 'bex',
+          byId: 'bex',
+        }),
+        rel(30, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' }),
+      ],
+      'ada',
+      'bex',
+      30,
+    )
+    expect(remarried?.kind).toBe('partner')
+    expect(remarried?.strength).toBe(2)
+  })
+
+  it('reads a walk out together as warmth, and leaves a bedding to the two of them', () => {
+    const court = [
+      rel(10, 'invitation_accepted', InvitationAccepted, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'court',
+      }),
+    ]
+    const b = only(court, 'ada', 'bex', 10)
+    expect(b?.warmth).toBeCloseTo(TIE_VALENCE.attraction, 10)
+    expect(b?.strength, 'a tie is no act').toBe(0)
+
+    for (const verb of ['propose', 'lie_with']) {
+      const other = only(
+        [rel(10, 'invitation_accepted', InvitationAccepted, { agentId: 'bex', byId: 'ada', verb })],
+        'ada',
+        'bex',
+        10,
+      )
+      expect(other, verb).toBeUndefined()
+    }
+  })
+
+  it('costs the asker only when the no was said in front of people', () => {
+    const seen = [
+      rel(10, 'invitation_refused', InvitationRefused, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'propose',
+        witnesses: ['cass'],
+      }),
+    ]
+    expect(only(seen, 'ada', 'bex', 10)?.warmth).toBeCloseTo(TIE_VALENCE.slight, 10)
+
+    const alone = [
+      rel(10, 'invitation_refused', InvitationRefused, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'propose',
+        witnesses: [],
+      }),
+    ]
+    expect(only(alone, 'ada', 'bex', 10), 'a no in private is between them').toBeUndefined()
   })
 })

@@ -124,6 +124,11 @@ describe('codex', () => {
     expect(store.frontier()).not.toContain('steel')
     expect(store.frontier()).not.toContain('charcoal')
     expect(store.frontier()).not.toContain('gunpowder')
+
+    // ★ The same rungs said the way a mind is told them. The court copies ids into a canon; a
+    // mind is told a thing is there to reach for, and an id is not a thing anybody reaches for.
+    expect(store.frontierNames()).toEqual(['Glazing', 'Iron smelting'])
+    for (const name of store.frontierNames()) expect(name).not.toMatch(/_/)
   })
 
   it('duplicate insert throws (PK)', () => {
@@ -131,6 +136,46 @@ describe('codex', () => {
     expect(() => {
       store.insert({ id: 'fire', era: 'handwork', name: 'Fire again', prerequisiteId: null })
     }).toThrow(/UNIQUE constraint failed/)
+  })
+})
+
+// The ladder was a ceiling: five authored rungs and no way to add a sixth.
+describe('the codex grows as it is climbed', () => {
+  it('learn() earns an unearned rung, and the frontier moves past it', () => {
+    const store = seededStore()
+    store.insert({
+      id: 'glazing',
+      era: 'arrangement',
+      name: 'Glazing',
+      prerequisiteId: 'pottery',
+      known: false,
+    })
+    store.insert({
+      id: 'tiling',
+      era: 'arrangement',
+      name: 'Tiling',
+      prerequisiteId: 'glazing',
+      known: false,
+    })
+    expect(store.frontier()).toEqual(['glazing'])
+    store.learn(['glazing', 'never_heard_of'])
+    expect(store.known()).toContain('glazing')
+    expect(store.frontier()).toEqual(['tiling'])
+  })
+
+  it('propose() hangs a new unearned rung off a rung the codex has, and refuses the rest', () => {
+    const store = seededStore()
+    expect(store.propose({ id: 'salt_curing', name: 'Salt curing', prerequisiteId: 'fire' })).toBe(
+      true,
+    )
+    expect(store.frontier()).toContain('salt_curing')
+    expect(store.withinAdjacency(['salt_curing'])).toBe(true)
+    // Same era as what it hangs off, and never twice.
+    expect(store.propose({ id: 'salt_curing', name: 'Again', prerequisiteId: 'fire' })).toBe(false)
+    expect(store.propose({ id: 'ghost', name: 'Ghost', prerequisiteId: 'no_such_rung' })).toBe(
+      false,
+    )
+    expect(store.frontier()).not.toContain('ghost')
   })
 })
 

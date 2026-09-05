@@ -149,3 +149,46 @@ describe('scoreHeat: the C11 sickness plane is visible to the director', () => {
     ])
   })
 })
+
+// The stakes axis was a catastrophe axis: a town that agreed a rule, took a partner and worked
+// out how to make a thing scored zero on it, so the paper's hottest scene was always a storm.
+describe('scoreHeat: what the town decided is at stake too', () => {
+  const flat: HeatCtx = {
+    priorTypeCounts: {},
+    firstsInScene: 0,
+    privateThoughts: 0,
+    publicSpeech: 0,
+  }
+  const one = (type: string): number => scoreHeat(scene([1]), flat, [ev(1, 0, type, {})]).stakes
+
+  it('a rule agreed is worth more at stake than a hearth catching', () => {
+    expect(one('law_ratified')).toBeGreaterThan(one('fire_ignited'))
+    expect(one('agent_born')).toBe(one('agent_died'))
+    expect(one('partnership_dissolved')).toBeGreaterThan(one('partnership_formed'))
+  })
+
+  it('carries the social rows at the shared table’s unit, a sixth of the live weight', () => {
+    expect(STAKES_WEIGHT.law_ratified).toBe(2)
+    expect(STAKES_WEIGHT.discovery_made).toBe(1.7)
+    expect(STAKES_WEIGHT.partnership_formed).toBe(2)
+    expect(STAKES_WEIGHT.partnership_dissolved).toBe(2.3)
+    expect(STAKES_WEIGHT.law_broken).toBe(1.5)
+    expect(STAKES_WEIGHT.agent_born).toBe(3)
+  })
+
+  it('scores a council that ratified above a quiet scene of the same length', () => {
+    const council = [
+      ev(1, 0, 'agent_spoke', { agentId: 'a', text: 'x' }),
+      ev(2, 1, 'law_proposed', { lawId: 'l1', agentId: 'a', text: 'no fires indoors' }),
+      ev(3, 2, 'law_ratified', { lawId: 'l1', agentId: 'a', text: 'no fires indoors' }),
+    ]
+    const idle = [
+      ev(11, 0, 'agent_spoke', { agentId: 'a', text: 'x' }),
+      ev(12, 1, 'agent_moved', { id: 'a', x: 1, y: 1 }),
+      ev(13, 2, 'crop_grew', { cropId: 'c1' }),
+    ]
+    expect(scoreHeat(scene([1, 2, 3]), flat, council).total).toBeGreaterThan(
+      scoreHeat(scene([11, 12, 13]), flat, idle).total,
+    )
+  })
+})

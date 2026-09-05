@@ -7,12 +7,14 @@ import {
   T_SAND,
   T_WATER,
   sanitizeSpokenText,
+  type InvitationVerb,
   type SimConfig,
   type TileId,
   type TownFacing,
 } from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
+import type { Law, TabledLaw } from './lawShapes.js'
 
 export type { TileId }
 
@@ -66,6 +68,21 @@ export type AgentBody = {
   sex?: 'f' | 'm' // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   pregnant?: { sinceDay: number; byId: string }
   parents?: [string, string] // [motherId, fatherId]; only ever set on the born
+  // The day this body came up the valley road, and the day it walked back down. Both absent on
+  // every founder and every child, so a town nobody has come to hashes as it always did.
+  arrived?: { day: number }
+  departed?: { day: number }
+  // The ask standing over this body, so the engine can tell a second consent from a fresh first.
+  // Absent until the first one, and cleared by the answer.
+  asked?: { byId: string; verb: InvitationVerb; tick: number }
+  // The last walk out together: one a day per pair, or the same two ask each other all day.
+  courted?: { withId: string; day: number }
+  // How many separate days this body has walked out with each person. A proposal is refused
+  // until the pair has enough of them, so a partnership is weeks of evenings, not one ask.
+  walkOuts?: Record<string, number>
+  // Who this body is partnered to. Set both ways at once, absent until the first partnership,
+  // so every log before the town's first one hashes as it always did.
+  partnerId?: string
   // Absent until the first affliction and absent again when the last one lifts, sorted by kind
   // so two bodies ailing the same way hash the same way.
   afflictions?: Affliction[]
@@ -88,6 +105,13 @@ export type AgentBody = {
   // Every place this body has ever had in sight, sorted and only ever growing. Absent until
   // the first one comes into view, so a mind that has seen no building hashes as it always did.
   knownPlaces?: string[]
+  // Tags a minted verb left on this body, readable by anyone who can see it. Absent until the
+  // first one, so a town that has invented nothing hashes as it always did.
+  marks?: Record<string, string>
+  // What a standing law asks this body to have done: the tick of a prerequisite act, or the
+  // period a tithe was paid in. Written only while a law names the verb, so a town that has
+  // agreed nothing hashes as it always did.
+  lawMarks?: Record<string, number>
   skills: Record<string, number> // track → xp
   activity: null | {
     verb: string
@@ -97,6 +121,9 @@ export type AgentBody = {
     // The act these legs were set going for, run the moment they arrive. Absent unless the
     // world composed the walk itself, so a town that never composed one hashes as it always did.
     then?: { verb: string; params: Record<string, unknown> }
+    // How long these legs have been following somebody, how many ticks running the gap has
+    // widened, and what it was last tick. Absent on every walk that is not a chase.
+    chase?: { ticks: number; grew: number; gap: number }
   }
   collapsedSinceTick: number | null
   zeroHungerSinceTick: number | null
@@ -128,6 +155,7 @@ export type Structure = {
   // The tick a fed fire burns down to. Absent until somebody stokes it, so an unlit hearth is
   // a hearth that was never lit — and the same field answers "is it warm" and "is it bright".
   fueledUntilTick?: number
+  marks?: Record<string, string>
 }
 
 export type Item = {
@@ -144,6 +172,7 @@ export type Item = {
   // struck yet — which is a full one.
   litUntilTick?: number
   fuelTicks?: number
+  marks?: Record<string, string>
   loc:
     | { t: 'tile'; x: number; y: number }
     | { t: 'agent'; id: string }
@@ -183,28 +212,23 @@ export type WorldState = {
   items: Record<string, Item>
   crops: Record<string, Crop>
   wildlife: { fish: number; deer: number }
-  // Absent until the first co_slept, so a world with no nights hashes as it always did.
-  pairNights?: Record<
-    string,
-    {
-      nights: number
-      lastNightDay: number
-      formedTick: number | null
-      dissolvedTick: number | null
-    }
-  >
   // Runtime overrides of world physics, keyed by dotted config path. Absent until the
   // first config_changed; hashed, snapshotted and replayed like every other fact.
   laws?: Record<string, unknown>
+  // Every rule the town itself has agreed on, by id. Absent until the first one passes, so a
+  // town that has never held a council hashes exactly as it always did.
+  socialLaws?: Record<string, Law>
+  // Rules a council was for, each waiting for a vote on a later day. Absent until the first.
+  tabledLaws?: Record<string, TabledLaw>
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number
   // Where the array's (0, 0) stands in the AUTHORED frame. Growing north or west moves it, south
   // or east never does; absent while the frames agree, so such a world hashes exactly as it did.
   origin?: { x: number; y: number } | undefined
-  // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
-  // nothing. Absent until the first step anybody takes.
-  traffic?: Record<string, number>
+  // Footfalls per tile, a flat grid indexed y * width + x — every step copies the whole of it,
+  // and copying numbers is a memcpy where copying keys was a rehash. Absent until the first step.
+  traffic?: number[]
   // The day each standing trail went quiet; absent while every trail is still in use.
   quietSince?: Record<string, number>
   // The day each standing sapling was seeded, keyed "x,y" — the maturity clock, sparse and
@@ -234,10 +258,6 @@ export function tileKey(x: number, y: number): string {
 export function fromTileKey(key: string): { x: number; y: number } {
   const comma = key.indexOf(',')
   return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
-}
-
-export function pairKey(a: string, b: string): string {
-  return [a, b].sort().join('|')
 }
 
 export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldState {

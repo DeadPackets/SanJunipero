@@ -2,7 +2,7 @@ import { NoObjectGeneratedError } from 'ai'
 import { assemblePrompt, type AssembledPrompt, type IdentityCore } from '../prompt/assemble.js'
 import type { PersonalityDoc } from '../personality.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import { TurnSchemaActionRequired, waitIsRest, type Turn } from '../turn.js'
+import { readMindTurn, StrictTurnSchema, waitIsRest, type Turn } from '../turn.js'
 
 // Asks the real schema the runtime asks with, the real system prompt and the real model id — a
 // grammar-constrained provider can return only a schema's required properties, and a bar measured
@@ -193,15 +193,15 @@ export async function runPreflight(opts: {
         const { value } = await opts.llm.object({
           system: prompt.system,
           messages: prompt.messages,
-          schema: TurnSchemaActionRequired,
+          schema: StrictTurnSchema,
         })
-        const parsed = TurnSchemaActionRequired.safeParse(value)
+        const parsed = readMindTurn(value)
         record(
           parsed.success
             ? { ok: true, turn: parsed.data }
             : {
                 ok: false,
-                error: `answer did not fit TurnSchemaActionRequired: ${JSON.stringify(value).slice(0, 200)}`,
+                error: `answer did not read as a turn: ${JSON.stringify(value).slice(0, 200)}`,
               },
         )
       } catch (err) {

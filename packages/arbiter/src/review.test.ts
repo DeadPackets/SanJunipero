@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold, genesisState, submitIntent, unregisterVerb, type WorldState } from '@sj/engine'
 import { CodexStore } from './codex.js'
 import { RulebookStore } from './rulebook.js'
@@ -13,7 +13,7 @@ const CFG: SimConfig = SimConfigSchema.parse({})
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
-  durationTicks: 6,
+  takes: 'minutes',
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
@@ -21,7 +21,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -45,7 +45,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function agentState(): WorldState {
   return fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
 }
@@ -82,7 +82,7 @@ describe('ReviewStore', () => {
   it('codify auto-queues a pending review for every codified rule', () => {
     const { review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -112,7 +112,7 @@ describe('ReviewStore', () => {
   it('revert tombstones the rulebook, unregisters the verb, and marks the row reverted', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -134,7 +134,7 @@ describe('ReviewStore', () => {
   it('★ and a restart does not bring it back: the boot loop reads only what is still active', () => {
     const { review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -147,7 +147,7 @@ describe('ReviewStore', () => {
   it('reverting an already-approved rule re-queues idempotently: a single reverted disposition', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )
@@ -164,10 +164,17 @@ describe('ReviewStore', () => {
     expect(review.pending()).toEqual([])
   })
 
+  it('approve says a rule nobody ever wrote is no rule, not a reverted one', () => {
+    const { review } = makeReview()
+    expect(() => {
+      review.approve(999)
+    }).toThrow(/no such rule 999/)
+  })
+
   it('approve throws on a tombstoned rule', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
-      boilSaltRecipe,
+      { recipe: boilSaltRecipe, summary: 'Boil river water for salt.' },
       { agentId: 'a1', intent: 'i try to boil the river water down' },
       { rulebook, review, codex, tick: 200 },
     )

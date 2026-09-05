@@ -10,6 +10,7 @@ import {
   trackRun,
   type ActRun,
 } from './acts.js'
+import { DURATION_TICKS, DURATION_WORDS } from '@sj/shared'
 import { AA_RATIO, bandRatios } from './legibility.js'
 import { GLYPH_ZOOM } from './bubbles.js'
 import { ZOOM_STOPS } from './camera.js'
@@ -150,6 +151,15 @@ describe('whose act is worth a word', () => {
     expect(actTrackShown(run({ total: ACT_TRACK_MAX_TICKS + 1 }))).toBe(false)
     expect(actTrackShown(run({ total: 30 })), 'felling a tree').toBe(true)
     expect(actTrackShown(run({ total: 3 })), 'tending a patch').toBe(true)
+  })
+
+  // A body still for four sim-hours with no bar under it reads as a frozen body, and every act
+  // the town can name is now inside this ceiling — only a build, worked on for days, is past it.
+  it('every length an act may take keeps its bar', () => {
+    for (const word of DURATION_WORDS) {
+      expect(actTrackShown(run({ total: DURATION_TICKS[word] })), word).toBe(true)
+    }
+    expect(ACT_TRACK_MAX_TICKS).toBe(DURATION_TICKS.day)
   })
 })
 

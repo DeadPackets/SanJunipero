@@ -3,7 +3,14 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ThoughtsButton } from '../stage/ThoughtsButton.js'
-import { rememberThoughts, thoughtsHidden, thoughtsSetting } from './thoughts.js'
+import {
+  BUBBLE_IMPORTANCE,
+  bubbleSubject,
+  rememberThoughts,
+  shouldBubble,
+  thoughtsHidden,
+  thoughtsSetting,
+} from './thoughts.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 
@@ -78,6 +85,70 @@ describe('★ two hands on the wisp gate', () => {
   })
 })
 
+describe('★ the importance gate over the heads', () => {
+  const t = (agentId: string, importance: number) => ({ agentId, importance })
+  const ALONE: readonly string[] = []
+
+  // ★ Twelve minds thinking every turn is twelve wisps, which is the opposite of easy to
+  // follow. The weight the mind gave the turn is what decides.
+  it('★ draws a heavy thought and lets a light one go by', () => {
+    expect(shouldBubble(t('omar', BUBBLE_IMPORTANCE), null, ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', 10), null, ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', BUBBLE_IMPORTANCE - 1), null, ALONE)).toBe(false)
+    expect(shouldBubble(t('omar', 1), null, ALONE)).toBe(false)
+  })
+
+  // ★ The person the viewer is watching is the one whose head they are reading.
+  it('★ keeps every thought of the camera subject, however light', () => {
+    expect(shouldBubble(t('omar', 1), 'omar', ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', 1), 'leyla', ALONE)).toBe(false)
+  })
+
+  // ★ A room the town is holding open IS the thing being watched; its heads all speak.
+  it('★ keeps every thought of anyone in the open scene', () => {
+    expect(shouldBubble(t('leyla', 2), null, ['omar', 'leyla'])).toBe(true)
+    expect(shouldBubble(t('tariq', 2), null, ['omar', 'leyla'])).toBe(false)
+  })
+
+  it('★ the gate is 6, and it is the same number the plan named', () => {
+    expect(BUBBLE_IMPORTANCE).toBe(6)
+  })
+
+  // ★ Nobody clicks on a broadcast, and the auto-director is the camera most of the time: read
+  // off the pick alone the gate had no subject at all and the wisps went to the heavy thoughts.
+  it('★ takes the auto-director’s subject when the viewer has picked nobody', () => {
+    expect(bubbleSubject({ pickedId: null, cameraSubject: 'omar' })).toBe('omar')
+    expect(bubbleSubject({ pickedId: null, cameraSubject: null })).toBe(null)
+    expect(
+      shouldBubble(t('omar', 1), bubbleSubject({ pickedId: null, cameraSubject: 'omar' }), ALONE),
+    ).toBe(true)
+  })
+
+  // ★ A hand on the lens outranks automation, here as at the camera.
+  it('★ and the viewer’s own pick still wins over it', () => {
+    expect(bubbleSubject({ pickedId: 'leyla', cameraSubject: 'omar' })).toBe('leyla')
+    expect(
+      shouldBubble(
+        t('omar', 1),
+        bubbleSubject({ pickedId: 'leyla', cameraSubject: 'omar' }),
+        ALONE,
+      ),
+    ).toBe(false)
+  })
+
+  it('★ the director writes the subject the gate reads', () => {
+    expect(src('./DirectorMode.tsx')).toContain('scene.cameraSubject =')
+    expect(src('../render/StageMount.tsx')).toContain('bubbleSubject(s)')
+  })
+
+  // ★ The T toggle is upstream of all of it: a viewer who turned the wisps off gets none,
+  // subject and scene included. `bubbles.ts` asks `thoughtsHidden` before it draws.
+  it('★ the spawner still asks the T gate, so this one never overrules it', () => {
+    expect(src('../render/bubbles.ts')).toMatch(/isThought && thoughtsHidden\(/)
+    expect(src('../render/StageMount.tsx')).toContain('shouldBubble(')
+  })
+})
+
 describe('the thoughts button', () => {
   const html = (thoughts: 'shown' | 'hidden'): string =>
     renderToStaticMarkup(createElement(ThoughtsButton, { thoughts, onToggle: () => {} }))
@@ -104,7 +175,7 @@ describe('the thoughts button', () => {
   // The post's four arms are the town's four sections; how the town is SHOWN is not a fifth.
   it('★ stands in the corner cluster, off the signpost', () => {
     expect(src('../paper/Signpost.tsx')).not.toContain('thoughts')
-    expect(src('./chrome.css')).toContain('.help-button, .thoughts-button {')
+    expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')
   })
 
   // ★ `--deep-l` was used here and declared nowhere: an unresolved var makes the declaration

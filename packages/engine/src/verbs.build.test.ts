@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, WANTS_DISCOVERING, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { VERBS } from './verbs/index.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
-import { ev } from './testutil/world.js'
+import { ev, runAct } from './testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 const FAST: SimConfig = SimConfigSchema.parse({
@@ -19,7 +19,11 @@ const NOON = 720
 
 function makeWorld(config = CFG, wood = 10): WorldState {
   let s = genesisState(config)
-  s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  s = fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
   if (wood > 0)
     s = fold(
       s,
@@ -173,7 +177,11 @@ describe('verb: build', () => {
 describe('verb: build reads structures.recipes', () => {
   function withStone(qty: number): WorldState {
     let s = genesisState(CFG)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = fold(
       s,
       ev('item_spawned', { id: 'item_1', kind: 'stone', qty, loc: { t: 'agent', id: 'a1' } }),
@@ -259,7 +267,11 @@ describe('verb: fill', () => {
     const terrain = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (): TileId => 0))
     if (wet) terrain[0]![1] = 2
     let s = genesisState(CFG, terrain)
-    s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'a1', name: 'a1', x, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     return fold(
       s,
       ev('item_spawned', {
@@ -275,7 +287,7 @@ describe('verb: fill', () => {
   const filled = (s: WorldState) => {
     const r = submitIntent(s, CFG, 'a1', 'fill', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
-    return tickOnce(applyAll(s, r.events))
+    return runAct(applyAll(s, r.events), CFG)
   }
 
   it('fills a waterskin to its config charge count and a bucket to exactly one', () => {
@@ -349,11 +361,36 @@ describe('verb: craft', () => {
     if (!poor.ok) expect(poor.reason).not.toContain('wants discovering')
   })
 
+  // ★ The clause the runtime routes on. A name the config has never heard of is a proposal for
+  // the court; every other refusal — including a kind the world places and nobody builds — is
+  // a fact about the world, and stays one. Rehearsal 6 raised four of these and the court heard
+  // none of them, because nothing but `unknown verb:` ever reached it.
+  it('★ a kind the town has no concept of leaves the door open; a grave does not', () => {
+    const asked = (kind: string) => submitIntent(makeWorld(), CFG, 'a1', 'build', { kind })
+
+    const granary = asked('granary')
+    expect(granary.ok).toBe(false)
+    if (!granary.ok) {
+      expect(granary.reason).toBe(`cannot build a granary — ${WANTS_DISCOVERING}`)
+    }
+
+    // An empty recipe is a deliberate `no`, not a gap in the town's knowledge: routing it to the
+    // court would ask a god to invent grave-digging every time somebody grieved.
+    const grave = asked('grave')
+    expect(grave.ok).toBe(false)
+    if (!grave.ok) expect(grave.reason).toBe('cannot build a grave')
+
+    // And a kind the town knows perfectly well keeps whatever the world's real objection was.
+    const house = asked('house')
+    expect(house.ok).toBe(false)
+    if (!house.ok) expect(house.reason).not.toContain('wants discovering')
+  })
+
   it('plank: consumes 1 wood, yields 2 planks, grants carpentry xp', () => {
     const s = makeWorld(CFG, 1)
     const r = submitIntent(s, CFG, 'a1', 'craft', { recipe: 'plank' })
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events).toContainEqual({
       type: 'item_qty_changed',
       payload: { id: 'item_1', delta: -1 },

@@ -1,8 +1,13 @@
-import { discoveryHeadline, tickToMoment, type AssetRecord, type DiscoveryRecord } from '@sj/shared'
+import {
+  MINUTES_PER_DAY,
+  discoveryHeadline,
+  tickToMoment,
+  type AssetRecord,
+  type DiscoveryRecord,
+} from '@sj/shared'
 import { EMPTY_COPY } from './townStats.js'
 
 export const DISCOVERY_REFETCH_MS = 20_000
-const MINUTES_PER_DAY = 1440
 
 /** One leaf of the record: a discovery, plus the art for the first thing it makes when the
  *  forge has produced any. Pure — no fetch, no DOM. */

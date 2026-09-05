@@ -14,7 +14,11 @@ import {
   ConstructSchema,
   CONSTRUCT_TYPE_INSTRUCTION,
   detectCandidates,
+  habitLines,
+  namedCustoms,
+  NAMED_CUSTOMS_SHOWN,
   runConstructPass,
+  type Construct,
 } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
 import { CANON } from './canon.js'
@@ -32,14 +36,14 @@ const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
 const THREE = ['ada', 'bex', 'cass']
 
 // One coming-together at (30, 30) on a given day: three bodies walk in, one dances.
-function gathering(day: number, who: readonly string[] = THREE): SimEvent[] {
+function gathering(day: number, who: readonly string[] = THREE, x0 = 30): SimEvent[] {
   const at = day * MINUTES_PER_DAY + 19 * 60
   return [
-    ...who.map((id, i) => ev(at, 'agent_moved', { id, x: 30 + i, y: 30 })),
+    ...who.map((id, i) => ev(at, 'agent_moved', { id, x: x0 + i, y: 30 })),
     ev(at + 1, 'agent_expressed', {
       agentId: who[0]!,
       verb: 'dance',
-      x: 30,
+      x: x0,
       y: 30,
       sense: 'sight',
     }),
@@ -136,6 +140,28 @@ describe('the daily pass', () => {
     ])
   })
 
+  it('never takes the name of one of its own bodies for the gathering', async () => {
+    const introduction = ev(5 * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
+      agentId: 'ada',
+      text: 'Bex, this is Cass, my son.',
+      x: 30,
+      y: 30,
+    })
+    const { rows } = await pass([...threeNights(), introduction], new ScriptedLlm(ruleEvery()))
+    expect(rows[0]!.name).toBeNull()
+  })
+
+  it('never takes a name that leads with one of its own bodies', async () => {
+    const remark = ev(5 * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
+      agentId: 'ada',
+      text: 'We call it Cass Night, after the boy.',
+      x: 30,
+      y: 30,
+    })
+    const { rows } = await pass([...threeNights(), remark], new ScriptedLlm(ruleEvery()))
+    expect(rows[0]!.name).toBeNull()
+  })
+
   it('leaves the name null when nobody has said one', async () => {
     const { rows } = await pass(threeNights(), new ScriptedLlm(ruleEvery()))
     expect(rows[0]!.name).toBeNull()
@@ -187,11 +213,180 @@ describe('the daily pass', () => {
     expect(store.events().filter((e) => e.type === 'construct_recognized')).toHaveLength(1)
   })
 
+  it('goes on recording recurrences long after the first week is over', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const run = (events: SimEvent[]) =>
+      runConstructPass({
+        events,
+        baseConfig: DEFAULT_CONFIG,
+        store,
+        llm: llm as unknown as LlmClient,
+      })
+    await run(threeNights())
+    const [row] = await run([...threeNights(), ...gathering(20)])
+
+    const at = (day: number): number => day * MINUTES_PER_DAY + 19 * 60
+    expect(row!.recurrences.map((r) => r.tick)).toEqual([at(3), at(5), at(20)])
+    expect(store.events().filter((e) => e.type === 'construct_recurred')).toHaveLength(3)
+  })
+
+  it('keeps a site its id when the window drops the gatherings that founded it', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const run = (events: SimEvent[]) =>
+      runConstructPass({
+        events,
+        baseConfig: DEFAULT_CONFIG,
+        store,
+        llm: llm as unknown as LlmClient,
+      })
+    const drifted = [
+      ...gathering(20, THREE, 33),
+      ...gathering(22, THREE, 33),
+      ...gathering(24, THREE, 33),
+    ]
+    const [founded] = await run([...threeNights(), ...drifted])
+    const [again] = await run(drifted)
+
+    expect(again!.id).toBe(founded!.id)
+    expect(store.all()).toHaveLength(1)
+    expect(store.events().filter((e) => e.type === 'construct_recognized')).toHaveLength(1)
+  })
+
+  it('asks the classifier only about the sites it has never typed', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const deps = {
+      events: threeNights(),
+      baseConfig: DEFAULT_CONFIG,
+      store,
+      llm: llm as unknown as LlmClient,
+    }
+    await runConstructPass(deps)
+    const rows = await runConstructPass(deps)
+
+    expect(llm.objectCalls).toBe(1)
+    expect(rows[0]!.type).toBe('festival')
+  })
+
   it('shows the model every type id it is allowed to answer with, and refuses the rest', async () => {
     const llm = new ScriptedLlm(ruleEvery('cult'))
     for (const t of CONSTRUCT_TYPES) expect(CONSTRUCT_TYPE_INSTRUCTION).toContain(t)
     const { rows } = await pass(threeNights(), llm)
     expect(rows[0]!.type).toBe('custom')
+  })
+})
+
+// The one thing that crosses the glass, and the whole of it: a name the town said out loud.
+// The owner's ruling: traditions build over days. A habit is told once it has come back on
+// three separate days, named or not; a week of days makes it a tradition.
+describe('habitLines', () => {
+  const day = (n: number, minute = 600): number => n * MINUTES_PER_DAY + minute
+  const habit = (over: Partial<Construct> = {}): Construct => ({
+    id: 'construct_30_30',
+    type: 'custom',
+    name: null,
+    nameProvenance: null,
+    anchor: { x: 30, y: 30 },
+    participants: ['ada', 'bex'],
+    firstTick: day(0),
+    recurrences: [
+      { tick: day(1), participants: ['ada', 'bex', 'cal'] },
+      { tick: day(2), participants: ['ada', 'bex'] },
+    ],
+    ...over,
+  })
+
+  it('says a habit that came back on three separate days, counting people and days, no name', () => {
+    expect(habitLines([habit()])).toEqual([
+      '3 of you have gathered at the same spot near (30, 30) on 3 different days. Nobody has given it a name yet.',
+    ])
+  })
+
+  it('counts days, not gatherings: three in one day is one day', () => {
+    const same = habit({
+      recurrences: [
+        { tick: day(0, 700), participants: ['ada'] },
+        { tick: day(0, 800), participants: ['bex'] },
+      ],
+    })
+    expect(habitLines([same])).toEqual([])
+  })
+
+  it('calls a week of days a tradition, and says the name the town gave', () => {
+    const week = habit({
+      name: 'Long Turning',
+      recurrences: [1, 2, 3, 4, 5, 6].map((d) => ({ tick: day(d), participants: ['ada', 'bex'] })),
+    })
+    expect(habitLines([week])).toEqual([
+      '2 of you have gathered at the same spot near (30, 30) on 7 different days. You call it the Long Turning. It is a tradition by now.',
+    ])
+  })
+
+  it('never says what kind of thing we decided it was', () => {
+    for (const type of ['festival', 'faith', 'council', 'market', 'custom'] as const) {
+      const said = habitLines([habit({ type })]).join(' ')
+      expect(said.toLowerCase(), type).not.toContain(type)
+    }
+  })
+})
+
+describe('namedCustoms', () => {
+  const construct = (over: Partial<Construct> = {}): Construct => ({
+    id: 'construct_30_30',
+    type: 'festival',
+    name: 'Long Turning',
+    nameProvenance: {
+      name: 'Long Turning',
+      sourceKind: 'speech',
+      eventSeq: 9,
+      quote: 'We call it the Long Turning.',
+      byId: 'bex',
+    },
+    anchor: { x: 30, y: 30 },
+    participants: THREE,
+    firstTick: MINUTES_PER_DAY,
+    recurrences: [],
+    ...over,
+  })
+
+  it('renders a construct a mouth named, and never one that only recurred', () => {
+    expect(namedCustoms([construct()])).toEqual(['Long Turning'])
+    expect(namedCustoms([construct({ name: null, nameProvenance: null })])).toEqual([])
+  })
+
+  it('takes a name only from speech, never from a wall', () => {
+    const written = construct({
+      nameProvenance: { ...construct().nameProvenance!, sourceKind: 'inscription' },
+    })
+    expect(namedCustoms([written])).toEqual([])
+  })
+
+  it('keeps a name that collides with our taxonomy, because a town will say council', () => {
+    const said = construct({
+      id: 'construct_9_9',
+      name: 'Council',
+      nameProvenance: { ...construct().nameProvenance!, name: 'Council' },
+    })
+    expect(namedCustoms([said])).toEqual(['Council'])
+  })
+
+  it('holds the oldest names, so a name already on the page never moves', () => {
+    const many = Array.from({ length: NAMED_CUSTOMS_SHOWN + 2 }, (_, i) =>
+      construct({
+        id: `construct_${i}_0`,
+        name: `Naming ${i}`,
+        firstTick: (NAMED_CUSTOMS_SHOWN + 2 - i) * MINUTES_PER_DAY,
+        nameProvenance: { ...construct().nameProvenance!, name: `Naming ${i}` },
+      }),
+    )
+    const held = namedCustoms(many)
+    expect(held).toHaveLength(NAMED_CUSTOMS_SHOWN)
+    expect(held[0]).toBe(`Naming ${NAMED_CUSTOMS_SHOWN + 1}`)
   })
 })
 

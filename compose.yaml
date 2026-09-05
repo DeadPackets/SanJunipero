@@ -35,9 +35,14 @@ services:
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
       - SJ_MAX_MINDS
+      - SJ_ART_DAILY_USD
       - SJ_IDLE_PACING
       - SJ_IDLE_AFTER_MS
       - SJ_IDLE_SPEED
+      # Sim-minutes a mind waits between turns with nothing happening to it. Every call the town
+      # makes scales roughly inversely with it, so this is the dial that trades money for life.
+      - SJ_IDLE_GAP
+      - SJ_PUBLIC_ORIGIN
       # The channel listens on loopback INSIDE the container; the served origin proxies
       # `/admin/*` to it behind the bearer token, so the operator's page reaches it (ruling 10).
       - SJ_ADMIN_TOKEN

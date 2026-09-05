@@ -1,6 +1,7 @@
 import {
   CITY_ANCHOR_DEFAULT,
   FOUNDER_IDS,
+  FOUNDER_SEATS,
   expandItemKinds,
   isRoofedKind,
   makeCityTemplate,
@@ -56,9 +57,14 @@ export type GenesisWorld = { terrain: TileId[][]; events: PendingEvent[] }
 // those are exactly these two. Holds shelterLedger().per at 0.8 — 4 slots against 5 bodies.
 export const GENESIS_SOUND_ROOFS: ReadonlySet<string> = new Set(['storehouse', 'cabin'])
 
-/** Three quarters. A house is 2 880 ticks, so 720 are left — one night for one pair of hands,
- *  six sim-hours for two. A cottage leaves 1 080 and a farmhouse 1 440. */
+/** Three quarters. A farmhouse leaves 1 440 ticks of roof to raise — one night for two pairs
+ *  of hands, and the village's first shared project. */
 export const GENESIS_ROOF_STOOD = 3 / 4
+
+/** The one roof the village left unfinished: the farmhouse nobody is seated under. Every
+ *  founder wakes under a whole one — the elder and the two singles in the cottage too — and a
+ *  house nobody has to finish is a day spent on each other instead of on the weather. */
+export const GENESIS_UNFINISHED_ROOFS: ReadonlySet<string> = new Set(['farmhouse'])
 
 /** Did this kind's roof come down while the village stood empty? Only roofed kinds have a roof
  *  to lose, and only buildable ones may lose it — see the note above. */
@@ -67,10 +73,10 @@ export function roofFell(config: SimConfig, kind: string): boolean {
   if (buildableRecipe(config, kind) === null) {
     throw new Error(`genesis: a ${kind} would stand roofless and nobody could finish it`)
   }
-  return true
+  return GENESIS_UNFINISHED_ROOFS.has(kind)
 }
 
-// Six things a founder wakes up owning. The bread is three sim-days of food and is stamped
+// Six things a founder wakes up owning. The bread is six sim-days of food and is stamped
 // like any other loaf, so the storehouse multiplier and the spoilage clock apply from tick 0.
 const FOUNDER_KIT: readonly { kind: string; qty: number }[] = [
   { kind: 'axe', qty: 1 },
@@ -78,15 +84,19 @@ const FOUNDER_KIT: readonly { kind: string; qty: number }[] = [
   { kind: 'knife', qty: 1 },
   { kind: 'seed_pouch', qty: 1 },
   { kind: 'waterskin', qty: 1 },
-  { kind: 'bread', qty: 3 },
+  { kind: 'bread', qty: 6 },
 ]
 
-// `wood`, not "timber": these are the kinds the build and craft recipes actually consume.
+// `wood`, not "timber": these are the kinds the build and craft recipes actually consume. The
+// twenty loaves are the surplus D1 asks for: weeks of meals, so a day is free for other things.
 const STOREHOUSE_STOCK: readonly { kind: string; qty: number }[] = [
-  { kind: 'wood', qty: 20 },
-  { kind: 'stone', qty: 12 },
-  { kind: 'rope', qty: 4 },
-  { kind: 'cloth', qty: 4 },
+  { kind: 'wood', qty: 60 },
+  { kind: 'stone', qty: 24 },
+  { kind: 'rope', qty: 8 },
+  { kind: 'cloth', qty: 8 },
+  { kind: 'bread', qty: 20 },
+  { kind: 'fish', qty: 10 },
+  { kind: 'seed_pouch', qty: 3 },
 ]
 
 /** The item kinds this world puts in a hand that no config row names: the kit, the stock, what
@@ -166,10 +176,10 @@ export function makeGenesisWorld(
     if (stood > 0) events.push({ type: 'structure_progressed', payload: { id, ticks: stood } })
   })
 
-  // The kind is READ from the template, never retyped here.
-  const houseIdByOwner = new Map<string, string>()
+  // The roof is READ off the template by the name its seat carries, never retyped here.
+  const roofIdByName = new Map<string, string>()
   template.structures.forEach((s, i) => {
-    if (s.kind === 'house' && s.owner !== null) houseIdByOwner.set(s.owner, structureIdByIndex[i]!)
+    if (s.name !== undefined) roofIdByName.set(s.name, structureIdByIndex[i]!)
   })
   const storehouseIndex = template.structures.findIndex((s) => s.kind === 'storehouse')
   if (storehouseIndex < 0) throw new Error('genesis: the city template has no storehouse to stock')
@@ -189,9 +199,9 @@ export function makeGenesisWorld(
   }
 
   for (const founder of FOUNDER_IDS) {
-    const houseId = houseIdByOwner.get(founder)
-    if (houseId === undefined) throw new Error(`genesis: no house for founder ${founder}`)
-    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, houseId, founder)
+    const roofId = roofIdByName.get(FOUNDER_SEATS[founder])
+    if (roofId === undefined) throw new Error(`genesis: no roof for founder ${founder}`)
+    for (const item of FOUNDER_KIT) spawnItem(item.kind, item.qty, roofId, founder)
   }
   for (const item of STOREHOUSE_STOCK)
     spawnItem(item.kind, item.qty, structureIdByIndex[storehouseIndex]!)

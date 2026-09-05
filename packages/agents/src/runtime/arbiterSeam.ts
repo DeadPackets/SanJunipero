@@ -1,5 +1,6 @@
 import type { EngineBridge } from './bridge.js'
-import type { DiscoveryCredit } from '@sj/shared'
+import type { LawPredicate } from '@sj/engine'
+import type { DiscoveryCredit, RosterEntry } from '@sj/shared'
 
 // @sj/arbiter depends on @sj/agents, so the arbiter's own types cannot come back here without a
 // package cycle. These are the structural minimums, and the arbiter side pins the assignability.
@@ -28,12 +29,32 @@ export type Adjudicator = (intent: string, ctx: AgentCtx) => Promise<Verdict>
 /** Who worked it out, and the words they used. The arbiter never knows who is asking at
  *  codify time; the runtime always does, so the credit is threaded rather than guessed. */
 export type Codifier = (
-  recipe: { id: string },
+  attempt: { recipe: { id: string }; summary: string },
   credit: DiscoveryCredit,
 ) => { ruleId: number; verb: string }
 
-// Both halves of the arbiter the runtime needs: rule on it, then make it law.
-export type SeamArbiter = { adjudicate: Adjudicator; codify: Codifier }
+/** What the court makes of a rule a town just agreed: the shape the world can hold them to, the
+ *  number of a standing rule it lets go of, and one sentence saying how the words were read. */
+export type LawSeam = (ask: {
+  text: string
+  standing: { ordinal: number; text: string }[]
+  places: { id: string; kind: string; name?: string }[]
+}) => Promise<{ predicate: LawPredicate; repeals: number | null; why: string }>
+
+// The four things the runtime needs of the arbiter: rule on it, make it law, say what laws the
+// town already has, and say what the town has named for itself.
+export type SeamArbiter = {
+  adjudicate: Adjudicator
+  codify: Codifier
+  roster?: () => RosterEntry[]
+  /** Names the town spoke for its own habits. Names only: the recognizer's words never cross. */
+  customs?: () => readonly string[]
+  habits?: () => readonly string[]
+  /** What stands one step beyond what the town practices, in the codex's own words. */
+  frontier?: () => readonly string[]
+  /** Read a rule the town agreed. Absent, a rule is kept in words only. */
+  compileLaw?: LawSeam
+}
 
 // Values only, in sorted key order: this string is a precedent key, so anything varying per
 // mind or per turn must never enter it. The mind's own sentence rides in `AgentCtx.saying`.

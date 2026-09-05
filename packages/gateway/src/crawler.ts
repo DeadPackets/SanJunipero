@@ -25,7 +25,7 @@ const ROBOTS = [
   '',
 ]
 
-function sitemapXml(deps: CrawlerDeps, origin: string): string {
+function sitemapPaths(deps: CrawlerDeps): string[] {
   const paths = ['/']
   for (const a of Object.values(deps.mirror.state().agents)) {
     if (a.alive) paths.push(`/agent/${encodeURIComponent(a.id)}`)
@@ -36,6 +36,10 @@ function sitemapXml(deps: CrawlerDeps, origin: string): string {
   } catch {
     // a narrator db that predates the table has written no day yet
   }
+  return paths
+}
+
+function sitemapXml(paths: readonly string[], origin: string): string {
   const urls = paths.map((p) => `  <url><loc>${attr(origin + p)}</loc></url>`).join('\n')
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
 }
@@ -54,15 +58,17 @@ export function mountCrawlerRoutes(router: Router, deps: CrawlerDeps): void {
     sendText(res, 'text/plain', [...ROBOTS, `Sitemap: ${originOf(req)}/sitemap.xml`, ''].join('\n'))
   })
 
-  let held: { origin: string; at: number; xml: string } | null = null
-  const sitemapFor = (origin: string): string => {
+  // The PATHS are held, not the rendered xml: the origin is a header away from being anybody's,
+  // and an origin in the key lets a stranger re-scan the town on every request.
+  let held: { at: number; paths: string[] } | null = null
+  const pathsNow = (): string[] => {
     const now = Date.now()
-    if (held?.origin === origin && now - held.at <= SITEMAP_TTL_MS) return held.xml
-    held = { origin, at: now, xml: sitemapXml(deps, origin) }
-    return held.xml
+    if (held !== null && now - held.at <= SITEMAP_TTL_MS) return held.paths
+    held = { at: now, paths: sitemapPaths(deps) }
+    return held.paths
   }
 
   router.route('GET', '/sitemap.xml', (req, res) => {
-    sendText(res, 'application/xml', sitemapFor(originOf(req)))
+    sendText(res, 'application/xml', sitemapXml(pathsNow(), originOf(req)))
   })
 }

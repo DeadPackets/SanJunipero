@@ -6,6 +6,7 @@ import { AssetCodex } from './codex.js'
 import { DEFAULT_FORGE_CONFIG } from './forgeConfig.js'
 import type { ImageClient, Candidate } from './imageClient.js'
 import { AnomalyStopError, PER_ASSET_STOP_USD } from './spendLedger.js'
+import { BudgetExceededError } from './budget.js'
 import { CRITERIA, deriveOverall, type VisionCriteria } from './visionQa/verdict.js'
 import type { VisionJudgeFn } from './visionQa/visionJudge.js'
 
@@ -181,6 +182,22 @@ describe('createForge().commission', () => {
     await expect(
       forge.commission('a runaway bill', { w: 1, h: 1 }, 'item', 'relic'),
     ).rejects.toBeInstanceOf(AnomalyStopError)
+    expect(codex.listSince(0)).toHaveLength(0)
+  })
+  it('★ a spend stop from the image client reaches the caller, never a placeholder', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    let calls = 0
+    const client: ImageClient = {
+      async generateCandidates() {
+        calls++
+        throw new BudgetExceededError(1, 2)
+      },
+    }
+    const forge = createForge({ client, judge: scriptedJudge([9]), codex, refs: [] })
+    await expect(
+      forge.commission('a drained purse', { w: 1, h: 1 }, 'item', 'relic'),
+    ).rejects.toBeInstanceOf(BudgetExceededError)
+    expect(calls).toBe(1) // the stop ends the draw; it does not burn the second try
     expect(codex.listSince(0)).toHaveLength(0)
   })
   it('mechanical-gate failures never reach the eye', async () => {

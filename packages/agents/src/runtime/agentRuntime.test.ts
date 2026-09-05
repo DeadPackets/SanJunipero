@@ -4,6 +4,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import type { LanguageModel } from 'ai'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
+  ACT_SET_DOWN,
   createWorldTick,
   fold,
   genesisState,
@@ -16,36 +17,45 @@ import {
   type TileId,
 } from '@sj/engine'
 import {
-  MINUTES_PER_DAY,
+  DURATION_TICKS,
+  NO_PARAMS,
   REFLECTION_SETTLE_MS,
   SimConfigSchema,
   stateHash,
   TICK_REAL_MS,
   type DiscoveryCredit,
+  type RosterEntry,
   type SimConfig,
 } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import {
   AgentRuntime,
+  BODY_WOULD_NOT_GO_ON,
+  brokeOffLine,
   CRAFT_HINT,
+  CANNOT_BEGIN,
   OPAQUE_REFUSAL,
   REFUSAL_MEMORY_TICKS,
-  REPEATED_REFUSAL,
+  TRIED_FREEFORM,
+  actImportance,
   reflectionOffsetTicks,
   refusalMemoryText,
+  wantedWater,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
+import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import { splitSentences } from '../prompt/assemble.js'
+import { ROSTER_HEAD, SPEECH_RULES } from '../prompt/rulesOfBeing.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import type { ReflectionLlm } from '../reflection.js'
 import type { DreamLlm } from '../dream.js'
 
-import type { MindConfig } from '../wake.js'
+import type { MindConfig, WakeReason } from '../wake.js'
 
 const AGENT = 'tamar'
 const BREAD_ID = 'item_1'
@@ -97,7 +107,16 @@ function baseDoc(): PersonalityDoc {
 const FAR_PLACE_ID = 'structure_2'
 const FAR_PLACE_NAME = 'the old farmhouse'
 
-function buildWorld(simConfig?: SimConfig, knownAfar = false) {
+// Cold fire pits either side of the body, and an armful of wood in its hands: everything
+// `stoke` wants except the mark, which is the whole point of the rows that ask for it.
+const FIRE_IDS = ['structure_fire_1', 'structure_fire_2']
+const FIRE_AT = [
+  { x: 3, y: 4 },
+  { x: 2, y: 3 },
+]
+const WOOD_ID = 'item_wood'
+
+function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -146,15 +165,52 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false) {
     emit('structure_completed', { id: FAR_PLACE_ID })
     emit('places_seen', { agentId: AGENT, structureIds: [FAR_PLACE_ID] })
   }
+  for (let i = 0; i < hearths; i++) {
+    emit('structure_planned', {
+      id: FIRE_IDS[i]!,
+      kind: 'fire_pit',
+      ...FIRE_AT[i]!,
+      w: 1,
+      h: 1,
+      maxHp: 50,
+      flammable: true,
+      builderId: AGENT,
+    })
+    emit('structure_completed', { id: FIRE_IDS[i]! })
+  }
+  if (hearths > 0) {
+    emit('item_spawned', { id: WOOD_ID, kind: 'wood', qty: 3, loc: { t: 'agent', id: AGENT } })
+  }
   return { config, terrain, engineDb, store, rng, state }
 }
 
-// The required-action schema: a fixture that names no act is answering the old shape, and the
-// real contract now is "name wait when nothing new begins" — added here once, not at 20 sites.
-const askedShape = (r: unknown): unknown =>
-  r !== null && typeof r === 'object' && 'thought' in r && !('action' in r)
-    ? { ...r, action: { verb: 'wait', params: {} } }
-    : r
+// The closed schema a mind is asked in: every field present, every param key answered, and a
+// fixture that names no act saying `wait` out loud. Added here once, not at 20 fixture sites.
+const NOTHING_SAID = { speech: null, plan: null, journal: null, recall: null, reconsider_at: null }
+const closedAct = (a: unknown): unknown =>
+  a !== null && typeof a === 'object' && 'verb' in a
+    ? {
+        verb: (a as { verb: string }).verb,
+        params: { ...NO_PARAMS, ...(a as { params?: object }).params },
+      }
+    : a
+// The one act, in the flat shape the strict schema asks for: a verb or words of your own, both
+// keys always present. A plan step stays the closed intent it always was.
+const closedAction = (a: unknown): unknown => {
+  if (a !== null && typeof a === 'object' && 'freeform' in a) {
+    return { verb: null, params: NO_PARAMS, freeform: (a as { freeform: string }).freeform }
+  }
+  return { ...(closedAct(a) as object), freeform: null }
+}
+const askedShape = (r: unknown): unknown => {
+  if (r === null || typeof r !== 'object' || !('thought' in r)) return r
+  const turn = { ...NOTHING_SAID, ...r } as { action?: unknown; plan?: unknown }
+  return {
+    ...turn,
+    action: closedAction(turn.action ?? { verb: 'wait' }),
+    plan: Array.isArray(turn.plan) ? turn.plan.map(closedAct) : (turn.plan ?? null),
+  }
+}
 
 function turnModel(responses: unknown[], fallback: unknown = BENIGN_TURN): MockLanguageModelV4 {
   let i = 0
@@ -302,6 +358,10 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     this.calls.push('updateLedger')
     return 'A person.'
   }
+  async listTies() {
+    this.calls.push('listTies')
+    return []
+  }
   async autobiographyParagraph(): Promise<string> {
     this.calls.push('autobiographyParagraph')
     return 'I lived a day.'
@@ -309,6 +369,15 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   async proposeEdit(): Promise<null> {
     this.calls.push('proposeEdit')
     return null
+  }
+}
+
+/** The same reflection, held at its first call so a checkpoint can be taken mid-night. */
+class GatedReflectionLlm extends ScriptedReflectionLlm {
+  gate: Promise<void> = Promise.resolve()
+  override async extractFacts(dayMemories: MemoryRow[]) {
+    await this.gate
+    return super.extractFacts(dayMemories)
   }
 }
 
@@ -329,12 +398,13 @@ async function setup(opts: {
   embedder?: { embed(t: string): Promise<Float32Array> }
   maxRetries?: number
   simConfig?: SimConfig
-  onThought?: (t: { tick: number; agentId: string; text: string }) => void
+  onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
+  hearths?: number
 }) {
-  const world = buildWorld(opts.simConfig, opts.knownAfar)
+  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -379,7 +449,7 @@ async function setup(opts: {
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
-  return { world, loop, bridge, runtime, llm, mem, personality, agentDb }
+  return { world, loop, bridge, runtime, llm, mem, personality, agentDb, embedder }
 }
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
@@ -427,6 +497,14 @@ function memoriesOfKind(
       'SELECT tick, text, importance FROM memories WHERE agent_id = ? AND kind = ? ORDER BY id',
     )
     .all(AGENT, kind) as { tick: number; text: string; importance: number }[]
+}
+
+// The half of the action memories that are refusals. Successes share the row and the kind,
+// so a row asking "was anything refused" has to say which half it means.
+function refusalMemories(db: Database.Database): string[] {
+  return memoriesOfKind(db, 'action')
+    .map((m) => m.text)
+    .filter((t) => t.startsWith('You realize you cannot'))
 }
 
 function journalRows(db: Database.Database): { tick: number; text: string }[] {
@@ -580,6 +658,67 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(memoriesOfKind(agentDb, 'action')).toHaveLength(1)
   })
 
+  // The bridge settles a submit at the START of the next tick, before any tick callback runs, so
+  // a turn resolving in the 2 s between the two lands its new plan first and the old head's
+  // answer arrives after it.
+  it('drops a plan-head answer that belongs to a plan the turn already replaced', async () => {
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve
+    })
+    let calls = 0
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        calls += 1
+        const answer =
+          calls === 1
+            ? {
+                thought: 'Walk out there, then make the thing.',
+                plan: [
+                  { verb: 'walk', params: { x: 20, y: 20 } },
+                  { verb: 'frobnicate', params: {} },
+                ],
+                reconsider_at: '00:03',
+                importance: 3,
+              }
+            : {
+                thought: 'No — the bread first.',
+                plan: [{ verb: 'walk', params: { x: 5, y: 6 } }],
+                importance: 3,
+              }
+        if (calls === 2) await gate
+        // Nothing after the two: a third turn would install the plan again and hide the wipe.
+        if (calls > 2) await new Promise(() => {})
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(askedShape(answer)) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: ZERO_USAGE,
+          warnings: [],
+        }
+      },
+    })
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, boredomTicks: 10_000 },
+      simConfig: SLOW_BODY,
+    })
+    // The stale head goes out while the replacing turn is still in flight: opening the gate here
+    // is the interleaving, not a delay bolted onto the test.
+    const real = bridge.submit.bind(bridge)
+    bridge.submit = (agentId, intent, onResult) => {
+      if (intent.verb === 'frobnicate') openGate()
+      return real(agentId, intent, onResult)
+    }
+    await stepUntil(loop, () => calls >= 2 && runtime.snapshot().plan.queue.length === 1, 400)
+    for (let i = 0; i < 30; i++) await flush()
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
+
+    loop.step()
+    await flush()
+    expect(runtime.snapshot().plan.lastResult).toBe('running')
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
+  })
+
   // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
   // no refusal and no alert. This row is the only trace such a turn ever leaves.
   it('books what each turn produced against the back end that served it', async () => {
@@ -699,10 +838,10 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const second = prompts[1]!.map((m) => m.text).join('\n')
     // Nothing was underway on the first turn, so the open framing stands.
     expect(first).not.toContain('You are in the middle of:')
-    // Three tiles a tick carries the five-tile walk and the take inside one turn, so what the
-    // second prompt finds underway is the last step of the same plan.
-    expect(second).toContain('You are in the middle of: eat item_1 (step 3 of 3).')
-    expect(second).toContain('Answer wait and it goes on.')
+    // Three tiles a tick carries the five-tile walk inside one turn, so what the second prompt
+    // finds underway is the next step of the same plan, still running.
+    expect(second).toContain('You are in the middle of: take item_1 (step 2 of 3).')
+    expect(second).toContain('Answer wait and it carries on.')
   })
 
   it('submits speech and records a thought memory with its importance', async () => {
@@ -803,10 +942,14 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('respects the doze backoff even when body_alarm keeps firing during an outage', async () => {
     // 25 ticks at a 20-tick backoff holds two attempts and no more. Without the backoff a
-    // ringing alarm would doze the mind every tick.
+    // ringing alarm would doze the mind every tick. The rung is set above this body's hunger
+    // rather than left at the default: D1 put that default under the 30 the fixture starts at.
     const { loop, runtime } = await setup({
       model: throwingModel(),
-      mindConfig: { dozeTicks: 20 },
+      mindConfig: {
+        dozeTicks: 20,
+        bodyAlarm: { hunger: 40, energy: 10, warmth: 20, thirst: 25, affliction: 1 },
+      },
     })
     for (let i = 0; i < 25; i++) {
       loop.step()
@@ -849,7 +992,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 120)
     expect(saidOn(prompts, 0)).not.toContain('Last turn:')
-    expect(saidOn(prompts, 1)).toContain('Last turn: eat did not take —')
+    expect(saidOn(prompts, 1)).toContain('Last turn: eat did not work:')
     expect(saidOn(prompts, 2)).not.toContain('Last turn:')
   })
 
@@ -895,6 +1038,47 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().reflections).toBe(0)
     expect(mem.summaryNodes('day', 0)).toHaveLength(0)
     expect(personality.current().version).toBe(1)
+  })
+
+  // A mind that talked past dawn or worked a plan all night never lay down, so the sleep gate
+  // never caught it and the day went unwritten for good.
+  it('writes the night down at dawn for a mind that never lay down', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= DAY_1_DAWN_TICK, 3000)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 100)
+    expect(runtime.stats().reflections).toBe(1)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+  })
+
+  // Seven calls under a slow back end is minutes. A checkpoint written inside them used to say
+  // the night was done, and the resume never wrote that day at all.
+  it('does not call the night written in a checkpoint taken while it is still running', async () => {
+    let release!: () => void
+    const reflection = new GatedReflectionLlm()
+    reflection.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { loop, runtime, mem, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
+    expect(runtime.snapshot().reflectedNight, 'nothing is written yet').toBeNull()
+
+    release()
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 200)
+    expect(runtime.snapshot().reflectedNight).toBe(0)
   })
 
   it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
@@ -944,8 +1128,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(startedVerbs(world.engineDb)).toEqual(['walk', 'sleep'])
     expect(loop.state.agents[AGENT]!.asleep).toBe(true)
-    // One 'already busy' rejection must not have discarded the intent.
-    expect(memoriesOfKind(agentDb, 'action')).toHaveLength(0)
+    // One 'already busy' rejection must not have discarded the intent, and must leave no
+    // refusal behind it. The two acts that landed are remembered as acts.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have slept.',
+    ])
   })
 
   it('does not reflect on a merely attempted sleep that the engine rejected', async () => {
@@ -1069,6 +1258,115 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(stateHash(replayed)).toBe(liveHash)
   })
 
+  // 98 of the gate's 402 refusals were this act, named with its fire left null — the largest
+  // bucket. The world reads it in; these three rows are that reading seen from the mind's side.
+  it('starts the act on the fire the mind left null, because only one was in reach', async () => {
+    const { world, loop } = await setup({
+      model: turnModel([
+        {
+          thought: 'The fire wants feeding.',
+          action: { verb: 'stoke', params: { structureId: null } },
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      hearths: 1,
+    })
+    await stepUntil(loop, () => startedVerbs(world.engineDb).includes('stoke'), 100)
+    const started = world.engineDb
+      .prepare("SELECT payload FROM events WHERE type = 'action_started' ORDER BY seq")
+      .all() as { payload: string }[]
+    const stoked = started
+      .map((r) => JSON.parse(r.payload) as { verb: string; params: { structureId?: string } })
+      .find((p) => p.verb === 'stoke')
+    expect(stoked?.params.structureId).toBe(FIRE_IDS[0])
+  })
+
+  it('leaves the fire null when two are within reach, so the mind is asked which', async () => {
+    const blank = {
+      thought: 'A fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { world, loop, runtime, agentDb } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      // A second pit on the body's other side: two readings, and no act may pick between them.
+      hearths: 2,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    // `actHasOneReading` is what buys a mind out of the retry, and two readings do not buy it.
+    // No fire is guessed at either: the act never reaches the world.
+    expect(prompts.length).toBe(2)
+    expect(alertKinds(agentDb)).toContain('empty_act_detail')
+    expect(startedVerbs(world.engineDb)).not.toContain('stoke')
+  })
+
+  // The gate's escape hatch reads the same table the world binds from, so closing the bucket
+  // and closing the repair call it bought are one change.
+  it('★ spends no second call on the one fire it could only have meant', async () => {
+    const blank = {
+      thought: 'The fire wants feeding.',
+      action: { verb: 'stoke', params: { structureId: null } },
+      importance: 5,
+    }
+    const { model, prompts } = capturingModel([blank, blank])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND, hearths: 1 })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).toContain('act_detail_filled_in')
+  })
+
+  // All 402 action memories the phase 1 gate wrote were refusals: no mind held a trace of a
+  // wall raised or a fish caught. Both call sites of the write were refusal paths.
+  it('★ remembers what worked, and not at the weight of what did not', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Walls first, then rest.',
+          plan: [
+            { verb: 'walk', params: { x: 4, y: 3 } },
+            { verb: 'sleep', params: {} },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 200)
+    const acts = memoriesOfKind(agentDb, 'action')
+    expect(acts.map((m) => m.text)).toEqual(['You have walked.', 'You have slept.'])
+    // Not one flat constant: a walk is worth less than the refusal a walk earns.
+    expect(acts.map((m) => m.importance)).toEqual([actImportance('walk'), actImportance('sleep')])
+    expect(actImportance('walk')).toBeLessThan(actImportance('build'))
+    expect(actImportance('recipe:plank')).toBe(actImportance('craft'))
+  })
+
+  // kamal wrote 87 action memories with 9 texts between them; leyla 69 with 11. Every copy
+  // competed in retrieval and could reach the prompt.
+  it('★ writes the same refusal once inside the window, and again outside it', async () => {
+    const refused = {
+      thought: 'The bread.',
+      action: { verb: 'eat', params: { itemId: 'nope' } },
+      importance: 3,
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([refused], refused),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    // Far more turns than texts: the window is what holds the count down, not the asking.
+    await stepUntil(loop, () => loop.tick >= REFUSAL_MEMORY_TICKS - 1, REFUSAL_MEMORY_TICKS)
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not holding that'])
+    await stepUntil(loop, () => refusalMemories(agentDb).length >= 2, REFUSAL_MEMORY_TICKS + 10)
+    expect(refusalMemories(agentDb)).toEqual([
+      'You realize you cannot: not holding that',
+      'You realize you cannot: not holding that',
+    ])
+  })
+
   it('does not execute the next plan item when the head is rejected', async () => {
     const { world, loop, agentDb } = await setup({
       model: turnModel([
@@ -1114,7 +1412,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 150)
     expect(completedVerbs(world.engineDb)).toEqual(['walk', 'take', 'eat'])
-    expect(memoriesOfKind(agentDb, 'action').length).toBe(0)
+    // Nothing was refused, and each of the three acts left the mind a trace of itself.
+    expect(refusalMemories(agentDb)).toEqual([])
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You have walked.',
+      'You have taken.',
+      'You have eaten.',
+    ])
   })
 
   it('retrieves ambient memories before inserting the current perception (finding 9)', async () => {
@@ -1177,7 +1481,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Last user message is block 6, `now`. It is the one place the words appear.
     const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
     expect(nowA).toContain('a house (10 wood)')
-    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is feeding')
+    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is keeping fed')
     expect(a.find((m) => m.role === 'system')!.text).not.toContain('a house (10 wood)')
     // And not in the day log, which is the day's events: a standing fact repeated every turn
     // would compact the day out of the mind that lived it.
@@ -1293,14 +1597,12 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(alertKinds(agentDb)).toContain('empty_act_detail')
   })
 
-  it('perception prose offers a standable tile beside a visible structure (g3 round 6)', async () => {
+  it('perception prose says a visible structure can be walked into (g3 round 6)', async () => {
     const { loop, runtime } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
-    // A storehouse is a thing you can walk into, so the prose names the doorway `enter`
-    // measures against rather than the nearest open ground beside the wall.
-    expect(runtime.dayLogSnapshot()[0]).toContain(
-      'its doorway is at (5, 6); stand there and you can go in',
-    )
+    // A storehouse is a thing you can walk into, so the prose says it has a doorway rather than
+    // offering ground beside the wall — and names neither as a tile.
+    expect(runtime.dayLogSnapshot()[0]).toContain('it has a doorway; walk to it and you can go in')
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {
@@ -1383,8 +1685,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
   })
 
-  it('fires the optional onThought hook once per turn with tick, agentId, and the turn thought', async () => {
-    const seen: { tick: number; agentId: string; text: string }[] = []
+  it('fires the optional onThought hook once per turn with tick, agentId, the turn thought and its weight', async () => {
+    const seen: { tick: number; agentId: string; text: string; importance: number }[] = []
     const { loop, runtime } = await setup({
       model: turnModel([BENIGN_TURN]),
       mindConfig: FAST_MIND,
@@ -1392,7 +1694,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => seen.length >= 1, 100)
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
-    expect(seen[0]).toEqual({ tick: expect.any(Number) as number, agentId: AGENT, text: 'I rest.' })
+    // ★ The weight rides with the thought: a viewer that has to gate on it cannot ask the mind.
+    expect(seen[0]).toEqual({
+      tick: expect.any(Number) as number,
+      agentId: AGENT,
+      text: 'I rest.',
+      importance: 1,
+    })
     expect(seen[0]!.tick).toBeGreaterThan(0)
   })
 })
@@ -1439,49 +1747,45 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
     expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
-      'You realize you cannot: your hands do not yet know the weave — perhaps someone nearby knows the craft.',
+      'You realize you cannot: your hands do not yet know the weave. Maybe someone nearby knows the craft.',
     )
     expect(startedVerbs(world.engineDb)).not.toContain('experiment')
   })
 
-  // A refusal a mind cannot act on is a refusal it repeats, at a full arbiter call each time.
-  it("★ asks the god ONCE for one idea: the same intent again is answered from the mind's own past", async () => {
+  // A refusal with a context-dependent class is never a precedent, so without a window the same
+  // ask every turn is a full ruling every turn. Inside it the refusal answers silently.
+  it('★ the same idea inside the window costs one call and leaves one memory of importance 3', async () => {
     let calls = 0
     const adjudicator: Adjudicator = async () => {
       calls += 1
       return {
         kind: 'impossible',
         reason: 'the reeds will not hold that shape',
-        class: 'physically_impossible',
+        class: 'insufficient_materials',
       }
     }
-    const { loop, agentDb } = await setup({
-      // The same idea, three turns running — and said differently the third time, because a
-      // mind rephrases. `sameIntent` normalizes case, spacing and trailing punctuation.
-      model: turnModel([
-        freeformTurn,
-        freeformTurn,
-        { ...freeformTurn, action: { freeform: 'Weave reeds into a basket.' } },
-      ]),
-      mindConfig: FAST_MIND,
-      adjudicator,
-    })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 3, 400)
+    const { model, prompts } = capturingModel([
+      freeformTurn,
+      { ...freeformTurn, action: { freeform: 'Weave reeds into a basket.' } },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 3, 400)
 
-    // One call for three asks. The other two cost nothing at all.
     expect(calls).toBe(1)
-    const texts = memoriesOfKind(agentDb, 'action').map((m) => m.text)
-    expect(texts[0]).toBe('You realize you cannot: the reeds will not hold that shape')
-    // ★ AND THE SECOND MEMORY IS DIFFERENT FROM THE FIRST. Handing a mind the identical
-    // sentence a third time is the defect, not the call count.
-    expect(texts[1]).toBe(REPEATED_REFUSAL)
-    expect(texts[2]).toBe(REPEATED_REFUSAL)
-    expect(REPEATED_REFUSAL).not.toBe(texts[0])
+    const memories = memoriesOfKind(agentDb, 'action')
+    expect(memories.map((m) => m.text)).toEqual([
+      'You realize you cannot: the reeds will not hold that shape',
+    ])
+    expect(memories.map((m) => m.importance)).toEqual([3])
+    // The second ask is still answered, from the mind's own refusal, in the next turn's line.
+    expect(saidOn(prompts, 2)).toContain(
+      `Last turn: ${TRIED_FREEFORM} did not work: the reeds will not hold that shape.`,
+    )
+    expect(REFUSAL_MEMORY_TICKS).toBe(240)
   })
 
   it('★ ANTI-VACUITY: a DIFFERENT idea still reaches the god, and so does the same one later', async () => {
-    // A breaker that silences the second ask of anything would be worse than the loop: it
-    // would cap a mind at one novel act per lifetime.
     const seen: string[] = []
     const adjudicator: Adjudicator = async (intent) => {
       seen.push(intent)
@@ -1502,9 +1806,153 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
 
     expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
-    // The window is a window: it is measured in ticks and it expires.
-    expect(REFUSAL_MEMORY_TICKS).toBeGreaterThan(0)
-    expect(REFUSAL_MEMORY_TICKS).toBeLessThan(MINUTES_PER_DAY)
+  })
+
+  // The recent window holds an utterance for 66 ticks, so a mind taking a turn every few ticks
+  // was told the same greeting as news three times and wrote it into the day three times.
+  it('tells a mind a word it heard once, not on every turn the word is still in the window', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    bridge.announce('agent_spawned', { id: 'omar', name: 'Omar', x: 3, y: 4, ageDays: 30 })
+    bridge.announce('agent_spoke', { agentId: 'omar', text: 'Rain soon.', x: 3, y: 4 })
+    // The heard block rides its own message, so this is the "happening now" reading of the line
+    // and not the day log's record of the moment it landed in.
+    const hears = (p: CapturedMessage[]): boolean =>
+      p.some((m) => m.text.startsWith('You hear Omar say: "Rain soon."'))
+    await stepUntil(loop, () => prompts.some(hears), 60)
+    const first = prompts.findIndex(hears)
+    expect(first, 'the mind was told at all').toBeGreaterThanOrEqual(0)
+
+    await stepUntil(loop, () => prompts.length >= first + 4, 60)
+    expect(prompts.slice(first + 1).filter(hears)).toEqual([])
+    expect(runtime.dayLogSnapshot().filter((l) => l.includes('Rain soon.'))).toHaveLength(1)
+  })
+
+  // The provider was still thinking when the body died. The answer is paid for, but a corpse
+  // cannot act, cannot think out loud to the viewer, and cannot write in its own book.
+  it('a turn that lands after its mind died writes nothing and publishes nothing', async () => {
+    const thoughts: { text: string }[] = []
+    const gate = gatedModel()
+    const { world, loop, bridge, agentDb } = await setup({
+      model: gate.model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      onThought: (t) => {
+        thoughts.push(t)
+      },
+    })
+    await stepUntil(loop, () => gate.calls.count >= 1, 50)
+    const thoughtsBefore = memoriesOfKind(agentDb, 'thought').length
+
+    bridge.announce('hp_changed', { agentId: AGENT, delta: -1000 })
+    await stepUntil(loop, () => loop.state.agents[AGENT]?.alive === false, 20)
+    gate.resolve(
+      JSON.stringify(
+        askedShape({
+          thought: 'One more step to the water.',
+          action: { verb: 'walk', params: { x: 9, y: 9 } },
+          importance: 2,
+        }),
+      ),
+    )
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(thoughts, 'nothing of a corpse reaches the viewer').toEqual([])
+    expect(memoriesOfKind(agentDb, 'thought')).toHaveLength(thoughtsBefore)
+    expect(startedVerbs(world.engineDb)).toEqual([])
+  })
+
+  // A restart used to leave the map empty, so the same idea inside the window bought the ruling
+  // a second time — the one thing the precedent exists to stop.
+  it('carries what the court has already ruled across a restart', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold that shape',
+        class: 'physically_impossible',
+      }
+    }
+    const tries = {
+      thought: 'I will try it.',
+      action: { freeform: 'weave reeds into a mat' },
+      importance: 3,
+    }
+    const shared = await setup({
+      model: turnModel([tries], tries),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(shared.loop, () => seen.length >= 1, 200)
+    const snap = shared.runtime.snapshot()
+    expect(snap.refused).toHaveLength(1)
+    shared.runtime.stop()
+
+    const resumed = new AgentRuntime({
+      db: shared.agentDb,
+      llm: shared.llm,
+      embedder: shared.embedder,
+      identity: tamarIdentity,
+      personality: shared.personality,
+      bridge: shared.bridge,
+      config: FAST_MIND,
+      adjudicator,
+    })
+    resumed.start(AGENT)
+    resumed.restore(snap)
+    await stepUntil(shared.loop, () => seen.length >= 2, 200)
+    expect(seen, 'the mind answered itself off the precedent it came back with').toHaveLength(1)
+  })
+
+  // One map held both the court's precedents and the sentences the mind already carries, on one
+  // sixteen-slot budget: nine ideas spend eighteen slots and the first precedent is gone.
+  it('keeps a precedent through the sentences the same acts write down', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: `${intent} will not hold that shape`,
+        class: 'physically_impossible',
+      }
+    }
+    const ideas = [
+      'weave reeds into a mat',
+      'bank the fire with river clay',
+      'split the elm with a wedge',
+      'salt the fish for winter',
+      'dam the brook below the ford',
+      'sink a post at the corner',
+      'boil the bones for glue',
+      'peg the roof against the wind',
+      'card the wool by the hearth',
+    ]
+    const { loop, agentDb } = await setup({
+      model: turnModel(
+        [...ideas, ideas[0]!].map((freeform) => ({
+          thought: 'I will try it.',
+          action: { freeform },
+          importance: 3,
+        })),
+      ),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= ideas.length, 400)
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(seen).toEqual(ideas)
   })
 
   // ★ Run D spent 3 of its 9 rulings on `stand`, `think` and `none player`, ~11 ticks of
@@ -1537,6 +1985,50 @@ describe('arbiter seam (T19)', () => {
     ).toEqual([])
   })
 
+  // ★ Four of the gate's seven paid rulings were `plan` named as the action verb, each ruled
+  // "not a recognized routine" for a fee. The turn's field list is three clauses from the
+  // action's own instruction, and minds read the two as one vocabulary.
+  it('★ a field of the turn named as a verb is a quiet beat, not a ruling', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return { kind: 'impossible', reason: 'not a recognized routine', class: 'nonsense' }
+    }
+    const asVerbs = [...TURN_FIELDS].map((field) => ({
+      thought: `I mean to ${field}.`,
+      action: { verb: field, params: { x: 1, y: 2 } },
+      importance: 3,
+    }))
+    const { loop, agentDb } = await setup({
+      model: turnModel([...asVerbs, freeformTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => seen.length >= 1, 400)
+
+    // Only the real try reaches the god; not one field name does, and none is remembered.
+    expect(seen).toEqual(['weave reeds into a basket'])
+    expect(refusalMemories(agentDb)).toEqual(['You realize you cannot: not a recognized routine'])
+  })
+
+  it('★ and buys no second call for one that named nothing either', async () => {
+    const bare = { thought: 'I plan.', action: { verb: 'plan', params: {} }, importance: 3 }
+    const { model, prompts } = capturingModel([bare, bare])
+    const { loop, runtime, agentDb } = await setup({ model, mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 50)
+
+    expect(prompts.length).toBe(1)
+    expect(alertKinds(agentDb)).not.toContain('empty_act_detail')
+    expect(refusalMemories(agentDb)).toEqual([])
+  })
+
+  it('★ takes the field names off the schema, so a new field cannot leave the guard stale', () => {
+    expect([...TURN_FIELDS].sort()).toEqual(Object.keys(StrictTurnSchema.shape).sort())
+    expect(TURN_FIELDS.has('plan')).toBe(true)
+    // A word the world does answer to is never one of them.
+    expect(TURN_FIELDS.has('walk')).toBe(false)
+  })
+
   it('falls back to the world’s own answer when no adjudicator is wired', async () => {
     const { loop, agentDb } = await setup({
       model: turnModel([freeformTurn]),
@@ -1544,29 +2036,28 @@ describe('arbiter seam (T19)', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
-    )
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'Perhaps someone in the town knows how.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
   })
 
-  it('falls back to the world when the adjudicator throws, and says so in an alert', async () => {
+  // ★ One-way glass: a god that fell over must not reach the mind as a verb the world lacks.
+  it('★ when the adjudicator throws, the try did not begin: an alert, no memory, no machinery', async () => {
     const adjudicator: Adjudicator = async () => {
       throw new Error('the arbiter is unreachable')
     }
-    const { loop, agentDb } = await setup({
-      model: turnModel([freeformTurn]),
-      mindConfig: FAST_MIND,
-      adjudicator,
-    })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+    const { model, prompts } = capturingModel([freeformTurn, BENIGN_TURN])
+    const { loop, agentDb } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
 
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
-    )
     expect(alertKinds(agentDb)).toContain('adjudicate_failed')
+    expect(memoriesOfKind(agentDb, 'action')).toEqual([])
+    const next = saidOn(prompts, 1)
+    expect(next).toContain(`Last turn: ${TRIED_FREEFORM} did not work: ${CANNOT_BEGIN}.`)
+    for (const text of [next, ...memoriesOfKind(agentDb, 'action').map((m) => m.text)]) {
+      expect(text).not.toContain('unknown verb')
+      expect(text).not.toContain('experiment')
+    }
   })
 
   // CAPABILITIES offers `experiment` as well as freeform, so a mind may name
@@ -1606,8 +2097,8 @@ describe('arbiter seam (T19)', () => {
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      `You realize you cannot: ${OPAQUE_REFUSAL}`,
     )
   })
 
@@ -1660,6 +2151,38 @@ describe('arbiter wiring expansion (T20)', () => {
     expect(seen).toEqual([`patch ${STRUCTURE_ID}`])
     expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
       'You realize you cannot: the roof is beyond mending',
+    )
+  })
+
+  // ★ THE INVENTION CHANNEL. Rehearsal 6 (2026-09-03): 631 acts, 11 rulings, and not one of
+  // verdict `attempt` — because this gate read only `unknown verb:`, so a mind that reached for
+  // a thing the town had no concept of was told no by the registry and never by a god. Four
+  // `wants discovering` refusals were raised that run and the court heard none of them.
+  it('★ sends a kind the town has no concept of to the arbiter, not to the refusal book', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'a granary wants a floor off the ground',
+        class: 'physically_impossible',
+      }
+    }
+    const unknownKindTurn = {
+      thought: 'The grain is spoiling. I will raise a granary.',
+      action: { verb: 'build', params: { kind: 'granary' } },
+      importance: 5,
+    }
+    const { loop, agentDb } = await setup({
+      model: turnModel([unknownKindTurn]),
+      mindConfig: FAST_MIND,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
+
+    expect(seen, "the act reached the court in the mind's own words").toHaveLength(1)
+    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toBe(
+      'You realize you cannot: a granary wants a floor off the ground',
     )
   })
 
@@ -1724,7 +2247,7 @@ describe('arbiter wiring expansion (T20)', () => {
         recipe: { id: RECIPE_VERB },
         summary: 'Weave reeds into a mat.',
       }),
-      codify: (recipe) => {
+      codify: ({ recipe }) => {
         codified.push(recipe.id)
         registerVerb({
           kind: RECIPE_VERB,
@@ -1758,7 +2281,7 @@ describe('arbiter wiring expansion (T20)', () => {
         asked = intent
         return { kind: 'attempt', recipe: { id: RECIPE_VERB }, summary: 'Weave reeds into a mat.' }
       },
-      codify: (recipe, credit) => {
+      codify: ({ recipe }, credit) => {
         calls.push({ recipeId: recipe.id, credit })
         registerVerb({
           kind: RECIPE_VERB,
@@ -1777,37 +2300,71 @@ describe('arbiter wiring expansion (T20)', () => {
     await stepUntil(loop, () => startedVerbs(world.engineDb).includes(RECIPE_VERB), 100)
 
     expect(calls).toHaveLength(1)
-    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT })
+    expect(calls[0]!.credit).toEqual({ agentId: AGENT, intent: INTENT, saying: INTENT })
     // The SAME words the arbiter was asked, never a paraphrase.
     expect(calls[0]!.credit!.intent).toBe(asked)
   })
 
-  it('falls back to the world when an attempt arrives with no way to codify it', async () => {
+  it('an attempt with no way to codify it did not begin: no memory, and no verb the world lacks', async () => {
     const adjudicator: Adjudicator = async () => ({
       kind: 'attempt',
       recipe: { id: RECIPE_VERB },
       summary: 'Weave reeds into a mat.',
     })
-    const { loop, agentDb } = await setup({
-      model: turnModel([
-        { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
-      ]),
-      mindConfig: FAST_MIND,
-      adjudicator,
+    const { model, prompts } = capturingModel([
+      { thought: 'A mat.', action: { freeform: 'weave reeds into a mat' }, importance: 5 },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb, world } = await setup({ model, mindConfig: FAST_MIND, adjudicator })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
+    expect(memoriesOfKind(agentDb, 'action')).toEqual([])
+    expect(startedVerbs(world.engineDb)).not.toContain('experiment')
+    expect(saidOn(prompts, 1)).toContain(`did not work: ${CANNOT_BEGIN}.`)
+  })
+})
+
+describe('what the town has learned reaches every mind', () => {
+  it('a verb minted between two turns is in the next prompt, after the static rules', async () => {
+    const minted: RosterEntry[] = []
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    wireArbiter(runtime, {
+      adjudicate: async () => ({
+        kind: 'impossible',
+        reason: 'no',
+        class: 'physically_impossible',
+      }),
+      codify: () => ({ ruleId: 1, verb: 'recipe:x' }),
+      roster: () => minted,
     })
-    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 100)
-    expect(memoriesOfKind(agentDb, 'action')[0]!.text).toContain(
-      'You lack the knowledge to attempt this.',
-    )
+    await stepUntil(loop, () => prompts.length >= 1, 200)
+    const systemOn = (turn: number): string =>
+      prompts[turn]!.filter((m) => m.role === 'system')
+        .map((m) => m.text)
+        .join('\n')
+    expect(systemOn(0)).not.toContain(ROSTER_HEAD)
+
+    minted.push({
+      id: 'recipe:smoke_fish',
+      name: 'Smoke Fish Over Green Wood',
+      gloss: 'Hang the catch in green-wood smoke so it keeps',
+      reads: [],
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 400)
+    const second = systemOn(1)
+    expect(second).toContain(ROSTER_HEAD)
+    expect(second).toContain('Name it recipe:smoke_fish')
+    expect(second.indexOf(ROSTER_HEAD)).toBeGreaterThan(second.indexOf(SPEECH_RULES))
+    expect(second.indexOf(ROSTER_HEAD)).toBeLessThan(second.indexOf('Name: Tamar'))
   })
 })
 
 describe('refusal prose teaches a path (T18)', () => {
   it('appends the hint only to an insufficient_skill verdict', () => {
     expect(refusalMemoryText('you have not the hands for it', 'insufficient_skill')).toBe(
-      'You realize you cannot: you have not the hands for it — perhaps someone nearby knows the craft.',
+      'You realize you cannot: you have not the hands for it. Maybe someone nearby knows the craft.',
     )
-    expect(CRAFT_HINT).toBe(' — perhaps someone nearby knows the craft.')
+    expect(CRAFT_HINT).toBe('. Maybe someone nearby knows the craft.')
   })
 
   // ★ One-way glass: the engine's registry names and param schemas must never enter a memory.
@@ -1904,9 +2461,9 @@ describe("a beat spent on one's own past", () => {
     const { model, prompts } = capturingModel([RECALL_TURN, BENIGN_TURN, BENIGN_TURN])
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
     await stepUntil(loop, () => runtime.stats().turns >= 3, 90)
-    expect(saidOn(prompts, 0)).not.toContain('You cast your mind back')
-    expect(saidOn(prompts, 1)).toContain('You cast your mind back to the storehouse.')
-    expect(saidOn(prompts, 2)).not.toContain('You cast your mind back')
+    expect(saidOn(prompts, 0)).not.toContain('You think back to')
+    expect(saidOn(prompts, 1)).toContain('You think back to the storehouse.')
+    expect(saidOn(prompts, 2)).not.toContain('You think back to')
   })
 
   it('reads its own book back, dated by the day the world counts', async () => {
@@ -1919,9 +2476,11 @@ describe("a beat spent on one's own past", () => {
       mindConfig: { ...FAST_MIND, journalTicks: 0 },
     })
     await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
-    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain('turn back the pages')
+    expect(prompts[0]!.map((m) => m.text).join('\n')).not.toContain(
+      'What you have written in your own book',
+    )
     expect(prompts[1]!.find((m) => m.role === 'user')!.text).toBe(
-      'You turn back the pages of your own book:\nDay 1: The roof held.',
+      'What you have written in your own book:\nDay 1: The roof held.',
     )
   })
 })
@@ -1947,5 +2506,315 @@ describe('the night boundary is staggered', () => {
     for (const id of CAST) {
       expect(reflectionOffsetTicks(id) * TICK_REAL_MS, id).toBeLessThan(REFLECTION_SETTLE_MS)
     }
+  })
+})
+
+// 521 paid turns and nobody could say which of the eight reasons bought them, because the row
+// never carried one. Instrumentation only: what a mind decides is untouched.
+describe('every turn row says what bought it', () => {
+  const REASONS: WakeReason[] = [
+    'body_alarm',
+    'salient_perception',
+    'plan_blocked',
+    'plan_done',
+    'floor',
+    'reconsider',
+    'boredom',
+    'morning',
+    'gathering',
+  ]
+
+  function bills(
+    db: Database.Database,
+  ): { reason: string | null; every: string[]; blocks: Record<string, number> }[] {
+    return (
+      db
+        .prepare(
+          "SELECT wake_reason, wake_reasons, block_tokens FROM llm_calls WHERE caller = 'turn' ORDER BY id",
+        )
+        .all() as {
+        wake_reason: string | null
+        wake_reasons: string | null
+        block_tokens: string | null
+      }[]
+    ).map((r) => ({
+      reason: r.wake_reason,
+      every: r.wake_reasons === null ? [] : (JSON.parse(r.wake_reasons) as string[]),
+      blocks: r.block_tokens === null ? {} : (JSON.parse(r.block_tokens) as Record<string, number>),
+    }))
+  }
+
+  it('carries the wake reason, the block sizes, and what the plan was worth', async () => {
+    const { loop, agentDb, world } = await setup({
+      model: turnModel([
+        {
+          thought: 'I should fetch and eat some bread.',
+          plan: [
+            { verb: 'walk', params: { x: 5, y: 6 } },
+            { verb: 'take', params: { itemId: BREAD_ID } },
+            { verb: 'eat', params: { itemId: BREAD_ID } },
+          ],
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => completedVerbs(world.engineDb).length >= 3, 100)
+
+    const first = bills(agentDb)[0]!
+    expect(REASONS).toContain(first.reason)
+    // The winner and everything else that was true, deciding one first: the histogram of winners
+    // alone could not say how much of salient_perception was a finished plan underneath it.
+    expect(first.every[0]).toBe(first.reason)
+    for (const r of first.every) expect(REASONS).toContain(r)
+    expect(first.blocks.shared).toBeGreaterThan(0)
+    expect(first.blocks.identity).toBeGreaterThan(0)
+    expect(first.blocks._planSize).toBe(3)
+    expect(first.blocks._priorStepsLeft).toBe(0)
+  })
+
+  // The waste this whole exercise is chasing: a paid call that lands on a plan still running.
+  it('counts the steps still queued when a call arrived on top of them', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'The long way round.',
+          plan: [
+            { verb: 'walk', params: { x: 22, y: 22 } },
+            { verb: 'walk', params: { x: 3, y: 22 } },
+            { verb: 'walk', params: { x: 22, y: 3 } },
+          ],
+          reconsider_at: '00:10',
+          importance: 5,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => bills(agentDb).length >= 2, 60)
+
+    const left = bills(agentDb).map((b) => b.blocks._priorStepsLeft ?? 0)
+    expect(left[0]).toBe(0)
+    expect(left[1]).toBeGreaterThan(0)
+  })
+})
+
+describe('★ an empty vessel is a want for water, though it names none', () => {
+  it('reads the water road off a refusal that names water, and off an empty vessel', () => {
+    expect(wantedWater('Last turn: drinking did not work: no water there.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not work: the skin is empty.')).toBe(true)
+    expect(wantedWater('Last turn: drinking did not work: the bucket is empty.')).toBe(true)
+  })
+  it('leaves a refusal about anything else alone', () => {
+    expect(wantedWater('Last turn: stoking did not work: not enough wood.')).toBe(false)
+    expect(wantedWater(null)).toBe(false)
+  })
+})
+
+// ★ Both ledger writes sat between the parsed turn and the act, outside the try that guards the
+// call. A database too busy to take a row would have thrown away an answer already paid for.
+describe('★ a ledger that cannot write does not cost the town a paid turn', () => {
+  it('still acts on the answer, and says the ledger failed', async () => {
+    const { loop, agentDb, runtime } = await setup({
+      model: turnModel([
+        { thought: 'I should fetch some bread.', importance: 5, speech: 'Bread, then.' },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    agentDb.exec('DROP TABLE turn_outcomes')
+    await stepUntil(loop, () => runtime.stats().turns > 0, 200)
+    const kinds = agentDb
+      .prepare('SELECT kind FROM alerts')
+      .all()
+      .map((r) => (r as { kind: string }).kind)
+    expect(kinds).toContain('ledger_write_failed')
+    expect(runtime.stats().turns).toBeGreaterThan(0)
+  })
+})
+
+// Task 27 measured the trap: a fisher on a 240-tick cast collapsed 15 times in three sim-days,
+// because `submitIntent` refuses every verb to busy hands and nothing could end an act early.
+// A minted vigil or mourning may run a whole day, which is twenty real minutes of being stuck.
+describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
+  const MOURN = 'express:mourn'
+  const MOURN_TURN = {
+    thought: 'I will keep the day for her.',
+    action: { verb: MOURN, params: {} },
+    importance: 8,
+  }
+  // Only hunger rings, and it rings at 20 — the fixture body starts at 30 and loses half a
+  // point a tick, so the alarm lands twenty ticks into an act six hundred ticks long.
+  const HUNGER_RINGS: Partial<MindConfig> = {
+    idleGapTicks: 0,
+    boredomTicks: 10_000,
+    bodyAlarm: { hunger: 20, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
+  }
+  const QUIET_SKY = SimConfigSchema.parse({
+    needs: { hungerDecayPerTick: 0.5 },
+    structures: { sleepIndoorsOnly: false },
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+
+  const interrupts = (db: Database.Database): { agentId: string; reason: string }[] =>
+    (
+      db
+        .prepare("SELECT payload FROM events WHERE type = 'action_interrupted' ORDER BY seq")
+        .all() as { payload: string }[]
+    ).map((r) => JSON.parse(r.payload) as { agentId: string; reason: string })
+
+  const wakeReasonsLogged = (db: Database.Database): (string | null)[] =>
+    (
+      db.prepare("SELECT wake_reason FROM llm_calls WHERE caller = 'turn' ORDER BY id").all() as {
+        wake_reason: string | null
+      }[]
+    ).map((r) => r.wake_reason)
+
+  const mournsForADay = (): void => {
+    registerVerb({
+      kind: MOURN,
+      validate: () => null,
+      duration: () => DURATION_TICKS.day,
+      onComplete: () => [],
+    })
+  }
+
+  afterEach(() => {
+    unregisterVerb(MOURN)
+  })
+
+  it('★ a body alarm takes the hands off a DAY-LONG act, and the turn that follows is the alarm’s', async () => {
+    mournsForADay()
+    const { model, prompts } = capturingModel([MOURN_TURN, BENIGN_TURN, BENIGN_TURN])
+    const { loop, runtime, world, agentDb } = await setup({
+      model,
+      mindConfig: HUNGER_RINGS,
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(
+      loop,
+      () => runtime.stats().turns >= 2 && interrupts(world.engineDb).length > 0,
+      200,
+    )
+
+    expect(startedVerbs(world.engineDb)).toContain(MOURN)
+    // Twenty real minutes is what a day-long act costs a mind that cannot put it down.
+    expect(DURATION_TICKS.day * TICK_REAL_MS).toBe(20 * 60 * 1000)
+    expect(loop.tick).toBeLessThan(DURATION_TICKS.day)
+    expect(loop.state.agents[AGENT]!.activity).toBeNull()
+    expect(interrupts(world.engineDb)).toEqual([{ agentId: AGENT, reason: ACT_SET_DOWN }])
+    expect(completedVerbs(world.engineDb)).not.toContain(MOURN)
+    // The mind never asked; the hands came off, and the very next turn is the one the alarm rang.
+    expect(wakeReasonsLogged(agentDb)[1]).toBe('body_alarm')
+    expect(saidOn(prompts, 1)).toContain(
+      `Last turn: you stopped mourning: ${BODY_WOULD_NOT_GO_ON}.`,
+    )
+    // Said once. The next turn opens on a body standing free, with nothing to explain.
+    await stepUntil(loop, () => runtime.stats().turns >= 3, 200)
+    expect(saidOn(prompts, 2)).not.toContain('Last turn:')
+  })
+
+  it('the mind’s own stop ends the act and nothing else', async () => {
+    mournsForADay()
+    const { model, prompts } = capturingModel([
+      MOURN_TURN,
+      { thought: 'Enough of that.', action: { verb: 'stop', params: {} }, importance: 3 },
+      BENIGN_TURN,
+    ])
+    // Boredom drives the second turn, and no rung rings at all: nothing here is the body's doing.
+    const { loop, runtime, world, agentDb } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, boredomTicks: 5 },
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(
+      loop,
+      () => runtime.stats().turns >= 3 && interrupts(world.engineDb).length > 0,
+      300,
+    )
+
+    expect(interrupts(world.engineDb)).toEqual([{ agentId: AGENT, reason: ACT_SET_DOWN }])
+    expect(loop.state.agents[AGENT]!.activity).toBeNull()
+    expect(completedVerbs(world.engineDb)).not.toContain(MOURN)
+    expect(wakeReasonsLogged(agentDb)).not.toContain('body_alarm')
+    // Nothing else: no refusal remembered, and no sentence for the mind to read back.
+    expect(
+      memoriesOfKind(agentDb, 'action').every((m) => !m.text.includes('You realize you cannot')),
+    ).toBe(true)
+    expect(saidOn(prompts, 2)).not.toContain('Last turn:')
+  })
+
+  // The line names the act as it was happening, so a coined verb reads as a thing being done
+  // rather than as the slug it is stored under.
+  it('says what was broken off in the words the act was happening in', () => {
+    expect(brokeOffLine('fish', 'why')).toBe('Last turn: you stopped fishing: why.')
+    expect(brokeOffLine(MOURN, 'why')).toContain('you stopped mourning')
+    expect(brokeOffLine('recipe:plank', 'why')).toContain('you stopped making plank')
+    expect(brokeOffLine('stow', 'why')).toContain('stowing')
+    expect(brokeOffLine('inscribe', 'why')).toContain('inscribing')
+  })
+
+  it('leaves the legs alone: a hungry body walking to its food is not stopped', async () => {
+    const { model } = capturingModel([
+      {
+        thought: 'The storehouse.',
+        action: { verb: 'walk', params: { x: 20, y: 20 } },
+        importance: 4,
+      },
+      BENIGN_TURN,
+    ])
+    const { loop, runtime, world } = await setup({
+      model,
+      mindConfig: HUNGER_RINGS,
+      simConfig: QUIET_SKY,
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 100)
+    expect(startedVerbs(world.engineDb)).toContain('walk')
+    expect(interrupts(world.engineDb).map((i) => i.reason)).not.toContain(ACT_SET_DOWN)
+  })
+})
+
+// Phase 1 left minds fed, warm and wanting nothing. The morning line is the one place a want
+// reaches the mind, and it has to reach it once a day and nowhere else.
+describe('★ the morning line names what this mind wants', () => {
+  const STILL_BODY = SimConfigSchema.parse({
+    needs: { hungerDecayPerTick: 0, energyDecayAwakePerTick: 0 },
+    structures: { sleepIndoorsOnly: false },
+  })
+
+  function wakeReasonsBilled(db: Database.Database): (string | null)[] {
+    return (
+      db.prepare("SELECT wake_reason FROM llm_calls WHERE caller = 'turn' ORDER BY id").all() as {
+        wake_reason: string | null
+      }[]
+    ).map((r) => r.wake_reason)
+  }
+
+  it('reaches the mind on the morning wake and on no other turn', async () => {
+    const { model, prompts } = capturingModel([
+      { thought: 'Time to rest.', action: { verb: 'sleep', params: {} }, importance: 5 },
+      BENIGN_TURN,
+    ])
+    const { loop, agentDb } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      simConfig: STILL_BODY,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    await stepUntil(loop, () => loop.tick >= DAWN_TICK && !loop.state.agents[AGENT]!.asleep, 800)
+
+    const carried = prompts
+      .map((_, i) => i)
+      .filter((i) => saidOn(prompts, i).includes('Today the thing you want most is'))
+    const mornings = wakeReasonsBilled(agentDb)
+      .map((reason, i) => ({ reason, i }))
+      .filter((r) => r.reason === 'morning')
+      .map((r) => r.i)
+
+    expect(mornings.length).toBe(1)
+    expect(carried).toEqual(mornings)
+    // Nothing fed a want overnight, so the seven stand level and the contract's order decides.
+    expect(saidOn(prompts, carried[0]!)).toContain(
+      'Today the thing you want most is belonging. Who could give you that?',
+    )
   })
 })

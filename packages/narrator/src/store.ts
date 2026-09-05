@@ -163,6 +163,15 @@ export class NarratorStore {
     }))
   }
 
+  /** One row marks the concept found and the other IS the mark. Written apart, a kill between
+   *  them loses the mark for good: the pass never scans for a concept it has already found. */
+  recordSemanticFirst(r: SemanticFirstRow, m: Milestone): void {
+    this.db.transaction(() => {
+      this.insertSemanticFirst(r)
+      this.insertMilestone(m)
+    })()
+  }
+
   insertSemanticFirst(r: SemanticFirstRow): void {
     this.db
       .prepare(

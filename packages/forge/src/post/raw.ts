@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type Sharp } from 'sharp'
 
 export type RawImage = { width: number; height: number; data: Uint8ClampedArray }
 
@@ -7,7 +7,7 @@ export async function decodePng(buf: Buffer): Promise<RawImage> {
   return { width: info.width, height: info.height, data: new Uint8ClampedArray(data) }
 }
 
-const fromRaw = (img: RawImage): sharp.Sharp =>
+const fromRaw = (img: RawImage): Sharp =>
   sharp(Buffer.from(img.data.buffer, img.data.byteOffset, img.data.byteLength), {
     raw: { width: img.width, height: img.height, channels: 4 },
   })

@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, scanPromptForGlassLeak, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  scanPromptForGlassLeak,
+  type SimEvent,
+} from '@sj/shared'
 import type { LlmClient, LlmMessage, LlmUsage } from '@sj/llm'
 import { openDb } from '@sj/engine/store'
 import type { TileId } from '@sj/engine'
@@ -39,7 +45,7 @@ const naming = (day: number): SimEvent =>
 
 /** The three of them arriving, so the same log folds into a world the observatory can serve. */
 const SPAWNS: SimEvent[] = THREE.map((id, i) =>
-  ev(0, 'agent_spawned', { id, name: id, x: 20 + i, y: 20, ageDays: 7300 }),
+  ev(0, 'agent_spawned', { id, name: id, x: 20 + i, y: 20, ageDays: ADULT_AGE_DAYS }),
 )
 
 const TRANSCRIPT: SimEvent[] = [

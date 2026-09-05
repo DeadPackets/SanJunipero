@@ -11,7 +11,6 @@ import {
   fromTileKey,
   clampNeed,
   INJURY_HEAL_DAYS,
-  pairKey,
   thirstOf,
   tileKey,
   type Affliction,
@@ -19,6 +18,7 @@ import {
   type TileId,
   type WorldState,
 } from './state.js'
+import type { TabledLaw } from './lawShapes.js'
 import {
   ActionCompleted,
   ActionInterrupted,
@@ -45,8 +45,15 @@ import {
   AgentRecovered,
   AgentSlept,
   AgentSpoke,
+  AgentArrived,
+  AgentDeparted,
   AgentSpawned,
   AgentTended,
+  SceneOpened,
+  SceneTurned,
+  SceneLineSaid,
+  SceneClosed,
+  TieLetGo,
   AgentWoke,
   CoSlept,
   CropGrew,
@@ -72,6 +79,19 @@ import {
   ItemSpoiled,
   ItemTaken,
   ItemUnequipped,
+  Invited,
+  InvitationAccepted,
+  InvitationRefused,
+  LawBroken,
+  LawProposed,
+  LawRatified,
+  LawRepealed,
+  LawTabled,
+  LawDropped,
+  Marked,
+  PartnershipDissolved,
+  PartnershipFormed,
+  PlaceNamed,
   StructureFueled,
   ConfigChanged,
   FaunaKilled,
@@ -98,6 +118,7 @@ import {
   TileChanged,
   TrafficDecayed,
   WalkParams,
+  WalkReaimed,
   WeatherChanged,
   WildlifeChanged,
   WorldGrown,
@@ -108,6 +129,7 @@ import { occupantsOf } from './interiors.js'
 import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
 import { renames } from './naming.js'
 import { findPath } from './path.js'
+import { markLaw, type Law } from './socialLaws.js'
 
 // Kept as its own step so a batch of N folds to exactly the state the N separate events left.
 function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig): AgentBody {
@@ -127,7 +149,10 @@ function applyNeed(a: AgentBody, c: NeedChange, tick: number, config: SimConfig)
   // Nothing else records this: it is the difference between dying tired and dying cold.
   const chilled =
     c.reason === 'exposure' ? { coldTicksSinceRecovery: (a.coldTicksSinceRecovery ?? 0) + 1 } : {}
-  return { ...a, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
+  // A swallow is the meal, whichever hand held it out: a body fed on the ground comes off
+  // the collapse ladder like one that fed itself.
+  const body = c.reason === 'meal' ? rested(a) : a
+  return { ...body, needs, zeroHungerSinceTick, collapsedSinceTick, ...chilled }
 }
 
 // Counter law: entity-creating events carry their id; the counter only ever rises.
@@ -155,6 +180,12 @@ function refuseOccupied(state: WorldState, structureId: string): void {
       `structure ${structureId} destroyed with occupant(s) ${occupants.join(', ')} still inside`,
     )
   }
+}
+
+/** The record without one key. An empty record stays a record: absent means never tabled. */
+function withoutKey<T>(rec: Record<string, T> | undefined, key: string): Record<string, T> {
+  const { [key]: _gone, ...rest } = rec ?? {}
+  return rest
 }
 
 export function fold(
@@ -205,12 +236,12 @@ export function fold(
       const agents = { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } }
       // A trail is worn by feet, not by arriving: only a body mid-walk marks the ground.
       if (!countsAsFootfall(state, p.id, config)) return { ...state, agents }
-      const key = tileKey(p.x, p.y)
-      return {
-        ...state,
-        agents,
-        traffic: { ...state.traffic, [key]: (state.traffic?.[key] ?? 0) + 1 },
-      }
+      const width = state.terrain[0]!.length
+      const traffic =
+        state.traffic?.slice() ?? new Array<number>(state.terrain.length * width).fill(0)
+      const i = p.y * width + p.x
+      traffic[i] = (traffic[i] ?? 0) + 1
+      return { ...state, agents, traffic }
     }
     case 'needs_changed': {
       const p = NeedsChanged.parse(event.payload)
@@ -268,6 +299,116 @@ export function fold(
     case 'discovery_made': {
       DiscoveryMade.parse(event.payload)
       return state
+    }
+    // A scene lives in the minds that are having it; the world only witnesses that it happened.
+    case 'scene_opened': {
+      SceneOpened.parse(event.payload)
+      return state
+    }
+    case 'scene_turned': {
+      SceneTurned.parse(event.payload)
+      return state
+    }
+    case 'scene_line': {
+      SceneLineSaid.parse(event.payload)
+      return state
+    }
+    case 'scene_closed': {
+      SceneClosed.parse(event.payload)
+      return state
+    }
+    // A rule put to the room, and a rule somebody broke: both witnessed, neither folded. What
+    // the town agreed is state; what it argued about and what it caught is the log's to keep.
+    case 'law_proposed': {
+      LawProposed.parse(event.payload)
+      return state
+    }
+    case 'law_broken': {
+      LawBroken.parse(event.payload)
+      return state
+    }
+    case 'law_tabled': {
+      const p = LawTabled.parse(event.payload)
+      const tabled: TabledLaw = {
+        id: p.lawId,
+        text: p.text,
+        proposedBy: p.agentId,
+        tabledTick: event.tick,
+        votes: p.votes,
+      }
+      return { ...state, tabledLaws: { ...state.tabledLaws, [p.lawId]: tabled } }
+    }
+    case 'law_dropped': {
+      const p = LawDropped.parse(event.payload)
+      if (!state.tabledLaws?.[p.lawId]) throw new Error(`law_dropped for unknown law ${p.lawId}`)
+      return { ...state, tabledLaws: withoutKey(state.tabledLaws, p.lawId) }
+    }
+    case 'law_ratified': {
+      const p = LawRatified.parse(event.payload)
+      if (state.socialLaws?.[p.lawId]) throw new Error(`law_ratified twice for ${p.lawId}`)
+      const socialLaws = state.socialLaws ?? {}
+      const law: Law = {
+        id: p.lawId,
+        ordinal: Object.keys(socialLaws).length + 1,
+        text: p.text,
+        predicate: p.predicate,
+        proposedBy: p.agentId,
+        ratifiedTick: event.tick,
+        votes: p.votes,
+        repealedTick: null,
+        why: p.why,
+      }
+      const tabledLaws =
+        state.tabledLaws?.[p.lawId] === undefined
+          ? state.tabledLaws
+          : withoutKey(state.tabledLaws, p.lawId)
+      return {
+        ...state,
+        socialLaws: { ...socialLaws, [p.lawId]: law },
+        ...(tabledLaws === undefined ? {} : { tabledLaws }),
+      }
+    }
+    case 'law_repealed': {
+      const p = LawRepealed.parse(event.payload)
+      const law = state.socialLaws?.[p.lawId]
+      if (!law) throw new Error(`law_repealed for unknown law ${p.lawId}`)
+      return {
+        ...state,
+        socialLaws: { ...state.socialLaws, [p.lawId]: { ...law, repealedTick: event.tick } },
+      }
+    }
+    // A promise nobody kept, letting go of itself. The bond graph weighs it; the world does not.
+    case 'tie_let_go': {
+      TieLetGo.parse(event.payload)
+      return state
+    }
+    case 'marked': {
+      const p = Marked.parse(event.payload)
+      if (p.on === 'agent') {
+        const a = state.agents[p.id]
+        if (!a) throw new Error(`marked for unknown agent ${p.id}`)
+        const marks = { ...a.marks, [p.key]: p.value }
+        return { ...state, agents: { ...state.agents, [p.id]: { ...a, marks } } }
+      }
+      if (p.on === 'structure') {
+        const s = state.structures[p.id]
+        if (!s) throw new Error(`marked for unknown structure ${p.id}`)
+        const marks = { ...s.marks, [p.key]: p.value }
+        return { ...state, structures: { ...state.structures, [p.id]: { ...s, marks } } }
+      }
+      const item = state.items[p.id]
+      if (!item) throw new Error(`marked for unknown item ${p.id}`)
+      const marks = { ...item.marks, [p.key]: p.value }
+      return { ...state, items: { ...state.items, [p.id]: { ...item, marks } } }
+    }
+    case 'place_named': {
+      const p = PlaceNamed.parse(event.payload)
+      const s = state.structures[p.structureId]
+      if (!s) throw new Error(`place_named for unknown structure ${p.structureId}`)
+      return {
+        ...state,
+        structures: { ...state.structures, [p.structureId]: { ...s, name: p.name } },
+      }
     }
     case 'item_worn': {
       const p = ItemWorn.parse(event.payload)
@@ -539,6 +680,23 @@ export function fold(
       }
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
     }
+    case 'walk_reaimed': {
+      const p = WalkReaimed.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a?.activity) throw new Error(`walk_reaimed for idle agent ${p.agentId}`)
+      const path = findPath(state, a, p, config)
+      if (!path) throw new Error(`walk_reaimed with no path for ${p.agentId}`)
+      // The params carry the new mark too: everything that reads where these legs are going —
+      // the packet's own arrow, the short-of-the-mark test — reads it out of them.
+      const activity = {
+        ...a.activity,
+        path,
+        ticksRemaining: p.ticks,
+        chase: p.chase,
+        params: { ...a.activity.params, x: p.x, y: p.y },
+      }
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, activity } } }
+    }
     case 'action_progressed': {
       const p = ActionProgressed.parse(event.payload)
       const a = state.agents[p.agentId]
@@ -551,7 +709,11 @@ export function fold(
       const p = ActionCompleted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
-      const body = p.verb === 'eat' ? rested(a) : a
+      const rest = p.verb === 'eat' ? rested(a) : a
+      // A prerequisite done, or a tithe paid: only a standing law that names this verb leaves
+      // anything behind, so a town that has agreed nothing never grows the field.
+      const lawMarks = markLaw(state, p.agentId, p.verb, a.activity?.params ?? {}, event.tick)
+      const body = lawMarks === undefined ? rest : { ...rest, lawMarks }
       // A meal is remembered by kind for as long as the variety window is wide, and the
       // remembering happens before the belly fills — the kind just eaten counts toward it.
       const kind = p.verb === 'eat' ? p.results?.kind : undefined
@@ -675,7 +837,7 @@ export function fold(
             alive: true,
             asleep: false,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
-            // Twelve years on this world's calendar, which is 364 days long — not 365.
+            // Twelve years on this world's calendar, whose year is four weeks long.
             hp: config.health.maxHp,
             injuries: [],
             ill: false,
@@ -692,35 +854,102 @@ export function fold(
         counters: bumpCounter(state.counters, p.id),
       }
     }
-    // A night together is a fact; partnership is the count of them. A gap wider than
-    // the window ends the run — and if the pair had reached partnership, that is a breakup.
+    // A night under one roof is a fact the viewer and the chronicle may show, and nothing more:
+    // who is partnered to whom is now chosen aloud, not counted off the beds.
     case 'co_slept': {
       const p = CoSlept.parse(event.payload)
       for (const id of [p.aId, p.bId]) {
         if (!state.agents[id]) throw new Error(`co_slept for unknown agent ${id}`)
       }
-      const key = pairKey(p.aId, p.bId)
-      const prev = state.pairNights?.[key]
-      const broken =
-        prev !== undefined && p.day - prev.lastNightDay > config.reproduction.partnerWindowDays
-      const nights = prev === undefined || broken ? 1 : prev.nights + 1
-      let formedTick = prev?.formedTick ?? null
-      let dissolvedTick = prev?.dissolvedTick ?? null
-      if (broken && formedTick !== null) dissolvedTick = event.tick
-      if (
-        nights >= config.reproduction.coSleepNightsToPartner &&
-        (formedTick === null || dissolvedTick !== null)
-      ) {
-        formedTick = event.tick
-        dissolvedTick = null
+      return state
+    }
+    // The ask itself. Last ask wins: a second suitor's word is the one standing when it lands.
+    case 'invited': {
+      const p = Invited.parse(event.payload)
+      for (const id of [p.agentId, p.byId]) {
+        if (!state.agents[id]) throw new Error(`invited for unknown agent ${id}`)
+      }
+      const invitee = state.agents[p.agentId]!
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.agentId]: { ...invitee, asked: { byId: p.byId, verb: p.verb, tick: event.tick } },
+        },
+      }
+    }
+    case 'invitation_accepted': {
+      const p = InvitationAccepted.parse(event.payload)
+      const invitee = state.agents[p.agentId]
+      if (!invitee?.asked) return state
+      const next = { ...invitee }
+      delete next.asked
+      if (p.verb !== 'court') return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+      const asker = state.agents[p.byId]
+      if (!asker) throw new Error(`invitation_accepted for unknown agent ${p.byId}`)
+      const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      const walked = (body: AgentBody, withId: string): Record<string, number> => {
+        const before = body.walkOuts?.[withId] ?? 0
+        const again = body.courted?.withId === withId && body.courted.day === day
+        return { ...body.walkOuts, [withId]: again ? before : before + 1 }
       }
       return {
         ...state,
-        pairNights: {
-          ...state.pairNights,
-          [key]: { nights, lastNightDay: p.day, formedTick, dissolvedTick },
+        agents: {
+          ...state.agents,
+          [p.agentId]: {
+            ...next,
+            courted: { withId: p.byId, day },
+            walkOuts: walked(invitee, p.byId),
+          },
+          [p.byId]: {
+            ...asker,
+            courted: { withId: p.agentId, day },
+            walkOuts: walked(asker, p.agentId),
+          },
         },
       }
+    }
+    // Only the ask that was refused is cleared: a stale one from a third party still stands.
+    case 'invitation_refused': {
+      const p = InvitationRefused.parse(event.payload)
+      const invitee = state.agents[p.agentId]
+      if (invitee?.asked?.byId !== p.byId || invitee.asked.verb !== p.verb) return state
+      const next = { ...invitee }
+      delete next.asked
+      return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+    }
+    case 'partnership_formed': {
+      const p = PartnershipFormed.parse(event.payload)
+      for (const id of [p.aId, p.bId]) {
+        if (!state.agents[id]) throw new Error(`partnership_formed for unknown agent ${id}`)
+      }
+      const a = state.agents[p.aId]!
+      const b = state.agents[p.bId]!
+      if (a.partnerId === p.bId && b.partnerId === p.aId) return state
+      if (a.partnerId !== undefined) throw new Error(`${p.aId} already has a partner`)
+      if (b.partnerId !== undefined) throw new Error(`${p.bId} already has a partner`)
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.aId]: { ...a, partnerId: p.bId },
+          [p.bId]: { ...b, partnerId: p.aId },
+        },
+      }
+    }
+    // Only a partnership that points both ways is undone, so a stale leaving cannot strand
+    // a body that has already remarried.
+    case 'partnership_dissolved': {
+      const p = PartnershipDissolved.parse(event.payload)
+      const a = state.agents[p.aId]
+      const b = state.agents[p.bId]
+      if (!a || !b || a.partnerId !== p.bId || b.partnerId !== p.aId) return state
+      const left = { ...a }
+      const right = { ...b }
+      delete left.partnerId
+      delete right.partnerId
+      return { ...state, agents: { ...state.agents, [p.aId]: left, [p.bId]: right } }
     }
     // Nothing changes. The payload is checked so a replay cannot invent a happening
     // the table never authored, and the state is returned untouched, same object.
@@ -757,6 +986,66 @@ export function fold(
           ...state.agents,
           [p.agentId]: { ...body, alive: false, asleep: false, activity: null },
         },
+      }
+    }
+    // Somebody walked up the valley road. The same body a founding makes, plus the day they came
+    // — which is what lets the town see a stranger as one for a while, and then stop.
+    case 'agent_arrived': {
+      const p = AgentArrived.parse(event.payload)
+      if (state.agents[p.id]) throw new Error(`agent_arrived for a body already here: ${p.id}`)
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.id]: {
+            id: p.id,
+            name: p.name,
+            x: p.x,
+            y: p.y,
+            alive: true,
+            asleep: false,
+            needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
+            hp: config.health.maxHp,
+            injuries: [],
+            ill: false,
+            ageDays: p.ageDays,
+            sex: p.sex,
+            arrived: { day: Math.floor(event.tick / MINUTES_PER_DAY) },
+            skills: {},
+            activity: null,
+            collapsedSinceTick: null,
+            zeroHungerSinceTick: null,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    // Somebody walked back down it, and took what they were carrying. The body stays, as a dead
+    // one does: the name is still owed to everyone who knew it, and late events still land.
+    case 'agent_departed': {
+      const p = AgentDeparted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_departed for unknown agent ${p.agentId}`)
+      if (!a.alive) throw new Error(`agent_departed for a body already gone: ${p.agentId}`)
+      const { insideId: _, ...body } = a
+      const items = Object.fromEntries(
+        Object.entries(state.items).filter(
+          ([, i]) => !(i.loc.t === 'agent' && i.loc.id === p.agentId),
+        ),
+      )
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.agentId]: {
+            ...body,
+            alive: false,
+            asleep: false,
+            activity: null,
+            departed: { day: Math.floor(event.tick / MINUTES_PER_DAY) },
+          },
+        },
+        items,
       }
     }
     // The wound on the record, and only that: the hp comes off through the `agent_harmed` the
@@ -823,7 +1112,7 @@ export function fold(
         ...(sourceId === undefined ? {} : { sourceId }),
       }
       const afflictions = [...prev.filter((x) => x.kind !== p.kind), merged].sort((l, r) =>
-        l.kind.localeCompare(r.kind),
+        l.kind < r.kind ? -1 : l.kind > r.kind ? 1 : 0,
       )
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, afflictions } } }
     }
@@ -1093,7 +1382,27 @@ export function fold(
 
       const dx = p.edge === 'w' ? p.depth : 0
       const dy = p.edge === 'n' ? p.depth : 0
-      if (dx === 0 && dy === 0) return { ...state, terrain, growths }
+      // The flat grid is indexed by the map's width, so a wider or taller map re-lays it even
+      // when the origin holds still.
+      const relayTraffic = (m: number[]): number[] => {
+        const nw = terrain[0]!.length
+        const out = new Array<number>(terrain.length * nw).fill(0)
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const v = m[y * w + x] ?? 0
+            if (v !== 0) out[(y + dy) * nw + (x + dx)] = v
+          }
+        }
+        return out
+      }
+      if (dx === 0 && dy === 0) {
+        return {
+          ...state,
+          terrain,
+          growths,
+          ...(state.traffic === undefined ? {} : { traffic: relayTraffic(state.traffic) }),
+        }
+      }
 
       // Params are translated on the `{x, y}` pair every landed coordinate-taking verb uses
       // (walk, till, plant, build): a destination in the old frame is a different tile now.
@@ -1190,7 +1499,7 @@ export function fold(
         origin,
         ...(fauna === undefined ? {} : { fauna }),
         ...(forageables === undefined ? {} : { forageables }),
-        ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
+        ...(state.traffic === undefined ? {} : { traffic: relayTraffic(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
         ...(state.saplings === undefined ? {} : { saplings: shiftSaplings(state.saplings) }),
       }
@@ -1199,12 +1508,7 @@ export function fold(
     // trail the town has stopped using. Pure arithmetic over what the world already holds.
     case 'traffic_decayed': {
       TrafficDecayed.parse(event.payload)
-      const traffic: Record<string, number> = {}
-      // A tile worn back to nothing leaves the map — every reader of it is already `?? 0`.
-      for (const [key, value] of Object.entries(state.traffic ?? {})) {
-        const worn = decayTraffic(value, config)
-        if (worn > 0) traffic[key] = worn
-      }
+      const traffic = (state.traffic ?? []).map((value) => decayTraffic(value, config))
       const quietSince = quietPathsAt(
         state,
         traffic,
@@ -1212,7 +1516,8 @@ export function fold(
         config,
       )
       const next: WorldState = { ...state }
-      if (Object.keys(traffic).length > 0) next.traffic = traffic
+      // A world walked back to nothing loses the grid entirely, rather than carrying zeroes.
+      if (traffic.some((v) => v > 0)) next.traffic = traffic
       else delete next.traffic
       if (Object.keys(quietSince).length > 0) next.quietSince = quietSince
       else delete next.quietSince

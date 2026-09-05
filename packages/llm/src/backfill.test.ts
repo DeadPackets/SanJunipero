@@ -13,12 +13,18 @@ function openDb(): Database.Database {
 }
 
 /** A call the ceiling priced because its answer named no back end: 1,000 in and 1,000 out at
- *  the ceiling is $0.00176, where Baidu's own rate is $0.00042. */
-function seedUnattributed(db: Database.Database, generationId: string | null): void {
+ *  the ceiling is $0.00176, where Baidu's rate FOR THIS MODEL is $0.00019490. This fixture read
+ *  $0.00042 until 2026-09-03 — Baidu's rate on the OTHER fleet model, which is what a price
+ *  table keyed by the back end's name alone had to say. */
+function seedUnattributed(
+  db: Database.Database,
+  generationId: string | null,
+  model = 'deepseek/deepseek-v4-flash-0731',
+): void {
   insertLlmCall(db, {
     agentId: 'amara',
     caller: 'turn',
-    model: 'deepseek/deepseek-v4-flash-0731',
+    model,
     provider: null,
     generationId,
     inputTokens: 1000,
@@ -55,16 +61,19 @@ describe('★ an unattributed row is asked about, not ceiling-priced for ever', 
   it('names the back end, takes its bill, and re-prices the row off the ceiling', async () => {
     const db = openDb()
     seedUnattributed(db, 'gen-1')
-    const fetchFn = answering({ data: { provider_name: 'Baidu', total_cost: 0.00042 } })
+    const fetchFn = answering({ data: { provider_name: 'Baidu', total_cost: 0.0001949 } })
 
     const r = await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW })
 
     expect(r).toEqual({ attempted: 1, backfilled: 1 })
     const row = rowOf(db)
     expect(row.provider).toBe('Baidu')
-    expect(row.cost_usd, 'the provider bill did not become the booked cost').toBeCloseTo(0.00042, 9)
+    expect(row.cost_usd, 'the provider bill did not become the booked cost').toBeCloseTo(
+      0.0001949,
+      9,
+    )
     expect(row.estimated_cost_usd, 'the pinned table was not re-run at the real rate').toBeCloseTo(
-      0.00042,
+      0.0001949,
       9,
     )
     expect(alertKinds(db)).toEqual(['llm_price_backfilled'])
@@ -148,6 +157,43 @@ describe('★ an unattributed row is asked about, not ceiling-priced for ever', 
       backfilled: 0,
     })
     expect(asked, 'a permanently dead row was asked about for ever').toBe(1)
+  })
+
+  // ★ 25 rows the endpoint will never answer for hold the whole window: every sweep for the next
+  // hour re-asks exactly those and never reaches row 26.
+  it('★ does not re-ask a generation this run has already been refused', async () => {
+    const db = openDb()
+    seedUnattributed(db, 'gen-dead')
+    seedUnattributed(db, 'gen-live')
+    const asked: string[] = []
+    const fetchFn = (async (url: string) => {
+      asked.push(url)
+      return url.includes('gen-dead')
+        ? { ok: false, json: async () => ({}) }
+        : { ok: true, json: async () => ({ data: { provider_name: 'Baidu', total_cost: 0.0002 } }) }
+    }) as unknown as typeof fetch
+    const unclaimable = new Set<string>()
+
+    await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW, unclaimable })
+    expect([...unclaimable]).toEqual(['gen-dead'])
+
+    asked.length = 0
+    await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW, unclaimable })
+    expect(asked.join(','), 'a permanently refused row was asked about again').not.toContain(
+      'gen-dead',
+    )
+  })
+
+  // The ceiling alert was raised when the row was written; raising it again on the sweep says
+  // the same thing twice about one call.
+  it('★ does not re-raise the ceiling alert for a route the backfill still cannot price', async () => {
+    const db = openDb()
+    seedUnattributed(db, 'gen-unpriced', 'nobody/knows-this-model')
+    const fetchFn = answering({ data: { provider_name: 'Nowhere', total_cost: null } })
+
+    await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW })
+
+    expect(alertKinds(db)).toEqual(['llm_price_backfilled'])
   })
 
   it('never asks about a row that has no generation id to ask about', async () => {

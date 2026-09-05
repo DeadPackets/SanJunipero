@@ -17,3 +17,21 @@ export function localStore(): Storage | null {
     return null
   }
 }
+
+/** The tick this browser had watched up to when the tab OPENED. `socket.ts` overwrites
+ *  `sj:lastSeenTick` on the first snapshot, so anything that wants to know what the viewer
+ *  missed has to have read it before that — which is what this module-load capture is for. */
+const VISIT_WATERMARK: number | null = (() => {
+  try {
+    const raw = localStore()?.getItem('sj:lastSeenTick')
+    if (raw === null || raw === undefined) return null
+    const n = Math.floor(Number(raw))
+    return Number.isFinite(n) && n >= 0 ? n : null
+  } catch {
+    return null
+  }
+})()
+
+export function lastVisitTick(): number | null {
+  return VISIT_WATERMARK
+}

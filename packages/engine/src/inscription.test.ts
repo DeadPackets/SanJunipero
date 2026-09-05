@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, DURATION_TICKS, type SimEvent } from '@sj/shared'
 import { composePerception } from './perception.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -41,7 +41,7 @@ function world(kind = 'house', stage: 'construction' | 'complete' = 'complete'):
 // Noon: the witness radius scales with the light on the thing looked at, and ten paces at
 // midnight is past it.
 const withCarver = (s: WorldState, x: number, y: number): WorldState => ({
-  ...fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x, y, ageDays: 7300 })),
+  ...fold(s, ev('agent_spawned', { id: 'a1', name: 'Rahel', x, y, ageDays: ADULT_AGE_DAYS })),
   tick: 720,
 })
 
@@ -58,9 +58,11 @@ const apply = (s: WorldState, params: Record<string, unknown>): WorldState =>
   )
 
 describe('verb: inscribe', () => {
-  it('is a registered verb that takes three ticks — a deliberate act', () => {
+  it('is a registered verb that takes half an hour — a deliberate act', () => {
     expect(VERBS.inscribe).toBeDefined()
-    expect(VERBS.inscribe!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(3)
+    expect(VERBS.inscribe!.duration(world(), DEFAULT_CONFIG, 'a1', {})).toBe(
+      DURATION_TICKS.half_hour,
+    )
   })
 
   it('carves a house wall from just outside it', () => {

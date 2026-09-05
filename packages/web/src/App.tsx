@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, structureTitle, tickToMoment } from '@sj/shared'
 import { createWorldStore, onFirstSnapshot } from './state/worldStore.js'
 import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './net/socket.js'
@@ -15,19 +15,32 @@ import {
   SpeechLive,
   SubjectRing,
   QuietStamp,
+  SceneCard,
   SkyArc,
+  SleepCard,
   toggleFullscreen,
   useStageKeys,
   type RingVerb,
   type Subject,
 } from './stage/index.js'
 import { HelpButton } from './stage/HelpButton.js'
+import { ReplayScene } from './stage/ReplayScene.js'
+import { Transport } from './stage/Transport.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { ThoughtsButton } from './stage/ThoughtsButton.js'
+import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
+import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
+import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
+import {
+  FIRST_FRAME_COPY,
+  dismissFirstFrame,
+  fadeFirstLines,
+  firstFrameNote,
+  showFirstLines,
+} from './ui/firstFrame.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { localStore, sessionStore } from './ui/storage.js'
@@ -38,6 +51,12 @@ import { firstTab, type Arm, type PageKey } from './paper/pageModel.js'
 import type { Thing } from './paper/pages/types.js'
 
 type Sheet = { page: PageKey; tab: string }
+
+const NO_CAST: readonly string[] = []
+
+/** How many minds are alive to be watched — what the first two lines count. */
+const livingCount = (agents: Record<string, { alive: boolean }> | undefined): number =>
+  Object.values(agents ?? {}).filter((a) => a.alive).length
 
 /** Safari throttles history writes to 100 per 30 s, and 8x playback asks for sixteen a second. */
 const ADDRESS_BAR_MS = 500
@@ -52,6 +71,8 @@ function writeAddress(next: Route, now: boolean): void {
 export function App() {
   const [store] = useState(createWorldStore)
   const [route, setRoute] = useState<Route>(() => parseRoute(location.pathname, location.search))
+  // The address is written outside the updater, so two navigations in one frame still compose.
+  const routeRef = useRef(route)
   const [scene, setScene] = useState<Scene | null>(null)
   const [handle, setHandle] = useState<ObservatoryHandle | null>(null)
   const [link, setLink] = useState<LinkStatus>('connecting')
@@ -64,7 +85,16 @@ export function App() {
   const [sheet, setSheet] = useState<Sheet | null>(() =>
     route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
   )
+  // The moment being replayed, or null for a town at the live edge or held on one still.
+  const [play, setPlay] = useState<MomentPlay | null>(null)
   const [cue, setCue] = useState<string | null>(null)
+  const [why, setWhy] = useState<string | null>(null)
+  // Who the director has in frame, and the scene it is of: the card and the caption follow this
+  // one answer, so neither can name somebody the camera is not on.
+  const [shot, setShot] = useState<{ cast: readonly string[]; sceneId: string | null }>(() => ({
+    cast: NO_CAST,
+    sceneId: null,
+  }))
   const [keysOpen, setKeysOpen] = useState(false)
   const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
@@ -72,7 +102,14 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, toggle: toggleDirector } = useAutoCut(route.broadcast)
+  const { autoCut, toggle: toggleDirector } = useAutoCut()
+  const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
+  // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
+  const moment = useStageCue(store)
+  // ...and what the town is DOING. One owner for the scene's eight-second hold, so the line and
+  // the camera can never disagree about whether the summary is still up.
+  const stage = useSceneStage(store)
+  const sceneCue = sceneCueFor(stage, store.getState()?.agents)
 
   useEffect(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -85,13 +122,18 @@ export function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the connection IS the external system this effect subscribes to; the tree needs the handle the moment it exists.
     setHandle(sock)
 
-    // deep link: once the first snapshot lands, scrub to the linked moment
+    // deep link: once the first snapshot lands, play the linked moment — the same bounded window
+    // a click gets, so a shared link and a clicked line are the same thing.
     const initial = parseRoute(location.pathname, location.search)
     const offMoment =
       initial.moment === null
         ? null
         : onFirstSnapshot(store, () => {
-            sock.scrub(momentToTick(initial.moment!.day, initial.moment!.time))
+            const at = momentToTick(initial.moment!.day, initial.moment!.time)
+            if (!Number.isFinite(at)) return
+            const next = pointPlay(at, store.liveEdge(), '')
+            setPlay(next)
+            sock.replay(next.from)
           })
 
     // A person ringed beside a moment link is not a pasted `/agent/:id`, and an id the town does
@@ -109,7 +151,8 @@ export function App() {
     // The canvas picks a figure by writing the person into the address and firing popstate
     // (render/StageMount).
     const onPop = (): void => {
-      setRoute(parseRoute(location.pathname, location.search))
+      routeRef.current = parseRoute(location.pathname, location.search)
+      setRoute(routeRef.current)
     }
     window.addEventListener('popstate', onPop)
     return () => {
@@ -122,9 +165,20 @@ export function App() {
 
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
-    if (scene !== null && link === 'online') dismissFirstFrame()
-    else firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
-  }, [scene, link])
+    if (scene !== null && link === 'online') {
+      dismissFirstFrame()
+      // ...and the two lines take the card's place, over the town they are about.
+      showFirstLines(livingCount(store.getState()?.agents))
+    } else
+      firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
+  }, [scene, link, store])
+
+  // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
+  // round turn is not one: it happens the instant the town arrives, before anybody has read them.
+  const onShot = useCallback((cast: readonly string[], sceneId: string | null, cut: boolean) => {
+    if (cut) fadeFirstLines()
+    setShot({ cast, sceneId })
+  }, [])
 
   // The address bar moves without a page load, so nothing else would ever rename the tab.
   const named = subject?.kind === 'agent' && subject.id === route.agentId ? subject.name : null
@@ -143,43 +197,67 @@ export function App() {
     })
   }, [agentId, store])
 
+  const closePaper = useCallback(() => {
+    setSheet(null)
+  }, [])
+
   // Every viewed moment is shareable: a link copied mid-playback reopens that minute.
-  const goTo = useCallback(
-    (tick: number | null): void => {
-      if (tick === null) handle?.goLive()
-      else handle?.scrub(tick)
-      setRoute((prev) => {
-        const next: Route = { ...prev, moment: tick === null ? null : tickToMoment(tick) }
-        writeAddress(next, tick === null)
-        return next
-      })
-    },
-    [handle],
-  )
-  const onJump = useCallback(
+  const address = useCallback((tick: number | null): void => {
+    const next: Route = {
+      ...routeRef.current,
+      moment: tick === null ? null : tickToMoment(tick),
+    }
+    routeRef.current = next
+    writeAddress(next, tick === null)
+    setRoute(next)
+  }, [])
+
+  // SCRUB IS FOR DRAGGING, REPLAY IS FOR CLICKING. A still frame is what a finger on the
+  // filmstrip asks for; every other way into the past is a thing the viewer wants to watch.
+  const onScrub = useCallback(
     (tick: number) => {
-      goTo(tick)
+      setPlay(null) // a hand on the filmstrip has left whatever moment was running
+      handle?.scrub(tick)
+      address(tick)
     },
-    [goTo],
+    [handle, address],
+  )
+  const onPlay = useCallback(
+    (next: MomentPlay) => {
+      // The paper sits at 66% of the screen and dims the town: a replay behind it is invisible.
+      closePaper()
+      setPlay(next)
+      handle?.replay(next.from)
+      address(next.from)
+    },
+    [handle, address, closePaper],
   )
   const onLive = useCallback(() => {
-    goTo(null)
-  }, [goTo])
+    setPlay(null)
+    handle?.goLive()
+    address(null)
+  }, [handle, address])
+
+  // The moment holds its last frame rather than running on into the rest of the day.
+  const onMomentEnd = useCallback(
+    (until: number) => {
+      handle?.scrub(until)
+      address(until)
+    },
+    [handle, address],
+  )
+  useMomentEnd(store, play, onMomentEnd)
 
   const onMoment = useCallback((id: number | null) => {
-    setRoute((prev) => {
-      const next: Route = { ...prev, momentId: id }
-      writeAddress(next, true)
-      return next
-    })
+    const next: Route = { ...routeRef.current, momentId: id }
+    routeRef.current = next
+    writeAddress(next, true)
+    setRoute(next)
   }, [])
 
   const openPage = (page: PageKey, tab?: string): void => {
     setSheet({ page, tab: tab ?? firstTab(page) })
   }
-  const closePaper = useCallback(() => {
-    setSheet(null)
-  }, [])
 
   const onArm = (arm: Arm): void => {
     setSheet((prev) => (prev?.page === arm ? null : { page: arm, tab: firstTab(arm) }))
@@ -239,6 +317,14 @@ export function App() {
     scene?.bubbles?.setThoughts(thoughts)
   }, [scene, thoughts])
 
+  // ONE label over the thing a viewer picked: the nameplate. The canvas layers read the pick
+  // off the handle and stand down for it.
+  useEffect(() => {
+    if (scene === null) return
+    // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
+    scene.pickedId = subject?.id ?? null
+  }, [scene, subject])
+
   const toggleThoughts = useCallback(() => {
     const next = thoughts === 'hidden' ? 'shown' : 'hidden'
     setThoughts(next)
@@ -276,6 +362,7 @@ export function App() {
       ref={appRef}
       data-broadcast={route.broadcast ? 'on' : undefined}
       data-paper={sheet === null ? undefined : 'on'}
+      data-replay={play === null || route.broadcast ? undefined : 'on'}
     >
       <h1 className="stage-sr">San Junipero</h1>
       <a className="skip" href="#signpost">
@@ -316,6 +403,14 @@ export function App() {
           <span aria-hidden="true">← </span>Back to town
         </button>
       )}
+      {/* The stamp already names the minute and reads REPLAY; this is the one way back out of it.
+          A stream frame has no hands, and its stamp says the same thing on its own. */}
+      {!mode.live && !route.broadcast && play === null && (
+        <button type="button" className="stage-live" onClick={onLive}>
+          Return to now<span aria-hidden="true"> →</span>
+        </button>
+      )}
+      {!route.broadcast && <ReplayScene store={store} play={play} />}
       <SpeechLive store={store} />
       <Figures
         scene={scene}
@@ -328,16 +423,24 @@ export function App() {
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} />
       <QuietStamp store={store} link={link} />
-      <DirectorCue text={cue} />
-      {route.broadcast && <LowerThird store={store} />}
+      <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
+      <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />
+      <SleepCard store={store} />
+      <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
         store={store}
         scene={scene}
         autoCut={autoCut}
         pinned={following}
+        moment={play?.cast ?? NO_CAST}
         onCue={setCue}
+        onWhy={setWhy}
+        onShot={onShot}
       />
+      {!route.broadcast && (
+        <Transport store={store} play={play} handle={handle} onLive={onLive} onAt={address} />
+      )}
       <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
       <HelpButton
         open={keysOpen}
@@ -346,6 +449,7 @@ export function App() {
         }}
       />
       <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
+      <Soundscape store={store} scene={scene} />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}
@@ -363,7 +467,8 @@ export function App() {
         onClose={closePaper}
         onSubject={pickSubject}
         onInside={enterInterior}
-        onJump={onJump}
+        onScrub={onScrub}
+        onPlay={onPlay}
         onLive={onLive}
         onMoment={onMoment}
       />

@@ -55,6 +55,30 @@ describe('scanPromptForGlassLeak', () => {
   })
 })
 
+describe('the ops plane may not name itself to a mind', () => {
+  it('flags our own words for the machinery that judges the town', () => {
+    for (const word of ['arbiter', 'codex', 'ruling', 'verdict', 'schema'])
+      expect(scanPromptForGlassLeak(`the ${word} said so`), word).toContain(word)
+    // A villager courts a neighbour, models clay and calls the river a provider.
+    for (const word of ['court', 'model', 'provider'])
+      expect(scanPromptForGlassLeak(`the ${word} said so`), word).toEqual([])
+    expect(scanPromptForGlassLeak('the arbiter finds no way')).toEqual(['arbiter'])
+    expect(scanPromptForGlassLeak('no verdict allows this')).toEqual(['verdict'])
+  })
+
+  it("leaves a thing's own id alone: a mind must write it into structureId or itemId", () => {
+    expect(scanPromptForGlassLeak('the storehouse (structure_fire_pit_39_39) is warm')).toEqual([])
+    expect(assertNoGlassLeak('you hold 2 bread (item_wood_3)', 'turn')).toBe(
+      'you hold 2 bread (item_wood_3)',
+    )
+  })
+
+  it('leaves ordinary prose that merely contains a word alone', () => {
+    expect(scanPromptForGlassLeak('The courtyard was empty.')).toEqual([])
+    expect(scanPromptForGlassLeak('She modelled the clay into a bowl.')).toEqual([])
+  })
+})
+
 describe('the counsel a perception sentence may not hand over', () => {
   it('★ names a planted remedy, and leaves a fact about now alone', () => {
     expect(scanForDirective('You should go inside before the cold.')).toEqual([

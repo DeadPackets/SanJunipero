@@ -19,7 +19,14 @@ import {
   type TickHandler,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  DAYS_PER_SEASON,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  simTimeFromTick,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 // Cross-package by relative path: @sj/gateway depends on @sj/agents, so a package-level
 // dependency here would close a cycle.
 import { buildBonds } from '../../gateway/src/bonds.js'
@@ -34,8 +41,8 @@ import { makeReflectionLlm } from '../src/reflection.js'
 const LABEL = process.env.LADDER_LABEL ?? 'ladder'
 const TOTAL_TICKS = Number(process.env.LADDER_TICKS ?? 420)
 // Day 0 is SPRING (ambient 9) and nobody drops under the shiver line, so three of the six
-// behaviours cannot fire. Day 273 20:00 is the first winter night, an hour before the deep dark.
-const WINTER_NIGHT = 273 * MINUTES_PER_DAY + 20 * 60
+// behaviours cannot fire. This is the first winter night, an hour before the deep dark.
+const WINTER_NIGHT = 3 * DAYS_PER_SEASON * MINUTES_PER_DAY + 20 * 60
 const START_TICK = Number(process.env.LADDER_START_TICK ?? WINTER_NIGHT)
 const CAP_USD = Number(process.env.LADDER_CAP ?? 3.0)
 const REAL_MS_PER_TICK = Number(process.env.LADDER_MS_PER_TICK ?? 250)
@@ -315,9 +322,7 @@ async function main(): Promise<void> {
     ticks: TOTAL_TICKS,
     startTick: START_TICK,
     simHours,
-    season: ['spring', 'summer', 'autumn', 'winter'][
-      Math.floor((Math.floor(START_TICK / MINUTES_PER_DAY) % 364) / 91)
-    ],
+    season: simTimeFromTick(START_TICK).season,
     warmthAtEnd: Object.fromEntries(
       MINDS.map((m) => [m.id, Number((loop.state.agents[m.id]?.needs.warmth ?? -1).toFixed(1))]),
     ),

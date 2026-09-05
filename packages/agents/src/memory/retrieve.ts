@@ -125,6 +125,13 @@ async function retrieve(
   const rawBm25 = new Map<number, number>()
   const cosine = new Map<number, number>()
 
+  // Today's perceptions ARE the day log, which the prompt already sends in full and in order.
+  // Serving them back as memory spends the ambient slots on what is one message earlier.
+  const skipDayLog = mode === 'ambient'
+  const notDayLog = (alias: string): string =>
+    skipDayLog ? ` AND NOT (${alias}kind = 'perception' AND ${alias}day = ?)` : ''
+  const dayArgs: number[] = skipDayLog ? [Math.floor(nowTick / MINUTES_PER_DAY)] : []
+
   // Every pool stops at `nowTick`. Live that is a no-op, because nothing is written past it;
   // replaying an archived turn, it is what keeps a mind's own future out of its 50 candidates.
   const terms = keywords(query)
@@ -135,11 +142,11 @@ async function retrieve(
         `SELECT m.id AS id, bm25(memories_fts) AS raw
          FROM memories_fts
          JOIN memories m ON m.id = memories_fts.rowid
-         WHERE memories_fts MATCH ? AND m.agent_id = ? AND m.tick <= ?
+         WHERE memories_fts MATCH ? AND m.agent_id = ? AND m.tick <= ?${notDayLog('m.')}
          ORDER BY bm25(memories_fts)
          LIMIT ?`,
       )
-      .all(matchExpr, agentId, nowTick, FTS_POOL) as { id: number; raw: number }[]
+      .all(matchExpr, agentId, nowTick, ...dayArgs, FTS_POOL) as { id: number; raw: number }[]
     for (const r of rows) {
       rawBm25.set(r.id, r.raw)
       candidates.add(r.id)
@@ -153,13 +160,16 @@ async function retrieve(
         `SELECT rowid AS id, distance AS dist
          FROM memory_vec
          WHERE embedding MATCH ? AND k = ?
-           AND rowid IN (SELECT id FROM memories WHERE agent_id = ? AND tick <= ?)`,
+           AND rowid IN (
+             SELECT id FROM memories WHERE agent_id = ? AND tick <= ?${notDayLog('')}
+           )`,
       )
       .all(
         Buffer.from(qvec.buffer, qvec.byteOffset, qvec.byteLength),
         VEC_POOL,
         agentId,
         nowTick,
+        ...dayArgs,
       ) as {
       id: number
       dist: number
@@ -178,11 +188,11 @@ async function retrieve(
         `SELECT DISTINCT t.memory_id AS id
          FROM memory_tags t
          JOIN memories m ON m.id = t.memory_id
-         WHERE t.tag IN (${placeholders}) AND m.agent_id = ? AND m.tick <= ?
+         WHERE t.tag IN (${placeholders}) AND m.agent_id = ? AND m.tick <= ?${notDayLog('m.')}
          ORDER BY m.tick DESC
          LIMIT ?`,
       )
-      .all(...[...qTags], agentId, nowTick, TAG_POOL) as { id: number }[]
+      .all(...[...qTags], agentId, nowTick, ...dayArgs, TAG_POOL) as { id: number }[]
     for (const r of rows) candidates.add(r.id)
   }
 

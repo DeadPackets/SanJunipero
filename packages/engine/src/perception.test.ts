@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
 import { hears } from './earshot.js'
 import { composePerception } from './perception.js'
+import { witnessesOf } from './socialLaws.js'
 import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
@@ -21,7 +28,8 @@ function makeWorld(agents: { id: string; x: number; y: number }[]): WorldState {
   for (const a of agents)
     s = fold(
       s,
-      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 7300 }),
+      // A grown adult, counted in this world's four-week years: 7 300 days is an elder here.
+      ev('agent_spawned', { id: a.id, name: a.id, x: a.x, y: a.y, ageDays: 30 * DAYS_PER_YEAR }),
       DEFAULT_CONFIG,
     )
   return { ...s, tick: NOON }
@@ -254,7 +262,7 @@ describe('composePerception: packet shape', () => {
 
 // You cannot read a birthday off a face, but you can tell a child from an old woman.
 describe('composePerception: age reads off the body', () => {
-  const YEAR = 364 // DAYS_PER_YEAR
+  const YEAR = DAYS_PER_YEAR
   const withAge = (ageDays: number): WorldState => {
     const s = makeWorld([
       { id: 'a', x: 0, y: 0 },
@@ -576,7 +584,7 @@ describe('composePerception: ownership prose', () => {
     ])
     s = fold(
       s,
-      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: 7300 }),
+      ev('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 3, y: 0, ageDays: ADULT_AGE_DAYS }),
       DEFAULT_CONFIG,
     )
     s = fold(
@@ -703,6 +711,67 @@ describe('composePerception: witnessed takings', () => {
     expect(
       composePerception(theftWorld(), off, 'bystander', [taken('omar', 'salma', 4, 4)]).seen,
     ).toEqual([])
+  })
+})
+
+describe('composePerception: a rule the town broke', () => {
+  const LAW_TEXT = 'Nobody takes from the store after dark.'
+
+  function lawWorld(): WorldState {
+    const s = makeWorld([
+      { id: 'omar', x: 4, y: 4 },
+      { id: 'salma', x: 5, y: 4 },
+      { id: 'distant', x: 40, y: 40 },
+    ])
+    return fold(
+      s,
+      ev('law_ratified', {
+        lawId: 'law_1',
+        agentId: 'salma',
+        text: LAW_TEXT,
+        why: 'they said so',
+        predicate: { kind: 'forbid', verb: 'take' },
+        votes: { for: ['salma'], against: [] },
+      }),
+      DEFAULT_CONFIG,
+    )
+  }
+
+  const broke = (s: WorldState, breaker: string): SimEvent =>
+    ev('law_broken', {
+      lawId: 'law_1',
+      agentId: breaker,
+      verb: 'take',
+      witnesses: witnessesOf(s, DEFAULT_CONFIG, breaker),
+    })
+
+  it('everyone the breach was witnessed by is told what was done and what was agreed', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'salma', [broke(s, 'omar')]).seen).toEqual([
+      { kind: 'law_broken', breakerName: 'omar', lawText: LAW_TEXT, self: false },
+    ])
+  })
+
+  it('the breaker gets their own copy: being seen is what a forbid costs', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'omar', [broke(s, 'omar')]).seen).toEqual([
+      { kind: 'law_broken', breakerName: 'omar', lawText: LAW_TEXT, self: true },
+    ])
+  })
+
+  it('past the horizon, or behind a wall, nobody saw a thing', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'distant', [broke(s, 'omar')]).seen).toEqual([])
+    const walled = goInside(withHouse(lawWorld()), 'salma')
+    expect(
+      composePerception(walled, DEFAULT_CONFIG, 'salma', [broke(walled, 'omar')]).seen,
+    ).toEqual([])
+  })
+
+  it('names the sentence the town said and never the id it is filed under', () => {
+    const s = lawWorld()
+    const p = composePerception(s, DEFAULT_CONFIG, 'salma', [broke(s, 'omar')])
+    expect(JSON.stringify(p.seen)).not.toContain('law_1')
   })
 })
 
@@ -1349,6 +1418,7 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          }
         ]
        },
+       "stores": [],
        "heard": [
         {
          "speakerId": "b",

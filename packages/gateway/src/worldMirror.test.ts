@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
   RngStreams,
@@ -27,7 +27,7 @@ function makeWorld(dbPath: string) {
     snapshotEveryTicks: 5,
     onTick: ({ tick, emit }) => {
       if (tick === 1)
-        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'walker', name: 'walker', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
       if (tick > 1) emit('agent_moved', { id: 'walker', x: (tick - 1) % 8, y: 0 })
     },
   })

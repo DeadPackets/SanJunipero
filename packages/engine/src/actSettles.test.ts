@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, stateHash, type SimEvent } from '@sj/shared'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
@@ -18,7 +18,10 @@ function world(rows: string[] = OPEN, at = { x: 0, y: 0 }): WorldState {
     CFG,
     rows.map((row) => Array.from(row).map((c) => CHAR[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: at.x, y: at.y, ageDays: 7300 }))
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const put = (s: WorldState, type: string, payload: unknown): WorldState =>
@@ -189,7 +192,13 @@ describe('★ an act refused only for the distance is a walk with the act on its
 
   // What the world holds against the act itself is not a distance, and no walk answers it.
   it('a thing in another pair of hands is refused wherever the feet are', () => {
-    let two = put(world(), 'agent_spawned', { id: 'a2', name: 'a2', x: 5, y: 3, ageDays: 7300 })
+    let two = put(world(), 'agent_spawned', {
+      id: 'a2',
+      name: 'a2',
+      x: 5,
+      y: 3,
+      ageDays: ADULT_AGE_DAYS,
+    })
     two = put(two, 'item_spawned', {
       id: 'item_1',
       kind: 'wood',

@@ -1,12 +1,19 @@
 import { createHash } from 'node:crypto'
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, SimConfigSchema, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  SimConfigSchema,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import {
   canStep,
   findPath,
+  firstReachable,
   isPassable,
   searchPath,
   searchToward,
@@ -290,6 +297,51 @@ const ROAD_RING = ['..............', 'R............R', 'R............R', 'RRRRRR
 const costOf = (s: WorldState, path: [number, number][], config: SimConfig): number =>
   path.reduce((sum, [x, y]) => sum + stepCostAt(s, x, y, config), 0)
 
+describe('the search memo', () => {
+  const s = world(WALL_MAP)
+  const A = { x: 1, y: 1 }
+  const B = { x: 5, y: 1 }
+
+  it('serves the same ground and the same buildings, however else the world has moved on', () => {
+    const first = searchPath(s, A, B, DEFAULT_CONFIG)
+    expect(first).not.toBeNull()
+    const spawned = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      DEFAULT_CONFIG,
+    )
+    // A different world object, the same ground: the answer is the very one already found.
+    expect(searchPath(spawned, A, B, DEFAULT_CONFIG)).toBe(first)
+    expect(searchPath(s, A, B, DEFAULT_CONFIG)).toBe(first)
+  })
+
+  it('is thrown away the moment the ground or a building could have moved a route', () => {
+    const first = searchPath(s, A, B, DEFAULT_CONFIG)
+    const built = fold(
+      s,
+      ev(1, 'structure_planned', {
+        id: 'shed_1',
+        kind: 'shed',
+        x: 5,
+        y: 5,
+        w: 1,
+        h: 1,
+        maxHp: 20,
+        flammable: true,
+        builderId: 'script',
+      }),
+      DEFAULT_CONFIG,
+    )
+    expect(searchPath(built, A, B, DEFAULT_CONFIG)).not.toBe(first)
+    const paved = fold(
+      s,
+      ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 7, reason: 'paved' }),
+      DEFAULT_CONFIG,
+    )
+    expect(searchPath(paved, A, B, DEFAULT_CONFIG)).not.toBe(first)
+  })
+})
+
 describe('the A* heuristic is admissible (Task 37a)', () => {
   it('never over-estimates, so the cheapest route wins even when it is the longest', () => {
     const s = world(ROAD_RING)
@@ -400,6 +452,22 @@ describe('the A* node budget', () => {
     ])
   })
 
+  it('one drained search answers for every mark still on the list', () => {
+    const s = world(['..~..', '..~..', '..~..'])
+    const here = { x: 0, y: 0 }
+    const across = [
+      { x: 4, y: 0 },
+      { x: 3, y: 1 },
+    ]
+    expect(firstReachable(s, here, across, DEFAULT_CONFIG)).toBeNull()
+    // The mark that drained the search comes first: the flood it ran is what finds the second.
+    expect(firstReachable(s, here, [...across, { x: 1, y: 2 }], DEFAULT_CONFIG)).toEqual({
+      x: 1,
+      y: 2,
+    })
+    expect(firstReachable(s, here, [], DEFAULT_CONFIG)).toBeNull()
+  })
+
   it('a partial that goes nowhere is a refusal, not a walk of length zero', () => {
     // Every step out of (1,1) leads away from (1,3); one expansion buys no ground at all.
     const s = world(['....', '....', '.~~~', '....'])
@@ -410,7 +478,11 @@ describe('the A* node budget', () => {
   it('walk accepts the cut-short target and perception says the way is unclear', () => {
     const tight = withMaxNodes(DEFAULT_CONFIG, 200)
     let s = genesisState(tight, serpentineMaze())
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      tight,
+    )
     expect(composePerception(s, tight, 'a1', []).wayUnclear).toBeUndefined()
 
     const r = submitIntent(s, tight, 'a1', 'walk', MAZE_TO)
@@ -431,7 +503,7 @@ describe('the A* node budget', () => {
     let open = genesisState(UNBOUNDED, serpentineMaze())
     open = fold(
       open,
-      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }),
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
       UNBOUNDED,
     )
     const whole = searchPath(open, MAZE_FROM, MAZE_TO, UNBOUNDED)!
@@ -452,7 +524,11 @@ describe('the A* node budget', () => {
   it('stays unclear once the legs are moving: the stored route is the answer', () => {
     const tight = withMaxNodes(DEFAULT_CONFIG, 200)
     let s = genesisState(tight, serpentineMaze())
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), tight)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      tight,
+    )
     const partial = searchPath(s, MAZE_FROM, MAZE_TO, tight)!.path
     s = fold(
       s,
@@ -591,7 +667,11 @@ describe('build: planning a bridge', () => {
       config,
       rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 1, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     return fold(
       s,
       ev(2, 'item_spawned', {

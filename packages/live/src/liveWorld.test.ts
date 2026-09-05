@@ -1,20 +1,34 @@
 // Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
 // behind the body proves nothing about the seam.
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
-import { LlmClient, insertAlert, insertTurnOutcome, migrateLlmTables } from '@sj/llm'
+import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
+import {
+  LlmClient,
+  insertAlert,
+  insertTurnOutcome,
+  migrateLlmTables,
+  PROVIDER_ORDER,
+} from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  FOUNDER_IDS,
+  MINUTES_PER_DAY,
+  NO_PARAMS,
+  POPULATION_MAX_DEFAULT,
+  type SimEvent,
+} from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
 import { thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
+  LIVE_PHYSICS,
   LIVE_ALLOW_PROVIDER_FALLBACKS,
   LIVE_OPS_DB,
   RATE_STOP_ALERT_KIND,
@@ -22,10 +36,14 @@ import {
   capReachedRefusal,
   createLiveCast,
   dailyReachedRefusal,
+  DEFAULT_IDLE_GAP_TICKS,
+  idleGapTicks,
   ledgerTotalUsd,
+  MindsHeldError,
   preflightCostUsd,
   restorableSnapshot,
   settle,
+  trimRecognizerWindow,
 } from './liveWorld.js'
 
 // What no puppet in `founders.ts` will ever say, because `founders.ts` cannot speak at all.
@@ -46,7 +64,7 @@ const TWO: MindSpec[] = [
   {
     id: 'amara',
     sex: 'f',
-    ageDays: 34 * 364,
+    ageDays: 34 * DAYS_PER_YEAR,
     identity: {
       name: 'Amara',
       age: 34,
@@ -71,7 +89,7 @@ const TWO: MindSpec[] = [
   {
     id: 'omar',
     sex: 'm',
-    ageDays: 46 * 364,
+    ageDays: 46 * DAYS_PER_YEAR,
     identity: {
       name: 'Omar',
       age: 46,
@@ -95,6 +113,11 @@ const TWO: MindSpec[] = [
   },
 ]
 
+/** Every method the real client offers, and no private field. A stand-in typed as this owes the
+ *  seam an answer for each one: a method the client grows and this rig does not is a mind that
+ *  dies mid-turn on a `TypeError`, and the whole file reads as a town of silent bodies. */
+type FakeClient = { [K in keyof LlmClient]: LlmClient[K] }
+
 /** A model that never leaves the process: it answers each schema with the first canned value that
  *  parses. `LlmClient`'s real cost accounting is covered by `agents/src/llm/client.test.ts`. */
 function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): LlmClient {
@@ -112,7 +135,7 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     { rulings: [] }, // the recognizer's classification
     {},
   ]
-  return {
+  const client: FakeClient = {
     async object<T>(o: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }) {
       for (const c of canned) {
         const parsed = o.schema.safeParse(c)
@@ -130,10 +153,13 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     noteTurnOutcome: (outcome: { acted: boolean; spoke: boolean; planContinued: boolean }) => {
       insertTurnOutcome(db, { agentId, provider: null, ...outcome })
     },
-    forCaller() {
-      return this
-    },
-  } as unknown as LlmClient
+    // Amends the ledger row the real client wrote for the call. This rig writes no rows, so
+    // there is nothing to amend.
+    noteCallBill: () => {},
+    requestBody: () => ({}) as ReturnType<LlmClient['requestBody']>,
+    forCaller: () => client as unknown as LlmClient,
+  }
+  return client as unknown as LlmClient
 }
 
 // The tile the SCRIPTED patrol walks to on this same map, so the act a mind chooses here is one
@@ -143,18 +169,40 @@ const WELLSIDE = foundersFor(townStructuresFor('showcase')).find((f) => f.id ===
 // `VERBS` has no `smoke_fish`, so the world refuses this with `unknown verb:` and the runtime
 // re-offers it to the arbiter as freeform words. That refusal is the only doorway to spec §4.
 const INVENTED_VERB = 'smoke_fish'
-const INVENTING_TURN = {
+// A mind is asked in the closed dialect: every field of the turn present, every param key
+// answered. Written once here so a fixture can go on naming only what it means.
+const closedTurn = (t: {
+  thought: string
+  importance: number
+  speech?: string
+  action?: { verb: string; params?: Partial<typeof NO_PARAMS> }
+}): unknown => ({
+  speech: null,
+  plan: null,
+  journal: null,
+  recall: null,
+  reconsider_at: null,
+  ...t,
+  action:
+    t.action === undefined
+      ? { verb: 'wait', params: NO_PARAMS }
+      : { verb: t.action.verb, params: { ...NO_PARAMS, ...t.action.params } },
+})
+
+// A verb the grammar has no key for takes its detail through `description`, which is the one
+// slot the closed params keep for words (§2.5).
+const INVENTING_TURN = closedTurn({
   thought: THOUGHT,
   importance: 7,
-  action: { verb: INVENTED_VERB, params: { over: 'green wood' } },
-}
+  action: { verb: INVENTED_VERB, params: { description: 'green wood' } },
+})
 
 // `canon: ['food_preserving']` is an UNEARNED rung whose prerequisite (`cooking`) the genesis
 // codex knows, so `withinAdjacency` lets it through. `requires`/`costs` are empty on purpose.
 const SMOKE_RECIPE = {
   id: 'recipe:smoke_fish',
   name: 'Smoke Fish Over Green Wood',
-  durationTicks: 2,
+  takes: 'moment',
   costs: [],
   requires: [],
   outcomeTable: [
@@ -162,30 +210,44 @@ const SMOKE_RECIPE = {
       weight: 1,
       success: true,
       label: 'The fish darkens and firms in the smoke.',
-      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'smoked_fish', qty: 1 }],
     },
   ],
   rngStream: 'recipe:smoke_fish',
   canon: ['food_preserving'],
 }
+// The court is asked in the strict dialect: the verdict rides wrapped and every absent key is
+// written null, which `readRuling` takes back out before anything downstream sees one.
 const SMOKE_VERDICT = {
-  kind: 'attempt',
-  recipe: SMOKE_RECIPE,
-  summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
+  verdict: {
+    kind: 'attempt',
+    recipe: {
+      ...SMOKE_RECIPE,
+      skillCheck: null,
+      outcomeTable: SMOKE_RECIPE.outcomeTable.map((row) => ({
+        ...row,
+        effects: row.effects.map((e) => (e.op === 'spawn_item' ? { ...e, durability: null } : e)),
+      })),
+    },
+    summary: 'Hang the fish in the smoke of green wood so it keeps past the week.',
+    unlocks: null,
+  },
 }
 const REFUSING_VERDICT = {
-  kind: 'impossible',
-  class: 'insufficient_skill',
-  reason: 'the smoke will not hold without a knack for it nobody here has shown',
+  verdict: {
+    kind: 'impossible',
+    class: 'insufficient_skill',
+    reason: 'the smoke will not hold without a knack for it nobody here has shown',
+  },
 }
 
-const SPEAKING_TURN = {
+const SPEAKING_TURN = closedTurn({
   thought: THOUGHT,
   importance: 5,
   speech: SPOKEN,
   action: { verb: 'walk', params: { x: WELLSIDE.x, y: WELLSIDE.y } },
-}
-const SILENT_TURN = { thought: THOUGHT, importance: 2 }
+})
+const SILENT_TURN = closedTurn({ thought: THOUGHT, importance: 2 })
 
 // Every mind turns on the tick it is asked to, so a row does not have to step out the 120-tick
 // boredom floor five times over.
@@ -246,12 +308,14 @@ async function liveWorld(opts: {
   rateWindowRealMinutes?: number
   spendAlertRealMinutes?: number
   fresh?: boolean
+  maxMinds?: number
   /** What the god answers. Absent, the arbiter caller gets the same canned client as a mind,
    *  which fits no verdict schema and therefore THROWS — which is the failure row below. */
   verdict?: unknown
   useArbiter?: boolean
   /** Where the day's chapter is written. Absent, no day is narrated. */
   narratorDbPath?: string
+  log?: (line: string) => void
 }): Promise<{
   world: DevWorld
   cast: LiveCast
@@ -277,6 +341,7 @@ async function liveWorld(opts: {
         minds: opts.minds ?? TWO,
         ...(opts.narratorDbPath === undefined ? {} : { narratorDbPath: opts.narratorDbPath }),
         preflight: false,
+        ...(opts.maxMinds === undefined ? {} : { maxMinds: opts.maxMinds }),
         embedder: new FakeEmbedder(),
         mindConfig: EAGER,
         ...(opts.spendCapUsd === undefined ? {} : { spendCapUsd: opts.spendCapUsd }),
@@ -288,7 +353,7 @@ async function liveWorld(opts: {
         ...(opts.spendAlertRealMinutes === undefined
           ? {}
           : { spendAlertRealMinutes: opts.spendAlertRealMinutes }),
-        log: () => {},
+        log: opts.log ?? (() => {}),
         ...(opts.useArbiter === undefined ? {} : { useArbiter: opts.useArbiter }),
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
@@ -336,6 +401,15 @@ function thoughtTexts(dir: string): string[] {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
     return thoughtsSince(db, 0).map((t) => t.text)
+  } finally {
+    db.close()
+  }
+}
+
+function thinkers(dir: string): Set<string> {
+  const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
+  try {
+    return new Set(thoughtsSince(db, 0).map((t) => t.agentId))
   } finally {
     db.close()
   }
@@ -558,12 +632,45 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now() - 60 * 60 * 1000, 0.06)
     await run(world, 10)
     expect(stops).toHaveLength(1)
+    // The pair the DAY was judged on, not the lifetime one: $40 of yesterday is in neither.
+    expect(stops[0]!.cap, 'the daily stop reported the lifetime cap').toBe(0.05)
+    expect(stops[0]!.spent).toBeGreaterThanOrEqual(0.06)
+    expect(stops[0]!.spent, 'the daily stop reported the lifetime total').toBeLessThan(40)
     expect(ledgerTotalUsd(opsDb), 'and the lifetime total was never the trigger').toBeLessThan(50)
 
     const atStop = eventsOf(dir, 'agent_spoke').length
     await run(world, 10)
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
+
+  // ★ 25 unclaimed rows at a 10 s fetch each is four minutes in front of the run's three reports,
+  // inside a 20 s stop grace: the container SIGKILLs the process and the reports never run.
+  it('★ closes inside the container’s grace when the price sweep will not answer', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'a-key-for-a-sweep-that-hangs')
+    vi.stubGlobal('fetch', () => new Promise(() => {}))
+    try {
+      const dir = tmp()
+      const { world, opsDb } = await liveWorld({ dir })
+      await run(world, 2)
+      opsDb
+        .prepare(
+          `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error, provider, generation_id)
+         VALUES (?, NULL, 'turn', 'm', 10, 10, 0, 0, 0.001, 5, 1, NULL, NULL, 'gen-unanswered')`,
+        )
+        .run(Date.now() - 60_000)
+
+      const started = Date.now()
+      await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+      expect(Date.now() - started, 'the sweep held the close open past the grace').toBeLessThan(
+        15_000,
+      )
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  }, 60_000)
 
   it('refuses a boot that is already over the day, before the pre-flight spends a cent', async () => {
     const dir = tmp()
@@ -572,7 +679,10 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now(), 0.4)
     await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
 
+    // Typed, not bare: `serve.ts` boots the town scripted on this one and refuses on every other
+    // failure, so a spent day costs the viewer nothing.
     await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toThrow(/daily budget/)
+    await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toBeInstanceOf(MindsHeldError)
   }, 60_000)
 
   // A run that never reconciles is a run whose dollar figures have no second opinion. The stale
@@ -693,9 +803,10 @@ describe('★ the money, inside the served world', () => {
       onSpendStop: (spent, cap) => stops.push({ spent, cap }),
     })
     // Run C's measured 4.7 calls a mind a sim-hour, for two minds over a 12-sim-hour window,
-    // and a nightly reflection burst on top of it.
+    // a nightly reflection burst on top of it, and the ledger's share of lines said out loud.
     callsTo(opsDb, 'turn', 113)
     callsTo(opsDb, 'reflection', 12)
+    callsTo(opsDb, 'scene', 70)
 
     await run(world, 20)
     expect(stops, 'the tripwire fired on an ordinary night').toHaveLength(0)
@@ -744,7 +855,7 @@ describe('★ the money, inside the served world', () => {
     const mix = alertsOf(opsDb, 'llm_provider_off_allow_list')
     expect(mix.length, 'the routing left the pin and nobody was told').toBeGreaterThan(0)
     expect(mix[0]).toContain('Baidu 1')
-    expect(mix[0]).toContain('[Wafer, DeepInfra]')
+    expect(mix[0]).toContain(`[${PROVIDER_ORDER.join(', ')}]`)
     expect(mix[0]).toContain('$0.0100')
     expect(stops, 'a leaked back end must never stop a town').toHaveLength(0)
   }, 40_000)
@@ -944,6 +1055,81 @@ describe("★ a mind's memory across a resume", () => {
   })
 })
 
+describe('★ the founding of twelve, under a flat cap of twenty', () => {
+  it("boots a mind for every founder, and the ceiling is the town's and not a multiple of the cast", async () => {
+    const dir = tmp()
+    const lines: string[] = []
+    const { world, opsDb } = await liveWorld({
+      dir,
+      minds: [...FOUNDER_MINDS],
+      log: (l) => lines.push(l),
+    })
+    await run(world, 4)
+
+    expect(lines.find((l) => l.startsWith('stream: LIVE'))).toContain('12 of at most 20 minds')
+    expect(alertsOf(opsDb, 'cast_at_max_minds')).toEqual([])
+    expect(
+      eventsOf(dir, 'agent_spawned')
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual([...FOUNDER_IDS].sort())
+    // Every one of the twelve took a turn: a body with no mind behind it stands still for ever.
+    expect([...thinkers(dir)].sort()).toEqual([...FOUNDER_IDS].sort())
+  }, 60_000)
+})
+
+describe('★ the physics a live town runs on', () => {
+  it('lays down faster hunger and shorter fuel as laws at Day 0, once', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    const laid = (): Record<string, unknown>[] =>
+      eventsOf(dir, 'config_changed').filter(
+        (p) => typeof p.path === 'string' && p.path in LIVE_PHYSICS,
+      )
+    expect(laid()).toEqual(Object.entries(LIVE_PHYSICS).map(([path, value]) => ({ path, value })))
+    await world.stop()
+    worlds.pop()
+    const { world: again } = await liveWorld({ dir })
+    await run(again, 3)
+    expect(laid()).toHaveLength(Object.keys(LIVE_PHYSICS).length)
+  })
+})
+
+describe('★ the ceiling as a world law', () => {
+  it('announces it once at attach, and not again on a resume that has not moved it', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    const capped = (): Record<string, unknown>[] =>
+      eventsOf(dir, 'config_changed').filter((p) => p.path === 'population.maxMinds')
+    expect(capped()).toEqual([{ path: 'population.maxMinds', value: POPULATION_MAX_DEFAULT }])
+    await world.stop()
+    worlds.pop()
+
+    // The same town, opened again with the same ceiling: the law already stands.
+    const { world: again } = await liveWorld({ dir })
+    await run(again, 3)
+    expect(capped()).toHaveLength(1)
+  }, 60_000)
+
+  it('announces the new one when the operator moves it', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 3)
+    await world.stop()
+    worlds.pop()
+
+    const { world: again } = await liveWorld({ dir, maxMinds: 4 })
+    await run(again, 3)
+    expect(
+      eventsOf(dir, 'config_changed')
+        .filter((p) => p.path === 'population.maxMinds')
+        .map((p) => p.value),
+    ).toEqual([POPULATION_MAX_DEFAULT, 4])
+  }, 60_000)
+})
+
 describe('★ what the first live boot broke', () => {
   it('the fresh wipe runs BEFORE the cast opens anything, so the ledger is still on disk', async () => {
     const dir = tmp()
@@ -1103,7 +1289,7 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     const said = memoriesOf(dir, 'amara')
     expect(said.some((t) => t.startsWith('You realize you cannot:'))).toBe(true)
     // `insufficient_skill` earns the one sanctioned door — a refusal must leave one open.
-    expect(said.some((t) => t.includes('perhaps someone nearby knows the craft'))).toBe(true)
+    expect(said.some((t) => t.includes('Maybe someone nearby knows the craft'))).toBe(true)
     // And nothing was codified: a refusal must not mint physics.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)
@@ -1118,11 +1304,12 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
     // The failure was recorded where an operator looks...
     const alerts = opsDb.prepare("SELECT kind FROM alerts WHERE kind = 'adjudicate_failed'").all()
     expect(alerts.length).toBeGreaterThan(0)
-    // ...and the intent still reached the world as `experiment`, which never starts an activity
-    // (`validate()` always declines), so the perceivable outcome is a memory, not an event.
-    expect(
-      memoriesOf(dir, 'amara').some((t) => t.includes('You lack the knowledge to attempt this')),
-    ).toBe(true)
+    // ...and the mind was told only that the try did not begin: no verb the world lacks, no
+    // machinery word, reached its memory.
+    for (const text of memoriesOf(dir, 'amara')) {
+      expect(text).not.toContain('unknown verb')
+      expect(text).not.toContain('experiment')
+    }
     // A god that fell over must not have minted law on the way down.
     expect(rulebookOf(dir)).toHaveLength(0)
   }, 30_000)
@@ -1288,4 +1475,52 @@ describe('★ the chronicle, written on the day boundary', () => {
     expect(narratorRows(dir, 'SELECT day FROM chapters')).toEqual([])
     expect(narratorRows(dir, 'SELECT day FROM publications')).toEqual([])
   }, 120_000)
+})
+
+// ★ Every tile a body crosses is a row, and the array held all of them since boot — the whole
+// log on a resumed town — inside a 1.5 GB container, re-walked whole at every day boundary.
+describe('★ the recognizer holds the window it reads, not the town’s whole life', () => {
+  const moved = (day: number): SimEvent => ({
+    seq: day,
+    tick: day * MINUTES_PER_DAY,
+    type: 'agent_moved',
+    payload: {},
+  })
+
+  it('drops the days no gathering can still be joined to', () => {
+    const events = Array.from({ length: 30 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 29 * MINUTES_PER_DAY, 7)
+    expect(events.map((e) => e.tick / MINUTES_PER_DAY)).toEqual([
+      21, 22, 23, 24, 25, 26, 27, 28, 29,
+    ])
+  })
+
+  // A stopped town keeps ticking — that is the design — and the rate window's trim sits behind
+  // an early return it never passes. Nothing reads the array after a stop, so the guard is the
+  // only thing there is to hold on to.
+  it('stops sampling the rate window once the minds are stopped', () => {
+    const src = readFileSync(new URL('./liveWorld.ts', import.meta.url), 'utf8')
+    expect(src).toContain('if (!stopped) tickHistory.push(')
+  })
+
+  it('leaves a town younger than the window untouched', () => {
+    const events = Array.from({ length: 4 }, (_, day) => moved(day))
+    trimRecognizerWindow(events, 3 * MINUTES_PER_DAY, 7)
+    expect(events).toHaveLength(4)
+  })
+})
+
+describe('★ the liveliness dial', () => {
+  it('defaults to acting four times an hour, not twice', () => {
+    expect(idleGapTicks({})).toBe(DEFAULT_IDLE_GAP_TICKS)
+    expect(DEFAULT_IDLE_GAP_TICKS).toBe(15)
+  })
+
+  it('takes SJ_IDLE_GAP, and ignores what cannot be a gap', () => {
+    expect(idleGapTicks({ SJ_IDLE_GAP: '45' })).toBe(45)
+    expect(idleGapTicks({ SJ_IDLE_GAP: '7.9' })).toBe(7)
+    for (const bad of ['0', '-5', 'lively', '']) {
+      expect(idleGapTicks({ SJ_IDLE_GAP: bad }), bad).toBe(DEFAULT_IDLE_GAP_TICKS)
+    }
+  })
 })

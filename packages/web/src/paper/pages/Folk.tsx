@@ -1,9 +1,9 @@
-import { Suspense, lazy, useState, useSyncExternalStore } from 'react'
+import { Suspense, lazy, useMemo, useState, useSyncExternalStore } from 'react'
 import { agentName, personWords, tickToMoment } from '@sj/shared'
 import { actsOf, becomingOf as buildBecoming, type Becoming } from '../../ui/roster/expand.js'
 import { rosterRows2, sortRoster, type RosterSort } from '../../ui/roster/rosterRow.js'
 import { EMPTY_LINEAGE } from '../../ui/bondModel2.js'
-import { changeLog, type PersonalityRow } from '../../ui/becoming.js'
+import { changeLog, personalityRows, type PersonalityRow } from '../../ui/becoming.js'
 import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
@@ -15,8 +15,6 @@ import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NO_CHANGES: PersonalityRow[] = []
-const personalityRows = (body: unknown): PersonalityRow[] =>
-  Array.isArray(body) ? (body as PersonalityRow[]) : []
 
 // react-force-graph-2d is ~180 KB the roster and the chronicle never reach.
 const BondsGraph = lazy(() => import('./BondsGraph.js').then((m) => ({ default: m.BondsGraph })))
@@ -48,20 +46,20 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       personalityRows,
     ).data ?? NO_CHANGES
 
+  const records = store.assetRecords()
+  const events = store.recentEvents()
+  const earshot = store.getConfig()?.movement.earshotRadius
+  // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
+  // The whole fold is one array allocation per person, so opening a row must not redo it.
+  const byName = useMemo(
+    () => (state === null ? [] : rosterRows2(state, records, bonds, tick, events, earshot)),
+    [state, records, bonds, tick, events, earshot],
+  )
+
   if (state === null) return <Skeleton rows={5} />
 
-  // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
-  const byName = rosterRows2(
-    state,
-    store.assetRecords(),
-    bonds,
-    tick,
-    store.recentEvents(),
-    store.getConfig()?.movement.earshotRadius,
-  )
   const rows = sort === 'name' ? byName : sortRoster(byName, sort)
   const people = Object.fromEntries(Object.values(state.agents).map((a) => [a.id, a.name]))
-  const events = store.recentEvents()
 
   const becomingOf = (agentId: string): Becoming =>
     buildBecoming({
@@ -79,7 +77,9 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   return (
     <RosterListView
       rows={rows}
-      gone={Object.values(state.agents).filter((a) => !a.alive).length}
+      // Somebody who walked down the valley road is not resting in anybody's memory.
+      gone={Object.values(state.agents).filter((a) => !a.alive && a.departed === undefined).length}
+      left={Object.values(state.agents).filter((a) => a.departed !== undefined).length}
       sort={sort}
       openId={openId}
       becomingOf={becomingOf}

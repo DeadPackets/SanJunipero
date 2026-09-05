@@ -58,10 +58,12 @@
     },
     "packages/gateway": {
       "entry": [
-        "src/**/*.test.ts"
+        "src/**/*.test.ts",
+        "scripts/*.ts"
       ],
       "project": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "scripts/**/*.ts"
       ]
     },
     "packages/live": {
@@ -93,5 +95,8 @@
   },
   "rules": {
     "duplicates": "warn"
-  }
+  },
+  "ignoreDependencies": [
+    "playwright-core"
+  ]
 }

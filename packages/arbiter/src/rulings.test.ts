@@ -68,7 +68,7 @@ function boilSaltVerdict(): Verdict {
     recipe: {
       id: 'recipe:boil_salt',
       name: 'Boil Salt',
-      durationTicks: 5,
+      takes: 'minutes',
       costs: [],
       requires: [{ type: 'adjacent_fire' }],
       outcomeTable: [
@@ -76,7 +76,7 @@ function boilSaltVerdict(): Verdict {
           weight: 1,
           success: true,
           label: 'A crust of salt forms.',
-          effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
         },
       ],
       rngStream: 'recipe:boil_salt',
@@ -92,7 +92,7 @@ function copperVerdict(): Verdict {
     recipe: {
       id: 'recipe:copper',
       name: 'Smelt Copper',
-      durationTicks: 8,
+      takes: 'minutes',
       costs: [],
       requires: [{ type: 'adjacent_fire' }],
       outcomeTable: [
@@ -100,7 +100,7 @@ function copperVerdict(): Verdict {
           weight: 1,
           success: true,
           label: 'Copper beads out of the ore.',
-          effects: [{ op: 'spawn_item', kind: 'copper', qty: 1, to: 'agent' }],
+          effects: [{ op: 'spawn_item', kind: 'copper', qty: 1 }],
         },
       ],
       rngStream: 'recipe:copper',

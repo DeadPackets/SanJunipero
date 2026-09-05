@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
-import { dayPhaseFromTick, FORBIDDEN_FRAMING, MINUTES_PER_DAY } from '@sj/shared'
+import { CLOSED_KEYS, dayPhaseFromTick, FORBIDDEN_FRAMING, MINUTES_PER_DAY } from '@sj/shared'
+import { strictModeFaults } from '@sj/shared/testutil'
 import { z } from 'zod'
 import * as engine from '@sj/engine'
-import { IntentParamsSchema } from '@sj/engine/verbs'
 import {
   FALLBACK_TURN,
   IntentSchema,
+  StrictTurnSchema,
   TurnSchema,
+  TurnSchemaActionRequired,
   actWithoutItsDetail,
+  BODY_NOOPS,
+  fromClosed,
   parseTurnWithRepair,
+  readMindTurn,
   reconsiderTick,
 } from './turn.js'
+import { SCENE_ANSWER } from './scene/sceneLlm.js'
 
 const validTurn = {
   thought: 'The well is low; I should fetch water before noon.',
@@ -114,6 +120,13 @@ describe('TurnSchema', () => {
     }
     expect((shape.reconsider_at as z.ZodType).description).toMatch(/\d{2}:\d{2}/)
   })
+
+  // A turn's output tokens bill 15 to 20 times a cached input token, and the field with no
+  // bound at all was the one the mind writes most freely in. The scene path already said it.
+  it('bounds the length of a thought, as the scene prompt already does', () => {
+    expect((TurnSchema.shape.thought as z.ZodType).description).toContain('one or two sentences')
+    expect(SCENE_ANSWER).toContain('thought is one short line')
+  })
 })
 
 // Every parameter shape a registered Tier-1 verb reads. `ExpressiveParams` is not reachable
@@ -125,7 +138,7 @@ const enginePlaces = Object.entries(engine as Record<string, unknown>)
 describe('IntentSchema.params emits a grammar a constrained decoder can compile', () => {
   it('names every parameter every registered verb reads', () => {
     expect(enginePlaces.length).toBeGreaterThan(20)
-    const named = new Set(Object.keys(IntentParamsSchema.shape))
+    const named = new Set<string>(CLOSED_KEYS)
     for (const [verbSchema, keys] of enginePlaces) {
       for (const key of keys) expect(named, `${verbSchema}.${key}`).toContain(key)
     }
@@ -140,9 +153,15 @@ describe('IntentSchema.params emits a grammar a constrained decoder can compile'
     }
   })
 
-  it('still carries a parameter nobody has written down yet, for a verb minted at runtime', () => {
-    const parsed = IntentSchema.parse({ verb: 'recipe:spoon', params: { whittledFrom: 'ash' } })
-    expect(parsed.params).toEqual({ whittledFrom: 'ash' })
+  it('takes a verb nobody has written down yet, and only the keys the grammar names', () => {
+    // Keys are grammar, verbs are lexicon: a minted verb costs nothing, a fourteenth key does
+    // not exist, and what such a verb needs it takes through `text` or `description`.
+    expect(IntentSchema.parse({ verb: 'recipe:spoon', params: { kind: 'ash' } }).verb).toBe(
+      'recipe:spoon',
+    )
+    expect(
+      IntentSchema.safeParse({ verb: 'recipe:spoon', params: { whittledFrom: 'ash' } }).success,
+    ).toBe(false)
   })
 
   it('keeps the params every real act passes', () => {
@@ -156,6 +175,153 @@ describe('IntentSchema.params emits a grammar a constrained decoder can compile'
     expect(
       IntentSchema.parse({ verb: 'build', params: { kind: 'house', x: 1, y: 2 } }).params,
     ).toEqual({ kind: 'house', x: 1, y: 2 })
+  })
+})
+
+const PARAM_KEYS: string[] = [...CLOSED_KEYS]
+const allNull = (): Record<string, unknown> => Object.fromEntries(PARAM_KEYS.map((k) => [k, null]))
+const strictTurn = (verb: string, params: Record<string, unknown>): Record<string, unknown> => ({
+  thought: 'the well is low; I should fetch water before noon',
+  speech: null,
+  action: { verb, params, freeform: null },
+  plan: null,
+  journal: null,
+  recall: null,
+  importance: 4,
+  reconsider_at: null,
+})
+// A number where the verb wants one, a word everywhere else.
+const sample = (key: string): string | number => (key === 'x' || key === 'y' ? 3 : `${key}-1`)
+
+describe('the closed turn a strict json_schema decoder can be handed', () => {
+  it('asks for every key the grammar names, and takes no other', () => {
+    expect(StrictTurnSchema.safeParse(strictTurn('sleep', allNull())).success).toBe(true)
+    for (const key of PARAM_KEYS) {
+      const { [key]: _left, ...missing } = allNull()
+      expect(StrictTurnSchema.safeParse(strictTurn('sleep', missing)).success, key).toBe(false)
+    }
+    const extra = { ...allNull(), whittledFrom: 'ash' }
+    expect(StrictTurnSchema.safeParse(strictTurn('recipe:spoon', extra)).success).toBe(false)
+  })
+
+  it('emits a schema a strict decoder accepts, in the direction the ai SDK converts', () => {
+    // The ai SDK emits at `io: 'input'`; `io: 'output'` is checked too so no later `.default()`
+    // can quietly drop a key out of `required` in one direction only.
+    for (const io of ['input', 'output'] as const) {
+      expect(strictModeFaults(z.toJSONSchema(StrictTurnSchema, { io })), io).toEqual([])
+    }
+    // The refusal this exists to answer: the runtime's own shape leaves fields optional.
+    expect(strictModeFaults(z.toJSONSchema(TurnSchema, { io: 'output' })).length).toBeGreaterThan(0)
+  })
+
+  it('round-trips every parameter every registered verb reads, into the shape it parses', () => {
+    for (const [verbSchema, keys] of enginePlaces) {
+      const asked = Object.fromEntries(keys.map((k) => [k, sample(k)]))
+      const strict = strictTurn('act', { ...allNull(), ...asked })
+      expect(StrictTurnSchema.safeParse(strict).success, verbSchema).toBe(true)
+      const turn = TurnSchemaActionRequired.parse(fromClosed(strict))
+      expect(turn.action, verbSchema).toEqual({ verb: 'act', params: asked })
+      // Each verb parses a `.strict()` schema of its own keys, so what comes back through the
+      // seam must satisfy it and the null-filled answer must not.
+      const shape = (engine as unknown as Record<string, z.ZodObject>)[verbSchema]!
+      expect(shape.safeParse(asked).success, verbSchema).toBe(true)
+      expect(shape.safeParse({ ...allNull(), ...asked }).success, verbSchema).toBe(false)
+    }
+  })
+
+  it('reads an act that asks for nothing, and a plan of them, as nothing named', () => {
+    const strict = {
+      ...strictTurn('sleep', allNull()),
+      plan: [{ verb: 'wake', params: allNull() }],
+    }
+    const turn = TurnSchemaActionRequired.parse(fromClosed(strict))
+    expect(turn.action).toEqual({ verb: 'sleep', params: {} })
+    expect(turn.plan).toEqual([{ verb: 'wake', params: {} }])
+  })
+
+  it('is the one dialect a mind is asked in, and the reader takes exactly its answers', () => {
+    const answer = strictTurn('walk', { ...allNull(), x: 4, y: 9 })
+    expect(StrictTurnSchema.safeParse(answer).success).toBe(true)
+    const read = readMindTurn(answer)
+    expect(read.success).toBe(true)
+    expect(read.data?.action).toEqual({ verb: 'walk', params: { x: 4, y: 9 } })
+  })
+})
+
+// ★ A union of two object shapes and a regex are the two schema features a grammar-constrained
+// back end is likeliest to drop or refuse. The turn had one of each; neither is asked for now,
+// and `fromClosed` hands the runtime the shapes it always read.
+describe('the flattened ask, and the normalizer that reads it back', () => {
+  const shapeUnions = (node: unknown): number => {
+    if (Array.isArray(node)) return node.reduce<number>((n, v) => n + shapeUnions(v), 0)
+    if (node === null || typeof node !== 'object') return 0
+    const o = node as Record<string, unknown>
+    const here =
+      Array.isArray(o.anyOf) &&
+      (o.anyOf as Record<string, unknown>[]).filter((b) => b.type !== 'null').length > 1
+        ? 1
+        : 0
+    return Object.values(o).reduce<number>((n, v) => n + shapeUnions(v), here)
+  }
+
+  it('asks for no choice between two shapes, and holds no string to a pattern', () => {
+    for (const io of ['input', 'output'] as const) {
+      const emitted = z.toJSONSchema(StrictTurnSchema, { io })
+      expect(shapeUnions(emitted), io).toBe(0)
+      expect(JSON.stringify(emitted), io).not.toContain('pattern')
+    }
+    // The shape it replaced, for the measurement: the runtime's own turn still holds both.
+    expect(shapeUnions(z.toJSONSchema(TurnSchema, { io: 'input' }))).toBeGreaterThan(0)
+    expect(JSON.stringify(z.toJSONSchema(TurnSchema, { io: 'input' }))).toContain('pattern')
+  })
+
+  const flat = (over: Record<string, unknown>): Record<string, unknown> => ({
+    ...strictTurn('wait', allNull()),
+    ...over,
+  })
+
+  it('reads a named verb back as the act the world takes, freeform and all', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: 'eat', params: { ...allNull(), itemId: 'i1' }, freeform: null } }),
+    )
+    expect(read.data?.action).toEqual({ verb: 'eat', params: { itemId: 'i1' } })
+  })
+
+  it('reads words of its own back as the freeform try it always was', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: null, params: allNull(), freeform: 'weave a basket' } }),
+    )
+    expect(read.data?.action).toEqual({ freeform: 'weave a basket' })
+  })
+
+  it('lets the named verb win when a mind fills in both', () => {
+    const read = readMindTurn(
+      flat({ action: { verb: 'sleep', params: allNull(), freeform: 'lie down' } }),
+    )
+    expect(read.data?.action).toEqual({ verb: 'sleep', params: {} })
+  })
+
+  it('an act that named neither is the null the runtime has always read', () => {
+    expect(fromClosed(flat({ action: { verb: null, params: allNull(), freeform: null } }))).toEqual(
+      expect.objectContaining({ action: null }),
+    )
+  })
+
+  it('reads a clock time back as the string, and pads the loose hour a decoder no longer holds', () => {
+    const at = (over: Record<string, unknown>): unknown =>
+      readMindTurn(flat({ reconsider_at: { time: null, day: null, phase: null, ...over } })).data
+        ?.reconsider_at
+    expect(at({ time: '08:30' })).toBe('08:30')
+    expect(at({ time: '9:30' })).toBe('09:30')
+    expect(at({ day: 12, phase: 'dusk' })).toEqual({ day: 12, phase: 'dusk' })
+    expect(at({})).toBeNull()
+  })
+
+  it('leaves an answer in the older two-shape dialect exactly as it found it', () => {
+    expect(readMindTurn(validTurn).data?.reconsider_at).toBe('14:30')
+    expect(readMindTurn({ ...validTurn, action: { freeform: 'whittle' } }).data?.action).toEqual({
+      freeform: 'whittle',
+    })
   })
 })
 
@@ -341,7 +507,7 @@ describe('an act with nothing named in it', () => {
   })
 
   it('is not raised for an act that asks for nothing, nor for one that is filled', () => {
-    for (const verb of ['sleep', 'wake', 'exit', 'doff', 'drink', 'forage']) {
+    for (const verb of ['sleep', 'wake', 'stop', 'exit', 'doff', 'drink', 'forage']) {
       expect(actWithoutItsDetail(turn({ verb, params: {} })), verb).toBeNull()
     }
     expect(
@@ -350,6 +516,20 @@ describe('an act with nothing named in it', () => {
     expect(actWithoutItsDetail(turn({ verb: 'walk', params: { x: 0, y: 0 } }))).toBeNull()
     expect(actWithoutItsDetail(turn({ freeform: 'I lean on the fence and watch' }))).toBeNull()
     expect(actWithoutItsDetail(TurnSchema.parse({ ...validTurn, action: null }))).toBeNull()
+  })
+
+  // Run D's own evidence: the runtime keeps a set of ten words for standing still, so minds do
+  // answer with them. Each one used to buy a full-prompt repair before the world shrugged it off.
+  it('is not raised for a word for standing still, which buys no second call', async () => {
+    for (const verb of BODY_NOOPS) {
+      expect(actWithoutItsDetail(turn({ verb, params: {} })), verb).toBeNull()
+      const answer = await parseTurnWithRepair(
+        { ...validTurn, plan: null, action: { verb, params: {} } },
+        () => Promise.reject(new Error(`${verb} asked for a repair`)),
+        () => {},
+      )
+      expect(answer.thought, verb).toBe(validTurn.thought)
+    }
   })
 
   it('cannot arrive as a blank string at all: the decoder is given the floor', () => {

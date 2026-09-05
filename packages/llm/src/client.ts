@@ -17,10 +17,13 @@ import {
   insertLlmCall,
   insertTurnOutcome,
   makeBudgetGuard,
+  mergeBlockTokens,
+  oldestCallTsSince,
   sumCostUsd,
   type BudgetGuard,
   type LlmCallInsert,
 } from './callLog.js'
+import { railHold, tripRail, RAIL_WINDOW_MS } from './rails.js'
 import { bookCostUsd, computeCostUsd } from './pricing.js'
 import {
   FALLBACK_MODELS,
@@ -43,6 +46,14 @@ export type LlmUsage = {
 }
 
 export type LlmMessage = { role: 'user' | 'assistant'; content: string }
+
+/** Why this call was made and what it sent, carried onto the row whichever way the call ends —
+ *  a call that came back with nothing is the one this most needs to explain. */
+export type CallBill = {
+  wakeReason?: string | null
+  wakeReasons?: readonly string[] | null
+  blockTokens?: Record<string, number> | null
+}
 
 /** What one attempt is known to have done, recorded the moment the provider answers and BEFORE
  *  the value is read: a generation that answered but produced no output still billed its
@@ -76,6 +87,22 @@ function stepFacts(r: GeneratedStep): StepFacts {
 }
 
 export class BudgetExceededError extends Error {}
+
+/** One caller has spent its own day. Its calls are refused and every other caller keeps going:
+ *  a `turn` refusal dozes one mind, a `scene` refusal times one floor out, and the town runs. */
+export class CallerRailError extends BudgetExceededError {
+  constructor(
+    readonly caller: string,
+    readonly spentUsd: number,
+    readonly railUsd: number,
+    readonly untilMs: number,
+  ) {
+    super(
+      `LLM caller rail reached for '${caller}': spent $${spentUsd.toFixed(4)} of` +
+        ` $${railUsd.toFixed(2)} for the day; held until ${new Date(untilMs).toISOString()}`,
+    )
+  }
+}
 
 // The provider's own bytes from a generation the schema refused. Anything else is not a wrong
 // answer and must never be re-asked.
@@ -153,6 +180,9 @@ export type LlmClientOpts = {
   transport?: 'response_format' | 'tool'
   // Tool transport only. 'named' forces the turn tool; Z.AI-class endpoints 404 on anything but auto.
   toolChoice?: 'named' | 'auto'
+  // 'ops' is a prompt no mind reads, whose question is made of the ops plane's own words — the
+  // recognisers. Sealed by default, so a caller nobody has thought about yet is a mind's.
+  audience?: 'mind' | 'ops'
 }
 
 type CallTokens = Pick<
@@ -212,14 +242,17 @@ export class LlmClient {
   private readonly maxQueueWaitMs: number
   private readonly limiter: AdaptiveLimiter
   private readonly budgetUsd: number | undefined
+  private readonly dailyUsd: number | undefined
   private readonly maxOutputTokens: number | undefined
   private readonly temperature: number | undefined
   private readonly transport: 'response_format' | 'tool'
   private readonly toolChoice: 'named' | 'auto'
   private readonly expectedCallCostUsd: number
+  private readonly audience: 'mind' | 'ops'
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
   private model: LanguageModel | undefined
+  private lastCallId: number | null = null
 
   constructor(opts: LlmClientOpts) {
     this.opts = { ...opts }
@@ -240,11 +273,13 @@ export class LlmClient {
     // key's concurrency at that back end, shared by every mind and every pass in the process.
     this.limiter = limiterFor(this.providerOrder.join(','))
     this.budgetUsd = opts.budgetUsd
+    this.dailyUsd = pinned.dailyUsd
     this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
     this.temperature = opts.temperature ?? pinned.temperature
     this.transport = opts.transport ?? 'response_format'
     this.toolChoice = opts.toolChoice ?? 'named'
     this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
+    this.audience = opts.audience ?? 'mind'
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
   }
@@ -256,11 +291,13 @@ export class LlmClient {
     messages: LlmMessage[]
     schema: z.ZodType<T>
     repairOnce?: boolean
+    bill?: CallBill
   }): Promise<{ value: T; usage: LlmUsage }> {
     const system = this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
+    const bill = opts.bill ?? {}
     try {
-      return await this.generateObject(system, messages, opts.schema)
+      return await this.generateObject(system, messages, opts.schema, bill)
     } catch (err) {
       const bad = opts.repairOnce === true ? malformedObjectText(err) : undefined
       if (bad === undefined) throw err
@@ -269,13 +306,18 @@ export class LlmClient {
         system,
         [
           ...messages,
-          { role: 'assistant', content: bad.length > 0 ? bad : '…' },
-          {
-            role: 'user',
-            content: `Your answer was rejected. Fix it:\n${why === undefined ? bad : z.prettifyError(why)}`,
-          },
+          // Sealed like the rest: these two carry the provider's own bytes and the schema's
+          // complaint, and they are appended after the one pass above.
+          ...this.sealAll([
+            { role: 'assistant', content: bad.length > 0 ? bad : '…' },
+            {
+              role: 'user',
+              content: `Your answer was rejected. Fix it:\n${why === undefined ? bad : z.prettifyError(why)}`,
+            },
+          ]),
         ],
         opts.schema,
+        bill,
       )
     }
   }
@@ -284,6 +326,7 @@ export class LlmClient {
     system: string,
     messages: LlmMessage[],
     schema: z.ZodType<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     return this.invoke(async (model, note) => {
       if (this.transport === 'tool') {
@@ -302,10 +345,18 @@ export class LlmClient {
         })
         note(stepFacts(r))
         const parsed = schema.safeParse(r.toolCalls[0]?.input)
-        if (!parsed.success)
-          throw new Error(
-            `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`,
-          )
+        if (!parsed.success) {
+          // The same class the response_format path throws: an off-schema answer is a wrong
+          // answer, and the loop must not bill an identical second ask for it.
+          const why = `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`
+          throw new NoObjectGeneratedError({
+            message: why,
+            text: JSON.stringify(r.toolCalls[0]?.input ?? null),
+            response: r.finalStep.response,
+            usage: r.usage,
+            finishReason: r.finishReason,
+          })
+        }
         return parsed.data
       }
       try {
@@ -335,7 +386,7 @@ export class LlmClient {
         })
         return repaired.value
       }
-    })
+    }, bill)
   }
 
   async text(opts: {
@@ -374,6 +425,13 @@ export class LlmClient {
     insertAlert(this.db, { agentId: this.agentId, kind, detail })
   }
 
+  /** Adds to the block JSON of the row this client wrote last — what the answer turned out to
+   *  be worth, which is only known once it has parsed. */
+  noteCallBill(patch: Record<string, number>): void {
+    if (this.lastCallId === null) return
+    mergeBlockTokens(this.db, this.lastCallId, patch)
+  }
+
   /** Books what the last answer produced against the back end that served it. A well-formed
    *  turn that does nothing is the one failure the ledger cannot see from the call row alone. */
   noteTurnOutcome(outcome: { acted: boolean; spoke: boolean; planContinued: boolean }): void {
@@ -400,9 +458,10 @@ export class LlmClient {
     )
   }
 
-  // The one door every provider-bound prompt passes through, whichever of the six callers
-  // assembled it: an ops-plane word is cut out here and the row says which caller leaked it.
+  // The one door every mind-bound prompt passes through, whichever of the six callers assembled
+  // it: an ops-plane word is cut out here and the row says which caller leaked it.
   private seal(text: string): string {
+    if (this.audience === 'ops') return text
     return assertNoGlassLeak(text, this.caller, (leaks, where) => {
       this.alert('glass_leak', `${where}: ${leaks.join(', ')} — redacted before the call`)
     })
@@ -414,43 +473,80 @@ export class LlmClient {
 
   private async invoke<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill = {},
   ): Promise<{ value: T; usage: LlmUsage }> {
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
         `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} of $${this.budgetUsd.toFixed(6)}`,
       )
     }
+    const now = Date.now()
+    // Already held: the map is the answer, so a held caller costs no SQL on the tick thread.
+    const standing = this.dailyUsd === undefined ? null : railHold(this.caller, now)
+    if (standing !== null) {
+      throw new CallerRailError(this.caller, standing.spentUsd, standing.railUsd, standing.untilMs)
+    }
     // Pre-book what this call is expected to cost, so concurrent callers cannot
     // all read the same headroom and all spend it.
-    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null)
-    if (reservation === null) {
-      throw new BudgetExceededError(
-        `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
-      )
+    const rail =
+      this.dailyUsd === undefined ? null : { usd: this.dailyUsd, sinceMs: now - RAIL_WINDOW_MS }
+    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null, rail)
+    if ('held' in reservation) {
+      if (reservation.held === 'budget') {
+        throw new BudgetExceededError(
+          `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
+        )
+      }
+      throw this.holdOnRail(reservation.spentUsd, rail!, now)
     }
     try {
-      return await this.invokeReserved(exec)
+      return await this.invokeReserved(exec, bill)
     } finally {
-      this.guard.release(reservation)
+      this.guard.release(reservation.id)
     }
+  }
+
+  /** Records the trip, writes the operator one line for it, and hands back the refusal. The
+   *  hold lifts when the oldest call in the window rolls out of it. */
+  private holdOnRail(
+    spentUsd: number,
+    rail: { usd: number; sinceMs: number },
+    now: number,
+  ): CallerRailError {
+    const oldest = oldestCallTsSince(this.db, this.caller, rail.sinceMs) ?? now
+    const untilMs = oldest + RAIL_WINDOW_MS
+    const hold = { caller: this.caller, untilMs, spentUsd, railUsd: rail.usd }
+    if (tripRail(hold, now)) {
+      this.alert(
+        'caller_rail_tripped',
+        `${this.caller} has spent $${spentUsd.toFixed(4)} of its $${rail.usd.toFixed(2)} for` +
+          ` the day; its calls are held until ${new Date(untilMs).toISOString()},` +
+          ` the town keeps running`,
+      )
+    }
+    return new CallerRailError(this.caller, spentUsd, rail.usd, untilMs)
   }
 
   private async invokeReserved<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const model = this.resolveModel()
     const modelName = typeof model === 'string' ? model : model.modelId
     let lastError: unknown
-    let attempt = 0
+    let sends = 0
+    // Two budgets, two counters: one shared attempt number lets a burst re-ask carry the counter
+    // past `maxRetries`, after which no stall can ever spend its own bound again.
+    let bursts = 0
+    let stalls = 0
     // One patience for the whole call, not one per attempt: a budget the retries each spent in
     // full would multiply the two waits together.
     const queueUntil = Date.now() + this.maxQueueWaitMs
-    // The outer bound is whichever budget is larger; which one this failure may spend is decided
-    // against the error itself, below.
-    for (; attempt <= Math.max(this.maxRetries, this.rateLimitRetries); attempt++) {
+    for (;;) {
+      sends += 1
       try {
         return await this.limiter.run(
-          () => this.attemptOnce(model, modelName, exec),
+          () => this.attemptOnce(model, modelName, exec, bill),
           Math.max(0, queueUntil - Date.now()),
         )
       } catch (err) {
@@ -463,8 +559,8 @@ export class LlmClient {
         if (NoObjectGeneratedError.isInstance(err)) throw err
         // Only a burst limit earns the pinned patience: it is refused in milliseconds and bills
         // nothing, where re-asking a stall this often would sit out the whole bound each time.
-        if (attempt === (rateLimited(err) ? this.rateLimitRetries : this.maxRetries)) break
-        const wait = retryBackoffMs(err, attempt)
+        if (rateLimited(err) ? ++bursts > this.rateLimitRetries : ++stalls > this.maxRetries) break
+        const wait = retryBackoffMs(err, sends - 1)
         // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
         if (wait > this.requestTimeoutMs) break
         if (wait > 0) await sleep(wait)
@@ -475,7 +571,7 @@ export class LlmClient {
     }
     this.alert(
       'llm_call_failed',
-      `${this.caller}: ${attempt + 1} attempt(s) failed, the last bounded at ` +
+      `${this.caller}: ${sends} attempt(s) failed, the last bounded at ` +
         `${(this.requestTimeoutMs / 1000).toFixed(0)}s — ` +
         (lastError instanceof Error ? lastError.message : String(lastError)),
     )
@@ -487,6 +583,7 @@ export class LlmClient {
     model: LanguageModel,
     modelName: string,
     exec: (model: LanguageModel, note: Note) => Promise<T>,
+    bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const start = performance.now()
     let facts: StepFacts = {}
@@ -508,7 +605,7 @@ export class LlmClient {
         served,
         provider,
       })
-      insertLlmCall(
+      this.lastCallId = insertLlmCall(
         this.db,
         this.llmCallRow({
           model: served,
@@ -521,6 +618,7 @@ export class LlmClient {
           latencyMs: performance.now() - start,
           finishReason: facts.finishReason ?? null,
           error: null,
+          ...bill,
         }),
       )
       this.warnIfTruncated(facts.finishReason)
@@ -542,7 +640,7 @@ export class LlmClient {
         served,
         provider,
       ).costUsd
-      insertLlmCall(
+      this.lastCallId = insertLlmCall(
         this.db,
         this.llmCallRow({
           model: served,
@@ -555,6 +653,7 @@ export class LlmClient {
           latencyMs: performance.now() - start,
           finishReason,
           error: err instanceof Error ? err.message : String(err),
+          ...bill,
         }),
       )
       this.warnIfTruncated(finishReason)

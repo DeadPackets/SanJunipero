@@ -3,8 +3,20 @@ import Database from 'better-sqlite3'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
-import { mockModel } from './testutil/mockModel.js'
-import { makeBudgetGuard, migrateLlmTables, sumReserved } from './callLog.js'
+import { mockModel, recordingModel } from './testutil/mockModel.js'
+import {
+  insertLlmCall,
+  makeBudgetGuard,
+  mergeBlockTokens,
+  migrateLlmTables,
+  sumReserved,
+  type Reserved,
+} from './callLog.js'
+
+const idOf = (r: Reserved): number => {
+  if ('held' in r) throw new Error(`expected a reservation, got ${r.held}`)
+  return r.id
+}
 import {
   BudgetExceededError,
   LlmClient,
@@ -12,16 +24,20 @@ import {
   retryBackoffMs,
   servedProvider,
 } from './client.js'
-import { limiterFor, resetLimiters } from './rateLimiter.js'
+import { DEFAULT_MAX_CONCURRENCY, limiterFor, resetLimiters } from './rateLimiter.js'
 import {
   FALLBACK_MODELS,
   MIND_MODEL,
   MIN_REQUEST_TIMEOUT_MS,
   PROSE_MODEL,
+  PROSE_PROVIDER_ORDER,
   PROVIDER_ORDER,
+  RULING_MODEL,
+  RULING_PROVIDER_ORDER,
   callSettingsFor,
   modelFor,
   requestTimeoutMsFor,
+  PRICE_PER_M,
 } from './pins.js'
 
 type CallRow = {
@@ -68,6 +84,149 @@ describe('migrateLlmTables', () => {
     expect(() => {
       migrateLlmTables(db)
     }).not.toThrow()
+  })
+
+  // ★ A reservation is released in a JS `finally`, so a kill or an OOM leaves it behind and it
+  // counts against that caller's budget for ever. One process owns the ledger: boot clears them.
+  it('★ clears the reservations a killed process left behind, and no call it billed', () => {
+    const db = openDb()
+    db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)').run(
+      Date.now(),
+      'reflection',
+      0.005,
+    )
+    insertLlmCall(db, {
+      agentId: null,
+      caller: 'reflection',
+      model: 'm',
+      provider: 'Wafer',
+      inputTokens: 10,
+      outputTokens: 2,
+      cacheReadTokens: 0,
+      reasoningTokens: 0,
+      costUsd: 0.01,
+      estimatedCostUsd: 0.01,
+      reportedCostUsd: null,
+      latencyMs: 90,
+      finishReason: 'stop',
+      ok: true,
+      error: null,
+    })
+
+    migrateLlmTables(db)
+
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_reservations').get()).toEqual({ n: 0 })
+    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 1 })
+  })
+
+  it('adds the two bill columns to a table that predates them, leaving its rows alone', () => {
+    const db = new Database(':memory:')
+    db.exec(`
+      CREATE TABLE llm_calls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, agent_id TEXT,
+        caller TEXT NOT NULL, model TEXT NOT NULL, input_tokens INTEGER NOT NULL,
+        output_tokens INTEGER NOT NULL, cache_read_tokens INTEGER NOT NULL,
+        reasoning_tokens INTEGER NOT NULL, cost_usd REAL NOT NULL, estimated_cost_usd REAL,
+        reported_cost_usd REAL, latency_ms INTEGER NOT NULL, ok INTEGER NOT NULL, error TEXT,
+        provider TEXT, finish_reason TEXT, generation_id TEXT);
+      INSERT INTO llm_calls VALUES
+        (1, 7, 'tamar', 'turn', 'm', 10, 2, 0, 0, 0.5, 0.5, NULL, 90, 1, NULL, 'Wafer', 'stop', NULL);
+    `)
+    migrateLlmTables(db)
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = 1').get() as Record<string, unknown>
+    expect(row.caller).toBe('turn')
+    expect(row.cost_usd).toBe(0.5)
+    expect(row.wake_reason).toBeNull()
+    expect(row.wake_reasons).toBeNull()
+    expect(row.block_tokens).toBeNull()
+  })
+})
+
+// Why a turn was bought and what its prompt weighed. Null for every caller with no wake —
+// reflection, arbiter, pre-flight — and for every row written before the columns existed.
+describe('the wake reason and the block bill', () => {
+  const call = {
+    agentId: 'tamar',
+    caller: 'turn',
+    model: MIND_MODEL,
+    provider: 'Wafer',
+    inputTokens: 8000,
+    outputTokens: 300,
+    cacheReadTokens: 2048,
+    reasoningTokens: 0,
+    costUsd: 0.001,
+    estimatedCostUsd: 0.001,
+    reportedCostUsd: null,
+    latencyMs: 900,
+    finishReason: 'stop',
+    ok: true,
+    error: null,
+  }
+
+  it('round-trips a wake reason, everything else that was true, and the block JSON', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, {
+      ...call,
+      wakeReason: 'salient_perception',
+      wakeReasons: ['salient_perception', 'plan_done'],
+      blockTokens: { shared: 2067, dayLog: 4200, _priorStepsLeft: 3 },
+    })
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
+      wake_reason: string | null
+      wake_reasons: string | null
+      block_tokens: string | null
+    }
+    expect(row.wake_reason).toBe('salient_perception')
+    expect(JSON.parse(row.wake_reasons!)).toEqual(['salient_perception', 'plan_done'])
+    expect(JSON.parse(row.block_tokens!)).toEqual({
+      shared: 2067,
+      dayLog: 4200,
+      _priorStepsLeft: 3,
+    })
+  })
+
+  it('reads back a row written without either, as a caller with no wake writes one', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, { ...call, caller: 'reflection' })
+
+    const row = db.prepare('SELECT * FROM llm_calls WHERE id = ?').get(id) as {
+      caller: string
+      wake_reason: string | null
+      wake_reasons: string | null
+      block_tokens: string | null
+    }
+    expect(row.caller).toBe('reflection')
+    expect(row.wake_reason).toBeNull()
+    expect(row.wake_reasons).toBeNull()
+    expect(row.block_tokens).toBeNull()
+  })
+
+  it('merges what the answer turned out to be worth into the row already written', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, {
+      ...call,
+      wakeReason: 'boredom',
+      blockTokens: { shared: 2067, _priorStepsLeft: 0 },
+    })
+    mergeBlockTokens(db, id, { _planSize: 4 })
+
+    const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as {
+      json: string
+    }
+    expect(JSON.parse(row.json)).toEqual({ shared: 2067, _priorStepsLeft: 0, _planSize: 4 })
+  })
+
+  it('starts the block JSON from nothing when the row carried none', () => {
+    const db = openDb()
+    const id = insertLlmCall(db, call)
+    mergeBlockTokens(db, id, { _planSize: 0 })
+
+    const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as {
+      json: string
+    }
+    expect(JSON.parse(row.json)).toEqual({ _planSize: 0 })
   })
 })
 
@@ -164,8 +323,11 @@ describe('LlmClient.object', () => {
     })
     expect(value).toEqual({ mood: 'calm', count: 3 })
 
-    const expectedCost = ((1000 - 600) * 0.15 + 600 * 0.03 + 50 * 0.5) / 1e6
-    expect(expectedCost).toBeCloseTo(0.000103, 10)
+    const P = PRICE_PER_M
+    const expectedCost = ((1000 - 600) * P.input + 600 * P.cacheRead + 50 * P.output) / 1e6
+    // Worked by hand off the pinned row, so a formula derived from the same table cannot agree
+    // with itself and be wrong: (400 x 0.10 + 600 x 0.02 + 50 x 0.35) / 1e6.
+    expect(expectedCost).toBeCloseTo(0.0000695, 10)
     expect(usage).toEqual({
       inputTokens: 1000,
       outputTokens: 50,
@@ -207,7 +369,7 @@ describe('LlmClient.object', () => {
     expect(row.reasoning_tokens).toBe(6100)
     expect(row.output_tokens).toBe(6168)
     // reasoning bills as output: cost formula unchanged
-    const expectedCost = (500 * 0.15 + 6168 * 0.5) / 1e6
+    const expectedCost = (500 * PRICE_PER_M.input + 6168 * PRICE_PER_M.output) / 1e6
     expect(Math.abs(row.cost_usd - expectedCost)).toBeLessThan(1e-6)
     expect(usage.costUsd).toBe(row.cost_usd)
   })
@@ -477,7 +639,7 @@ describe('price reconciliation', () => {
 
   it('alerts when the table disagrees with what the provider charged', async () => {
     const db = openDb()
-    // Wafer's real price for these tokens is (1000*0.15 + 1000*0.5)/1e6 = $0.00065.
+    // The pinned price for these tokens, whatever the table currently says it is.
     const model = mockModel([
       {
         text: 'a',
@@ -509,7 +671,7 @@ describe('price reconciliation', () => {
         provider: 'Wafer',
         servedModelId: MIND_MODEL,
         usage: { inputTokens: 1000, outputTokens: 1000 },
-        reportedCostUsd: (1000 * 0.15 + 1000 * 0.5) / 1e6,
+        reportedCostUsd: (1000 * PRICE_PER_M.input + 1000 * PRICE_PER_M.output) / 1e6,
       },
     ])
     const client = new LlmClient({ model, db, caller: 'test' })
@@ -519,7 +681,7 @@ describe('price reconciliation', () => {
 
   it('stays silent on sub-cent rounding rather than crying wolf', async () => {
     const db = openDb()
-    const exact = (10 * 0.15 + 2 * 0.5) / 1e6
+    const exact = (10 * PRICE_PER_M.input + 2 * PRICE_PER_M.output) / 1e6
     const model = mockModel([
       {
         text: 'a',
@@ -550,7 +712,9 @@ describe('price reconciliation', () => {
     const row = rows(db)[0]!
     expect(row.cost_usd).toBeCloseTo((1000 * 0.44 + 1000 * 1.32) / 1e6, 12)
     // Strictly more than the pinned route would have charged: it can only over-report.
-    expect(row.cost_usd).toBeGreaterThan((1000 * 0.15 + 1000 * 0.5) / 1e6)
+    expect(row.cost_usd).toBeGreaterThan(
+      (1000 * PRICE_PER_M.input + 1000 * PRICE_PER_M.output) / 1e6,
+    )
     expect(row.reported_cost_usd).toBeNull()
     const detail = (
       db.prepare("SELECT detail FROM alerts WHERE kind = 'llm_price_unpriced_route'").get() as {
@@ -694,11 +858,11 @@ describe('pessimistic reservation (T21)', () => {
     const db = openDb()
     const mine = makeBudgetGuard(db, 'mine')
     const theirs = makeBudgetGuard(db, 'theirs')
-    const a = mine.reserve(0.005, 1)
-    theirs.reserve(0.005, 1)
+    const a = mine.reserve(0.005, 1, null)
+    theirs.reserve(0.005, 1, null)
     expect(mine.sumReserved()).toBeCloseTo(0.005, 10)
     expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
-    mine.release(a!)
+    mine.release(idOf(a))
     expect(mine.sumReserved()).toBe(0)
     expect(theirs.sumReserved()).toBeCloseTo(0.005, 10)
   })
@@ -706,16 +870,16 @@ describe('pessimistic reservation (T21)', () => {
   it('refuses the reservation that would cross the cap and admits it again once released', () => {
     const db = openDb()
     const guard = makeBudgetGuard(db, 'test')
-    const first = guard.reserve(0.005, 0.006)
-    expect(first).not.toBeNull()
-    expect(guard.reserve(0.005, 0.006)).toBeNull()
-    guard.release(first!)
-    expect(guard.reserve(0.005, 0.006)).not.toBeNull()
+    const first = guard.reserve(0.005, 0.006, null)
+    expect(first).not.toHaveProperty('held')
+    expect(guard.reserve(0.005, 0.006, null)).toEqual({ held: 'budget', spentUsd: 0 })
+    guard.release(idOf(first))
+    expect(guard.reserve(0.005, 0.006, null)).not.toHaveProperty('held')
   })
 })
 
-describe('★ the one-way glass, on every prompt the client sends', () => {
-  const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter', 'semantic'] as const
+describe('★ the one-way glass, on every prompt a mind reads', () => {
+  const CALLERS = ['turn', 'reflection', 'dream', 'naming', 'arbiter'] as const
 
   const recorder = (): { model: MockLanguageModelV4; sent: string[] } => {
     const sent: string[] = []
@@ -757,6 +921,26 @@ describe('★ the one-way glass, on every prompt the client sends', () => {
     }
   })
 
+  // ★ The repair rung appends the provider's own bytes and the schema complaint AFTER the one
+  // sealing pass — the only two messages in the client that reached a provider unsealed.
+  it('★ seals the two messages the repair rung appends', async () => {
+    const db = openDb()
+    const { model, sent } = recordingModel([
+      { text: 'god_afterlife, and not JSON either' },
+      { json: { a: 1 } },
+    ])
+    await new LlmClient({ model, db, caller: 'turn' }).object({
+      system: 'You are Amara.',
+      messages: [{ role: 'user', content: 'answer' }],
+      schema: z.object({ a: z.number() }),
+      repairOnce: true,
+    })
+
+    expect(sent, 'the repair rung never ran').toHaveLength(2)
+    expect(sent[1]).not.toContain('god_afterlife')
+    expect(sent[1]).toContain('[redacted]')
+  })
+
   it('leaves a clean prompt byte-for-byte alone and writes no row', async () => {
     const db = openDb()
     const { model, sent } = recorder()
@@ -769,6 +953,31 @@ describe('★ the one-way glass, on every prompt the client sends', () => {
     expect(db.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'glass_leak'").get()).toEqual({
       n: 0,
     })
+  })
+
+  it('hands an ops recogniser its own words, because its question is made of them', async () => {
+    const db = openDb()
+    const { model, sent } = recorder()
+    const ask = 'Answer with the id: god_afterlife, multi_day_plan. first_bridge counts.'
+    await new LlmClient({ model, db, caller: 'semantic', audience: 'ops' }).text({
+      system: ask,
+      messages: [{ role: 'user', content: 'god_afterlife' }],
+    })
+    expect(sent[0]).toContain(ask)
+    expect(sent[0]).not.toContain('[redacted]')
+    expect(db.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'glass_leak'").get()).toEqual({
+      n: 0,
+    })
+  })
+
+  it('seals a caller nobody declared, so a new one is a mind’s until it says otherwise', async () => {
+    const db = openDb()
+    const { model, sent } = recorder()
+    await new LlmClient({ model, db, caller: 'a-caller-added-next-year' }).text({
+      system: 'god_afterlife',
+      messages: [{ role: 'user', content: 'hello' }],
+    })
+    expect(sent[0]).not.toContain('god_afterlife')
   })
 })
 
@@ -806,9 +1015,9 @@ describe('default OpenRouter path extraBody', () => {
     }
     expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
-    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: ['Inceptron'] })
-    // The court rides the mind's pair: a ruling's params carry the same binding a turn's do.
-    expect(body('arbiter')).toEqual(body('turn'))
+    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: PROSE_PROVIDER_ORDER })
+    // The court is the one caller off the fleet's two models: what it writes is permanent.
+    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], order: RULING_PROVIDER_ORDER })
   })
 
   // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
@@ -945,7 +1154,7 @@ describe('★ why the provider stopped is on every ledger row', () => {
     })
     // The caller and its ceiling, so the row says which number in `pins.ts` to move.
     expect(alertsOf(db, 'llm_output_truncated')).toEqual([
-      'turn: the answer stopped at the 600 output token ceiling — raise it or the answer is a fragment',
+      `turn: the answer stopped at the ${callSettingsFor('turn').maxOutputTokens} output token ceiling — raise it or the answer is a fragment`,
     ])
   })
 
@@ -1198,6 +1407,47 @@ describe('a re-ask waits out the window it was refused in', () => {
     expect(model.doGenerateCalls).toHaveLength(2)
   })
 
+  // ★ A model that answers off-schema is not a transient fault, and the response_format path has
+  // never re-asked one. The tool path threw a plain Error, so the loop billed a second ask.
+  it('★ never re-asks a tool call the schema refused', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'no tool call at all' }, { text: 'nor this one' }])
+    await expect(
+      new LlmClient({ model, db, caller: 'turn', transport: 'tool' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: z.object({ a: z.number() }),
+      }),
+    ).rejects.toThrow(/tool transport/)
+    expect(model.doGenerateCalls, 'an off-schema answer was asked for twice').toHaveLength(1)
+  })
+
+  // ★ The stall budget used to be re-armed by a burst: once `attempt` had passed `maxRetries`,
+  // the stall check could never fire again, so reflection billed three 45 s stalls for two.
+  it('spends the stall budget once, whatever order a burst arrives in', async () => {
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      let sent = 0
+      const script = [new Error('scripted failure'), refused, new Error('scripted failure')]
+      const model = new MockLanguageModelV4({
+        doGenerate: () => {
+          sent += 1
+          return Promise.reject(script[sent - 1] ?? new Error(`re-asked ${sent} times, for three`))
+        },
+      })
+      const call = new LlmClient({ model, db, caller: 'reflection' })
+        .text({ messages: [{ role: 'user', content: 'u' }] })
+        .catch((err: unknown) => err)
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(20_000)
+      await call
+      expect(model.doGenerateCalls, 'two stalls billed, not three').toHaveLength(3)
+      expect(alertsOf(db, 'llm_call_failed')[0]).toContain('reflection: 3 attempt(s)')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('sleeps before the retry that follows a 429, and books both attempts', async () => {
     const db = openDb()
     const model = answeringAfter(refused)
@@ -1269,34 +1519,38 @@ describe('the fleet meets the provider through one gate', () => {
   it('never lets more minds at the back end at once than the cap allows', async () => {
     const db = openDb()
     const held = holding()
-    const asks = ['a', 'b', 'c', 'd', 'e', 'f'].map((id) =>
-      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+    // Two more than the gate allows, whatever the gate allows: the cap is a measured number and
+    // this test is about the queue, not about its value.
+    const over = DEFAULT_MAX_CONCURRENCY + 2
+    const asks = Array.from({ length: over }, (_, i) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: `a${i}` }).text({
         messages: [{ role: 'user', content: 'u' }],
       }),
     )
     await vi.waitFor(() => {
-      expect(held.live()).toBe(4)
+      expect(held.live()).toBe(DEFAULT_MAX_CONCURRENCY)
     })
-    expect(held.live(), 'two of the six are queued, not refused').toBe(4)
+    expect(held.live(), 'the excess is queued, not refused').toBe(DEFAULT_MAX_CONCURRENCY)
     held.open()
     await vi.waitFor(() => {
       expect(held.live()).toBe(2)
     })
     held.open()
     await Promise.all(asks)
-    expect(rows(db)).toHaveLength(6)
+    expect(rows(db)).toHaveLength(over)
   })
 
   it('gives up unsent rather than bill a wait it has no patience for', async () => {
     const db = openDb()
     const held = holding()
-    const blocking = ['a', 'b', 'c', 'd'].map((id) =>
-      new LlmClient({ model: held.model, db, caller: 'turn', agentId: id }).text({
+    // Exactly enough to fill the gate, so the next one has nowhere to go.
+    const blocking = Array.from({ length: DEFAULT_MAX_CONCURRENCY }, (_, i) =>
+      new LlmClient({ model: held.model, db, caller: 'turn', agentId: `a${i}` }).text({
         messages: [{ role: 'user', content: 'u' }],
       }),
     )
     await vi.waitFor(() => {
-      expect(held.live()).toBe(4)
+      expect(held.live()).toBe(DEFAULT_MAX_CONCURRENCY)
     })
     const late = new LlmClient({
       model: held.model,
@@ -1306,7 +1560,7 @@ describe('the fleet meets the provider through one gate', () => {
       maxQueueWaitMs: 20,
     }).text({ messages: [{ role: 'user', content: 'u' }] })
     await expect(late).rejects.toThrow('no slot on')
-    expect(rows(db), 'four sent, and the fifth never reached the provider').toHaveLength(0)
+    expect(rows(db), 'the gate is full, and the next never reached the provider').toHaveLength(0)
     expect(alertsOf(db, 'llm_call_failed')[0]).toContain('turn: 1 attempt(s)')
     held.open()
     await Promise.all(blocking)
@@ -1319,11 +1573,21 @@ describe('the fleet meets the provider through one gate', () => {
     try {
       const db = openDb()
       const gate = limiterFor(PROVIDER_ORDER.join(','))
+      // The cap gives ground only to a refusal our own calls were part of, so one is held in
+      // flight while three are refused beside it: 8 -> 4 -> 2 -> 1.
+      let release!: () => void
+      const busy = new Promise<string>((res) => {
+        release = () => {
+          res('done')
+        }
+      })
+      void gate.run(() => busy, 60_000)
       for (let i = 0; i < 3; i++) {
-        await gate.run(() => Promise.reject(refused), 0).catch(() => null)
+        void gate.run(() => Promise.reject(refused), 0).catch(() => null)
         await vi.advanceTimersByTimeAsync(2_000)
       }
       expect(gate.state().cap).toBe(1)
+      release()
       await vi.advanceTimersByTimeAsync(60_000)
       for (let i = 0; i < 3; i++) {
         await new LlmClient({ model: mockModel([{ text: 'ok' }]), db, caller: 'turn' }).text({

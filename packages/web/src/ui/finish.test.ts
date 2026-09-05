@@ -69,7 +69,7 @@ describe('1 · an icon and its word sit on one line, declared and never defaulte
 // ── 2 · tabular figures wherever a number ticks ───────────────────────────────────────────
 const TICKING_NUMBERS = named([
   '.player-clock',
-  '.thumb-day',
+  '.thumb-when',
   '.paper-sheet .stamp',
   '.feed-line .stamp',
   '.bond-history .stamp',

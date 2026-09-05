@@ -1,15 +1,36 @@
 import { describe, expect, it } from 'vitest'
-import { CLOCK_STOPS, WEATHER_DIAG, clockTint, gradingMatrix, skyLevel } from './tints.js'
+import {
+  CLOCK_STOPS,
+  NIGHT_FLOOR,
+  WEATHER_DIAG,
+  clockTint,
+  gradingMatrix,
+  skyLevel,
+} from './tints.js'
 
 describe('clock tint LUT', () => {
   it('pins the calibrated stops', () => {
-    expect(CLOCK_STOPS[0]).toEqual({ minute: 0, tint: [0.45, 0.52, 0.95] })
-    expect(CLOCK_STOPS.at(-1)).toEqual({ minute: 1440, tint: [0.45, 0.52, 0.95] })
+    expect(CLOCK_STOPS[0]).toEqual({ minute: 0, tint: NIGHT_FLOOR })
+    expect(CLOCK_STOPS.at(-1)).toEqual({ minute: 1440, tint: NIGHT_FLOOR })
     expect(CLOCK_STOPS.map((s) => s.minute)).toEqual([0, 300, 390, 480, 1050, 1140, 1230, 1440])
   })
 
-  it('deep night at 04:00 packs to 0x7385F2', () => {
-    expect(clockTint(240)).toBe(0x7385f2)
+  // ★ THE NIGHT FLOOR (task 18). 0.45/0.52 read as a hole in the picture: a roof under it
+  // measured 0.536 of its own luma. The floor is lifted to a watchable blue and the hue held.
+  it('★ the night floor is [0.5, 0.58, 0.95], and 04:00 packs to 0x8094F2', () => {
+    expect(NIGHT_FLOOR).toEqual([0.5, 0.58, 0.95])
+    expect(clockTint(240)).toBe(0x8094f2)
+  })
+
+  it('★ lifts the night without turning it: the same blue cast, brighter', () => {
+    const [r, g, b] = NIGHT_FLOOR
+    expect(b).toBe(0.95)
+    expect(r).toBeLessThan(g)
+    expect(g).toBeLessThan(b)
+    // 0.536 → 0.590 of the material's own luma, measured off the floor rather than chosen
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    expect(lum).toBeGreaterThan(0.58)
+    expect(lum).toBeLessThan(0.62)
   })
 
   it('06:45 lands mid-lerp between dawn and full day (channel math, not a magic hex)', () => {

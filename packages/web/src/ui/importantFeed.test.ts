@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CHRONICLE_FALLBACK_ICON,
   CHRONICLE_ICONS,
   DEFAULT_CONFIG,
@@ -53,7 +54,7 @@ function agent(id: string, name: string): WorldState['agents'][string] {
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,

@@ -3,7 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
-import { DEFAULT_CONFIG, DiscoveryResponseSchema, type DiscoveryRecord } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  DiscoveryResponseSchema,
+  type DiscoveryRecord,
+} from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
@@ -40,8 +45,8 @@ function scriptedWorld(dbPath: string, withDiscoveries: boolean): Database.Datab
     snapshotEveryTicks: 50,
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
-        emit('agent_spawned', { id: 'a1', name: 'Maret', x: 0, y: 0, ageDays: 7300 })
-        emit('agent_spawned', { id: 'a2', name: 'Sena', x: 1, y: 0, ageDays: 7300 })
+        emit('agent_spawned', { id: 'a1', name: 'Maret', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        emit('agent_spawned', { id: 'a2', name: 'Sena', x: 1, y: 0, ageDays: ADULT_AGE_DAYS })
       }
       if (!withDiscoveries) return
       if (tick === 40) emit('discovery_made', D1)

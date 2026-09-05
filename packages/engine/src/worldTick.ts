@@ -5,7 +5,7 @@ import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import type { System, TickCtx } from './tickCtx.js'
 import { submitIntent } from './intent.js'
-import { stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
+import { chaseStep, stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
 import { needsSystem } from './systems/needs.js'
 import { flushNeedsSystem } from './systems/needsBatch.js'
 import { warmthSystem } from './systems/warmth.js'
@@ -42,18 +42,25 @@ function actionsSystem(ctx: TickCtx): void {
     const a = ctx.state().agents[id]!
     if (!a.alive || !a.activity) continue
     if (a.activity.verb === 'walk') {
-      const path = a.activity.path
-      const tilesLeft = path
-        ? path.length - (path.findIndex(([x, y]) => x === a.x && y === a.y) + 1)
-        : 0
-      if (tilesLeft > 0) {
-        for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
-      } else if (a.activity.ticksRemaining > 0) {
-        ctx.emit('action_interrupted', { agentId: id, reason: 'blocked' })
-        continue
+      // A walk that named a person is re-aimed at where they are standing now: the mark moves,
+      // so a route laid once is stale by the second tick.
+      const chase = chaseStep(ctx.state(), ctx.config, id)
+      if (chase !== null) {
+        for (const e of chase) ctx.emit(e.type, e.payload)
+      } else {
+        const path = a.activity.path
+        const tilesLeft = path
+          ? path.length - (path.findIndex(([x, y]) => x === a.x && y === a.y) + 1)
+          : 0
+        if (tilesLeft > 0) {
+          for (const e of stepWalk(ctx.state(), id)) ctx.emit(e.type, e.payload)
+        } else if (a.activity.ticksRemaining > 0) {
+          ctx.emit('action_interrupted', { agentId: id, reason: 'blocked' })
+          continue
+        }
+        // No tiles and no clock left is a body that set off already standing at its destination:
+        // that walk is done, not stopped, and it completes below like any other.
       }
-      // No tiles and no clock left is a body that set off already standing at its destination:
-      // that walk is done, not stopped, and it completes below like any other.
     } else if (a.activity.verb === 'build') {
       for (const e of stepBuild(ctx.state(), ctx.config, id)) ctx.emit(e.type, e.payload)
     } else {
@@ -153,13 +160,14 @@ const SYSTEMS: System[] = [
 ]
 
 // Each emit folds immediately, so every system is generated against the already-folded state.
+// A driver that folds what it writes hands its `apply` in and the tick folds through that, once.
 // ctx.config is a getter: a law flipped at this boundary is true for every system that runs after.
 export function createWorldTick(
   config: SimConfig,
   rng: RngStreams,
   laws?: LawQueue,
-): (state: WorldState) => WorldTickResult {
-  return (initial) => {
+): (state: WorldState, apply?: (type: string, payload: unknown) => WorldState) => WorldTickResult {
+  return (initial, apply) => {
     let state = initial
     const events: PendingEvent[] = []
     const ctx: TickCtx = {
@@ -170,7 +178,10 @@ export function createWorldTick(
       needs: new Map(),
       state: () => state,
       emit: (type, payload) => {
-        state = fold(state, { seq: 0, tick: state.tick, type, payload }, config)
+        state =
+          apply === undefined
+            ? fold(state, { seq: 0, tick: state.tick, type, payload }, config)
+            : apply(type, payload)
         events.push({ type, payload })
       },
     }

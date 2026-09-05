@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, type TileId } from '@sj/engine'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { perceptionToProse } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import { FLAT_WORLD } from '../testutil/fixtures.js'
@@ -19,8 +19,8 @@ function pair(): { prose: () => string; state: () => ReturnType<typeof genesisSt
   const put = (type: string, payload: unknown): void => {
     seed = fold(seed, store.append(seed.tick, type, payload), DEFAULT_CONFIG)
   }
-  put('agent_spawned', { id: WATCHER, name: 'Tamar', x: 8, y: 8, ageDays: 7300 })
-  put('agent_spawned', { id: OTHER, name: 'Amara', x: 9, y: 8, ageDays: 7300 })
+  put('agent_spawned', { id: WATCHER, name: 'Tamar', x: 8, y: 8, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: OTHER, name: 'Amara', x: 9, y: 8, ageDays: ADULT_AGE_DAYS })
   // Noon, so the other body is inside the sight horizon.
   const { bridge, loop } = wireTown({ state: seed, store, seed: 'downed', startTick: 720 })
   return {
@@ -31,21 +31,21 @@ function pair(): { prose: () => string; state: () => ReturnType<typeof genesisSt
 
 describe('a body that has gone down is seen to have gone down', () => {
   it('on its feet it stands', () => {
-    expect(pair().prose()).toContain('Amara (amara) stands at (9, 8)')
+    expect(pair().prose()).toContain('Amara (amara) stands close to the east')
   })
 
   it('merely asleep it sleeps', () => {
     const t = pair()
     t.state().agents[OTHER]!.asleep = true
     const said = t.prose()
-    expect(said).toContain('Amara (amara) sleeps at (9, 8)')
+    expect(said).toContain('Amara (amara) sleeps close to the east')
     expect(said).not.toContain('lies collapsed')
   })
 
   it('collapsed while awake it lies collapsed', () => {
     const t = pair()
     t.state().agents[OTHER]!.collapsedSinceTick = 700
-    expect(t.prose()).toContain('Amara (amara) lies collapsed at (9, 8)')
+    expect(t.prose()).toContain('Amara (amara) lies collapsed close to the east')
   })
 
   // Hunger keeps falling through the night, so `collapseDeathSystem` fires on a sleeping body and
@@ -56,7 +56,7 @@ describe('a body that has gone down is seen to have gone down', () => {
     t.state().agents[OTHER]!.asleep = true
     t.state().agents[OTHER]!.collapsedSinceTick = 700
     const said = t.prose()
-    expect(said).toContain('Amara (amara) lies collapsed at (9, 8)')
-    expect(said).not.toContain('sleeps at')
+    expect(said).toContain('Amara (amara) lies collapsed close to the east')
+    expect(said).not.toContain('sleeps close to')
   })
 })

@@ -37,10 +37,10 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   const id = subject?.kind === 'structure' ? subject.id : null
   // Keyed on the building, so a new subject is structurally a new read and the page can never
   // show one building's sentence under the next one's name.
-  const provFeed = useEndpointFor<Provenance>(
+  const provRead = useEndpointFor<Provenance>(
     id === null ? null : `/api/structure/${encodeURIComponent(id)}/provenance`,
   )
-  const prov = useFeed(provFeed)
+  const prov = useFeed(provRead)
   const builderId = prov.data?.builderId ?? null
   const journal = usePolled<Journal[]>(
     builderId === null ? null : `/api/agent/${encodeURIComponent(builderId)}/journal`,
@@ -72,8 +72,8 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   return (
     <section className="provenance">
       <h3 className="feed-head">{structureTitle(structure)}</h3>
-      {prov.data === null && prov.failed ? (
-        <OutOfReach onRetry={provFeed.retry} />
+      {prov.failed && prov.data === null ? (
+        <OutOfReach onRetry={provRead.retry} />
       ) : settled ? (
         <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (

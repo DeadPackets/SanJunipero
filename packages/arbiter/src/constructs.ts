@@ -152,7 +152,14 @@ const NAME_PATTERNS: readonly RegExp[] = [
   /\bthis is (?:the )?([\p{Lu}][\p{L}' -]{1,39})/u,
 ]
 
-function nameIn(ev: SimEvent): QuotedName | null {
+// A custom is never named after a person, and "this is Tariq" is an introduction, not a naming.
+const namesABody = (found: string, cast: ReadonlySet<string>): boolean =>
+  found
+    .toLowerCase()
+    .split(/[^\p{L}]+/u)
+    .some((word) => cast.has(word))
+
+function nameIn(ev: SimEvent, cast: ReadonlySet<string>): QuotedName | null {
   const p = ev.payload as { agentId?: unknown; text?: unknown } | null
   if (typeof p?.text !== 'string' || typeof p.agentId !== 'string') return null
   const source = { sourceKind: 'speech' as const, text: p.text, eventSeq: ev.seq, byId: p.agentId }
@@ -162,6 +169,7 @@ function nameIn(ev: SimEvent): QuotedName | null {
       ?.replace(/[.,!?;:]+$/, '')
       .trim()
     if (found === undefined || found.length < 2) continue
+    if (namesABody(found, cast)) continue
     // Verbatim or nothing, through the one enforcement point of the naming law (G9).
     const quoted = assertQuotedName(found, [source])
     if (quoted !== null) return quoted
@@ -177,9 +185,11 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
 
   // One occasion = bodies standing together on one day.
   const byDay = new Map<number, Presence[]>()
+  const cast = new Set<string>()
   for (const ev of events) {
     const pr = presenceOf(ev)
     if (pr === null) continue
+    cast.add(pr.agentId)
     const day = Math.floor(ev.tick / MINUTES_PER_DAY)
     const list = byDay.get(day)
     if (list === undefined) byDay.set(day, [pr])
@@ -213,10 +223,17 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
   // tick order, so the earliest gathering seeds the place.
   for (const all of clusterBy(occasions)) {
     const first = all[0]!
-    const window = all.filter((g) => g.tick - first.tick <= cfg.windowDays * MINUTES_PER_DAY)
-    if (window.length - 1 < cfg.minRecurrences) continue
+    // A habit, once formed, stays one: some run of gatherings inside a single window is what
+    // makes a site, and thereafter every gathering it ever had is one of its own.
+    const span = cfg.windowDays * MINUTES_PER_DAY
+    const dense = all.some(
+      (g) =>
+        all.filter((h) => h.tick >= g.tick && h.tick - g.tick <= span).length - 1 >=
+        cfg.minRecurrences,
+    )
+    if (!dense) continue
 
-    const presences = window.flatMap((g) => g.presences)
+    const presences = all.flatMap((g) => g.presences)
     const speech = presences.filter((p) => p.ev.type === 'agent_spoke')
     const tokens = new Map<string, Set<string>>()
     for (const s of speech) {
@@ -235,16 +252,16 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
 
     let name: CandidateName | null = null
     for (const s of speech) {
-      const found = nameIn(s.ev)
+      const found = nameIn(s.ev, cast)
       if (found !== null && (name === null || found.eventSeq < name.eventSeq)) name = found
     }
 
     out.push({
       key: `construct_${first.x}_${first.y}`,
       anchor,
-      participants: [...new Set(window.flatMap((g) => g.participants))].sort(),
+      participants: [...new Set(all.flatMap((g) => g.participants))].sort(),
       firstTick: first.tick,
-      gatherings: window.map((g) => ({ tick: g.tick, participants: g.participants })),
+      gatherings: all.map((g) => ({ tick: g.tick, participants: g.participants })),
       signals: {
         expressive: presences.filter((p) => p.ev.type === 'agent_expressed').length,
         offerings: presences.filter((p) => p.ev.type === 'item_taken').length,
@@ -317,6 +334,63 @@ export async function classifyCandidates(
   return out
 }
 
+/** How many named things the town can hold in front of it at once. Oldest first, so a name
+ *  already on the page never moves and the block it sits in stays cached. */
+export const NAMED_CUSTOMS_SHOWN = 6
+
+/** The only thing about a construct a mind may ever be told: the name the town gave it, out of
+ *  its own mouth. The glass stops OUR words reaching a mind, and a name quoted verbatim from a
+ *  mind's own speech is the town's word already — `council` is a word a town will use. */
+/** How many separate days a gathering has to come back on before the town is told it has a
+ *  habit, and how many before that habit is called a tradition. Days, not gatherings: three
+ *  market mornings in one day are one morning. */
+export const HABIT_DAYS = 3
+export const TRADITION_DAYS = 7
+export const HABITS_SHOWN = 4
+
+const daysOf = (c: Construct): number =>
+  new Set(
+    [c.firstTick, ...c.recurrences.map((r) => r.tick)].map((t) => Math.floor(t / MINUTES_PER_DAY)),
+  ).size
+
+/** What the town keeps doing, said to every mind in plain words: how many of them, where, and on
+ *  how many days. What kind of thing the recognizer decided it is stays behind the glass; a name
+ *  is said only when the town gave one. Oldest habit first. */
+export function habitLines(constructs: readonly Construct[]): string[] {
+  return constructs
+    .map((c) => ({ c, days: daysOf(c) }))
+    .filter(({ days }) => days >= HABIT_DAYS)
+    .sort((a, b) => a.c.firstTick - b.c.firstTick || (a.c.id < b.c.id ? -1 : 1))
+    .slice(0, HABITS_SHOWN)
+    .map(({ c, days }) => {
+      const people = new Set([...c.participants, ...c.recurrences.flatMap((r) => r.participants)])
+      const where =
+        c.anchor === null
+          ? ''
+          : typeof c.anchor === 'string'
+            ? ` at the ${c.anchor}`
+            : ` at the same spot near (${c.anchor.x}, ${c.anchor.y})`
+      const named =
+        c.name === null ? 'Nobody has given it a name yet.' : `You call it the ${c.name}.`
+      const standing = days >= TRADITION_DAYS ? 'It is a tradition by now.' : ''
+      return [
+        `${people.size} of you have gathered${where} on ${days} different days.`,
+        named,
+        standing,
+      ]
+        .filter((s) => s.length > 0)
+        .join(' ')
+    })
+}
+
+export function namedCustoms(constructs: readonly Construct[]): string[] {
+  return constructs
+    .filter((c) => c.nameProvenance?.sourceKind === 'speech')
+    .sort((a, b) => a.firstTick - b.firstTick || (a.id < b.id ? -1 : 1))
+    .flatMap((c) => (c.name === null ? [] : [c.name]))
+    .slice(0, NAMED_CUSTOMS_SHOWN)
+}
+
 // The ops-plane read of the world's laws (G5): the recognizer is an entry point into
 // config-derived behaviour, so it derives its own from the same whitelist the fold uses.
 export function lawsFromEvents(events: SimEvent[]): Record<string, unknown> {
@@ -345,17 +419,30 @@ export type ConstructPassDeps = {
 export async function runConstructPass(deps: ConstructPassDeps): Promise<Construct[]> {
   const config = effectiveConfig(deps.baseConfig, deps.laws ?? lawsFromEvents(deps.events))
   if (!config.constructs.enabled) return []
-  const candidates = detectCandidates(deps.events, config)
-  const types = await classifyCandidates(candidates, deps.llm, config)
+  // A key is the earliest gathering still in the window, and the window rolls: the same ground
+  // keeps the id it was first registered under rather than being recognized a second time.
+  const registry = deps.store.all()
+  const candidates = detectCandidates(deps.events, config).map((c) => {
+    const seen = registry.find(
+      (r) =>
+        r.id === c.key ||
+        (typeof r.anchor === 'object' && r.anchor !== null && near(r.anchor, c.anchor)),
+    )
+    return seen === undefined ? c : { ...c, key: seen.id }
+  })
+  // A site the registry has already typed is not asked about again: the answer for one is
+  // thrown away, and the prompt grows a block per site.
+  const untyped = candidates.filter((c) => deps.store.byId(c.key) === null)
+  const types = await classifyCandidates(untyped, deps.llm, config)
 
   const out: Construct[] = []
   for (const c of candidates) {
-    const type = types.get(c.key)
-    if (type === undefined) continue
     const known = deps.store.byId(c.key)
+    const type = known?.type ?? types.get(c.key)
+    if (type === undefined) continue
     const row: Construct = {
       id: c.key,
-      type: known?.type ?? type,
+      type,
       name: c.name?.name ?? known?.name ?? null,
       nameProvenance: c.name ?? known?.nameProvenance ?? null,
       anchor: c.anchor,
@@ -372,16 +459,13 @@ export async function runConstructPass(deps: ConstructPassDeps): Promise<Constru
         anchor: row.anchor,
         participants: row.participants,
       })
-      for (const r of row.recurrences) {
-        deps.store.record('construct_recurred', row.id, r.tick, { participants: r.participants })
-      }
-      if (row.nameProvenance !== null) {
-        deps.store.record('construct_named', row.id, row.firstTick, {
-          name: row.name,
-          provenance: row.nameProvenance,
-        })
-      }
-    } else if (known.nameProvenance === null && row.nameProvenance !== null) {
+    }
+    const already = new Set((known?.recurrences ?? []).map((r) => r.tick))
+    for (const r of row.recurrences) {
+      if (already.has(r.tick)) continue
+      deps.store.record('construct_recurred', row.id, r.tick, { participants: r.participants })
+    }
+    if (row.nameProvenance !== null && (known?.nameProvenance ?? null) === null) {
       deps.store.record('construct_named', row.id, row.firstTick, {
         name: row.name,
         provenance: row.nameProvenance,

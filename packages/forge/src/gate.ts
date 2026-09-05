@@ -1,5 +1,8 @@
 import type { RawImage } from './post/raw.js'
 
+/** A cell that is all but empty clears every other check: right size, has alpha, not blank. */
+const MIN_OPAQUE_FRACTION = 0.01
+
 export function mechanicalGate(
   img: RawImage,
   expected: { w: number; h: number; requireAlpha: boolean },
@@ -9,7 +12,13 @@ export function mechanicalGate(
     failures.push(`size ${img.width}x${img.height}, expected ${expected.w}x${expected.h}`)
   let transparent = 0
   for (let i = 3; i < img.data.length; i += 4) if (img.data[i] === 0) transparent++
-  if (transparent === img.width * img.height) failures.push('empty: sprite is fully transparent')
+  const cells = img.width * img.height
+  const opaque = cells - transparent
+  if (opaque < cells * MIN_OPAQUE_FRACTION)
+    failures.push(
+      `empty: ${((opaque / cells) * 100).toFixed(1)}% of the sprite is opaque, ` +
+        `below the ${MIN_OPAQUE_FRACTION * 100}% floor`,
+    )
   if (expected.requireAlpha && transparent === 0)
     failures.push('no alpha: expected transparent background pixels')
   return { ok: failures.length === 0, failures }

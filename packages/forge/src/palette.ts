@@ -15,6 +15,20 @@ export const MASTER_PALETTE = [
   '#F5D3B3', '#D9A876', '#9C6B47',
 ] as const
 
+// A style anchor teaches architecture; a swatch teaches colour. With the anchor cottage attached
+// the model returned THE ANCHOR RECOLOURED against a prompt that banned the arch by name.
+export const SWATCH_CLAUSE =
+  'The reference image is a COLOUR CHART, not an object. It carries the palette and nothing ' +
+  'else. There is NO object to copy anywhere in this request — invent the subject from the ' +
+  'description alone.'
+
+/** The palette, in words, for calls whose only reference is the colour chart. */
+export const PALETTE_WORDS = [
+  'Colour it from this warm cozy pastel palette ONLY:',
+  MASTER_PALETTE.join(' '),
+  '— flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
+].join(' ')
+
 export function paletteRgb(hexes: readonly string[] = MASTER_PALETTE): Rgb[] {
   return hexes.map((h) => [
     parseInt(h.slice(1, 3), 16),

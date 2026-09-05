@@ -10,13 +10,13 @@ export type GistLlm = { gist(text: string): Promise<string> }
 // A mark is the only handle an act has on a thing: a short form that paraphrases
 // `item_..._bread` as "bread" leaves the next turn unable to name what it reaches for.
 export const GIST_SYSTEM = [
-  'One moment of your day comes back to you. Set it down in short.',
+  'One moment of your day comes back to you. Write it down short.',
   'Copy every mark exactly as it is written (item_..., structure_..., node_...) beside the thing',
   'it names. Write each mark out in full, one for each thing; never shorten one, never rename one,',
-  'never fold several into a shared stem, never leave one out.',
+  'never merge several into one, never leave one out.',
   'Keep every number, every promise made or owed, every want of yours, and who did what to whom.',
-  'Let go of the weather, the scenery, and anything the moment only says twice.',
-  'Answer with the short form alone, in two sentences or three.',
+  'Drop the weather, the scenery, and anything the moment says twice.',
+  'Answer with the short version only, in two or three sentences.',
 ].join('\n')
 
 /** What a memory is worth sending: the night's short form once it has one. */

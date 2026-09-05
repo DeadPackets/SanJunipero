@@ -19,8 +19,8 @@ export type CommittedItem = {
   icon: Buffer
 }
 
-/** Every committed item, in kind order. A directory missing any of its three files is an
- *  ERROR, not a skip: half an item on disk is how art goes quietly missing. */
+/** Every committed item, in kind order. A half-present directory is loud and skipped: one bad
+ *  item must not take the other fifty-three and the interiors down with it. */
 export function listCommittedItems(root: string = ITEMS_CONTENT_DIR): CommittedItem[] {
   if (!existsSync(root)) return []
   const out: CommittedItem[] = []
@@ -34,32 +34,33 @@ export function listCommittedItems(root: string = ITEMS_CONTENT_DIR): CommittedI
       sprite: join(base, 'sprite.webp'),
       icon: join(base, 'icon.webp'),
     }
-    for (const [name, p] of Object.entries(paths)) {
-      if (!existsSync(p)) throw new Error(`items/${kind}: ${name} is missing`)
+    try {
+      for (const [name, p] of Object.entries(paths)) {
+        if (!existsSync(p)) throw new Error(`${name} is missing`)
+      }
+      const manifest = LibraryItemManifestSchema.parse(
+        JSON.parse(readFileSync(paths.manifest, 'utf8')),
+      )
+      if (manifest.kind !== kind)
+        throw new Error(`manifest kind "${manifest.kind}" belongs in items/${manifest.kind}`)
+      // The catalog is the specification and the content is the answer to it: content for a kind
+      // the catalog does not carry would ship as a row nothing can ever resolve.
+      const entry = libraryEntry(kind)
+      if (entry === null) throw new Error('no LIBRARY entry — the catalog does not carry this kind')
+      if (manifest.category !== entry.category)
+        throw new Error(
+          `manifest category "${manifest.category}" is not the catalog's "${entry.category}"`,
+        )
+      out.push({
+        kind,
+        entry,
+        manifest,
+        sprite: readFileSync(paths.sprite),
+        icon: readFileSync(paths.icon),
+      })
+    } catch (err) {
+      console.warn(`items/${kind}: NO ART — ${err instanceof Error ? err.message : String(err)}`)
     }
-    const manifest = LibraryItemManifestSchema.parse(
-      JSON.parse(readFileSync(paths.manifest, 'utf8')),
-    )
-    if (manifest.kind !== kind)
-      throw new Error(
-        `items/${kind}: manifest kind "${manifest.kind}" belongs in items/${manifest.kind}`,
-      )
-    // The catalog is the specification and the content is the answer to it: content for a kind
-    // the catalog does not carry would ship as a row nothing can ever resolve.
-    const entry = libraryEntry(kind)
-    if (entry === null)
-      throw new Error(`items/${kind}: no LIBRARY entry — the catalog does not carry this kind`)
-    if (manifest.category !== entry.category)
-      throw new Error(
-        `items/${kind}: manifest category "${manifest.category}" is not the catalog's "${entry.category}"`,
-      )
-    out.push({
-      kind,
-      entry,
-      manifest,
-      sprite: readFileSync(paths.sprite),
-      icon: readFileSync(paths.icon),
-    })
   }
   return out
 }

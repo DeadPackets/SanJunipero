@@ -1,7 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   DEFAULT_CONFIG,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   type SimConfig,
@@ -47,7 +49,10 @@ function makeWorld(rows: string[] = ['........', '........', '........', '......
     DEFAULT_CONFIG,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
+  return fold(
+    s,
+    ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 
 const testVerb: VerbDef = {
@@ -67,6 +72,7 @@ const TIER1 = [
   'walk',
   'sleep',
   'wake',
+  'stop',
   'enter',
   'exit',
   'eat',
@@ -101,7 +107,11 @@ const TIER1 = [
   'inscribe',
   'teach',
   'attack',
-  'experiment',
+  'court',
+  'propose',
+  'lie_with',
+  'leave_partner',
+  'leave_town',
 ]
 
 afterEach(() => {
@@ -220,6 +230,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
           {
             need: 'hunger',
             delta: POISONS.needs.eatRestoreHunger * nutritionOf(POISONS, 'pale_mushroom'),
+            reason: 'meal',
           },
         ],
       },
@@ -317,7 +328,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
     it('a loaf in another pair of hands is not within anybody else’s reach', () => {
       const s = fold(
         at({ t: 'tile', x: 1, y: 0 }),
-        ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }),
+        ev(3, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: ADULT_AGE_DAYS }),
       )
       const held = fold(s, ev(4, 'item_moved', { id: 'item_1', loc: { t: 'agent', id: 'a2' } }))
       expect(submitIntent(held, DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' })).toEqual({
@@ -383,15 +394,23 @@ describe("tend: an hour of another body's hands", () => {
       CFG,
       ['....', '....', '....', '....'].map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), CFG)
-    s = fold(s, ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     return { ...s, agents: { ...s.agents, a1: { ...s.agents.a1!, hp: 50 } } }
   }
   const complete = (s: WorldState, params: Record<string, unknown>) =>
     VERBS.tend!.onComplete(s, CFG, 'a2', params, new RngStreams('t').get('actions'))
 
-  it('takes three ticks, names the tender, and reads as a C9 log when it has to', () => {
-    expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(3)
+  it('takes an hour, names the tender, and reads as a C9 log when it has to', () => {
+    expect(VERBS.tend!.duration(pair(), CFG, 'a2', { targetId: 'a1' })).toBe(DURATION_TICKS.hour)
     expect(complete(pair(), { targetId: 'a1' })).toEqual([
       { type: 'agent_tended', payload: { agentId: 'a1', tenderId: 'a2' } },
     ])
@@ -476,7 +495,11 @@ describe('verb: pave', () => {
       config,
       rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
     )
-    s = fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+    s = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+      config,
+    )
     if (qty === 0) return s
     return fold(
       s,
@@ -492,10 +515,10 @@ describe('verb: pave', () => {
   const laid = (s: WorldState, x: number, y: number, config = CFG) =>
     VERBS.pave!.onComplete(s, config, 'a1', { x, y }, new RngStreams('t').get('actions'))
 
-  it('turns grass to road for one stone and six ticks of work', () => {
+  it('turns grass to road for one stone and minutes of work', () => {
     const s = quarried()
     expect(VERBS.pave!.duration(s, CFG, 'a1', { x: 1, y: 0 })).toBe(CFG.roads.paveDurationTicks)
-    expect(CFG.roads.paveDurationTicks).toBe(6)
+    expect(CFG.roads.paveDurationTicks).toBe(DURATION_TICKS.minutes)
     expect(laid(s, 1, 0)).toEqual([
       { type: 'item_qty_changed', payload: { id: 'item_1', delta: -CFG.roads.stonePerTile } },
       {
@@ -745,7 +768,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     weather: { hourlyChangeChance: 0 },
     mystery: { chancePerDay: 0 },
   })
-  const AUTUMN_DUSK = 200 * MINUTES_PER_DAY + 19 * 60 + 30
+  const AUTUMN_DUSK = (2 * DAYS_PER_SEASON + 3) * MINUTES_PER_DAY + 19 * 60 + 30
 
   const carrying = (kinds: string[], s = makeWorld()): WorldState => {
     let out = s
@@ -780,7 +803,12 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
     if (r.ok)
       expect(r.events[0]).toEqual({
         type: 'action_started',
-        payload: { agentId: 'a1', verb: 'wear', params: { itemId: 'item_1' }, duration: 1 },
+        payload: {
+          agentId: 'a1',
+          verb: 'wear',
+          params: { itemId: 'item_1' },
+          duration: DURATION_TICKS.minutes,
+        },
       })
     expect(
       VERBS.wear!.onComplete(
@@ -874,7 +902,7 @@ describe('wear and doff: one body slot, and a night you can survive', () => {
 
     const onlooker = fold(
       worn,
-      ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: 7300 }),
+      ev(600, 'agent_spawned', { id: 'a2', name: 'a2', x: 2, y: 0, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
     const seen = composePerception(onlooker, CFG, 'a2', []).visible.agents.find(
@@ -909,7 +937,7 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
     s = { ...s, tick }
     s = fold(
       s,
-      ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }),
+      ev(700, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
       config,
     )
     const kit: [string, string][] = [

@@ -125,3 +125,32 @@ describe('derivePersona (T25)', () => {
     expect(son.identity.backstory).not.toMatch(/\bshe\b|\bher\b/)
   })
 })
+
+describe('★ a voice that came up the valley road', () => {
+  const WALKER = { ...CHILD, ageYears: 31 }
+
+  it('is drawn on a stream of its own, so the road and the cradle never build one person', () => {
+    const road = derivePersona(WALKER, [MOTHER, FATHER], 'road')
+    expect(JSON.stringify(road)).toBe(
+      JSON.stringify(derivePersona(WALKER, [MOTHER, FATHER], 'road')),
+    )
+    expect(JSON.stringify(road)).not.toBe(JSON.stringify(derivePersona(CHILD, [MOTHER, FATHER])))
+  })
+
+  it('carries its own years and a road behind it, and names nobody as a parent', () => {
+    const { identity, personality } = derivePersona(WALKER, [MOTHER, FATHER], 'road')
+    expect(identity.age).toBe(31)
+    expect(identity.backstory).toContain('valley road')
+    expect(identity.backstory).not.toContain('Amara')
+    expect(identity.backstory).not.toContain('Yusuf')
+    expect(identity.backstory).not.toMatch(FORBIDDEN_FRAMING)
+    expect(personality.current.goals.join(' ')).toContain('this place')
+  })
+
+  it('still takes its voice from the two cards behind it', () => {
+    const { identity } = derivePersona(WALKER, [MOTHER, FATHER], 'road')
+    expect([MOTHER.identity.voiceCard.register, FATHER.identity.voiceCard.register]).toContain(
+      identity.voiceCard.register,
+    )
+  })
+})

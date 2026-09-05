@@ -143,6 +143,15 @@ export function createInteriorScene(
   root.eventMode = 'passive'
   const veil = new Graphics()
   veil.eventMode = 'static' // the dimmed town is scenery: a click must not reach through it
+  // A screen-sized rectangle of two constants: cut when the screen changes size, never a frame.
+  let veilFor = { w: 0, h: 0 }
+  const drawVeil = (): void => {
+    if (veilFor.w === app.screen.width && veilFor.h === app.screen.height) return
+    veilFor = { w: app.screen.width, h: app.screen.height }
+    veil.clear()
+    veil.rect(0, 0, veilFor.w, veilFor.h)
+    veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })
+  }
   const room = new Container()
   // Passive, not inert: the room takes no click of its own, and the bodies inside it do.
   room.eventMode = 'passive'
@@ -191,6 +200,10 @@ export function createInteriorScene(
   // of the body it belongs to, because it is not in the sort at all.
   const shadows = new Graphics()
   shadows.zIndex = -1.5
+  // Every ellipse the plane holds, flat: (sx, sy, rx, ry, alpha). A room where nobody is
+  // walking hands `Graphics` the same set sixty times a second otherwise.
+  const shadowSet: number[] = []
+  let shadowDrawn: number[] = []
   room.addChild(
     walls,
     wallArt,
@@ -716,7 +729,7 @@ export function createInteriorScene(
         b.inside === null ? null : b.inside.slice(0, b.inside.indexOf(':')),
       ]),
     )
-    shadows.clear()
+    shadowSet.length = 0
     const bodyPts: { id: string; sx: number; sy: number }[] = []
     for (const p of pieces) {
       const node = p.kind === 'body' ? bodies.get(p.id) : furniture.get(p.id)
@@ -739,8 +752,15 @@ export function createInteriorScene(
         p.kind === 'body'
           ? { sx: node.position.x, sy: node.position.y }
           : { sx: node.position.x, sy: node.position.y - s.lift }
-      shadows.ellipse(foot.sx, foot.sy, s.rx, s.ry)
-      shadows.fill({ color: ROOM_SHELL_INK, alpha: s.alpha })
+      shadowSet.push(foot.sx, foot.sy, s.rx, s.ry, s.alpha)
+    }
+    if (shadowSet.length !== shadowDrawn.length || shadowSet.some((v, i) => v !== shadowDrawn[i])) {
+      shadowDrawn = [...shadowSet]
+      shadows.clear()
+      for (let i = 0; i < shadowSet.length; i += 5) {
+        shadows.ellipse(shadowSet[i]!, shadowSet[i + 1]!, shadowSet[i + 2]!, shadowSet[i + 3]!)
+        shadows.fill({ color: ROOM_SHELL_INK, alpha: shadowSet[i + 4]! })
+      }
     }
 
     for (const [id, sprite] of bodies) {
@@ -775,8 +795,10 @@ export function createInteriorScene(
     if (beforePush === null) return
     const { sx, sy, stop } = beforePush
     beforePush = null
-    if (scene.getZoomStop() !== stop) scene.setZoom(stop)
+    // Centre FIRST: the transit pins whatever is at screen centre when a stop is asked for, and
+    // re-pins it every frame it runs. Zoom first and the door is what comes back.
     scene.centerOnScreen(sx, sy)
+    if (scene.getZoomStop() !== stop) scene.setZoom(stop)
   }
 
   function setActive(structureId: string | null): void {
@@ -832,9 +854,7 @@ export function createInteriorScene(
     if (!root.visible) return
     veil.alpha = veilAlpha
     room.alpha = roomAlpha
-    veil.clear()
-    veil.rect(0, 0, app.screen.width, app.screen.height)
-    veil.fill({ color: INTERIOR_VEIL, alpha: INTERIOR_VEIL_ALPHA })
+    drawVeil()
     // Option C has one integer scene zoom and it is 1: the interior tile is authored at the size
     // it reaches the glass, so every other factor resamples pixel art.
     const zoom = roomZoomFor(app.screen.height)

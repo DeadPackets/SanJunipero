@@ -1,3 +1,4 @@
 { "name": "@sj/shared", "version": "0.0.1", "type": "module",
-  "exports": { ".": "./src/index.ts", "./narratorSchema": "./src/narratorSchema.ts" },
+  "exports": { ".": "./src/index.ts", "./narratorSchema": "./src/narratorSchema.ts",
+    "./testutil": "./src/testutil/index.ts" },
   "dependencies": { "zod": "^4.4.0" } }

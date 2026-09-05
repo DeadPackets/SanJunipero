@@ -28,6 +28,7 @@ const IRREGULAR_PARTICIPLE: Record<string, string> = {
   go: 'gone',
   hold: 'held',
   leave: 'left',
+  lie: 'lain',
   light: 'lit',
   make: 'made',
   put: 'put',
@@ -54,7 +55,10 @@ const IRREGULAR_PARTICIPLE: Record<string, string> = {
 const DOUBLES_FINAL_CONSONANT = /^[^aeiou]*[aeiou][^aeiouwxy]$/
 
 export const pastParticiple = (verb: string): string => {
-  const irregular = IRREGULAR_PARTICIPLE[verb]
+  // A minted verb id may be spelled `constructor`, and a plain object answers to that.
+  const irregular = Object.hasOwn(IRREGULAR_PARTICIPLE, verb)
+    ? IRREGULAR_PARTICIPLE[verb]
+    : undefined
   if (irregular !== undefined) return irregular
   if (verb.endsWith('e')) return `${verb}d`
   if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ed`
@@ -65,4 +69,20 @@ export const pastParticiple = (verb: string): string => {
 export const verbPhrasePast = (verb: string): string => {
   const [head, ...rest] = verbWords(verb)
   return [pastParticiple(head), ...rest].join(' ')
+}
+
+// -ie takes -ying, not -ieing: lie -> lying. The one shape the -e rule below gets wrong.
+const IRREGULAR_PRESENT_PARTICIPLE: Record<string, string> = { lie: 'lying' }
+
+const presentParticiple = (verb: string): string => {
+  if (Object.hasOwn(IRREGULAR_PRESENT_PARTICIPLE, verb)) return IRREGULAR_PRESENT_PARTICIPLE[verb]!
+  if (verb.endsWith('e') && !verb.endsWith('ee')) return `${verb.slice(0, -1)}ing`
+  if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ing`
+  return `${verb}ing`
+}
+
+/** "you broke off fishing" — the act named while it was still going on. */
+export const verbPhraseGerund = (verb: string): string => {
+  const [head, ...rest] = verbWords(verb)
+  return [presentParticiple(head), ...rest].join(' ')
 }

@@ -11,6 +11,7 @@ import {
   type TileId,
 } from '@sj/engine'
 import {
+  ADULT_AGE_DAYS,
   DISCOVERY_EVENT,
   SimConfigSchema,
   stateHash,
@@ -84,9 +85,9 @@ function ownedWorld(opts: { recentWindowTicks?: number } = {}): {
   const put = (type: string, payload: unknown) => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: 7300 })
-  put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: 7300 })
-  put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 3, y: 3, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'bex', name: 'Bex', x: 4, y: 3, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'cass', name: 'Cass', x: 5, y: 3, ageDays: ADULT_AGE_DAYS })
   put('item_spawned', {
     id: 'item_1',
     kind: 'bread',
@@ -223,6 +224,25 @@ describe('the default perception window outlasts the gap between turns (D-28-6)'
     expect(read[0]!.rows.every((ev) => ev.tick > cutoff)).toBe(true)
   })
 
+  it('reads the log once a tick, however often the minds look', () => {
+    const { bridge, store, step } = ownedWorld()
+    step()
+    bridge.perception(AGENT)
+    let reads = 0
+    const inner = store.readFrom.bind(store)
+    store.readFrom = (from: number) => {
+      reads += 1
+      return inner(from)
+    }
+    bridge.perception(AGENT)
+    bridge.perception(AGENT)
+    expect(reads).toBe(0)
+    step()
+    bridge.perception(AGENT)
+    bridge.perception(AGENT)
+    expect(reads).toBe(1)
+  })
+
   it('a bridge built moments after the event still carries it', () => {
     const { config, loop, store, step } = ownedWorld()
     step() // Cass lifts Bex's plank at tick 1, in Tamar's sight
@@ -311,7 +331,7 @@ function larder(plant?: (terrain: TileId[][]) => void): EngineBridge {
   const put = (type: string, payload: unknown) => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: 'shed_1',
     kind: 'storehouse',
@@ -419,7 +439,7 @@ function announceHarness(world: TickHandler = () => {}): {
       name: 'Tamar',
       x: 3,
       y: 3,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
     }),
     config,
   )
@@ -555,5 +575,32 @@ describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
     expect(stateHash(replayFromGenesis(store, config, terrain))).toBe(stateHash(loop.state))
     expect(loop.state.tick).toBe(1)
     expect(before).not.toBe('')
+  })
+})
+
+// Perception reports that a thing was done and never that it was done to you, and only the
+// second is what a mind's affection is fed by.
+describe('★ an expression aimed at one body', () => {
+  it('names whoever aimed it here, and not whoever only did it nearby', () => {
+    const { bridge, store, loop } = ownedWorld()
+    const expressed = (agentId: string, verb: string, targetId?: string): void => {
+      store.append(loop.tick, 'agent_expressed', {
+        agentId,
+        verb,
+        ...(targetId === undefined ? {} : { targetId }),
+        x: 4,
+        y: 3,
+        sense: 'sight',
+      })
+    }
+    expressed('bex', 'express:comfort', AGENT)
+    expressed('cass', 'express:mourn')
+    expressed('cass', 'express:sing', 'bex')
+    // A minted act that is not an expression reaches nobody's affection.
+    expressed('bex', 'dig_channel', AGENT)
+
+    expect(bridge.expressedAt(AGENT)).toEqual(['bex'])
+    expect(bridge.expressedAt('bex')).toEqual(['cass'])
+    expect(bridge.expressedAt('cass')).toEqual([])
   })
 })

@@ -49,6 +49,12 @@ describe('connectObservatory link status', () => {
       getItem: () => null,
       setItem: () => undefined,
     })
+    const session = new Map<string, string>()
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => session.get(k) ?? null,
+      setItem: (k: string, v: string) => void session.set(k, v),
+      removeItem: (k: string) => void session.delete(k),
+    })
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -131,6 +137,64 @@ describe('connectObservatory link status', () => {
     expect(reload).toHaveBeenCalledTimes(1)
   })
 
+  /** A bundle Cloudflare still serves after a protocol bump refuses the SAME hello after the
+   *  reload; without a guard every open tab fetches it again about once a second, forever. */
+  it('★ reloads once for a refusal, then reconnects instead of looping', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.drop(CLOSE_BAD_HELLO)
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    // the reload happened: the same bundle comes back up and is refused again
+    FakeWebSocket.instances = []
+    const statuses: string[] = []
+    connectObservatory({
+      url: 'ws://test/ws',
+      store: createWorldStore(),
+      onStatus: (s) => statuses.push(s),
+    })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.drop(CLOSE_BAD_HELLO)
+    expect(reload, 'a second refusal must not fetch the bundle again').toHaveBeenCalledTimes(1)
+    expect(statuses.at(-1)).toBe('reconnecting')
+  })
+
+  it('★ reloads once for a snapshot this bundle cannot read, and not again', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const bad = JSON.stringify({ ...SNAPSHOT, config: { mystery: 1 } })
+    for (let round = 0; round < 2; round++) {
+      FakeWebSocket.instances = []
+      connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+      FakeWebSocket.instances[0]!.open()
+      FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    }
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  /** A tab that came back and READ the town is not out of date; the next real mismatch must
+   *  still be allowed its one reload. */
+  it('★ a snapshot the bundle can read clears the once-guard', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const bad = JSON.stringify({ ...SNAPSHOT, config: { mystery: 1 } })
+    connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    FakeWebSocket.instances = []
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    expect(store.getState()).not.toBeNull()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    expect(reload).toHaveBeenCalledTimes(2)
+  })
+
   /** A delta that will not fold leaves a half-folded town; only the server's own state is one. */
   it('★ asks to go live again when the store cannot take a delta', () => {
     const store = createWorldStore()
@@ -157,6 +221,53 @@ describe('connectObservatory link status', () => {
       data: JSON.stringify({ t: 'scrubbed', reqId: 1, tick: 5, state: SNAPSHOT.state }),
     })
     expect(store.getMode()).toEqual({ live: true })
+  })
+
+  /** The same reqId ladder a scrub climbs: an answer for a moment the viewer has left is stale
+   *  whichever frame carries it. */
+  it('★ asks for a replay, and drops one answered after the viewer went back to now', () => {
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+
+    handle.replay(7)
+    expect(sock.sent.at(-1)).toBe('{"t":"replay","from":7,"reqId":1}')
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 7, seq: 3, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 7 })
+
+    handle.goLive()
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 7, seq: 3, state: SNAPSHOT.state }),
+    })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 7 })
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    expect(store.getMode()).toEqual({ live: true })
+  })
+
+  /** `sj:lastSeenTick` is what decides whether the next visit is offered a digest of the days it
+   *  missed. A replayed minute is one this viewer is watching, not one it slept through. */
+  it('★ never stores a replayed minute as the last minute this viewer saw', () => {
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => null, setItem })
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    setItem.mockClear()
+
+    handle.replay(1)
+    sock.onmessage?.({
+      data: JSON.stringify({ t: 'replaying', reqId: 1, tick: 1, seq: 0, state: SNAPSHOT.state }),
+    })
+    const adv = { seq: 1, tick: 1, type: 'tick_advanced', payload: {} }
+    sock.onmessage?.({ data: JSON.stringify({ t: 'tick', tick: 1, seq: 1, events: [adv] }) })
+    expect(store.getTick(), 'the replayed minute did land').toBe(1)
+    expect(setItem).not.toHaveBeenCalled()
   })
 
   it('a deliberate close() never reports reconnecting', () => {

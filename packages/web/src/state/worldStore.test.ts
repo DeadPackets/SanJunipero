@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type AssetRecord, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  stateHash,
+  type AssetRecord,
+  type SimEvent,
+} from '@sj/shared'
 import { fold, genesisState, type TileId } from '@sj/engine'
 import { createWorldStore, onFirstSnapshot } from './worldStore.js'
 
@@ -9,7 +15,7 @@ const spawn: SimEvent = {
   seq: 1,
   tick: 1,
   type: 'agent_spawned',
-  payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: 7300 },
+  payload: { id: 'walker', name: 'Walker', x: 0, y: 0, ageDays: ADULT_AGE_DAYS },
 }
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
@@ -110,20 +116,83 @@ describe('worldStore', () => {
     const snap = makeSnapshot()
     store.applyServer(snap)
     store.applyServer({ t: 'scrubbed', reqId: 1, tick: 1, state: snap.state })
-    expect(store.getMode()).toEqual({ live: false, tick: 1 })
+    expect(store.getMode()).toEqual({ live: false, replaying: false, tick: 1 })
+    expect(store.timeMoving()).toBe(false)
     expect(store.getTick()).toBe(1)
     store.applyServer(makeSnapshot())
     expect(store.getMode()).toEqual({ live: true })
+    expect(store.timeMoving()).toBe(true)
+  })
+
+  // ★ The whole of the bug the owner reported: a scrub was a still frame because every delta was
+  // dropped unless the view was live. A replay is not live, and its time moves.
+  it('★ a replay folds its deltas and walks the clock on; a still scrub takes none', () => {
+    const store = createWorldStore()
+    const snap = { ...makeSnapshot(), seq: 900 } // the live edge, far ahead of the replayed past
+    store.applyServer(snap)
+    const reached: SimEvent = { seq: 900, tick: 5, type: 'tick_advanced', payload: {} }
+    store.applyServer({ t: 'tick', tick: 5, seq: 901, events: [reached] })
+    expect(store.liveEdge()).toBe(5)
+
+    store.applyServer({ t: 'replaying', reqId: 1, tick: 1, seq: 1, state: snap.state })
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 1 })
+    expect(store.timeMoving()).toBe(true)
+
+    const adv: SimEvent = { seq: 2, tick: 2, type: 'tick_advanced', payload: {} }
+    const ev: SimEvent = {
+      seq: 3,
+      tick: 2,
+      type: 'agent_moved',
+      payload: { id: 'walker', x: 1, y: 2 },
+    }
+    // ★ the recorded seqs are far BELOW the live head this viewer had; the guard must not eat them
+    store.applyServer({ t: 'tick', tick: 2, seq: 3, events: [adv, ev] })
+    const reference = fold(fold(snap.state, adv, DEFAULT_CONFIG), ev, DEFAULT_CONFIG)
+    expect(stateHash(store.getState())).toBe(stateHash(clone(reference)))
+    expect(store.getTick()).toBe(2)
+    expect(store.getMode()).toEqual({ live: false, replaying: true, tick: 2 })
+
+    // ...and the live watermark stays where the live town left it
+    expect(store.liveEdge()).toBe(5)
+
+    // the same delta on a STILL scrub changes nothing at all
+    const still = createWorldStore()
+    still.applyServer(makeSnapshot())
+    still.applyServer({ t: 'scrubbed', reqId: 1, tick: 1, state: snap.state })
+    still.applyServer({ t: 'tick', tick: 2, seq: 3, events: [adv, ev] })
+    expect(stateHash(still.getState())).toBe(stateHash(snap.state))
+    expect(still.getTick()).toBe(1)
+  })
+
+  // ★ Going live must not leave the viewer deaf: the snapshot carries the live head, so the
+  // frames after it clear the guard the replay had wound back.
+  it('★ a snapshot after a replay takes the live deltas that follow it', () => {
+    const store = createWorldStore()
+    store.applyServer({ ...makeSnapshot(), seq: 900 })
+    store.applyServer({ t: 'replaying', reqId: 1, tick: 1, seq: 1, state: makeSnapshot().state })
+    expect(store.logSeq()).toBe(1)
+
+    store.applyServer({ ...makeSnapshot(), seq: 900 })
+    expect(store.getMode()).toEqual({ live: true })
+    const adv: SimEvent = { seq: 901, tick: 2, type: 'tick_advanced', payload: {} }
+    expect(store.applyServer({ t: 'tick', tick: 2, seq: 901, events: [adv] })).toBeNull()
+    expect(store.getTick()).toBe(2)
   })
 
   it('thoughts feed latestThought and a 200-entry capped log', () => {
     const store = createWorldStore()
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 3, text: 'First.' })
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 4, text: 'Second.' })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 3, text: 'First.', importance: 5 })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 4, text: 'Second.', importance: 5 })
     expect(store.latestThought('walker')).toEqual({ tick: 4, text: 'Second.' })
     expect(store.latestThought('nobody')).toBeNull()
     for (let i = 0; i < 205; i++)
-      store.applyServer({ t: 'thought', agentId: 'other', tick: 5 + i, text: `t${i}` })
+      store.applyServer({
+        t: 'thought',
+        agentId: 'other',
+        tick: 5 + i,
+        text: `t${i}`,
+        importance: 5,
+      })
     expect(store.thoughtsLog()).toHaveLength(200)
     expect(store.thoughtsLog()[0]!.text).toBe('t5') // oldest 7 dropped (2 walker + t0..t4)
   })
@@ -133,7 +202,7 @@ describe('worldStore', () => {
   it('★ keeps counting thoughts past the cap the log holds', () => {
     const store = createWorldStore()
     for (let i = 0; i < 205; i++)
-      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}` })
+      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}`, importance: 5 })
     expect(store.thoughtsSeq()).toBe(205)
     expect(store.thoughtsLog()).toHaveLength(200)
   })
@@ -149,6 +218,26 @@ describe('worldStore', () => {
     store.applyServer({ t: 'assets', records: [record, record] })
     expect(store.assetsSeq()).toBe(3)
     expect(store.assetRecords()).toHaveLength(3)
+  })
+
+  it('★ holds the scene the town is in, and keeps the closing frame that carries the summary', () => {
+    const store = createWorldStore()
+    expect(store.getScene()).toBe(null)
+    const open = {
+      id: 'sc_1',
+      kind: 'quarrel' as const,
+      participants: ['amara', 'salma'],
+      topic: 'the well',
+      stakes: 9,
+      open: true,
+    }
+    store.applyServer({ t: 'scene', scene: open })
+    expect(store.getScene()).toEqual(open)
+
+    // The close is not a clear: whoever shows the summary decides how long it stands.
+    store.applyServer({ t: 'scene', scene: { ...open, open: false, summary: 'They agreed.' } })
+    expect(store.getScene()?.open).toBe(false)
+    expect(store.getScene()?.summary).toBe('They agreed.')
   })
 
   it('onEvents fires per delta and recentEvents keeps the last 400', () => {
@@ -202,7 +291,7 @@ describe('worldStore', () => {
     store.applyServer(makeSnapshot())
     expect(n).toBe(1)
     off()
-    store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: 'x' })
+    store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: 'x', importance: 5 })
     expect(n).toBe(1)
   })
 
@@ -221,14 +310,14 @@ describe('worldStore', () => {
       store.subscribe(() => n++)
       store.applyServer(makeSnapshot())
       for (let i = 0; i < 40; i++) {
-        store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: `t${i}` })
+        store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: `t${i}`, importance: 5 })
       }
       expect(n).toBe(0) // nothing has been drawn yet
       expect(frames).toHaveLength(1) // one frame asked for, not forty-one
       frames.pop()!()
       expect(n).toBe(1)
       expect(store.thoughtsLog()).toHaveLength(40) // every message still applied
-      store.applyServer({ t: 'thought', agentId: 'a', tick: 2, text: 'next' })
+      store.applyServer({ t: 'thought', agentId: 'a', tick: 2, text: 'next', importance: 5 })
       expect(frames).toHaveLength(1) // the next burst asks for the next frame
     } finally {
       if (had) g.requestAnimationFrame = prev
@@ -246,7 +335,7 @@ describe('onFirstSnapshot', () => {
     expect(ran).toBe(0)
     store.applyServer(makeSnapshot())
     expect(ran).toBe(1)
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 2, text: 'again' })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 2, text: 'again', importance: 5 })
     expect(ran).toBe(1)
   })
 

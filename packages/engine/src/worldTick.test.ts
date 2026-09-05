@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { DAYS_PER_YEAR, DURATION_TICKS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
 import { FOOD_KINDS, nutritionOf, VERBS } from './verbs/index.js'
 import { RngStreams } from './rng.js'
 import { createWorldTick, type WorldTickResult } from './worldTick.js'
-import { ev } from './testutil/world.js'
+import { ev, runAct } from './testutil/world.js'
 
 const FAST: SimConfig = SimConfigSchema.parse({
   needs: {
@@ -23,6 +23,13 @@ const FAST: SimConfig = SimConfigSchema.parse({
   structures: { sleepIndoorsOnly: false },
 })
 
+// A meal is half a sim-hour; at FAST's five hunger a tick a body would starve inside its own
+// supper. The eat row keeps the world's real decay and nothing else changes.
+const MEAL: SimConfig = SimConfigSchema.parse({
+  needs: { eatRestoreHunger: 60 },
+  structures: { sleepIndoorsOnly: false },
+})
+
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 
 function makeWorld(
@@ -33,7 +40,12 @@ function makeWorld(
     config,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  // An adult, not an elder: on a 28-day year 7 300 days would buy the 1.2x energy toll.
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 30 * DAYS_PER_YEAR }),
+    config,
+  )
 }
 function patchAgent(
   s: WorldState,
@@ -217,7 +229,7 @@ describe('worldTick: sleep and eat flows', () => {
     const r = submitIntent(s, FAST, 'a1', 'sleep', {})
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const t1 = tickOnce(s)
+    const t1 = runAct(s, FAST)
     expect(t1.events.map((e) => e.type)).toContain('agent_slept')
     expect(t1.state.agents.a1!.asleep).toBe(true)
     expect(t1.state.agents.a1!.activity).toBeNull()
@@ -228,27 +240,29 @@ describe('worldTick: sleep and eat flows', () => {
   })
 
   it('eat restores eatRestoreHunger and consumes qty 1; item removed at qty 0', () => {
-    let s = makeWorld()
+    let s = makeWorld(MEAL)
     s = fold(
       s,
       ev('item_spawned', { id: 'item_1', kind: 'berries', qty: 2, loc: { t: 'agent', id: 'a1' } }),
-      FAST,
+      MEAL,
     )
     s = patchAgent(s, 'a1', { needs: { hunger: 20, energy: 100, warmth: 100, social: 100 } })
-    const r = submitIntent(s, FAST, 'a1', 'eat', { itemId: 'item_1' })
+    const r = submitIntent(s, MEAL, 'a1', 'eat', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
-    s = applyAll(s, r.events)
-    const t1 = tickOnce(s)
-    // decay first (20−5), then eat completes: berries are half a meal, so +30.
-    expect(t1.state.agents.a1!.needs.hunger).toBe(
-      15 + FAST.needs.eatRestoreHunger * nutritionOf(FAST, 'berries'),
+    s = applyAll(s, r.events, MEAL)
+    const t1 = runAct(s, MEAL)
+    // Half an hour of decay first, then eat completes: berries are half a meal, so +30.
+    expect(t1.state.agents.a1!.needs.hunger).toBeCloseTo(
+      20 -
+        DURATION_TICKS.half_hour * MEAL.needs.hungerDecayPerTick +
+        MEAL.needs.eatRestoreHunger * nutritionOf(MEAL, 'berries'),
     )
     expect(t1.state.items.item_1!.qty).toBe(1)
     expect(t1.state.agents.a1!.activity).toBeNull()
 
-    const r2 = submitIntent(t1.state, FAST, 'a1', 'eat', { itemId: 'item_1' })
+    const r2 = submitIntent(t1.state, MEAL, 'a1', 'eat', { itemId: 'item_1' })
     if (!r2.ok) throw new Error(r2.reason)
-    const t2 = tickOnce(applyAll(t1.state, r2.events))
+    const t2 = runAct(applyAll(t1.state, r2.events, MEAL), MEAL)
     expect(t2.state.items.item_1).toBeUndefined()
   })
 })
@@ -306,7 +320,7 @@ describe('worldTick: collapse recovery through sleep', () => {
     expect(r.ok).toBe(true)
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(t.state, r.events)
-    t = tickOnce(s) // sleep completes: asleep
+    t = runAct(s, FAST) // sleep completes: asleep
     expect(t.state.agents.a1!.asleep).toBe(true)
     expect(t.state.agents.a1!.collapsedSinceTick).not.toBeNull()
     t = tickOnce(t.state) // asleep: energy regens past collapseThreshold
@@ -397,5 +411,26 @@ describe('worldTick: replay safety', () => {
     const out = createWorldTick(FAST, new RngStreams('t'))(s)
     expect(out.events.length).toBeGreaterThan(0)
     expect(applyAll(s, out.events, FAST, s.tick)).toEqual(out.state)
+  })
+
+  it('folds through the driver when one is handed in, so each event is folded once', () => {
+    let s = makeWorld()
+    s = fold(s, ev('tick_advanced', {}, s.tick + 1), FAST)
+    const folded: string[] = []
+    let driven = s
+    const apply = (type: string, payload: unknown): WorldState => {
+      folded.push(type)
+      driven = fold(driven, ev(type, payload, driven.tick), FAST)
+      return driven
+    }
+    const out = createWorldTick(FAST, new RngStreams('t'))(s, apply)
+    expect(out.events.length).toBeGreaterThan(0)
+    // One fold per event, and the world the systems ran against is the driver's own.
+    expect(folded).toEqual(out.events.map((e) => e.type))
+    expect(out.state).toBe(driven)
+    // And the same tick either way.
+    const alone = createWorldTick(FAST, new RngStreams('t'))(s)
+    expect(out.events).toEqual(alone.events)
+    expect(out.state).toEqual(alone.state)
   })
 })

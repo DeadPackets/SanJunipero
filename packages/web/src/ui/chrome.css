@@ -109,6 +109,13 @@
   --sky-w: 600px;
   --sky-h: 34px;
 
+  /* The transport strip's own height, named because the cue and the title card both step over
+     it and neither can measure a sibling: 44px of button in --s-3 of padding, plus a gap. */
+  --transport-h: calc(44px + 2 * var(--s-3) + var(--s-4));
+  /* ...and the cue's own row above it, reserved so the narrator's plate never lands on the
+     town's own caption. Two lines of --f-1 at 1.4, plus the gap. */
+  --cue-h: calc(2 * 1.4 * var(--f-1) + var(--s-4));
+
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
 
@@ -630,7 +637,7 @@ body {
 .moment-card:hover { background: var(--cream); border-left-color: var(--honey); }
 .moment-card:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the day you are watching — a rail as well as a fill, never colour alone */
-.moment-card.open { background: var(--cream); border-left-color: var(--ember); }
+.moment-card[data-open='yes'] { background: var(--cream); border-left-color: var(--ember); }
 @media (prefers-reduced-motion: no-preference) {
   .moment-card {
     transition-property: background-color, border-left-color;
@@ -643,8 +650,8 @@ body {
 /* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by the
    band; the aria-label still says the whole postcard. */
 .thumb-body { display: grid; gap: var(--s-1); min-width: 0; align-content: start; }
-.thumb-day {
-  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink-quiet);
+.thumb-when {
+  font-family: var(--font-data); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 .thumb-title {
@@ -985,12 +992,12 @@ body {
    duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
   .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
-  .roster-row, .key-summary, .discovery-leaf, .stage-exit {
+  .roster-row, .key-summary, .discovery-leaf, .stage-exit, .stage-live {
     transition-duration: 0s;
   }
   .feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
   .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
-  .discovery-leaf:hover, .stage-exit:hover {
+  .discovery-leaf:hover, .stage-exit:hover, .stage-live:hover {
     transition-duration: var(--t-fast);
   }
 }
@@ -1216,7 +1223,12 @@ body {
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
 @media (max-width: 900px) {
-  .sky-bar { width: auto; grid-template-columns: auto auto; justify-content: center; }
+  /* NOT `width: auto`: on an abspos box offset only by `left: 50%` that shrinks to fit HALF the
+     viewport, and two nowrap chips overran it as `DAY 0 · SPRINGLOUDY 8°`. */
+  .sky-bar {
+    width: calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left)));
+    grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
+  }
   .sky-arc { display: none; }
   /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
   /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */
@@ -1240,19 +1252,209 @@ body {
 }
 .stage-stamp.shown { opacity: 1; }
 
+/* A WIDTH, not only a cap: an offset with no `right` leaves shrink-to-fit half the stage. */
 .stage-cue {
-  position: absolute; z-index: 21; left: 50%; translate: -50% 0; margin: 0;
+  position: absolute; z-index: 21; left: 0; right: 0; margin: 0 auto; width: fit-content;
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
-  max-width: min(60ch, calc(100% - 2 * var(--mark-inset)));
+  /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
+     room that thing takes, so the reading width is the same line to line. */
+  --cue-aside: 0px;
+  max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
   font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow: var(--halo-deep);
+  opacity: 1;
+}
+/* Its own case, not the caption's capitals: a law is a sentence the town wrote, and setting it
+   in caps is the machine shouting it back. */
+.stage-cue[data-moment='on'] {
+  display: flex; align-items: center; justify-content: center; gap: var(--s-4);
+  letter-spacing: 0.04em; text-transform: none;
+}
+.stage-cue-glyph { display: block; flex: none; image-rendering: pixelated; }
+
+/* A scene is not news: it stands for as long as the room is talking, so it is a struck stamp
+   and a sentence, never a caption shouted in capitals for a minute at a time. */
+/* A stamp and a sentence, set like a chyron: `balance` shrinks a flex item to equalise its
+   lines, which on a phone left the sentence 112px wide with 100px of slot empty each side.
+   The sentence is body text — `pretty`, ranged left, its first line on the stamp's baseline. */
+.stage-cue[data-scene='on'] {
+  display: flex; align-items: baseline; justify-content: center; gap: var(--s-4);
+  letter-spacing: 0.04em; text-transform: none;
+  text-align: start; text-wrap: pretty;
+  /* A WIDTH, not only a cap: `left: 50%` with no `right` leaves shrink-to-fit half the stage to
+     work in, and on a phone that clamped the sentence to 117px. `max-width` still does the
+     capping — the two rules above compose. */
+  width: calc(100% - 2 * var(--mark-inset));
+  /* The stamp's own room, so the sentence keeps its 60ch: inside it, a 51-character topic
+     wrapped onto two lines while there was a third of the slot standing empty. */
+  --cue-aside: calc(3 * var(--s-8));
+}
+.stage-scene-stamp {
+  position: relative; flex: none;
+  /* the extra 2px at the foot is the stakes rule's own room, so the word never sits on it */
+  padding: var(--s-2) var(--s-3) calc(var(--s-2) + var(--s-1));
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cream-quiet); background: var(--deep);
+  box-shadow: var(--frame); text-shadow: none;
+}
+/* What is at stake, MEASURED rather than counted — the rule runs the fraction of the stamp the
+   scene is worth, in the ink the band already chose. Colour is never the only channel. */
+.stage-scene-stamp::after {
+  content: ''; position: absolute; left: 0; bottom: 0;
+  width: calc(var(--stakes, 0) * 100%); height: var(--s-1);
+  background: currentColor;
+}
+/* 6.92:1 and 5.56:1 on --deep. A closed scene keeps neither: stakes is a live pressure, and a
+   summary has none left. */
+.stage-scene-stamp[data-stakes='warm'] { color: var(--honey); }
+.stage-scene-stamp[data-stakes='hot'] { color: var(--ember); }
+/* The reason the camera is here is a sentence the town could have said, so it keeps the scene
+   line's own case rather than the shot caption's capitals. */
+.stage-cue[data-why='on'] { letter-spacing: 0.04em; text-transform: none; }
+
+/* ── the scene card: who and where, for six seconds after a cut ─────────────────────────────
+   The stamp's opposite corner and the stamp's own material — a struck slab for what the town
+   calls the scene, a body line for the place and the people. It is a TITLE, not a readout: it
+   is written at the cut and stands still while the people in it walk. */
+.scene-card {
+  position: absolute; z-index: 21;
+  /* the second row of the top-left corner, level with `.stage-live` across the picture */
+  top: calc(
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+  );
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3);
+  max-width: min(38ch, calc(100% - 2 * var(--mark-inset)));
+  pointer-events: none;
+}
+@media (max-width: 900px) {
+  /* the arc is gone below 900px, and the card clears one chip row like the stamp does */
+  .scene-card { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+}
+.scene-card-title {
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cream-quiet); background: var(--deep);
+  box-shadow: var(--frame); text-shadow: none;
+}
+.scene-card-where {
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  letter-spacing: 0.02em; text-wrap: pretty;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
 }
 
-.stage-exit {
+/* ── the sleep card: the one honest empty frame ─────────────────────────────────────────────
+   A town where every living body is asleep has nothing to cut to. Saying so, and saying when it
+   ends, is the difference between a quiet hour and a broken stream. */
+.sleep-card {
+  position: absolute; z-index: 22; inset: 0;
+  display: grid; place-content: center; justify-items: center;
+  gap: var(--s-5);
+  padding: var(--mark-inset);
+  text-align: center;
+  pointer-events: none;
+}
+.sleep-card-line {
+  margin: 0;
+  padding: var(--s-4) var(--s-6);
+  font-family: var(--font-px); font-size: var(--f-4); line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--cream); background: var(--deep);
+  box-shadow: var(--frame);
+}
+.sleep-card-note {
+  margin: 0; max-width: 34ch;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  color: var(--cream-quiet); text-wrap: pretty;
+  text-shadow: var(--halo-deep);
+}
+
+/* ── the lower third at the desk ────────────────────────────────────────────────────────────
+   The same slab the stream frame carries, at a quarter of its size, and only while somebody the
+   camera is on is talking. The ghost holds the box at the width of the finished line so the
+   slab does not grow a letter at a time under the words arriving in it. */
+.lower-third {
+  position: absolute; z-index: 26;
+  /* A WIDTH, not an offset — the cue's own trick. It sits directly over the cue rather than in
+     the bottom-left corner, which already carries three 44px slabs and the sound cues stacking
+     upward off them. */
+  left: 0; right: 0; margin: 0 auto; width: fit-content;
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--s-8));
+  display: flex; align-items: stretch; gap: var(--s-3);
+  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  padding: var(--s-3);
+  pointer-events: none;
+  background: var(--parchment); color: var(--ink);
+  box-shadow: var(--frame);
+  border-bottom: var(--s-2) solid var(--honey);
+}
+.lower-third-bust {
+  flex: 0 0 auto; width: 28px; height: 28px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;   /* the bust IS world art */
+  box-shadow: var(--frame-tight);
+}
+.lower-third-bust.none { background-color: var(--sand); }
+.lower-third-body {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--s-2); min-width: 0;
+}
+.lower-third-name {
+  align-self: flex-start; padding: var(--s-1) var(--s-3);
+  font-family: var(--font-px); font-size: var(--f-1); line-height: 1.1;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+}
+.lower-third-words {
+  position: relative; display: block;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600; line-height: 1.35;
+  color: var(--ink);
+}
+/* Once the signpost has a corner, the caption may not reach it — the cue's own rule. */
+@media (min-width: 700px) {
+  .lower-third { max-width: min(46ch, calc(100% - 320px)); }
+}
+/* Reserves the finished line's box; `visibility` rather than a colour, so it takes no ink. */
+.lower-third-ghost { visibility: hidden; }
+.lower-third-typed { position: absolute; inset: 0; }
+
+/* ── the first two lines a visitor reads ────────────────────────────────────────────────────
+   Fixed, not absolute: this mark stands outside `.app`, so React clearing `#root` cannot take
+   it. It goes on the first cut, the first hand on the camera, or twenty seconds. */
+.first-lines {
+  position: fixed; inset: 0; z-index: 30;
+  display: grid; place-content: center; justify-items: center;
+  gap: var(--s-5);
+  padding: var(--mark-inset);
+  text-align: center;
+  pointer-events: none;
+  opacity: 1;
+}
+/* An author `display` beats the UA's `[hidden]` rule whatever the specificity says, so the
+   attribute the static file ships with has to be honoured here or the lines paint on load. */
+.first-lines[hidden] { display: none; }
+.first-lines p { margin: 0; max-width: 34ch; }
+.first-lines-head {
+  font-family: var(--font-body); font-size: var(--f-6); font-weight: 600;
+  letter-spacing: -0.01em; text-wrap: balance;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
+}
+.first-lines-note {
+  font-family: var(--font-body); font-size: var(--f-3); font-weight: 400;
+  text-wrap: pretty;
+  color: var(--cream-quiet);
+  text-shadow: var(--halo-deep);
+}
+.first-lines.gone { opacity: 0; }
+
+.stage-exit, .stage-live {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
   top: max(var(--mark-inset), env(safe-area-inset-top));
@@ -1261,22 +1463,52 @@ body {
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .stage-exit { transition-property: background-color, translate, box-shadow; }
+/* Under the stamp, in the same corner: the word REPLAY and the way out of it are one thing.
+   One stamp line plus a gap below its own top, so the two never sit on each other. */
+.stage-live {
+  left: auto;
+  right: max(var(--mark-inset), env(safe-area-inset-right));
+  top: calc(
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+  );
 }
-.stage-exit:hover { background: var(--deep); }
-.stage-exit:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-.stage-exit:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+@media (max-width: 900px) {
+  /* The stamp clears one chip row below 900px, and this follows it down. */
+  .stage-live { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stage-exit, .stage-live { transition-property: background-color, translate, box-shadow; }
+}
+.stage-exit:hover, .stage-live:hover { background: var(--deep); }
+.stage-exit:active, .stage-live:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.stage-exit:focus-visible, .stage-live:focus-visible {
+  outline: 2px solid var(--honey); outline-offset: 2px;
+}
 
 /* Once the signpost has a corner, the cue may not reach it. */
 @media (min-width: 700px) {
-  .stage-cue { max-width: min(60ch, calc(100% - 320px)); }
+  .stage-cue { max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 320px)); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   /* Slow out, fast in: a mark that answers a mouse-move may not lag it by 300ms. */
   .stage-stamp { transition: opacity var(--t-slow) var(--ease-enter); }
   .stage-stamp.shown { transition-duration: var(--t-fast); }
+  /* A moment arrives and goes on the sheet's own reveal — it is news, not an answer to a hand. */
+  .stage-cue {
+    transition: opacity var(--t-fast) var(--ease-enter);
+    animation: cue-in var(--t-fast) var(--ease-enter) backwards;
+  }
+  /* A sound chip is the cue mark's own news, in the corner rather than the middle: same fade. */
+  .sound-cue { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
+  /* A cut's card and the night's card arrive the same way the cue does — a fade, nothing else:
+     a mark that slid in would be moving the picture the camera just settled. */
+  .scene-card, .sleep-card { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
+  .first-lines { transition: opacity var(--t-slow) var(--ease-enter); }
+  @keyframes cue-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .stage-plate { opacity: 1; animation: none; }
@@ -1359,7 +1591,9 @@ body {
   .signpost[data-open='yes'] .signpost-post { display: none; }
   /* Three marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline
      carries the day, the season and the clock while it is up. */
-  .app[data-paper='on'] :is(.sky-bar, .stage-stamp) { display: none; }
+  .app[data-paper='on'] :is(.sky-bar, .stage-stamp, .scene-card, .lower-third, .sleep-card) {
+    display: none;
+  }
 }
 @media (min-width: 641px) and (max-height: 620px) {
   .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
@@ -1778,7 +2012,9 @@ body {
   .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
-  .bond-detail, .fps-overlay, .stage-plate, .signpost-arm, .help-button, .thoughts-button {
+  .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
+  .thoughts-button, .sound-button, .scene-card-title, .sleep-card-line, .lower-third,
+  .lower-third-bust {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }
@@ -1804,7 +2040,7 @@ body {
 /* ── the corner cluster: two 44px targets, each with the glyph everyone already knows ─────── */
 /* Bottom-LEFT, not the top-right the pattern usually takes: the sun arc owns the top edge and
    the quiet stamp sits under it, so this is the one corner nothing else stands in at any width. */
-.help-button, .thoughts-button {
+.help-button, .thoughts-button, .sound-button {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
   bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
@@ -1817,24 +2053,26 @@ body {
   transition-property: translate, background-color;
   transition-timing-function: var(--ease-tap);
 }
-.help-button:hover, .thoughts-button:hover { background: var(--honey-l); }
-.help-button:active, .thoughts-button:active {
+.help-button:hover, .thoughts-button:hover, .sound-button:hover { background: var(--honey-l); }
+.help-button:active, .thoughts-button:active, .sound-button:active {
   translate: 0 1px; box-shadow: var(--frame-tight);
 }
 @media (prefers-reduced-motion: no-preference) {
   /* A transition reads the duration of the state it goes TO, so the hover-out is instant; the
      press and the switch's own change of paper both answer an input and read the tap band. */
-  .help-button, .thoughts-button { transition-duration: 0s; }
+  .help-button, .thoughts-button, .sound-button { transition-duration: 0s; }
   .help-button:hover, .help-button:active,
-  .thoughts-button:hover, .thoughts-button:active { transition-duration: var(--t-tap); }
-  .thoughts-button[aria-pressed='false'] { transition-duration: var(--t-tap); }
+  .thoughts-button:hover, .thoughts-button:active,
+  .sound-button:hover, .sound-button:active { transition-duration: var(--t-tap); }
+  .thoughts-button[aria-pressed='false'],
+  .sound-button[aria-pressed='false'] { transition-duration: var(--t-tap); }
 }
 /* The ground under it is the town, so the ring carries its own the way the signpost's does. */
-.help-button:focus-visible, .thoughts-button:focus-visible {
+.help-button:focus-visible, .thoughts-button:focus-visible, .sound-button:focus-visible {
   outline: 2px solid var(--honey); outline-offset: 2px;
   box-shadow: var(--frame), 0 0 0 6px var(--deep);
 }
-[data-broadcast='on'] :is(.help-button, .thoughts-button) { display: none; }
+[data-broadcast='on'] :is(.help-button, .thoughts-button, .sound-button) { display: none; }
 
 /* The second slab, an --s-3 gap over the first. It carries no text at all: `--font-sign` is on
    an 8px grid and the ladder has no legal size for it under 16, so the mark is drawn as pixels. */
@@ -1844,8 +2082,39 @@ body {
 .thoughts-glyph { display: block; image-rendering: pixelated; }
 /* Off steps one notch inside the same family, the way `.legend-chip.off` does — honey to sand is
    1.10:1, so the paper is never the signal; the emptied wisp is. Deep holds 11.2:1 on sand. */
-.thoughts-button[aria-pressed='false'] { background: var(--sand); }
-.thoughts-button[aria-pressed='false']:hover { background: var(--parchment); }
+.thoughts-button[aria-pressed='false'],
+.sound-button[aria-pressed='false'] { background: var(--sand); }
+.thoughts-button[aria-pressed='false']:hover,
+.sound-button[aria-pressed='false']:hover { background: var(--parchment); }
+
+/* The third slab, one --s-3 over the wisp. Same drawn mark, same reason: the ladder has no
+   legal size for `--font-sign` under 16px and it has no ♪ at any size. */
+.sound-button {
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + 2 * var(--s-3));
+}
+.sound-glyph { display: block; image-rendering: pixelated; }
+
+/* ── the sound cues: what the town is making a noise about, whether or not you can hear it ── */
+/* Muted is the default, so these chips ARE the signal for almost every viewer. They stand in
+   the cue's own register — cream on the four-way halo, letter-spaced — because that is what a
+   mark over the town is, and they stack UPWARD from the cluster so a bell arriving on top
+   leaves every chip under it exactly where the eye left it. */
+.sound-cues {
+  position: absolute; z-index: 25; margin: 0; padding: 0; list-style: none;
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 132px + 3 * var(--s-3));
+  display: flex; flex-direction: column-reverse; gap: var(--s-2);
+  pointer-events: none;
+}
+.sound-cue {
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+  color: var(--cream); text-shadow: var(--halo-deep);
+  pointer-events: none;
+}
+[data-broadcast='on'] .sound-cues, [data-paper='on'] .sound-cues { display: none; }
+
+
 
 .key-map {
   position: fixed; inset: 0; z-index: 45;
@@ -1920,8 +2189,21 @@ body {
 }
 [data-broadcast='on'] .stage-cue { font-size: var(--f-bcast); bottom: var(--bcast-safe); }
 
+/* The sky bar is gone on the stream, so the card takes the corner itself. */
+[data-broadcast='on'] .scene-card {
+  top: max(var(--mark-inset), env(safe-area-inset-top));
+  gap: 12px;
+  max-width: 44%;
+}
+[data-broadcast='on'] .scene-card-title { font-size: 24px; padding: 8px 12px; }
+[data-broadcast='on'] .scene-card-where { font-size: 28px; }
+[data-broadcast='on'] .sleep-card { gap: 24px; }
+[data-broadcast='on'] .sleep-card-line { font-size: 40px; padding: 20px 32px; }
+[data-broadcast='on'] .sleep-card-note { font-size: 24px; }
+
 [data-broadcast='on'] .lower-third {
-  position: absolute; left: 4%; bottom: var(--bcast-safe); z-index: 26;
+  position: absolute; left: 4%; right: auto; margin: 0; width: auto; z-index: 26;
+  bottom: var(--bcast-safe);
   display: flex; align-items: stretch; gap: var(--s-5);
   max-width: 64%;
   padding: var(--s-5);
@@ -1966,3 +2248,254 @@ body {
   color: var(--cream);
 }
 
+
+/* ── the director's cut: what the past looks like ───────────────────────────────────────────
+   No letterbox. The Signpost ruling is that all UI is a thing in the town, and the sheet
+   already takes 66% of it — two black bars on top of that is a picture inside a picture. */
+
+/* A tenth less saturation, a warm wash, and the corners taken down. NEVER sepia: the town has
+   to stay worth watching once it is old, and a brown wash is a photograph of a town.
+   `backdrop-filter` grades on the compositor, so the desaturation costs the 40ms/s tick budget
+   nothing — a Pixi ColorMatrixFilter would copy the whole stage inside the app's own frame. */
+.replay-grade {
+  position: absolute; inset: 0; z-index: 18;
+  pointer-events: none; visibility: hidden;
+  backdrop-filter: saturate(0.9);
+  -webkit-backdrop-filter: saturate(0.9);
+  /* the warm half, and the vignette, in one paint: honey at the middle, deep at the corners */
+  background:
+    radial-gradient(120% 90% at 50% 45%, rgba(242, 200, 121, 0.07) 0%, rgba(242, 200, 121, 0) 55%),
+    radial-gradient(96% 74% at 50% 50%, rgba(36, 31, 43, 0) 42%, rgba(36, 31, 43, 0.34) 100%);
+}
+.replay-grade[data-on='yes'] { visibility: visible; }
+
+/* The dip is written by rAF (stage/ReplayScene), so it carries no transition of its own: a
+   transition on top of a per-frame write fights it and lands the curtain late. */
+.replay-dip {
+  position: absolute; inset: 0; z-index: 27;
+  pointer-events: none; opacity: 0;
+  background: var(--deep);
+}
+
+/* The card stands in the cue's own slot, over the transport — and the two can never collide:
+   the card goes down on the first thing that happens, which is the only thing that brings the
+   cue up. The corners are all taken (help and thoughts bottom-left, the signpost bottom-right,
+   the stamp and the arc along the top), and a caption belongs on the centre line anyway.
+   Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
+   Ranged left, not centred: the plate carries a paragraph more often than a title. */
+.replay-card {
+  position: absolute; z-index: 24; left: 0; right: 0; width: fit-content;
+  bottom: calc(
+    max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h) + var(--cue-h)
+  );
+  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  text-align: start;
+  margin: 0 auto; padding: var(--s-4) var(--s-5);
+  pointer-events: none;
+  background: var(--deep); box-shadow: var(--frame);
+  opacity: 0;
+}
+.replay-card[data-up='yes'] { opacity: 1; }
+.replay-card-when {
+  margin: 0;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--honey);
+}
+/* Fraunces, because the card is a title and this is the one face the sheet titles with. */
+.replay-card-title {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  text-wrap: balance; color: var(--cream);
+}
+.replay-card-cast {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-body); font-size: var(--f-2); color: var(--cream-quiet);
+}
+/* The narrator's own paragraph, in the face the town's prose is set in — and ranged left,
+   because it is a paragraph and not a title. Three lines is the cap: past that the plate is
+   reading matter standing over the thing it is about. */
+.replay-card-prose {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-body); font-size: var(--f-2); line-height: 1.45;
+  text-align: start; text-wrap: pretty; color: var(--cream);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
+}
+
+/* The transport is a thing standing in the town, bottom-centre, as wide as its own controls. */
+.transport {
+  position: absolute; z-index: 25; left: 50%; translate: -50% 0;
+  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: var(--s-4);
+  width: min(560px, calc(100% - 2 * var(--mark-inset)));
+  padding: var(--s-3) var(--s-4);
+  background: var(--deep); box-shadow: var(--frame);
+}
+.transport .player-btn.live {
+  flex: none; padding: 0 var(--s-5);
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.transport .player-btn:focus-visible, .transport .player-track:focus-visible {
+  outline: 2px solid var(--honey); outline-offset: 2px;
+}
+
+/* The cue and the card both step over the strip rather than under it: one number, so the two
+   can never disagree about how tall it is. */
+[data-replay='on'] .stage-cue {
+  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
+}
+/* A replay already names itself — its own dateline card, its own cue and the transport bar.
+   The live director's three marks would be three more slabs in the same two corners. */
+[data-replay='on'] :is(.lower-third, .scene-card, .sleep-card) { display: none; }
+
+/* The grade carries no transition: the curtain is fully black at the midpoint of the dip, so
+   the grade arrives behind it and there is nothing to ease. */
+@media (prefers-reduced-motion: no-preference) {
+  .replay-card { transition: opacity var(--t-slow) var(--ease-enter); }
+}
+
+@media (max-width: 640px) {
+  /* Under 640 the arms take the TOP edge, so the strip has the bottom to itself — but the
+     "Return to now" word and a 44px track cannot share 320px, and the word is the one that
+     wraps. It keeps its own row. */
+  .transport { flex-wrap: wrap; justify-content: center; }
+  .transport .player-track { order: 3; flex-basis: 100%; }
+}
+
+/* ── the firsts shelf: ceremony, not competition ─────────────────────────────────────────────
+   No count, no bar, no streak, no points, no badge, no leaderboard, and no tier number: the
+   catalogue has no denominator (2.5 is minted by the arbiter), so "23 of 61" would be a lie.
+   What a plate gives is the FEELING of an unlock with none of its arithmetic. */
+
+.first-shelf {
+  display: grid; gap: var(--s-5);
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  margin: 0; padding: 0; list-style: none;
+}
+
+/* Rarity is carried by the ink, and the ink is THE SLAB'S OWN LEDGE — the sheet's signature
+   shape, cast in the material the plate is cut from. Not a coloured stripe down one edge, which
+   is decoration pretending to be meaning, and not a fill under any word: every plate keeps its
+   crisp 2px ink ring and the colour is the shadow it throws. */
+.first-plate {
+  position: relative;
+  display: grid; gap: var(--s-2);
+  padding: var(--s-5);
+  background: var(--parchment);
+  --plate-ink: var(--sand);
+  box-shadow: var(--frame-tight), 4px 4px 0 0 var(--plate-ink);
+}
+.first-plate[data-material='gilded'] { --plate-ink: var(--honey); background: var(--cream); }
+.first-plate[data-material='ember'] { --plate-ink: var(--ember); }
+.first-plate[data-material='sage'] { --plate-ink: var(--sage); }
+.first-plate[data-material='sand'] { --plate-ink: var(--sand); }
+.first-plate[data-current='yes'] { background: var(--cream); }
+
+/* A DOG-EAR, not a toast: the corner of the page is turned down on a first the town reached
+   while nobody was watching, and it lies flat again once this visit has caught up to it. */
+.first-plate[data-fresh='yes']::after {
+  content: ''; position: absolute; right: 0; top: 0;
+  border-width: 0 var(--s-6) var(--s-6) 0;
+  border-style: solid;
+  border-color: var(--plate-ink) var(--deep);
+}
+
+.first-emblem { margin: 0; line-height: 0; }
+.first-emblem .feed-glyph { display: block; }
+/* Fraunces: the plate is a label on a thing, and this is the face the sheet titles with. */
+.first-label {
+  margin: 0;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  text-wrap: balance; color: var(--ink);
+}
+.first-when {
+  margin: 0;
+  font-family: var(--font-data); font-size: var(--f-1); font-variant-numeric: tabular-nums;
+  color: var(--ink-quiet);
+}
+
+.first-cast {
+  display: flex; flex-wrap: wrap; gap: var(--s-4);
+  margin: var(--s-2) 0 0; padding: 0; list-style: none;
+}
+.first-cast li { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+.first-bust {
+  flex: none; width: 40px; height: 40px;
+  background-repeat: no-repeat; background-color: var(--sand);
+  box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.first-bust[data-blank='yes'] { background-image: var(--grain); }
+.first-cast-name {
+  font-size: var(--f-2); font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The words the thing was named out of, verbatim — the one place a plate quotes the town. */
+.first-quote {
+  margin: var(--s-2) 0 0;
+  font-family: var(--font-title); font-size: var(--f-2); font-style: italic;
+  line-height: 1.4; text-wrap: pretty; color: var(--ink-quiet);
+}
+
+/* ONE verb. A plate offers the thing itself, never a second way to read about it. */
+.first-watch {
+  justify-self: start; margin-top: var(--s-3);
+  min-height: 44px; padding: 0 var(--s-6); cursor: pointer;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream); background: var(--ink);
+  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .first-watch { transition: background-color var(--t-fast), translate var(--t-tap); }
+}
+.first-watch:hover { background: var(--deep); }
+.first-watch:active { translate: 0 1px; box-shadow: var(--ledge-in); }
+.first-watch:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+@media (forced-colors: active) {
+  .first-plate, .first-bust { border: 2px solid CanvasText; }
+}
+
+/* ── the record, a day at a time ─────────────────────────────────────────────────────────────
+   One scene leads each day and the rest of that day wait behind one word. The old rail served
+   the narrator's segments — dozens a day, every one titled with the day's chapter title — and
+   thirty cards sharing one name cannot look significant however they are drawn. */
+
+.moment-run { display: grid; gap: var(--s-7); }
+.moment-day { display: grid; gap: var(--s-4); }
+
+/* The day's lead sits up: more room for the motif, and the room's own outcome under the title.
+   The others are the same card at its ordinary size, so the ladder is size and not colour. */
+.moment-card.lead { padding: var(--s-5); gap: var(--s-5); }
+.moment-card.lead .thumb-title { font-size: var(--f-5); }
+.thumb-summary {
+  font-family: var(--font-title); font-size: var(--f-2); font-style: italic;
+  line-height: 1.4; text-wrap: pretty; color: var(--ink-quiet);
+}
+
+/* Not a count of anything the town can win — only how much more of that day there is to look
+   at. It says the number in words and never over a total. */
+.moment-more {
+  justify-self: start;
+  min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  color: var(--ink); background: transparent;
+  border: 2px solid var(--ink); border-radius: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .moment-more { transition: background-color var(--t-fast) var(--ease-enter); }
+}
+.moment-more:hover { background: var(--cream); }
+.moment-more:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* The lead card carries the gateway's own postcard — the same picture a shared link opens with,
+   composed by `sharp` from the plate's hour, the busts and the place. The width and height are
+   on the tag so the row never reflows when it lands. */
+.thumb-card {
+  flex: none; display: block; width: 100%; max-width: 360px; height: auto;
+  background: var(--sand); box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.moment-card.lead { flex-direction: column; }

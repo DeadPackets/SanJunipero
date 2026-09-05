@@ -101,3 +101,30 @@ export function thumbMotif(m: Moment): Motif {
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
   return MOTIFS[h % MOTIFS.length]!
 }
+
+// ------------------------------------------------------------------ the day's own shelf
+
+/** One day of the town's record: the scene with most at stake leads, and the rest of that day
+ *  wait behind it. Thirty cards a day is a filmstrip nobody reads to the end of. */
+export type MomentDay = { day: number; lead: Moment; rest: Moment[] }
+
+export function momentDays(moments: readonly Moment[]): MomentDay[] {
+  const byDay = new Map<number, Moment[]>()
+  for (const m of moments) {
+    const seen = byDay.get(m.day)
+    if (seen === undefined) byDay.set(m.day, [m])
+    else seen.push(m)
+  }
+  return [...byDay]
+    .sort((a, b) => b[0] - a[0])
+    .map(([day, list]) => {
+      const sorted = [...list].sort((a, b) => b.stakes - a.stakes || a.startTick - b.startTick)
+      return { day, lead: sorted[0]!, rest: sorted.slice(1) }
+    })
+}
+
+/** How many others that day holds, said as words. Not a score and not a total: the town has no
+ *  denominator, and this only says how much more there is to look at. */
+export function moreFromDay(rest: readonly Moment[]): string {
+  return rest.length === 1 ? 'One more from this day' : `${rest.length} more from this day`
+}

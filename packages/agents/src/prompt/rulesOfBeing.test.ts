@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   FORBIDDEN_FRAMING,
   MINUTES_PER_DAY,
@@ -9,7 +10,8 @@ import {
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, perceptionToProse } from './prose.js'
-import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
+import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES, WORKED_TURN } from './rulesOfBeing.js'
+import { readMindTurn, StrictTurnSchema } from '../turn.js'
 import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
 
 // Block 1 is the cache-stable prefix of every prompt.
@@ -19,30 +21,30 @@ function block1(): string {
 
 describe('SPEECH_RULES', () => {
   it('carries the distilled humanizer rules, diegetically', () => {
-    expect(SPEECH_RULES).toContain('single word')
-    expect(SPEECH_RULES).toContain('fragment')
+    expect(SPEECH_RULES).toContain('plain words')
+    expect(SPEECH_RULES).toContain('Half a sentence is fine')
     expect(SPEECH_RULES).toMatch(/plain/)
   })
 
   // The two deleted sentences are the ones the live transcript obeyed into an 81% talk rate
   // and a forty-line plank loop; silence and the decay ladder are what replaced them.
   it('makes silence the default and gives a repeat somewhere to go', () => {
-    expect(SPEECH_RULES).toMatch(/Most moments you say nothing/)
-    expect(SPEECH_RULES).toMatch(/shorter and wearier/)
+    expect(SPEECH_RULES).toMatch(/Most of the time you say nothing/)
+    expect(SPEECH_RULES).toMatch(/once it is said, it is said/)
     expect(SPEECH_RULES).not.toMatch(/never wasted|words spent on/i)
     expect(SPEECH_RULES).not.toContain('in the words they said it')
   })
 
   it('aims a line at one person, lets it end, and keeps the counting out of it', () => {
-    expect(SPEECH_RULES).toMatch(/one person, by name/)
-    expect(SPEECH_RULES).toMatch(/the talk is allowed to end/)
-    expect(SPEECH_RULES).toMatch(/Numbers are for the tally book/)
+    expect(SPEECH_RULES).toMatch(/one person at a time/)
+    expect(SPEECH_RULES).toMatch(/do not have to get the last word/)
+    expect(SPEECH_RULES).toMatch(/Map coordinates are for your feet/)
   })
 
   // The em dash ran at 35-54% of lines in a corpus produced with the old block already in the
   // prompt, and it was the one humanizer tell nothing here named.
   it('forbids the long dash', () => {
-    expect(SPEECH_RULES).toMatch(/long dash/)
+    expect(SPEECH_RULES).toMatch(/No dashes/)
   })
 
   it('spends no em dash of its own', () => {
@@ -95,6 +97,31 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
     expect(CAPABILITIES).not.toContain('An act named with nothing in it')
     expect(CAPABILITIES).not.toMatch(/mind who means/)
     expect(block1()).not.toContain('Every act carries what it asks for')
+  })
+
+  // Nothing in the prompt said "you may invent"; the old closing line said the opposite.
+  it('carries the invitation, not the old promise of a lesson', () => {
+    expect(CAPABILITIES).toContain(
+      'Anything you can name, you can try; the world tells you what it cost.\n',
+    )
+    expect(CAPABILITIES).not.toContain('the world will show you')
+  })
+
+  // ★ The one worked answer. It has to be the last bytes of the block or every mind's cached
+  // prefix moves, and it has to parse as the very thing the mind is asked for or it teaches
+  // the wrong shape.
+  it('closes on one whole answer that the turn schema itself accepts', () => {
+    expect(CAPABILITIES.endsWith(WORKED_TURN)).toBe(true)
+    const read = StrictTurnSchema.safeParse(JSON.parse(WORKED_TURN))
+    expect(read.error?.issues ?? []).toEqual([])
+    expect(readMindTurn(JSON.parse(WORKED_TURN)).data?.action).toEqual({
+      verb: 'stoke',
+      params: { structureId: 'structure_4' },
+    })
+  })
+
+  it('keeps the example short enough to be worth its bytes', () => {
+    expect(Math.ceil(WORKED_TURN.length / 4)).toBeLessThan(150)
   })
 
   // A shared block that hands every mind the same example makes five copies of one actor.
@@ -175,7 +202,11 @@ describe('★ block 1 tells the truth about sleep', () => {
       CFG,
     )
     s = fold(s, ev(2, 'structure_completed', { id: 'structure_1' }), CFG)
-    s = fold(s, ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev(3, 'agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 3, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     if (opts.indoors) {
       s = fold(s, ev(4, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     }
@@ -221,9 +252,10 @@ describe('the shared calendar', () => {
   const at = (tick: number): string => calendarLine(simTimeFromTick(tick))
 
   it('names the day, the part of the day and the season, in that order', () => {
-    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is day 12, dusk, early spring.')
-    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is day 351, night, late winter.')
-    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is day 223, day, mid autumn.')
+    // A season is a week now, so day 12 falls late in the first summer, not early in spring.
+    expect(at(11 * MINUTES_PER_DAY + 19 * 60)).toBe('It is Friday, day 12, dusk, late summer.')
+    expect(at(350 * MINUTES_PER_DAY + 3 * 60)).toBe('It is Monday, day 351, night, early autumn.')
+    expect(at(222 * MINUTES_PER_DAY + 12 * 60)).toBe('It is Saturday, day 223, day, late winter.')
   })
 
   it('reaches every turn through the moment prose, ahead of everything else in it', () => {
@@ -231,9 +263,9 @@ describe('the shared calendar', () => {
       ...quietMeadowPacket,
       time: simTimeFromTick(11 * MINUTES_PER_DAY + 19 * 60),
     })
-    expect(prose.startsWith('It is day 12, dusk, early spring.')).toBe(true)
+    expect(prose.startsWith('It is Friday, day 12, dusk, late summer.')).toBe(true)
     const a = assemblePrompt(fixtureBlocks({ now: { prose } }))
-    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, early spring')
+    expect(a.messages.at(-1)!.content).toContain('day 12, dusk, late summer')
   })
 
   it('is a fact and nothing more — no machinery, no counsel, no taxonomy', () => {
@@ -271,7 +303,7 @@ describe('word budgets', () => {
       }),
     )
     expect(a.system).toContain(
-      'You usually say about 10 words at a time; when truly moved, up to 40.',
+      'You usually say about 10 words at a time; when it really matters to you, up to 40.',
     )
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -290,7 +322,7 @@ describe('word budgets', () => {
     expect(without.system).not.toContain('words at a time')
     expect(without.system.length).toBeLessThan(withBudget.system.length)
     // The only difference is the appended line: everything before it is identical.
-    const idx = without.system.indexOf('Example lines:')
+    const idx = without.system.indexOf('Example lines,')
     expect(withBudget.system.slice(0, idx)).toBe(without.system.slice(0, idx))
   })
 
@@ -311,8 +343,48 @@ describe('word budgets', () => {
         },
       }),
     )
-    expect(terse.system).toContain('about 4 words at a time; when truly moved, up to 12.')
-    expect(talkative.system).toContain('about 30 words at a time; when truly moved, up to 90.')
+    expect(terse.system).toContain(
+      'about 4 words at a time; when it really matters to you, up to 12.',
+    )
+    expect(talkative.system).toContain(
+      'about 30 words at a time; when it really matters to you, up to 90.',
+    )
     expect(terse.system).not.toBe(talkative.system)
+  })
+})
+
+describe('CAPABILITIES — the four acts that need another person to agree', () => {
+  const RELATIONSHIP_VERBS = ['court', 'propose', 'lie_with', 'leave_partner']
+
+  it.each(RELATIONSHIP_VERBS)('names %s with the word the registry answers to', (verb) => {
+    expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}; give targetId`, 'm'))
+  })
+
+  it('says who answers, and that three of the four need a yes', () => {
+    expect(CAPABILITIES).toMatch(/court: [^\n]*whoever is near may hear the answer/)
+    expect(CAPABILITIES).toMatch(/propose: [^\n]*Only they can say yes/)
+    expect(CAPABILITIES).toMatch(/lie_with: [^\n]*only if they say yes/)
+    expect(CAPABILITIES).toMatch(/leave_partner: [^\n]*needs no answer/)
+  })
+
+  // The roof gate is the whole of it: 31 of rehearsal 13's 42 ask refusals read "not under a
+  // roof of your own", and the line never said the rule before the mind spent the turn.
+  it('says the roof rule on the line it gates, before the ask', () => {
+    expect(CAPABILITIES).toMatch(
+      /lie_with: [^\n]*a house that is yours or theirs, with the two of you inside it/,
+    )
+    expect(CAPABILITIES).toMatch(/lie_with: [^\n]*neither will standing outside one/)
+  })
+
+  it('warns that a child may come of one of them, and names no dial behind it', () => {
+    expect(CAPABILITIES).toContain('A child may come of it')
+    expect(CAPABILITIES).not.toMatch(/chance|roll|percent|1 in /i)
+  })
+
+  it('never names the machinery', () => {
+    for (const verb of RELATIONSHIP_VERBS) {
+      const line = CAPABILITIES.split('\n').find((l) => l.startsWith(`${verb}:`))!
+      expect(line, verb).not.toMatch(FORBIDDEN_FRAMING)
+    }
   })
 })

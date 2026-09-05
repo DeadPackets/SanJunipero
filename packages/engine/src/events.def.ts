@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { TOWN_FACINGS } from '@sj/shared'
+import { InvitationVerbSchema, TOWN_FACINGS, SceneMove } from '@sj/shared'
+import { LAW_TEXT_MAX, LawPredicateSchema } from './lawShapes.js'
 
 export const TickAdvanced = z.object({}).strict()
 export const AgentSpawned = z
@@ -14,6 +15,26 @@ export const AgentSpawned = z
   .strict()
 export const CoSlept = z
   .object({ aId: z.string(), bId: z.string(), day: z.number().int() })
+  .strict()
+// `agentId` is always the invitee and `byId` the asker, which is the pair of keys the cue,
+// emote and heat layers already read a person out of.
+export const Invited = z
+  .object({ agentId: z.string(), byId: z.string(), verb: InvitationVerbSchema })
+  .strict()
+// The same shape under its own name: an acceptance is the ask coming back the other way.
+export const InvitationAccepted = Invited
+export const InvitationRefused = z
+  .object({
+    agentId: z.string(),
+    byId: z.string(),
+    verb: InvitationVerbSchema,
+    witnesses: z.array(z.string()),
+  })
+  .strict()
+// aId < bId, so one partnership has one spelling.
+export const PartnershipFormed = z.object({ aId: z.string(), bId: z.string() }).strict()
+export const PartnershipDissolved = z
+  .object({ aId: z.string(), bId: z.string(), byId: z.string() })
   .strict()
 export const AgentConceived = z
   .object({
@@ -45,7 +66,7 @@ export const NeedsChanged = z
           .object({
             need: z.enum(['hunger', 'energy', 'warmth', 'social', 'thirst']),
             delta: z.number(),
-            reason: z.literal('exposure').optional(),
+            reason: z.enum(['exposure', 'meal']).optional(),
           })
           .strict(),
       )
@@ -159,17 +180,33 @@ export const FireExtinguished = z
   })
   .strict()
 
-// `structureId` is the place the mind actually named, kept beside the tile it settled on: the
-// legs read the two numbers, and the log still knows she set out for the mill.
+// The mark the mind actually named, kept beside the tile it settled on: the legs read the two
+// numbers, and the log still knows she set out for the mill, for Omar, or for the axe.
 export const WalkParams = z
   .object({
     x: z.number().int(),
     y: z.number().int(),
     structureId: z.string().min(1).optional(),
+    targetId: z.string().min(1).optional(),
+    itemId: z.string().min(1).optional(),
   })
   .strict()
-// The other way to say it, before the tile is found. Settled once, at the intent seam.
+// The other three ways to say it, before the tile is found. Settled once, at the intent seam.
 export const WalkToPlace = z.object({ structureId: z.string().min(1) }).strict()
+export const WalkToPerson = z.object({ targetId: z.string().min(1) }).strict()
+export const WalkToThing = z.object({ itemId: z.string().min(1) }).strict()
+
+// A chase re-aimed at where the person is now. The path is not carried: the fold finds it the
+// same way `action_started` does, so one walk and its hundredth re-aim are laid the same way.
+export const WalkReaimed = z
+  .object({
+    agentId: z.string(),
+    x: z.number().int(),
+    y: z.number().int(),
+    ticks: z.number().int().nonnegative(),
+    chase: z.object({ ticks: z.number(), grew: z.number(), gap: z.number() }).strict(),
+  })
+  .strict()
 
 export const ActionStarted = z
   .object({
@@ -177,9 +214,7 @@ export const ActionStarted = z
     verb: z.string(),
     params: z.record(z.string(), z.unknown()),
     duration: z.number(),
-    then: z
-      .object({ verb: z.string(), params: z.record(z.string(), z.unknown()) })
-      .optional(),
+    then: z.object({ verb: z.string(), params: z.record(z.string(), z.unknown()) }).optional(),
   })
   .strict()
 export const ActionProgressed = z.object({ agentId: z.string(), ticks: z.number() }).strict()
@@ -214,7 +249,8 @@ export const AgentSpoke = z
   })
   .strict()
 // A witness record and nothing else. `sense` says which way the act travelled, so a replay knows
-// a song from a dance; `insideId` replays the doorway rule from the event alone.
+// a song from a dance; `insideId` replays the doorway rule from the event alone. A minted verb
+// may say in words what the others see (`label`) and how far it carries (`radius`).
 export const AgentExpressed = z
   .object({
     agentId: z.string(),
@@ -224,10 +260,25 @@ export const AgentExpressed = z
     y: z.number(),
     sense: z.enum(['sight', 'sound']).optional(),
     insideId: z.string().optional(),
+    label: z.string().min(1).optional(),
+    radius: z.number().int().positive().optional(),
   })
   .strict()
-// `byId` is the inventor, `intent` the words they used, `makes` the item kinds the new verb can
-// produce (empty for a coined word). The tick is the envelope's.
+// A tag on a person, a building or a thing, readable by anyone who can see it.
+export const Marked = z
+  .object({
+    on: z.enum(['agent', 'structure', 'item']),
+    id: z.string().min(1),
+    key: z.string().min(1),
+    value: z.string().min(1),
+  })
+  .strict()
+// A name given to a place by a minted verb; `byId` is the mouth it came from.
+export const PlaceNamed = z
+  .object({ structureId: z.string().min(1), name: z.string().min(1), byId: z.string().min(1) })
+  .strict()
+// `byId` is the inventor, `intent` the words they used, `saying` the thought behind the ask,
+// `makes` the item kinds the new verb can produce (empty for a coined word). The tick is the envelope's.
 export const DiscoveryMade = z
   .object({
     recipeId: z.string().min(1),
@@ -235,15 +286,162 @@ export const DiscoveryMade = z
     kind: z.enum(['craft', 'word']),
     byId: z.string().min(1),
     intent: z.string().min(1),
+    saying: z.string().min(1).optional(),
     makes: z.array(z.string().min(1)),
   })
   .strict()
+// A scene is the agents' own bookkeeping; the world only witnesses that one happened. All three
+// fold to nothing, the way a discovery does.
+export const SceneOpened = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation']),
+    participants: z.array(z.string().min(1)),
+    topic: z.string().nullable(),
+    stakes: z.number().int().min(0).max(10),
+  })
+  .strict()
+// A talk that turned into something else, or grew a voice. The frame the viewer holds and the
+// camera's own scorer both keep the opening kind and the opening pair without it.
+export const SceneTurned = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(['talk', 'quarrel', 'council', 'gathering', 'telling', 'invitation']),
+    participants: z.array(z.string().min(1)),
+    stakes: z.number().int().min(0).max(10),
+  })
+  .strict()
+export const SceneLineSaid = z
+  .object({
+    id: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string(),
+    move: SceneMove,
+  })
+  .strict()
+export const SceneClosed = z
+  .object({
+    id: z.string().min(1),
+    summary: z.string(),
+    deltas: z.array(
+      z
+        .object({
+          agentId: z.string().min(1),
+          personId: z.string().min(1),
+          kind: z.enum([
+            'promise',
+            'debt',
+            'slight',
+            'grudge',
+            'attraction',
+            'secret',
+            'alliance',
+            'kin',
+          ]),
+          text: z.string(),
+          settled: z.literal(true).optional(),
+        })
+        .strict(),
+    ),
+    closeReason: z.enum(['ended', 'left', 'capped', 'timeout']),
+    // Optional: every log recorded before the cast rode the closing frame still parses.
+    participants: z.array(z.string().min(1)).optional(),
+  })
+  .strict()
+
+// The town writing its own rules. A proposal and a breach fold to a witness record; only a
+// ratification and a repeal move state. The predicate is compiled once, at the close of the
+// council that passed it, and rides here — so replay never asks the court anything.
+export const LawProposed = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+  })
+  .strict()
+export const LawTabled = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    votes: z
+      .object({ for: z.array(z.string().min(1)), against: z.array(z.string().min(1)) })
+      .strict(),
+  })
+  .strict()
+export const LawDropped = z
+  .object({
+    lawId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    why: z.enum(['rejected', 'lapsed']),
+  })
+  .strict()
+export const LawRatified = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    why: z.string().max(200),
+    predicate: LawPredicateSchema,
+    votes: z
+      .object({ for: z.array(z.string().min(1)), against: z.array(z.string().min(1)) })
+      .strict(),
+  })
+  .strict()
+export const LawBroken = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    verb: z.string().min(1),
+    witnesses: z.array(z.string().min(1)),
+  })
+  .strict()
+export const LawRepealed = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+  })
+  .strict()
+
+// A tie nothing fed for seven days, quietly lapsing. The same class as a scene: witnessed by the
+// world, folded to nothing, and read off the log by whoever keeps the bond graph.
+export const TieLetGo = z
+  .object({
+    agentId: z.string().min(1),
+    personId: z.string().min(1),
+    kind: z.enum([
+      'promise',
+      'debt',
+      'slight',
+      'grudge',
+      'attraction',
+      'secret',
+      'alliance',
+      'kin',
+    ]),
+  })
+  .strict()
+
 export const AgentCollapsed = z.object({ agentId: z.string() }).strict()
 // `cause` stays a free string so every recorded log still parses; DEATH_CAUSES is the
 // vocabulary emitters are held to.
 export const AgentDied = z
   .object({ agentId: z.string(), cause: z.string(), byId: z.string().optional() })
   .strict()
+// Two presence events: who came up the valley road, and who walked back down it. The body a
+// departure leaves behind is kept, the way a death keeps one — a name outlives the person here.
+export const AgentArrived = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    sex: z.enum(['f', 'm']),
+    ageDays: z.number().int().positive(),
+    x: z.number().int(),
+    y: z.number().int(),
+  })
+  .strict()
+export const AgentDeparted = z.object({ agentId: z.string() }).strict()
 export const AgentAged = z.object({ agentId: z.string() }).strict()
 export const AgentInjured = z
   .object({ agentId: z.string(), kind: z.enum(['minor', 'serious', 'grave']) })

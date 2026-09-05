@@ -41,6 +41,10 @@ import {
   doorFrontTile,
   structureTiles,
   FOUNDER_IDS,
+  FOUNDER_SEATS,
+  roomCapacity,
+  type DwellingKind,
+  type FounderId,
   CITY_INTERIOR_SLOTS,
   CITY_FURNISHING_KINDS,
   CITY_BED_KIND,
@@ -436,10 +440,10 @@ describe('city structures', () => {
   )
   const houses = structures.filter((s) => s.kind === 'house')
 
-  it('places exactly eleven structures: nine on claimed plots, two in the square', () => {
-    expect(structures).toHaveLength(11)
+  it('places exactly thirteen structures: eleven on claimed plots, two in the square', () => {
+    expect(structures).toHaveLength(13)
     expect(cityPlacements()).toHaveLength(GENESIS_WANTED.length)
-    expect(GENESIS_WANTED).toHaveLength(9)
+    expect(GENESIS_WANTED).toHaveLength(11)
   })
 
   // ★ THE TOWN IS A LIST OF BUILDINGS, NOT A LIST OF POSITIONS. Nothing in this file names a
@@ -458,9 +462,37 @@ describe('city structures', () => {
   })
 
   // USER RULING 1, both halves.
-  it('gives each of the five houses a distinct founder owner', () => {
-    expect(houses).toHaveLength(5)
-    expect(houses.map((h) => h.owner).sort()).toEqual([...FOUNDER_IDS].sort())
+  it('gives each of the seven houses a distinct founder owner', () => {
+    expect(houses).toHaveLength(7)
+    expect(houses.map((h) => h.owner).sort()).toEqual(
+      ['amara', 'yusuf', 'nadia', 'omar', 'salma', 'farida', 'kamal'].sort(),
+    )
+  })
+
+  // Twelve founders under eight roofs: a house holds a couple and the cottage the three who
+  // have no house, so nobody is seated past the floor a room has.
+  it('seats every founder under a named roof of the template, within its capacity', () => {
+    const byName = new Map(structures.map((s) => [s.name, s]))
+    const seated = new Map<string, number>()
+    for (const id of FOUNDER_IDS) {
+      const roof = byName.get(FOUNDER_SEATS[id])
+      expect(roof, `${id} is seated under a roof the template does not stand`).toBeDefined()
+      seated.set(roof!.name!, (seated.get(roof!.name!) ?? 0) + 1)
+    }
+    expect(seated.size).toBe(8)
+    for (const [name, n] of seated) {
+      const roof = byName.get(name)!
+      expect(n, `${name} seats more than it sleeps`).toBeLessThanOrEqual(
+        roomCapacity(DWELLING_FOOTPRINTS[roof.kind as DwellingKind]),
+      )
+      if (roof.kind === 'house' && roof.owner !== null)
+        expect(
+          FOUNDER_SEATS[roof.owner as FounderId],
+          `${roof.owner} does not sleep in their own house`,
+        ).toBe(name)
+    }
+    for (const h of houses) expect(seated.get(h.name!), `${h.name} stands empty`).toBeDefined()
+    expect(seated.get('the old cottage')).toBe(3)
   })
 
   it('leaves every non-house public — owner null, never absent', () => {
@@ -572,8 +604,9 @@ describe('city structures', () => {
 // ★ THE SPACING INVARIANT, AS THE TOWN ACTUALLY STANDS. The exhaustive proof is in
 // `townGrammar.test.ts`; this is the instance of it, measured.
 describe('★ the town this grammar builds, measured', () => {
+  // 125.2198 with nine roofs; the two couples' houses bring the pair in, still over the floor.
   it('holds its closest pair at the reference ring-1 distance', () => {
-    expect(closestPair(cityPlacements())).toBeCloseTo(125.2198, 3)
+    expect(closestPair(cityPlacements())).toBeCloseTo(107.3313, 3)
   })
 
   it('has no error of any kind in it', () => {
@@ -721,7 +754,7 @@ describe('★ the town still stands at ring 5', () => {
   // The clamp the lane removed. The old `cityFreePlots` filtered every plot through a ring-1
   // extent, so an agent standing in a ring-2 town would have been offered nothing at all.
   it('offers the plots of the ring it is asked about, not the ring genesis platted', () => {
-    expect(genesisEmptyPlots(1)).toHaveLength(11)
+    expect(genesisEmptyPlots(1)).toHaveLength(9)
     expect(genesisEmptyPlots(5)).toHaveLength(436 - GENESIS_WANTED.length)
     for (const p of genesisEmptyPlots(5))
       expect(inExtent(p.dx, p.dy, 5), key(p.dx, p.dy)).toBe(true)
@@ -905,7 +938,7 @@ describe('the plots agents will build on', () => {
     expect(plots).toHaveLength(
       freePlots(TOWN_RINGS_GENESIS, CITY_GROUND).length - GENESIS_WANTED.length,
     )
-    expect(plots).toHaveLength(11)
+    expect(plots).toHaveLength(9)
     const built = new Set(cityPlacements().map(plotKey))
     for (const p of plots) expect(built.has(plotKey(p)), `${plotKey(p)} is built on`).toBe(false)
   })
@@ -1148,15 +1181,17 @@ describe('PROPERTY 1 — buildings front onto something', () => {
   })
 
   // Moving equally in +dx and +dy is pure depth, so a building directly behind another cannot be
-  // seen. Two doors on one line is the array-space signature of that.
+  // seen. Two doors on one line is the array-space signature of that — within a block pitch:
+  // a door a whole pitch behind stands across a street, and the two couples' houses do.
   it('never puts one door directly behind another', () => {
     const fronts = t.structures.filter((s) => s.w > 1 || s.h > 1).map(doorFrontTile)
     expect(new Set(fronts.map((d) => key(d.dx, d.dy))).size).toBe(fronts.length)
     for (const a of fronts)
       for (const b of fronts) {
         if (a === b) continue
+        const depth = Math.abs(a.dx + a.dy - (b.dx + b.dy))
         expect(
-          a.dx - a.dy === b.dx - b.dy && a.dx + a.dy !== b.dx + b.dy,
+          a.dx - a.dy === b.dx - b.dy && depth !== 0 && depth < 2 * PITCH,
           `${key(a.dx, a.dy)} is straight behind ${key(b.dx, b.dy)}`,
         ).toBe(false)
       }

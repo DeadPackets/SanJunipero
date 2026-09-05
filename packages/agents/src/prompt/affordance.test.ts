@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EventStore, openDb } from '@sj/engine/store'
 import { doorTile, fold, genesisState, type TileId } from '@sj/engine'
-import { DEFAULT_CONFIG, scanPromptForGlassLeak } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, scanPromptForGlassLeak } from '@sj/shared'
 import { perceptionToProse } from './prose.js'
 import { wireTown } from '../testutil/fixtures.js'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
@@ -15,7 +15,7 @@ const BREAD = 'item_bread'
 
 type Town = { bridge: EngineBridge; step: () => void; door: { x: number; y: number } }
 
-function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
+function town(opts: { indoors?: boolean; sheds?: number; owner?: string } = {}): Town {
   const config = DEFAULT_CONFIG
   const terrain: TileId[][] = Array.from({ length: 16 }, () =>
     Array.from({ length: 16 }, (): TileId => 0),
@@ -25,7 +25,8 @@ function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
   const put = (type: string, payload: unknown): void => {
     state = fold(state, store.append(state.tick, type, payload), config)
   }
-  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: 7300 })
+  put('agent_spawned', { id: AGENT, name: 'Tamar', x: 10, y: 10, ageDays: ADULT_AGE_DAYS })
+  put('agent_spawned', { id: 'yusuf', name: 'Yusuf', x: 14, y: 14, ageDays: ADULT_AGE_DAYS })
   put('structure_planned', {
     id: HOUSE,
     kind: 'house',
@@ -36,6 +37,7 @@ function town(opts: { indoors?: boolean; sheds?: number } = {}): Town {
     maxHp: 50,
     flammable: true,
     builderId: AGENT,
+    ...(opts.owner === undefined ? {} : { owner: opts.owner }),
   })
   put('structure_completed', { id: HOUSE })
   put('item_spawned', { id: BREAD, kind: 'bread', qty: 1, loc: { t: 'tile', x: 10, y: 11 } })
@@ -93,13 +95,17 @@ describe('the affordance block says what the validators would otherwise refuse',
     expect(await refusal(t, { verb: 'walk', params: { x: 10, y: 10 } })).toBe(
       'the world allowed it',
     )
-    expect(proseFor(t.bridge)).toContain('a walk to (10, 10) goes nowhere: you already stand there')
+    expect(proseFor(t.bridge)).toContain(
+      'walking to (10, 10) gets you nowhere: you are already there',
+    )
   })
 
   it('open sky is said, not left to be inferred — and stepping out of it costs nothing', async () => {
     const t = town()
     expect(await refusal(t, { verb: 'exit', params: {} })).toBe('the world allowed it')
-    expect(proseFor(t.bridge)).toContain('No walls are around you: there is nothing to step out of')
+    expect(proseFor(t.bridge)).toContain(
+      'You are not inside anything, so there is nothing to step out of',
+    )
   })
 
   it('the roof overhead is said to bar every other one, and entering it again is over at once', async () => {
@@ -108,7 +114,7 @@ describe('the affordance block says what the validators would otherwise refuse',
       'the world allowed it',
     )
     expect(proseFor(t.bridge)).toContain(
-      `Four walls are around you: while you are inside the house (${HOUSE}) you can walk nowhere and enter nothing, and the doorway at (${t.door.x}, ${t.door.y}) is the way back out under the sky.`,
+      `You are inside the house (${HOUSE}). While you are in here you cannot walk anywhere or enter anything, and the doorway at (${t.door.x}, ${t.door.y}) is the way back out.`,
     )
   })
 
@@ -116,8 +122,8 @@ describe('the affordance block says what the validators would otherwise refuse',
     const t = town()
     expect(await refusal(t, { verb: 'walk', params: { x: 5, y: 5 } })).toBe('no path to that spot')
     const said = proseFor(t.bridge)
-    expect(said).toContain(`A house (${HOUSE}) stands at (5, 5)`)
-    expect(said).toContain('Wall or water covers (5, 5); no walk of yours can end there.')
+    expect(said).toContain(`A house (${HOUSE}) stands close to the north-west`)
+    expect(said).toContain('Wall or water covers (5, 5), so you cannot walk there.')
   })
 
   it('`not holding that` — what the hands can touch is told apart from what they hold', async () => {
@@ -126,10 +132,10 @@ describe('the affordance block says what the validators would otherwise refuse',
       'not holding that',
     )
     expect(proseFor(t.bridge)).toContain(
-      `Your hands are empty; close enough for them to touch, but not yet in them: 1 bread (${BREAD}).`,
+      `Your hands are empty; close enough to touch but not in your hands yet: 1 bread (${BREAD}).`,
     )
     expect(proseFor(town({ indoors: true }).bridge)).toContain(
-      'Your hands are empty; nothing is close enough for them to touch.',
+      'Your hands are empty; nothing is close enough to touch.',
     )
   })
 
@@ -140,7 +146,7 @@ describe('the affordance block says what the validators would otherwise refuse',
     )
     for (let i = 0; i < 20; i++) t.step()
     expect(proseFor(t.bridge)).toContain(
-      `Your hands hold 1 bread (${BREAD}); nothing else is close enough for them to touch.`,
+      `Your hands hold bread ×1 (${BREAD}); nothing else is close enough to touch.`,
     )
   })
 
@@ -148,10 +154,24 @@ describe('the affordance block says what the validators would otherwise refuse',
     const said = proseFor(town({ sheds: 6 }).bridge)
     const block = said
       .split(/(?<=\.)\s+/)
-      .filter((s) => /^(No walls are|Four walls are|Your hands )/.test(s))
+      .filter((s) => /^(You are not inside anything|You are inside the|Your hands )/.test(s))
     expect(block).toHaveLength(2)
-    const barred = /Wall or water covers ([^;]+);/.exec(said)![1]!
+    const barred = /Wall or water covers ([^.]+), so you cannot walk there\./.exec(said)![1]!
     expect(barred.match(/\(\d+, \d+\)/g)).toHaveLength(4)
+  })
+
+  // 31 of rehearsal 13's 42 `You could not ask:` refusals were the one reason "not under a roof
+  // of your own", and no line ever said whose roof this was.
+  it('names whose roof the body is under, both ways round, and says nothing of unowned walls', () => {
+    expect(proseFor(town({ indoors: true, owner: AGENT }).bridge)).toContain(
+      `You stand inside your own house (${HOUSE}) at`,
+    )
+    expect(proseFor(town({ indoors: true, owner: 'yusuf' }).bridge)).toContain(
+      `You stand inside Yusuf's house (${HOUSE}) at`,
+    )
+    expect(proseFor(town({ indoors: true }).bridge)).toContain(
+      `You stand inside the house (${HOUSE}) at`,
+    )
   })
 
   it('every fixture reads clean through the one-way glass', () => {

@@ -45,13 +45,28 @@ vi.mock('pixi.js', () => {
     }
   }
   class ColorMatrixFilter {
-    matrix: number[] = []
+    static writes = 0
+    #m: number[] = []
+    get matrix(): number[] {
+      return this.#m
+    }
+    set matrix(v: number[]) {
+      ColorMatrixFilter.writes++
+      this.#m = v
+    }
   }
   return { ColorMatrixFilter, Container, Graphics, Point, Sprite, Texture: { WHITE: {} } }
 })
 import type { WorldState } from '@sj/engine/state'
 import type { Scene } from './scene.js'
-import { SKY_MAX_ALPHA, createAtmosphere, skyAlpha } from './atmosphere.js'
+import {
+  MOON_COLOR,
+  MOON_MAX_ALPHA,
+  SKY_MAX_ALPHA,
+  createAtmosphere,
+  skyAlpha,
+} from './atmosphere.js'
+import { moonAltitude } from '../ui/skyModel.js'
 import { clockTint } from './tints.js'
 
 describe('the sky gradient (U4)', () => {
@@ -135,6 +150,22 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     expect(src).not.toContain('ticker.add') // the tint is computed once a frame, by `update`
   })
 
+  // ★ `update` runs once a frame. The matrix is a pure function of the weather kind, and
+  // assigning it dirties the filter's uniform group — an 80-byte re-upload at 60 fps.
+  it('★ writes the grading matrix when the weather changes, not on every frame', async () => {
+    const { ColorMatrixFilter } = (await import('pixi.js')) as unknown as {
+      ColorMatrixFilter: { writes: number }
+    }
+    const { atm, state } = drive()
+    atm.update(state(720, 'rain'))
+    const written = ColorMatrixFilter.writes
+    for (let i = 1; i <= 30; i++) atm.update(state(720 + i, 'rain'))
+    expect(ColorMatrixFilter.writes, 'a frame of rain is not new weather').toBe(written)
+
+    atm.update(state(760, 'storm'))
+    expect(ColorMatrixFilter.writes).toBe(written + 1)
+  })
+
   it('tints the quad from the clock and the sky from the quad', () => {
     const { atm, night, lights, state } = drive()
     atm.update(state(240, 'sunny'))
@@ -143,5 +174,39 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     const sky = lights.children.find((c) => c.blendMode === 'screen')!
     expect(sky.tint).toBe(quad.tint)
     expect(sky.alpha).toBeCloseTo(skyAlpha(0), 6)
+  })
+})
+
+// ── ★ THE MOON ON THE ARC LIGHTS THE ROOFS UNDER IT (task 18) ────────────────────────────
+
+describe('★ the moon', () => {
+  const moonOf = (lights: Node): Node =>
+    lights.children.filter((c) => c.blendMode === 'screen').at(-1)!
+
+  it('★ is a second screened ramp in `lights`, over the same masked ground', () => {
+    const { lights } = drive()
+    const screened = lights.children.filter((c) => c.blendMode === 'screen')
+    expect(screened).toHaveLength(2)
+    expect(moonOf(lights).mask).not.toBeNull()
+    expect(moonOf(lights).tint).toBe(MOON_COLOR)
+  })
+
+  it('★ is dark all day and rides its own altitude at night', () => {
+    const { atm, lights, state } = drive()
+    atm.update(state(720, 'sunny'))
+    expect(moonOf(lights).alpha).toBe(0)
+    atm.update(state(60, 'sunny'))
+    expect(moonOf(lights).alpha).toBeCloseTo(MOON_MAX_ALPHA * moonAltitude(60), 6)
+    expect(moonOf(lights).alpha).toBeGreaterThan(0)
+  })
+
+  it('★ is cool where every other light in the town is warm, and stays under its ceiling', () => {
+    expect((MOON_COLOR >> 16) & 0xff).toBeLessThan(MOON_COLOR & 0xff)
+    const { atm, lights, state } = drive()
+    for (let m = 0; m < 1440; m += 7) {
+      atm.update(state(m, 'sunny'))
+      expect(moonOf(lights).alpha, `minute ${m}`).toBeLessThanOrEqual(MOON_MAX_ALPHA)
+    }
+    expect(MOON_MAX_ALPHA).toBeLessThanOrEqual(0.2)
   })
 })

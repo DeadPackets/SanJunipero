@@ -59,9 +59,9 @@ function tilesFrom(s: Structure, x: number, y: number): number {
 function nearestStructure(state: WorldState, x: number, y: number): Structure | null {
   let best: Structure | null = null
   let bestAt = Infinity
-  for (const s of Object.values(state.structures).sort((a, b) => (a.id < b.id ? -1 : 1))) {
+  for (const s of Object.values(state.structures)) {
     const d = tilesFrom(s, x, y)
-    if (d < bestAt) {
+    if (d < bestAt || (d === bestAt && best !== null && s.id < best.id)) {
       bestAt = d
       best = s
     }

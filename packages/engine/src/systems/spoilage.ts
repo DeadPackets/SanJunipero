@@ -18,16 +18,20 @@ export function spoilageFor(
   return days === undefined ? {} : { spoilage: { spawnDay: dayOf(state.tick), days } }
 }
 
+// What where a thing sits does to how long it keeps: the open ground costs it, a preserving
+// roof buys it, and hands or any other roof leave it as it is.
+function placeMultiplier(state: WorldState, item: Item, config: SimConfig): number {
+  if (item.loc.t === 'tile') return config.spoilage.groundMultiplier
+  const kind = item.loc.t === 'structure' ? state.structures[item.loc.id]?.kind : undefined
+  const preserved = kind !== undefined && config.spoilage.preservingKinds.includes(kind)
+  return preserved ? config.spoilage.storehouseMultiplier : 1
+}
+
 // Read from where the thing sits *now*: shelving a loaf on its fifth day buys the
 // full multiplier, and taking it back out again spends it.
 export function spoilDeadline(state: WorldState, item: Item, config: SimConfig): number | null {
   if (!item.spoilage) return null
-  const kind = item.loc.t === 'structure' ? state.structures[item.loc.id]?.kind : undefined
-  const preserved = kind !== undefined && config.spoilage.preservingKinds.includes(kind)
-  return (
-    item.spoilage.spawnDay +
-    item.spoilage.days * (preserved ? config.spoilage.storehouseMultiplier : 1)
-  )
+  return item.spoilage.spawnDay + item.spoilage.days * placeMultiplier(state, item, config)
 }
 
 // The last day you can still eat it — deep-world's poison window reads this.

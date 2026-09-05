@@ -1,7 +1,7 @@
 import { appendFileSync, cpSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import {
   AssetCodex,
   BUILDINGS_CONTENT_DIR,
@@ -24,7 +24,7 @@ import {
 import {
   DEFAULT_CONFIG,
   DWELLING_FOOTPRINTS,
-  FOUNDER_IDS,
+  CAST_IDS,
   ROAD_AUTOTILE_KEYS,
   TERRAIN_TILE_KINDS,
   makeCityTemplate,
@@ -44,8 +44,10 @@ import {
   ingestLibraryArt,
   ingestProductionArt,
   ingestTerrainArt,
+  type IngestEntry,
 } from './ingestArt.js'
 import { townStructuresFor } from './founders.js'
+import { SHOWCASE_CONFIG } from './devWorld.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
 afterAll(() => {
@@ -53,6 +55,14 @@ afterAll(() => {
 })
 
 describe('ingestProductionArt', () => {
+  // ★ `missing` had no producer anywhere — every lister throws on a half-present directory
+  // instead — so the `NO ART for <kind>` line it fed was a diagnostic that could never print.
+  it('★ carries only the two actions its listers can produce', () => {
+    // @ts-expect-error a third action would be a state no ingest can reach
+    const unreachable: IngestEntry = { kind: 'shed', action: 'missing', id: 'x' }
+    expect(unreachable.action).toBe('missing')
+  })
+
   it('registers every committed cell and every committed sheet, idempotently', async () => {
     const db = openForgeDb(join(dir, 'codex.db'))
     const codex = new AssetCodex(db)
@@ -113,12 +123,23 @@ describe('ingestProductionArt', () => {
     db.close()
   }, 30_000)
 
-  it('names half a cell instead of quietly drawing a prism', () => {
+  it('names half a cell and skips it, instead of quietly drawing a prism or dropping the class', () => {
     const root = mkdtempSync(join(dir, 'half-'))
-    const one = listCommittedBuildings()[0]!
-    cpSync(join(BUILDINGS_CONTENT_DIR, one.dir), join(root, one.dir), { recursive: true })
-    rmSync(join(root, one.dir, 'cell.webp'))
-    expect(() => listCommittedBuildings(root)).toThrow(new RegExp(`${one.dir}.*cell\\.webp`))
+    const [one, two] = listCommittedBuildings()
+    for (const b of [one!, two!])
+      cpSync(join(BUILDINGS_CONTENT_DIR, b.dir), join(root, b.dir), { recursive: true })
+    rmSync(join(root, one!.dir, 'cell.webp'))
+    const warned: string[] = []
+    const warn = vi.spyOn(console, 'warn').mockImplementation((m: unknown) => {
+      warned.push(String(m))
+    })
+    try {
+      const kept = listCommittedBuildings(root).map((b) => b.dir)
+      expect(kept).toEqual([two!.dir])
+      expect(warned.join('\n')).toMatch(new RegExp(`${one!.dir}.*cell\\.webp`))
+    } finally {
+      warn.mockRestore()
+    }
   })
 
   // `structureArt.ts` cannot see `TOWN_STRUCTURES` in `founders.ts` — `@sj/forge` must not import
@@ -272,13 +293,11 @@ describe('ingestCastArt', () => {
 
     const first = ingestCastArt(db)
     expect(first.map((e) => e.kind).sort()).toEqual(
-      [...FOUNDER_IDS].map((id) => `character:${id}`).sort(),
+      [...CAST_IDS].map((id) => `character:${id}`).sort(),
     )
     expect(first.every((e) => e.action === 'registered')).toBe(true)
     expect(ingestCastArt(db).every((e) => e.action === 'unchanged')).toBe(true)
-    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(
-      FOUNDER_IDS.length,
-    )
+    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(CAST_IDS.length)
     db.close()
   }, 30_000)
 })
@@ -306,7 +325,8 @@ describe('the boot resolves every kind the world will ask for', () => {
   // ★ Only this lane sees both the sim and the catalogue, so only here can the whole question be
   // asked: `seed_pouch` sat in every founder's kit and `torch` in a recipe, neither ever drawn.
   it('★ every kind the sim seeds or crafts is a kind the catalog carries', () => {
-    const world = configItemKinds(DEFAULT_CONFIG, seededItemKinds())
+    // SHOWCASE_CONFIG is the config the town boots; a showcase-only recipe must be covered too.
+    const world = configItemKinds(SHOWCASE_CONFIG, seededItemKinds())
     for (const k of ['seed_pouch', 'torch', 'plank'])
       expect(world, `the walk lost ${k} — the gate would be vacuous`).toContain(k)
     const absent = catalogGap(world)
@@ -318,6 +338,6 @@ describe('the boot resolves every kind the world will ask for', () => {
 
   it('and an empty codex reports every one of them, so the guard cannot go vacuous', () => {
     expect(itemArtCoverage([]).missing).toHaveLength(LIBRARY.length * 2)
-    expect(castArtCoverage([]).missing).toHaveLength(FOUNDER_IDS.length)
+    expect(castArtCoverage([]).missing).toHaveLength(CAST_IDS.length)
   })
 })

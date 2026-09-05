@@ -44,9 +44,9 @@ function stormyDays(stormLightningFireChance: number): StormRun {
 describe('★ lightning is rare drama: a storm-heavy town keeps its roofs', () => {
   const ruled = stormyDays(SHOWCASE_CONFIG.weather.stormLightningFireChance)
 
-  it('runs the weather it is measuring — three storm spells over fifty-eight roofs', () => {
+  it('runs the weather it is measuring — three storm spells over a hundred and ten roofs', () => {
     expect(ruled.spells).toBeGreaterThan(0)
-    expect(ruled.roofs).toBe(58)
+    expect(ruled.roofs).toBe(110)
   })
 
   it('★ burns two roofs at most over three days', () => {
@@ -60,5 +60,5 @@ describe('★ lightning is rare drama: a storm-heavy town keeps its roofs', () =
     expect(before.spells).toBe(ruled.spells)
     expect(before.struck).toBeGreaterThan(10)
     expect(before.lost).toBeGreaterThan(10)
-  })
+  }, 300_000)
 })

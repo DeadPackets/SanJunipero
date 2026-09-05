@@ -1,11 +1,9 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
 import { IntentSchema } from './turn.js'
 import type { PerceptionPacket } from './prompt/prose.js'
 
 export type MindConfig = {
-  conversationGapTicks: number
-  conversationWindowTicks: number
   idleGapTicks: number
   boredomTicks: number
   // Four clocks that ring when they run low, and one rung that rings when it rises: a named
@@ -18,18 +16,16 @@ export type MindConfig = {
   napTicks: number
   dreamChance: number
   ambientK: number
+  // How high `belonging` has to stand before the dusk fire is worth a turn of its own.
+  gatheringWant: number
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
-  // Five ticks is ten seconds at 1x: a reply lands in the pause a person leaves, not on top
-  // of the words it answers.
-  conversationGapTicks: 5,
-  conversationWindowTicks: 60,
   idleGapTicks: 30,
   boredomTicks: 60,
-  // Thirst empties as hunger does and kills faster, so it rings on the same rung. Any named
-  // affliction rings at its first severity: poison and illness both begin there.
-  bodyAlarm: { hunger: 25, energy: 15, warmth: 20, thirst: 25, affliction: 1 },
+  // Thirst rings with hunger; any named affliction rings at its first severity. Hunger and
+  // energy ring late (D1): a body turn should be rare enough to read as an emergency.
+  bodyAlarm: { hunger: 15, energy: 10, warmth: 20, thirst: 25, affliction: 1 },
   alarmHysteresis: 10,
   journalTicks: 10,
   dozeTicks: 60,
@@ -37,6 +33,10 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   napTicks: 120,
   dreamChance: 0.35,
   ambientK: 6,
+  // 40 of 100, which a want rising 0.017 a tick from zero reaches in 1.6 sim-days. At 60 a fresh
+  // town saw this fire for nobody until day three, and the first two days are what a new watcher
+  // watches. Belonging resets to zero on any scene, so the lonely gather and then stop firing.
+  gatheringWant: 40,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }
@@ -61,14 +61,18 @@ export type MindClock = {
   // so a zero makes a new arrival wait out the whole boredom floor first.
   lastTurnTick: number | null
   reconsiderAtTick: number | null
-  conversationUntilTick: number
   dozeUntilTick: number
   // Keyed by need name and by `affliction:<kind>`. Absent is armed: a rung nobody has spent
   // yet still rings, so a clock added after a mind woke up needs no migration.
   alarmArmed: Partial<Record<string, boolean>>
   morningWokeDay: number | null
+  // The day this mind last spent a turn on the dusk fire. Null is a mind that never has.
+  gatheringDay: number | null
   wakeRetryAtTick: number
   prevVisibleIds: string[]
+  // The felt tags this mind has already been asked about. Optional: a checkpoint written before
+  // it existed still resumes, and an absent latch costs one turn, not sixty-six.
+  feltSeen?: string[] | undefined
 }
 
 type Intent = z.infer<typeof IntentSchema>
@@ -86,114 +90,122 @@ export type WakeReason =
   | 'salient_perception'
   | 'plan_blocked'
   | 'plan_done'
-  | 'conversation_beat'
+  | 'floor'
   | 'reconsider'
   | 'boredom'
   | 'morning'
+  | 'gathering'
 
+/** Where this mind stands in an open scene. A scene holds the talk now, so it outranks every
+ *  other reason while it is open: a floor-holder who woke for a plan would never answer. */
+export type FloorState = { inScene: boolean; holdsFloor: boolean }
+const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
+
+/** The one reason that decides the turn: the head of the list below, and the same answer this
+ *  function has always given. */
 export function decideWake(
   cfg: MindConfig,
   packet: PerceptionPacket,
   clock: MindClock,
   tick: number,
   plan: PlanState,
+  floor: FloorState = NO_SCENE,
+  belonging = 0,
 ): WakeReason | null {
-  // Backoff after a failed turn: even floor-exempt reasons wait it out.
-  if (tick < clock.dozeUntilTick) return null
-
-  if (packet.self.asleep) {
-    if (packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))) {
-      return 'salient_perception'
-    }
-    // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
-    // the re-arm point, so the alarm has to ring again until the body rises.
-    if (tick < clock.wakeRetryAtTick) return null
-    if (bodyAlarmBelow(cfg, packet.self.body)) return 'body_alarm'
-    if (!packet.time.isNight && clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)) {
-      return 'morning'
-    }
-    // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
-    const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
-    if (!packet.time.isNight && napped >= cfg.napTicks) return 'morning'
-    return null
-  }
-
-  const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
-  const inConversation = tick < clock.conversationUntilTick
-
-  // Floor-exempt: physical rousing and immediate surprises.
-  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) return 'body_alarm'
-  if (salientPerception(packet, clock.prevVisibleIds)) return 'salient_perception'
-  if (plan.lastResult === 'blocked') return 'plan_blocked'
-
-  // plan_done: subject to the idle floor, but the floor only applies outside
-  // an open conversation window.
-  if (plan.lastResult === 'done' && (inConversation || sinceLast >= cfg.idleGapTicks))
-    return 'plan_done'
-
-  // conversation_beat: inside the window, its own tighter cadence.
-  if (inConversation && sinceLast >= cfg.conversationGapTicks) return 'conversation_beat'
-
-  // The idle floor gates the remaining reasons only outside conversation.
-  if (!inConversation && sinceLast < cfg.idleGapTicks) return null
-
-  if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) return 'reconsider'
-  if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) return 'boredom'
-
-  return null
+  return wakeReasons(cfg, packet, clock, tick, plan, floor, belonging)[0] ?? null
 }
 
-// Six lines of earshot is enough to see a two-mind loop close on itself.
-const EARSHOT_MEMORY = 6
-const NEAR_DUPLICATE_OVERLAP = 0.8
-// Under three words a shared opening is coincidence, so the overlap rule judges those alone.
-const PREFIX_MIN_WORDS = 3
-
-// Per-clock and ephemeral, because `MindClock` is serialised into a strict checkpoint schema;
-// a resumed mind with nothing to have heard before is the sane reset.
-const earshot = new WeakMap<MindClock, { tick: number; said: string[][] }>()
-
-function words(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .split(' ')
-    .filter((w) => w.length > 0)
-}
-
-function nearDuplicate(a: string[], b: string[]): boolean {
-  if (a.length === 0 || b.length === 0) return a.length === b.length
-  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
-  if (short.length >= PREFIX_MIN_WORDS && short.every((w, i) => long[i] === w)) return true
-  const setA = new Set(a)
-  const setB = new Set(b)
-  let shared = 0
-  for (const w of setA) if (setB.has(w)) shared += 1
-  return shared / (setA.size + setB.size - shared) >= NEAR_DUPLICATE_OVERLAP
-}
-
-/** The conversation window's re-arm, called every tick. Speech the mind has just heard said
- *  again is an echo, not a beat: it is still heard, it just buys no second window. */
-export function rearmConversationWindow(
+/** Every reason true at this tick, the deciding one first. What follows the head bought nothing
+ *  — it is what a histogram of winners alone cannot see, and `salient_perception` at 82% of the
+ *  gate's calls was mostly a mind with nothing left to do that someone also walked past. It is
+ *  read on two rungs now: felt is immediate, noticed waits for the idle gap.
+ *
+ *  A reason gated behind a `return` still ends the list: the backoff, the retry rung and the idle
+ *  floor each stop the ladder, and what they stop was never going to be returned either.
+ *
+ *  Asked once a tick, and an answer with anything in it is a turn — so the felt latch is spent
+ *  here. Asking twice at one tick answers the second ask as if the first had bought the turn. */
+export function wakeReasons(
   cfg: MindConfig,
   packet: PerceptionPacket,
   clock: MindClock,
   tick: number,
-): void {
-  if (packet.heard.length === 0) return
-  // A sleeper holds no conversation, so it wakes with nothing to have heard before.
-  if (packet.self.asleep) earshot.delete(clock)
-  const prior = earshot.get(clock)
-  const said =
-    prior === undefined || tick - prior.tick > cfg.conversationWindowTicks ? [] : prior.said
-  let novel = false
-  for (const h of packet.heard) {
-    const line = words(h.text)
-    if (!said.some((seen) => nearDuplicate(line, seen))) novel = true
-    said.push(line)
+  plan: PlanState,
+  floor: FloorState = NO_SCENE,
+  belonging = 0,
+): WakeReason[] {
+  // Backoff after a failed turn: even floor-exempt reasons wait it out.
+  if (tick < clock.dozeUntilTick) return []
+
+  // Fire and a blow reach a sleeper, so they reach a listener too: talk is a shallower state
+  // than sleep, and it must not hold a mind still through the one thing sleep does not.
+  const rousing = packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))
+
+  // Standing in a talk is hands at work, and the body breaks off both the same way. Nothing
+  // closes a talk for being late any more, so this is the only thing that reaches anyone in one
+  // running down: merely tired keeps listening, genuinely failing goes.
+  const failing = bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)
+
+  // An hour lain with somebody is chosen, and it is as deep a state as sleep: a boredom or a
+  // plan wake out of it is a turn spent being refused for hands that are full.
+  if (packet.self.activity === 'lie_with' && !packet.self.asleep && !rousing && !failing) return []
+
+  // A listener takes no turn at all — that is what makes hearing free.
+  if (floor.inScene && !packet.self.asleep && !rousing && !failing) {
+    return floor.holdsFloor ? ['floor'] : []
   }
-  earshot.set(clock, { tick, said: said.slice(-EARSHOT_MEMORY) })
-  if (novel) clock.conversationUntilTick = tick + cfg.conversationWindowTicks
+
+  const reasons: WakeReason[] = []
+  if (packet.self.asleep) {
+    if (rousing) reasons.push('salient_perception')
+    // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
+    // the re-arm point, so the alarm has to ring again until the body rises.
+    if (tick < clock.wakeRetryAtTick) return reasons
+    if (bodyAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
+    // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
+    const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
+    const dawn = clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)
+    if (!packet.time.isNight && (dawn || napped >= cfg.napTicks)) reasons.push('morning')
+    return reasons
+  }
+
+  const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
+
+  // Floor-exempt: physical rousing, and whatever happened TO this body. A felt event sits in the
+  // window for all 66 of its ticks, so only what is new since the last ask is worth a turn.
+  const spentFelt = clock.feltSeen ?? []
+  const felt =
+    packet.feltEvents.length > spentFelt.length ||
+    packet.feltEvents.some((e) => !spentFelt.includes(e))
+  clock.feltSeen = [...packet.feltEvents]
+  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
+  if (felt) reasons.push('salient_perception')
+  if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
+  // Above the gate on purpose, and affordable there because a scene resets belonging to 0: a
+  // mind with company never reaches the threshold, so the rung is only ever billed to the lonely.
+  if (gatheringDue(cfg, clock, tick, belonging)) reasons.push('gathering')
+
+  if (sinceLast < cfg.idleGapTicks) return reasons
+
+  // Merely noticed: a word overheard, a face arriving or going. The scene machine is what
+  // answers speech now — a mind spoken to becomes a participant and gets the floor, which is
+  // gap-exempt — so hearing one buys a turn no sooner than an idle mind's own pacing allows.
+  if (!felt && noticed(packet, clock.prevVisibleIds)) reasons.push('salient_perception')
+  if (plan.lastResult === 'done') reasons.push('plan_done')
+  if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) reasons.push('reconsider')
+  if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) reasons.push('boredom')
+
+  return reasons
+}
+
+// Once per mind per dusk. The want is true for all 120 dusk ticks, so what makes it one turn is
+// `gatheringDay`, latched by the runtime the way `morningWokeDay` is — on a turn actually bought.
+function gatheringDue(cfg: MindConfig, clock: MindClock, tick: number, belonging: number): boolean {
+  return (
+    belonging > cfg.gatheringWant &&
+    dayPhaseFromTick(tick) === 'dusk' &&
+    clock.gatheringDay !== Math.floor(tick / MINUTES_PER_DAY)
+  )
 }
 
 // Every rung the body is failing on right now, need and affliction alike, as alarm keys.
@@ -235,9 +247,11 @@ export function disarmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClo
   for (const key of ringing(cfg, body)) clock.alarmArmed[key] = false
 }
 
-function salientPerception(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
+// What this mind only noticed, as against what happened to it. A word carries no claim on the
+// hearer: an audience of ten around a twelve-line scene would otherwise buy 120 turns at
+// $0.00079 apiece to overhear one that cost $0.00017 a line.
+function noticed(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
   if (packet.heard.length > 0) return true
-  if (packet.feltEvents.length > 0) return true
   const ids = packet.visible.agents.map((a) => a.id)
   if (ids.length !== prevVisibleIds.length) return true
   const seen = new Set(ids)

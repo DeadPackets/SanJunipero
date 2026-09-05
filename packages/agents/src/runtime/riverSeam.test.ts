@@ -14,7 +14,7 @@ import {
   type TileId,
   type WorldState,
 } from '@sj/engine'
-import { isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, isWet, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { perceptionToProse, placesKnownLine } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
@@ -47,7 +47,7 @@ function valley(
       name: 'Tamar',
       x: at.x,
       y: at.y,
-      ageDays: 7300,
+      ageDays: ADULT_AGE_DAYS,
     }),
     config,
   )
@@ -117,6 +117,23 @@ describe('★ the valley a mind is born knowing', () => {
       refusal: 'you know no such place',
     })
   })
+
+  // ★ The block tells a mind to walk to any landmark it is shown, so every word the block prints
+  // has to be a word the legs answer to. Nothing here checks the bank; only that the mark is read
+  // as a place at all, which is the one way the prompt and the engine can drift apart.
+  it('walks to every landmark the block prints, from anywhere in the valley', () => {
+    for (const at of [EAST_BANK, { x: 4, y: 4 }, { x: 70, y: 8 }, { x: 20, y: 100 }]) {
+      const { bridge, loop, config } = valley(at)
+      const known = bridge.knownPlaces(AGENT).filter((p) => p.natural === true)
+      expect(known.length, `landmarks at ${at.x},${at.y}`).toBeGreaterThan(0)
+      for (const p of known) {
+        const to = walkDestination(loop.state, config, AGENT, { structureId: p.id })
+        expect(to, `${p.id} from ${at.x},${at.y}`).not.toEqual({
+          refusal: 'you know no such place',
+        })
+      }
+    }
+  })
 })
 
 describe('★ water at the far edge of the valley', () => {
@@ -125,7 +142,7 @@ describe('★ water at the far edge of the valley', () => {
     const prose = perceptionToProse(bridge.perception(AGENT), undefined, {
       distantWater: (x, y) => bridge.distantWater(x, y),
     })
-    expect(prose).toContain('Water glints to the west.')
+    expect(prose).toContain('You can see water off to the west.')
     // The same water the legs would be sent to, so the glint and the walk cannot disagree.
     const to = walkDestination(loop.state, config, AGENT, { structureId: 'river' })
     expect((to as { x: number }).x).toBeLessThan(EAST_BANK.x)

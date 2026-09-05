@@ -15,6 +15,7 @@ import {
   lyingHitPolygon,
 } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
+import { shadowCast } from '../ui/skyModel.js'
 import { artOptional, characterArt, type TextureBook } from './textures.js'
 import {
   SLOT_ABOVE_HEAD_PX,
@@ -24,6 +25,9 @@ import {
   type Overhead,
 } from './overhead.js'
 import { hoverPlate } from '../ui/interaction.js'
+import { statusOf } from '../ui/status.js'
+import { createConversation, faceInScene, floorHolder } from './converse.js'
+import { progress } from '../ui/motion.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -59,6 +63,12 @@ import {
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
+/** The floor of a scene, drawn on the ground the speaker is standing on: 2:1 like the tile, and
+ *  a shade wider than the 20×8 contact shadow so it reads as a ring and not as an outline. */
+const FLOOR_RING_RX = 12
+const FLOOR_RING_RY = 6
+const FLOOR_RING_INK = 0xf2c879 // --honey, the one accent
+
 /** The movement law's defaults, restated for a world whose snapshot has not arrived; `charAnim.test.ts` asserts these are what `shared/src/config.ts` defaults to. */
 export const MOVEMENT_FALLBACK = { debuffThreshold: 30, base: 3, debuff: 2 } as const
 
@@ -68,6 +78,12 @@ type Sheet = { art: CharArt; texture: Texture | null }
 type CharEntry = {
   sprite: Sprite
   shadow: Sprite
+  /** the honey ring that says this body holds the floor, and the fade it is part-way through */
+  ring: Graphics
+  ringA: number
+  ringFrom: number
+  ringWant: number
+  ringSinceMs: number
   overhead: Overhead
   /** the kind the slot is drawing, so the atlas is cut once and not once a frame */
   glyphKind: EmoteKind | null
@@ -215,6 +231,8 @@ export function createCharacterLayer(
   let lastAssetsSeq = store.assetsSeq()
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
+  /** Who is answering whom, so a talker turns to their partner rather than out to sea. */
+  const talk = createConversation()
   /** ONE clock for the whole town: the world ticks for everybody at once, so a per-body
    *  estimate would be five noisy copies of one number. */
   let clock: TickClock = initialTickClock()
@@ -279,7 +297,7 @@ export function createCharacterLayer(
   // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
   // fires on a camera stop, not on a frame.
   const recutOnZoom = (): void => {
-    const zoom = scene.getZoom()
+    const zoom = scene.getZoomStop()
     if (zoom === hitZoom) return
     hitZoom = zoom
     for (const e of entries.values()) {
@@ -290,19 +308,28 @@ export function createCharacterLayer(
     }
   }
 
-  /** The atlas cell for the row the slot is showing. Cut once per kind per person: a new
-   *  Texture every frame is a new texture every frame. */
+  /** The atlas cell for the row the slot is showing. Cut once per kind for the whole layer:
+   *  Pixi's Texture holds a listener on its source that only `destroy()` takes off again. */
   const setGlyph = (e: CharEntry, kind: EmoteKind | null): void => {
     if (e.glyphKind === kind) return
     e.glyphKind = kind
-    if (kind === null || emoteAtlas === null) {
+    // Check the index: `indexOf` answers -1 for a kind the sheet lacks, and a frame cut off the
+    // left of the atlas is the forge's checkerboard standing over somebody's head.
+    const cell = kind === null ? -1 : EMOTE_KINDS.indexOf(kind)
+    if (cell < 0 || emoteAtlas === null) {
       e.overhead.glyph.texture = Texture.EMPTY
       return
     }
-    e.overhead.glyph.texture = new Texture({
-      source: emoteAtlas.source,
-      frame: new Rectangle(EMOTE_KINDS.indexOf(kind) * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
-    })
+    const atlas = emoteAtlas
+    e.overhead.glyph.texture = cached(
+      atlas,
+      `emote:${kind}`,
+      () =>
+        new Texture({
+          source: atlas.source,
+          frame: new Rectangle(cell * EMOTE_PX, 0, EMOTE_PX, EMOTE_PX),
+        }),
+    )
     e.overhead.glyph.width = EMOTE_PX
     e.overhead.glyph.height = EMOTE_PX
   }
@@ -324,9 +351,17 @@ export function createCharacterLayer(
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
     shadow.eventMode = 'none'
+    const ring = new Graphics()
+    ring.ellipse(0, 0, FLOOR_RING_RX, FLOOR_RING_RY)
+    ring.stroke({ width: 1, color: FLOOR_RING_INK })
+    ring.eventMode = 'none'
+    ring.alpha = 0
+    ring.visible = false
     // each companion to the layer it belongs in: a contact shadow under every body, the
     // overhead slot and the plate over every body. None competes with the depth sort any more.
+    // The ring is a mark on the GROUND, so it goes in with the other ground decals.
     scene.layers.shadow.addChild(shadow)
+    scene.layers.groundDecal.addChild(ring)
     scene.layers.entities.addChild(sprite)
     // ★ ONE SLOT over the head, and the track wraps it exactly while a job runs.
     const overhead = createOverhead(scene.layers.worldText)
@@ -343,6 +378,11 @@ export function createCharacterLayer(
     const e2: CharEntry = {
       sprite,
       shadow,
+      ring,
+      ringA: 0,
+      ringFrom: 0,
+      ringWant: 0,
+      ringSinceMs: now,
       overhead,
       glyphKind: null,
       hovered: false,
@@ -384,6 +424,11 @@ export function createCharacterLayer(
       debuff: conf?.movement.debuffTilesPerTick ?? MOVEMENT_FALLBACK.debuff,
     }
     for (const ev of evts) {
+      if (ev.type === 'agent_spoke') {
+        const s = ev.payload as { agentId: string; x: number; y: number }
+        talk.heard({ agentId: s.agentId, x: s.x, y: s.y, atMs: now })
+        continue
+      }
       if (ev.type !== 'agent_moved') continue
       const p = ev.payload as { id: string; x: number; y: number }
       const e = entries.get(p.id)
@@ -419,6 +464,12 @@ export function createCharacterLayer(
       }
     }
     const nowTick = store.getTick()
+    // An open scene turns its cast toward each other and puts the ring under whoever has it.
+    const open = store.getScene()
+    const cast = open?.open === true ? open.participants : null
+    const heard = talk.voices()
+    const inScene = new Set(cast ?? [])
+    const floor = cast === null ? null : floorHolder(cast, heard)
     const live = new Set<string>()
     // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
     // who else is there and every position must settle before any of them is drawn.
@@ -433,8 +484,8 @@ export function createCharacterLayer(
       if (!rendersOnMap(a)) continue
       live.add(a.id)
       const e = ensure(a.id, a.x, a.y)
-      // scrubbed views teleport: past positions are facts, not animation
-      if (!store.getMode().live) {
+      // a still view teleports: a pinned position is a fact, not animation. A replay walks.
+      if (!store.timeMoving()) {
         e.path = [{ x: a.x, y: a.y, atMs: nowMs }]
       }
       e.path = prunePath(e.path, nowMs)
@@ -442,7 +493,20 @@ export function createCharacterLayer(
       const walking = e.path.length > 1 && nowMs < e.path[e.path.length - 1]!.atMs
       // while walking, face the current leg; the event-time facing stays as the
       // idle orientation after arrival
+      // A scene outranks the exchange rule: it says who the room is listening to, where
+      // `partnerOf` can only guess from earshot.
+      const toward = inScene.has(a.id) ? faceInScene(a.id, cast!, heard) : null
       if (walking) e.facing = legFacing(e.path) ?? e.facing
+      else if (toward !== null) {
+        const at = state.agents[toward]
+        if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      } else if (statusOf(a, nowTick) === 'talking') {
+        // Turned toward whoever they are answering: two talkers facing where they last walked
+        // read as two people, not as an exchange.
+        const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
+        const at = partner === null ? undefined : state.agents[partner]
+        if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      }
       const sheet = sheets.get(a.id)
       const pose = charPose(
         {
@@ -471,6 +535,9 @@ export function createCharacterLayer(
 
     // ── pass two: the rank, then everything that hangs off a body's position ────────────────
     const ranks = crowdOffsets(standing)
+    const wantsMotion = scene.wantsMotion()
+    // once a frame for every body: the sun's height is a function of the minute, not of who
+    const sun = shadowCast(nowTick)
     for (const { a, e, pos, bobY } of drawing) {
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
@@ -498,19 +565,30 @@ export function createCharacterLayer(
       const { sx, sy } = feetOf(px, py)
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
-      e.shadow.position.set(sx, sy)
+      // ★ The sun's own height, off the same token the arc draws: a low sun draws the blob
+      // out and lays it away from the light, and noon puts it back under the feet.
+      e.shadow.position.set(sx + sun.dx, sy)
+      e.shadow.scale.set(sun.scaleX, sun.scaleY)
+      e.shadow.alpha = SHADOW_ALPHA * sun.alpha
+      // On the ground, not on the body: the ring takes the shadow's point, so an idle bob
+      // does not lift it off the tile.
+      e.ring.position.set(sx, sy)
+      const hasFloor = a.id === floor ? 1 : 0
+      if (hasFloor !== e.ringWant) {
+        e.ringFrom = e.ringA
+        e.ringWant = hasFloor
+        e.ringSinceMs = nowMs
+      }
+      const fade = wantsMotion ? progress('reveal', e.ringSinceMs, nowMs) : 1
+      e.ringA = e.ringFrom + (hasFloor - e.ringFrom) * fade
+      e.ring.alpha = e.ringA
+      e.ring.visible = e.ringA > 0
       e.sprite.scale.y = e.sprite.scale.x * e.mulY
-      // ★ 7A AT REST, 7M-B WHILE A JOB RUNS. The slot holds the one glyph the priority table
-      // picks; the track wraps that same slot exactly while there is an act to report and goes
-      // when it does. `actFraction` is last frame's — the act layer places its chips against
-      // these very sprites, so it cannot run before them, and a world tick is two seconds.
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)
-      const running = emotesHidden ? null : (scene.actFraction?.(a.id) ?? null)
-      e.overhead.setTrack(running)
-      e.overhead.node.visible = row !== null || running !== null
+      e.overhead.node.visible = row !== null
       // ONE placement rule for every label in the product, and the layer applies it: the plate
       // is welded to the feet and only leaves them when the view has no room down there. Said
       // every frame, because the body it names walks.
@@ -520,7 +598,7 @@ export function createCharacterLayer(
         const head = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX
         scene.tags.show(
           'hover',
-          hoverPlate(state, 'agent', a.id),
+          hoverPlate(state, 'agent', a.id, a.id === scene.pickedId),
           anchorForSprite({ x: sx, y: sy }, { width: SHOULDER_W, height: head }),
         )
       }
@@ -529,6 +607,7 @@ export function createCharacterLayer(
       if (!live.has(agentId)) {
         e.sprite.destroy()
         e.shadow.destroy()
+        e.ring.destroy()
         e.overhead.destroy()
         entries.delete(agentId)
         sheets.delete(agentId)
@@ -555,6 +634,7 @@ export function createCharacterLayer(
       for (const e of entries.values()) {
         e.sprite.destroy()
         e.shadow.destroy()
+        e.ring.destroy()
         e.overhead.destroy()
       }
       entries.clear()

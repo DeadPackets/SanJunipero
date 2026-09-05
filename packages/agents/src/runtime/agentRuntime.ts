@@ -1,17 +1,23 @@
 import {
   BOND_VALENCE,
+  dayPhaseFromTick,
   decayWarmth,
   MINUTES_PER_DAY,
+  namedParams,
   nightStartTick,
   REFLECTION_SETTLE_MS,
+  type RosterEntry,
   sanitizeSpokenText,
   simTimeFromTick,
   stateHash,
   TICK_REAL_MS,
+  verbPhraseGerund,
+  verbPhrasePast,
+  WANTS_DISCOVERING,
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
-import type { LlmClient } from '@sj/llm'
+import type { CallBill, LlmClient } from '@sj/llm'
 import type {
   IdentityCore,
   AssembledPrompt,
@@ -27,18 +33,30 @@ import {
   OWN_WORDS_SHOWN,
 } from '../prompt/assemble.js'
 import {
+  heardKey,
   heardProse,
   makeablesLine,
   roadLine,
+  doorstepLine,
   perceptionToProse,
   placesKnownLine,
   valleyExtentLine,
+  walkTargetsLine,
+  roadOutLine,
+  PARTNER_GONE_DAYS,
+  RESTLESS_DAYS,
+  SHUNNED_BREACHES,
+  SHUNNED_DAYS,
+  type RoadCause,
   absenceLine,
   type Company,
+  gatheringLine,
   type ProseWorld,
+  type WalkMark,
   standingWallsLine,
   stasisLine,
   stillnessAt,
+  wantLine,
   type Stillness,
   worldDay,
   type PerceptionPacket,
@@ -46,26 +64,32 @@ import {
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
+import { TIE_PHRASE, type TieStore } from '../memory/ties.js'
+import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '../memory/wants.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
+  BODY_NOOPS,
   isBlankAnswer,
   parseTurnWithRepair,
+  StrictTurnSchema,
   reconsiderTick,
   turnSpeaks,
-  TurnSchemaActionRequired,
+  TURN_FIELDS,
   type Turn,
 } from '../turn.js'
 import {
-  decideWake,
+  wakeReasons,
   disarmBodyAlarm,
   rearmBodyAlarm,
-  rearmConversationWindow,
   DEFAULT_MIND_CONFIG,
   type MindClock,
   type MindConfig,
   type PlanState,
+  type WakeReason,
 } from '../wake.js'
+import type { SceneCoordinator } from '../scene/coordinator.js'
+import type { Scene } from '../scene/scene.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
@@ -112,34 +136,31 @@ function jsonOrRaw(text: string): unknown {
 
 const EMPTY_TAGS: MemoryTags = { people: [], place: null, objects: [], topics: [] }
 
+/** The mind's tie book and the closed roll a night may name. Absent, a mind reflects the way it
+ *  did before there were ties. */
+export type RuntimeTies = { store: TieStore; cast: () => readonly { id: string; name: string }[] }
+
+const LET_GO_IMPORTANCE = 4
+
+/** Two ties a person, on the turn that pays full price. What a pair holds past two is a scene's
+ *  to read, and the scene already shows all of it. */
+const TIES_SHOWN_PER_PERSON = 2
+
 // Rendered at prose time and never written back into a stored ruling. Only a skill deficit
 // earns it: a thing nobody can do teaches no one a false path.
-export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
+export const CRAFT_HINT = '. Maybe someone nearby knows the craft.'
 
 // Engine-side words: a parameter schema spelled out in braces, or a registry name. Every
 // other engine reason is the town's own sentence now and reaches the mind whole.
 const MACHINE_REASON = /\{[^}]*\}|^(?:unknown verb:|no such agent)/
 
-// Words for standing still. The body was already doing it, so the moment is a quiet beat: no
-// refusal to remember, and nothing for a god to rule on.
-const BODY_NOOPS = new Set([
-  'stand',
-  'sit',
-  'wait',
-  'rest',
-  'look',
-  'think',
-  'none',
-  'nothing',
-  'pause',
-  'stay',
-])
-
+// A word for standing still, or one of the turn's own field names read off the list it was
+// asked in: `plan` is a thing a mind writes, never a thing a body does.
 function isBodyNoOp(reason: string, verb: string): boolean {
-  return reason.startsWith('unknown verb:') && BODY_NOOPS.has(verb)
+  return reason.startsWith('unknown verb:') && (BODY_NOOPS.has(verb) || TURN_FIELDS.has(verb))
 }
 
-export const OPAQUE_REFUSAL = 'it does not take, and you cannot say why'
+export const OPAQUE_REFUSAL = 'it does not work, and you cannot say why'
 
 // Whether the reason can be said out loud at all. Asked once, so the memory and the next turn
 // cannot drift apart the day the pattern changes.
@@ -151,29 +172,82 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${said}${hint}`
 }
 
+/** The other half of the same sentence: what the hands did do. All 402 action memories the
+ *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. */
+function actionMemoryText(verb: string): string {
+  return `You have ${verbPhrasePast(verb)}.`
+}
+
+// What a finished act is worth on the mind's own one to ten. A refusal is 3, so most doing
+// outranks most failing to; a wall raised is not a bucket filled, and neither is a walk.
+const ACT_IMPORTANCE: Record<string, number> = {
+  walk: 1,
+  drop: 1,
+  stow: 1,
+  fill: 1,
+  exit: 1,
+  enter: 1,
+  wake: 1,
+  take: 2,
+  drink: 2,
+  stoke: 2,
+  sleep: 2,
+  read: 2,
+  wear: 2,
+  craft: 6,
+  give: 6,
+  lie_with: 8,
+  tend: 6,
+  inscribe: 6,
+  build: 7,
+  teach: 7,
+}
+const ORDINARY_ACT = 3
+const REFUSAL_IMPORTANCE = 3
+
+export function actImportance(verb: string): number {
+  // A minted making is a making: `recipe:plank` is what `craft` was before the town had a word.
+  return ACT_IMPORTANCE[verb] ?? (verb.startsWith('recipe:') ? ACT_IMPORTANCE.craft! : ORDINARY_ACT)
+}
+
 /** The same refusal, said to the next turn instead of only to the memory store. A reason that
  *  reached a memory row had to win retrieval to be seen, and mostly did not (rehearsal4 K20). */
 export function lastTurnLine(what: string, reason: string): string {
-  return `Last turn: ${what} did not take — ${sayable(reason)}.`
+  return `Last turn: ${what} did not work: ${sayable(reason)}.`
 }
 
+/** The other thing a turn can open with: not an act refused, but an act the body set down
+ *  half-finished. A mind that woke standing empty-handed would otherwise never learn why. */
+export function brokeOffLine(verb: string, why: string): string {
+  return `Last turn: you stopped ${verbPhraseGerund(verb)}: ${sayable(why)}.`
+}
+
+/** The verb that takes a body's hands off what they are doing. */
+const STOP = 'stop'
+
+// What a body says to itself when it stops before it meant to. It never asked; the hands came
+// off the work because the body was failing under it.
+export const BODY_WOULD_NOT_GO_ON = 'your body could not keep going'
+
 // The reasons `drink`, `fill` and `fish` are turned away by all name the water. Read off the
-// rendered line, which is the one place a refusal survives into the next turn.
-export const wantedWater = (lastOutcome: string | null): boolean =>
-  (lastOutcome ?? '').includes('water')
+// rendered line, which is the one place a refusal survives into the next turn. An empty vessel
+// names no water and is the same want: the road out of it runs to the bank either way.
+export const wantedWater = (lastOutcome: string | null): boolean => {
+  const said = lastOutcome ?? ''
+  return said.includes('water') || /\bis empty\b/.test(said)
+}
 
 // A freeform intent has no verb to name, only the words the mind used.
 export const TRIED_FREEFORM = 'what you tried'
 
-// The second ask inside the window is answered from the mind's own history, not from the god.
-// It names the repetition and nothing else: a mind's own past is not a hint.
-export const REPEATED_REFUSAL = 'You turn it over again and it comes back the way it did before.'
+// What a mind is told when the court could not be reached or the ruling could not be made law:
+// no verb of the world's and no machinery word, only a try that did not begin.
+export const CANNOT_BEGIN = 'you think it over and cannot start it now'
 
-// Sim minutes: long enough to cover a loop, short enough that a changed town gets asked again.
+// A refusal with a context-dependent class is never short-circuited by precedent, so the same
+// ask every turn would be a full ruling every turn. Inside this window the mind's own refusal
+// answers, silently: no call, no new memory.
 export const REFUSAL_MEMORY_TICKS = 240
-
-// How many refused intents a mind carries. Bounded because it is per-mind state held for the
-// life of the process, not because 16 is special.
 const REFUSAL_MEMORY_SIZE = 16
 
 // Only enough to make "the same idea, said again" match. `normalizeIntent` would be the one
@@ -184,6 +258,17 @@ function sameIntent(text: string): string {
     .trim()
     .replace(/\s+/g, ' ')
     .replace(/[.,!?;:]+$/, '')
+}
+
+// The spoken reason behind a discovery is the mind's own words for the attempt, reported as
+// "he said he would <saying>": first person stripped, flattened as speech is, and short.
+const SAYING_MAX_CHARS = 120
+function spokenReason(intent: string): string {
+  const said = sanitizeSpokenText(intent)
+    .replace(/^i (?:try|want|attempt|mean|am going) to /i, '')
+    .replace(/^i (?:will |shall )?/i, '')
+    .replace(/[.!]+$/, '')
+  return said.length <= SAYING_MAX_CHARS ? said : said.slice(0, SAYING_MAX_CHARS).trimEnd()
 }
 
 function nearestStructureKind(packet: PerceptionPacket): string | null {
@@ -212,6 +297,9 @@ export type RuntimeStats = { turns: number; dozes: number; reflections: number; 
 
 // What a mind is carrying at a tick boundary, in a shape that survives a JSON round trip. Cost
 // is absent on purpose: it is in the database and would be double-counted here.
+/** One remembered key and what it stood for, in a shape that survives a JSON round trip. */
+type Remembered = [string, { tick: number; reason: string }]
+
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
@@ -230,16 +318,29 @@ export type RuntimeSnapshot = {
   spoken?: string[] | undefined
   still?: Stillness | null | undefined
   company?: (Company & { id: string })[] | undefined
+  /** The scene this mind is standing in, if any. Every participant carries the whole thing, and
+   *  a restore keys it by id, so one scene comes back once however many minds saved it. */
+  scene?: Scene | null | undefined
+  /** What the court has already refused, and the sentences the mind already carries. Absent,
+   *  a resume buys a ruling it had already paid for and writes a memory it already holds. */
+  refused?: Remembered[] | undefined
+  held?: Remembered[] | undefined
+  /** The utterances counted toward warmth last tick, and the ones already told. Absent, every
+   *  word still inside the recent window is credited and read as news a second time. */
+  heardKeys?: string[] | undefined
+  heardTold?: string[] | undefined
+  /** When the heap on this mind's own doorstep was last named. */
+  doorstepSaidTick?: number | null | undefined
 }
 
 function freshClock(): MindClock {
   return {
     lastTurnTick: null,
     reconsiderAtTick: null,
-    conversationUntilTick: 0,
     dozeUntilTick: 0,
     alarmArmed: {},
     morningWokeDay: null,
+    gatheringDay: null,
     wakeRetryAtTick: 0,
     prevVisibleIds: [],
   }
@@ -257,9 +358,18 @@ export class AgentRuntime {
   readonly #config: MindConfig
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
-  readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
+  readonly #onThought:
+    | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
+    | null
+  readonly #scenes: SceneCoordinator | null
+  readonly #ties: RuntimeTies | null
+  readonly #wantBias: WantBias
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
+  #roster: (() => RosterEntry[]) | null = null
+  #customs: (() => readonly string[]) | null = null
+  #habits: (() => readonly string[]) | null = null
+  #frontier: (() => readonly string[]) | null = null
 
   #agentId = ''
   #mem: MemoryStore | null = null
@@ -273,12 +383,20 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, and when. Read before the god is asked again.
-  #refusedIntents = new Map<string, number>()
+  // What this mind has already been refused, when, and why. Read before the god is asked again.
+  #refusedIntents = new Map<string, { tick: number; reason: string }>()
+  // The sentences the mind already carries, so one thing that happened is written down once.
+  // Its own budget: an act writes one of these every turn, and a precedent is rare and dear.
+  #heldTexts = new Map<string, { tick: number; reason: string }>()
+  // How far down the world's log this mind has read its own finished acts.
+  #lastActSeq = 0
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
+  // The night this mind has actually finished writing down. `#reflectedNight` is latched before
+  // the seven calls begin, so only this one may reach a checkpoint.
+  #nightWritten: number | null = null
   #reflectionInFlight = false
   #pendingDreamMood: string | null = null
   #pendingRecall: Recalled | null = null
@@ -289,6 +407,8 @@ export class AgentRuntime {
   // Where the feet have been standing, and since when. Null while asleep and after any act
   // the world took that was not a walk or a word.
   #still: Stillness | null = null
+  // When the heap on this mind's own doorstep was last named. Null until it ever is.
+  #doorstepSaidTick: number | null = null
   // Who this mind has been with and how warm the tie stood when they last parted. The engine
   // keeps no bonds and the gateway folds a log no mind can read, so a mind's own tie is folded
   // here — out of the one act perception can witness, which is a word. Warmth is carried
@@ -297,9 +417,20 @@ export class AgentRuntime {
   // Last tick's utterances. The recent window holds one for as long as it is recent, so only a
   // key that was not there a tick ago is a new word rather than the same word again.
   #heardKeys = new Set<string>()
+  // Every utterance this mind has already been told about, on the same reasoning: what the last
+  // turn read is not news on this one.
+  #heardTold = new Set<string>()
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
+  #wants: WantStore | null = null
+  // Why the road out of the valley is worth saying to this mind, as of its last turn. Null when
+  // nothing stands behind it, which is what makes a leaving with no cause worth a note.
+  #roadCause: RoadCause | null = null
+  // How many places this mind knew, and how many of them carry its own name, when it last
+  // looked. Null until the first look, or a resume would read its whole map as new ground.
+  #knownPlaceCount: number | null = null
+  #namedForMeCount: number | null = null
 
   constructor(deps: {
     db: Database.Database
@@ -311,8 +442,15 @@ export class AgentRuntime {
     config?: Partial<MindConfig> | undefined
     reflectionLlm?: ReflectionLlm | undefined
     dreamLlm?: DreamLlm | undefined
-    onThought?: ((t: { tick: number; agentId: string; text: string }) => void) | undefined
+    onThought?:
+      | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
+      | undefined
     adjudicator?: Adjudicator | undefined
+    /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
+    scenes?: SceneCoordinator | undefined
+    ties?: RuntimeTies | undefined
+    /** How much faster than everybody else this mind feels a want, off its voice card. */
+    wantBias?: WantBias | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -325,12 +463,19 @@ export class AgentRuntime {
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
     this.#adjudicator = deps.adjudicator ?? null
+    this.#scenes = deps.scenes ?? null
+    this.#ties = deps.ties ?? null
+    this.#wantBias = deps.wantBias ?? {}
   }
 
   start(agentId: string): void {
     if (this.#started) this.stop()
     this.#agentId = agentId
     this.#mem = new MemoryStore(this.#db, agentId, this.#embedder)
+    this.#wants = new WantStore(this.#db, agentId, this.#wantBias)
+    this.#wants.begin(this.#bridge.currentTick())
+    this.#knownPlaceCount = null
+    this.#namedForMeCount = null
     this.#dayLog = []
     this.#prevMomentSentences = new Set()
     this.#clock = freshClock()
@@ -342,6 +487,7 @@ export class AgentRuntime {
     this.#wakeOwed = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
+    this.#nightWritten = null
     this.#pendingDreamMood = null
     this.#pendingRecall = null
     this.#lastOutcome = null
@@ -349,7 +495,13 @@ export class AgentRuntime {
     this.#still = null
     this.#company = new Map()
     this.#heardKeys = new Set()
+    this.#heardTold = new Set()
+    this.#refusedIntents = new Map()
+    this.#heldTexts = new Map()
+    this.#doorstepSaidTick = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
+    // From here forward only: a mind that resumes must not remember a day it was not there for.
+    this.#lastActSeq = this.#bridge.lastSeq()
     this.#started = true
     if (this.#offTick === null) {
       this.#offTick = (tick) => {
@@ -375,7 +527,7 @@ export class AgentRuntime {
       },
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
-      reflectedNight: this.#reflectedNight,
+      reflectedNight: this.#nightWritten,
       wasNight: this.#wasNight,
       pendingDreamMood: this.#pendingDreamMood,
       pendingRecall: this.#pendingRecall,
@@ -383,6 +535,12 @@ export class AgentRuntime {
       spoken: [...this.#spoken],
       still: this.#still,
       company: [...this.#company].map(([id, c]) => ({ id, ...c })),
+      scene: this.#scenes?.sceneFor(this.#agentId) ?? null,
+      refused: [...this.#refusedIntents].map(([k, v]) => [k, { ...v }]),
+      held: [...this.#heldTexts].map(([k, v]) => [k, { ...v }]),
+      heardKeys: [...this.#heardKeys],
+      heardTold: [...this.#heardTold],
+      doorstepSaidTick: this.#doorstepSaidTick,
     }
   }
 
@@ -401,6 +559,7 @@ export class AgentRuntime {
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
     this.#reflectedNight = s.reflectedNight
+    this.#nightWritten = s.reflectedNight
     this.#wasNight = s.wasNight
     this.#pendingDreamMood = s.pendingDreamMood
     this.#pendingRecall = s.pendingRecall ?? null
@@ -408,6 +567,12 @@ export class AgentRuntime {
     this.#spoken = [...(s.spoken ?? [])]
     this.#still = s.still ?? null
     this.#company = new Map((s.company ?? []).map(({ id, ...c }) => [id, { ...c }]))
+    this.#refusedIntents = new Map((s.refused ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heldTexts = new Map((s.held ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heardKeys = new Set(s.heardKeys ?? [])
+    this.#heardTold = new Set(s.heardTold ?? [])
+    this.#doorstepSaidTick = s.doorstepSaidTick ?? null
+    this.#scenes?.adopt(s.scene)
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -415,6 +580,10 @@ export class AgentRuntime {
   useArbiter(arbiter: SeamArbiter): void {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
+    this.#roster = arbiter.roster ?? null
+    this.#customs = arbiter.customs ?? null
+    this.#habits = arbiter.habits ?? null
+    this.#frontier = arbiter.frontier ?? null
   }
 
   stop(): void {
@@ -440,6 +609,18 @@ export class AgentRuntime {
     return this.#reflectionInFlight
   }
 
+  /** How warm this mind stands toward another. The only tie the runtime keeps itself, and what
+   *  breaks a tie for the floor when two people have said the same amount. */
+  warmthToward(otherId: string): number {
+    return this.#company.get(otherId)?.warmth ?? 0
+  }
+
+  /** A want answered by something only the log knows: a partnership, a birth, a public no. */
+  feedWants(occasions: readonly WantOccasion[], tick: number): void {
+    if (occasions.length === 0) return
+    this.#book(() => this.#wants?.feed(occasions, tick))
+  }
+
   #onTick(tick: number): void {
     if (!this.#started) return
     // `intent.ts` refuses the dead every verb, so a corpse that still woke spent its turn on a
@@ -457,11 +638,13 @@ export class AgentRuntime {
         ? null
         : stillnessAt(this.#still, packet.self.x, packet.self.y, tick)
     this.#noteCompany(packet, tick)
+    this.#noteFinishedActs()
+    this.#feedWants(packet, tick)
     rearmBodyAlarm(this.#config, packet.self.body, this.#clock)
     void this.#submitPendingIfIdle(packet.self.activity).catch(this.#sink('submit_crash'))
     this.#pumpPlan(packet.self.activity)
     this.#answerWakeOwed(packet)
-    rearmConversationWindow(this.#config, packet, this.#clock, tick)
+    this.#scenes?.onTick(tick)
     this.#handleNight(tick, packet)
     // Morning is consumed by an actual rise, not by the reason firing: a body
     // seen awake in daylight has had its morning.
@@ -469,14 +652,58 @@ export class AgentRuntime {
       this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
     }
     if (this.#turnInFlight) return
-    const reason = decideWake(this.#config, packet, this.#clock, tick, this.#plan)
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
+    // Read only at dusk: it is a query per mind per tick, and the gathering rung is the one
+    // thing that reads it.
+    const belonging =
+      dayPhaseFromTick(tick) === 'dusk' ? (this.#wants?.levelOf('belonging', tick) ?? 0) : 0
+    const wake = wakeReasons(this.#config, packet, this.#clock, tick, this.#plan, floor, belonging)
+    const reason = wake[0] ?? null
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
+    if (reason === 'floor') {
+      void this.#takeFloor(tick)
+      return
+    }
+    // The body's own reflex, and it costs the mind nothing. The legs are left out of it: a walk
+    // is how a hungry body reaches food, so breaking one off takes the road away too.
+    if (reason === 'body_alarm' && working) this.#breakOff(packet.self.activity!)
+    // A mouth mid-sentence is hands at work: the same alarm takes this mind out of the talk. The
+    // others keep it, and it ends only where too few of them are left to answer each other.
+    if (reason === 'body_alarm' && floor.holdsFloor) this.#scenes?.leave(this.#agentId, tick)
     if (reason !== null) {
+      // Latched on the turn, not on the reason: a dusk the mind was never billed for is a dusk
+      // it has not had.
+      if (wake.includes('gathering')) this.#clock.gatheringDay = Math.floor(tick / MINUTES_PER_DAY)
       if (packet.self.asleep) {
         this.#wakeOwed = true
         this.#clock.wakeRetryAtTick = tick + this.#config.wakeRetryTicks
       }
-      void this.#startTurn()
+      void this.#startTurn(wake)
+    }
+  }
+
+  // The hands come off the work now; the turn that follows is the alarm's, and opens by saying
+  // what happened, so the mind is never left to guess why it is standing with nothing in hand.
+  #breakOff(verb: string): void {
+    this.#lastOutcome = brokeOffLine(verb, BODY_WOULD_NOT_GO_ON)
+    void this.#bridge.submit(this.#agentId, { verb: STOP, params: {} })
+  }
+
+  // A scene line, under the same in-flight guard an ordinary turn runs under, so a mind never
+  // holds two moments at once. What it costs is one call, and only the floor-holder makes it.
+  async #takeFloor(tick: number): Promise<void> {
+    if (this.#turnInFlight || this.#scenes === null) return
+    this.#turnInFlight = true
+    try {
+      await this.#scenes.takeFloor(this.#agentId, tick)
+      this.#clock.lastTurnTick = tick
+      this.#stats.turns += 1
+    } catch (err) {
+      this.#llm.alert('scene_crash', messageOf(err))
+      this.#doze(tick, err)
+    } finally {
+      this.#turnInFlight = false
     }
   }
 
@@ -514,7 +741,7 @@ export class AgentRuntime {
         return
       }
     }
-    if (activity === null) {
+    if (activity === null || this.#plan.queue[0]?.verb === STOP) {
       this.#planHeadInFlight = true
       const head = this.#plan.queue[0]!
       void this.#bridge.submit(this.#agentId, head, (res) => {
@@ -538,7 +765,7 @@ export class AgentRuntime {
     for (const a of packet.visible.agents) if (a.id !== this.#agentId) met(a.id, a.name)
     const keys = new Set<string>()
     for (const h of packet.heard) {
-      const key = `${h.speakerId}\u0000${h.text}`
+      const key = heardKey(h)
       keys.add(key)
       const them = met(h.speakerId, h.name)
       // The window holds one utterance for as long as it is recent, so only a key that was not
@@ -546,6 +773,27 @@ export class AgentRuntime {
       if (!this.#heardKeys.has(key)) them.warmth += BOND_VALENCE.friend
     }
     this.#heardKeys = keys
+  }
+
+  /** Everything this tick answered a want with. Feeding is idempotent — it sets the want back
+   *  to nothing — so a talk that runs an hour keeps belonging at nothing for that hour. */
+  #feedWants(packet: PerceptionPacket, tick: number): void {
+    const fed = new Set<WantOccasion>(occasionsInPacket(packet, this.#identity.name))
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    if (scene !== null) {
+      fed.add('scene')
+      const partner = this.#bridge.partnerOf(this.#agentId)
+      if (partner !== null && scene.participants.includes(partner)) fed.add('partner_scene')
+    }
+    if (this.#bridge.expressedAt(this.#agentId).length > 0) fed.add('expressed_at')
+    const places = this.#bridge.knownPlaces(this.#agentId)
+    const named = places.filter((p) => p.name?.includes(this.#identity.name) === true).length
+    if (this.#knownPlaceCount !== null && places.length > this.#knownPlaceCount)
+      fed.add('new_place')
+    if (this.#namedForMeCount !== null && named > this.#namedForMeCount) fed.add('named_building')
+    this.#knownPlaceCount = places.length
+    this.#namedForMeCount = named
+    if (fed.size > 0) this.#book(() => this.#wants?.feed(fed, tick))
   }
 
   // What the WORLD took, not what the model wrote: the words are sanitized the way the verb
@@ -559,6 +807,8 @@ export class AgentRuntime {
       if (typeof text === 'string') {
         this.#spoken.push(sanitizeSpokenText(text))
         if (this.#spoken.length > OWN_WORDS_SHOWN) this.#spoken.shift()
+        // A word anyone heard, said by a mind in no scene, is a scene starting.
+        this.#scenes?.noteSpoken(this.#agentId, text, this.#bridge.currentTick())
       }
       if (this.#still !== null) this.#still = { ...this.#still, spoke: true }
       return
@@ -588,7 +838,9 @@ export class AgentRuntime {
 
   #submitPendingIfIdle(activity: string | null): Promise<void> {
     if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
-    if (activity !== null) return Promise.resolve()
+    // `stop` is the one act aimed AT the hands rather than done with them: holding it until they
+    // come free is holding it until the very thing it means to end is over.
+    if (activity !== null && this.#pendingIntent.verb !== STOP) return Promise.resolve()
     const intent = this.#pendingIntent
     this.#pendingInFlight = true
     return this.#bridge
@@ -603,8 +855,8 @@ export class AgentRuntime {
         if (res.reason.startsWith('already busy')) return
         this.#pendingIntent = null
         if (isBodyNoOp(res.reason, intent.verb)) return
-        if (this.#reroutesUnknownVerb(res.reason)) {
-          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params)).catch(
+        if (this.#reroutesToTheCourt(res.reason)) {
+          void this.#adjudicateFreeform(humanizeIntent(intent.verb, intent.params), false).catch(
             this.#sink('adjudicate_crash'),
           )
           return
@@ -614,10 +866,13 @@ export class AgentRuntime {
       .then(() => undefined)
   }
 
-  // An invented verb is a proposal, not a mistake: it re-enters the turn as freeform words.
+  // A proposal, not a mistake, re-enters the turn as freeform words: a verb the registry has no
+  // word for, or a name the town has no concept of — an unbuildable kind, an unknown recipe,
+  // crop or skill. A refusal about a mark that merely missed is neither, and is recorded.
   // Once per turn, or an unwired arbiter would loop on itself.
-  #reroutesUnknownVerb(reason: string): boolean {
-    if (!reason.startsWith('unknown verb:')) return false
+  #reroutesToTheCourt(reason: string): boolean {
+    const proposes = reason.startsWith('unknown verb:') || reason.includes(WANTS_DISCOVERING)
+    if (!proposes) return false
     if (this.#adjudicator === null || this.#reframedThisTurn) return false
     this.#reframedThisTurn = true
     return true
@@ -626,19 +881,51 @@ export class AgentRuntime {
   // Held until the body is free; a busy rejection retries instead of
   // discarding, until accepted or superseded by a newer turn's action.
   #holdIntent(intent: Intent): Promise<void> {
+    // Not a refusal: a person may leave whenever they like. It is written down because a town
+    // whose people walk out for no reason anybody can name is a town with something wrong in it.
+    if (intent.verb === 'leave_town' && this.#roadCause === null) {
+      this.#llm.alert(
+        'departure_without_cause',
+        'named the road out with nothing standing behind it: no loneliness, no partner gone, no breach witnessed',
+      )
+    }
     this.#pendingIntent = intent
     return this.#submitPendingIfIdle(this.#bridge.perception(this.#agentId).self.activity)
   }
 
-  // A try at something new goes to the arbiter, not to the verb registry. The
-  // world stays the fallback: an unreachable arbiter must never eat the turn.
-  async #adjudicateFreeform(description: string): Promise<void> {
-    const fallback = (): Promise<void> =>
-      this.#holdIntent({ verb: 'experiment', params: { description } })
-    // The same idea inside the window, answered from this mind's own history at no call. The
-    // memory it leaves differs from the first refusal, or the mind learns nothing.
-    if (this.#alreadyRefused(description)) {
-      await this.#writeActionMemory(REPEATED_REFUSAL)
+  /** Why the road out is worth saying today: nobody's company for long enough, a partner who
+   *  took it first, or a town that has watched this body break what it agreed. Nothing else. */
+  #whyTheRoad(tick: number): RoadCause | null {
+    const belonging = this.#wants?.levels(tick).find((w) => w.kind === 'belonging')
+    const alone =
+      belonging === undefined ? 0 : Math.floor((tick - belonging.lastFedTick) / MINUTES_PER_DAY)
+    if (alone >= RESTLESS_DAYS) return { kind: 'restless', days: alone }
+    const gone = this.#bridge.partnersGoneSince(
+      this.#agentId,
+      tick - PARTNER_GONE_DAYS * MINUTES_PER_DAY,
+    )[0]
+    if (gone !== undefined) {
+      return {
+        kind: 'partner_gone',
+        name: gone.name,
+        days: Math.floor(tick / MINUTES_PER_DAY) - gone.day,
+      }
+    }
+    const seen = this.#bridge.breachesOf(this.#agentId, tick - SHUNNED_DAYS * MINUTES_PER_DAY)
+    return seen >= SHUNNED_BREACHES ? { kind: 'shunned', times: seen } : null
+  }
+
+  // A try at something new goes to the arbiter, not to the verb registry. An unreachable
+  // arbiter must never eat the turn, and never reach the mind in its own words either: the
+  // try simply did not begin. `said` is whether the words are the mind's own (freeform, or an
+  // experiment's description) rather than a verb flattened on its way back from the world.
+  async #adjudicateFreeform(description: string, said: boolean): Promise<void> {
+    const fallback = (): void => {
+      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, CANNOT_BEGIN)
+    }
+    const refused = this.#refusedIntents.get(sameIntent(description))
+    if (refused !== undefined && this.#bridge.currentTick() - refused.tick < REFUSAL_MEMORY_TICKS) {
+      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, refused.reason)
       return
     }
     let verdict
@@ -649,46 +936,87 @@ export class AgentRuntime {
       )
     } catch (err) {
       this.#llm.alert('adjudicate_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
     if (verdict.kind === 'map')
-      return this.#holdIntent({ verb: verdict.verb, params: verdict.params })
+      return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
     if (verdict.kind === 'impossible') {
-      this.#rememberRefusal(description)
+      this.#rememberRefusal(description, verdict.reason)
       this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
       await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
       return
     }
-    // Adjudicate once, physics forever. With no codifier wired the attempt still reaches the
-    // world rather than vanishing.
-    if (this.#codify === null) return fallback()
+    // Adjudicate once, physics forever.
+    if (this.#codify === null) {
+      fallback()
+      return
+    }
     let verb: string
     try {
-      verb = this.#codify(verdict.recipe, { agentId: this.#agentId, intent: description }).verb
+      verb = this.#codify(verdict, {
+        agentId: this.#agentId,
+        intent: description,
+        ...(said ? { saying: spokenReason(description) } : {}),
+      }).verb
     } catch (err) {
       this.#llm.alert('codify_failed', messageOf(err))
-      return fallback()
+      fallback()
+      return
     }
+    // One moment answers two wants: the town credits this mind with the word, and keeps it.
+    this.#book(() =>
+      this.#wants?.feed(['discovery_credit', 'verb_codified'], this.#bridge.currentTick()),
+    )
     return this.#holdIntent({ verb, params: {} })
   }
 
-  #alreadyRefused(description: string): boolean {
-    const at = this.#refusedIntents.get(sameIntent(description))
-    return at !== undefined && this.#bridge.currentTick() - at < REFUSAL_MEMORY_TICKS
+  #rememberRefusal(description: string, reason: string): void {
+    this.#remember(this.#refusedIntents, sameIntent(description), reason)
   }
 
-  #rememberRefusal(description: string): void {
-    const key = sameIntent(description)
-    this.#refusedIntents.delete(key)
-    this.#refusedIntents.set(key, this.#bridge.currentTick())
+  #remember(
+    into: Map<string, { tick: number; reason: string }>,
+    key: string,
+    reason: string,
+  ): void {
+    into.delete(key)
+    into.set(key, { tick: this.#bridge.currentTick(), reason })
     // Insertion-ordered, so the first key is the oldest.
-    while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
-      this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
+    while (into.size > REFUSAL_MEMORY_SIZE) into.delete(into.keys().next().value!)
+  }
+
+  /** Whether this mind already carries this sentence from inside the refusal window. kamal
+   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval. */
+  #alreadyHeld(text: string): boolean {
+    const key = sameIntent(text)
+    const held = this.#heldTexts.get(key)
+    if (held !== undefined && this.#bridge.currentTick() - held.tick < REFUSAL_MEMORY_TICKS)
+      return true
+    this.#remember(this.#heldTexts, key, text)
+    return false
+  }
+
+  // Every act the world finished for this body since the last look. The refusals were always
+  // written; this is the other half, so a mind holds a trace of what worked.
+  #noteFinishedActs(): void {
+    for (const done of this.#bridge.completedSince(this.#agentId, this.#lastActSeq)) {
+      this.#lastActSeq = done.seq
+      // Being taught from is the plainest way a mind is relied on, and the teacher is the only
+      // one of the two who can see it happen.
+      if (done.verb === 'teach')
+        this.#book(() => this.#wants?.feed(['taught'], this.#bridge.currentTick()))
+      void this.#writeActionMemory(actionMemoryText(done.verb), actImportance(done.verb)).catch(
+        this.#sink('memory_write_failed'),
+      )
     }
   }
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     this.#noteAccepted(head, res)
+    // A head answered after the turn replaced the plan speaks for a queue that is gone: reading
+    // it would wipe the plan the mind just paid for.
+    if (this.#plan.queue[0] !== head) return
     if (res.ok) return
     // A word for standing still is a step spent, not a plan refused: the body was already doing
     // it, so the queue carries on from the next step instead of dying at this one.
@@ -700,8 +1028,8 @@ export class AgentRuntime {
     }
     this.#clearPlanQueue()
     this.#plan.lastResult = 'blocked'
-    if (this.#reroutesUnknownVerb(res.reason)) {
-      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params)).catch(
+    if (this.#reroutesToTheCourt(res.reason)) {
+      void this.#adjudicateFreeform(humanizeIntent(head.verb, head.params), false).catch(
         this.#sink('adjudicate_crash'),
       )
       return
@@ -721,6 +1049,10 @@ export class AgentRuntime {
   #handleNight(tick: number, packet: PerceptionPacket): void {
     const isNight = packet.time.isNight
     if (this.#wasNight && !isNight) {
+      // A mind that never lay down still lived the day. The night is over either way, and a day
+      // nobody wrote down is a day the mind never gets back.
+      const owed = nightOf(tick - 1)
+      if (owed >= 0 && this.#reflectedNight !== owed) void this.#runNight(owed)
       if (this.#pendingDreamMood !== null) {
         const cur = this.#personality.current().doc.current
         this.#personality.updateCurrent({ ...cur, mood: this.#pendingDreamMood })
@@ -740,12 +1072,12 @@ export class AgentRuntime {
     this.#wasNight = isNight
   }
 
-  async #startTurn(): Promise<void> {
+  async #startTurn(wake: readonly WakeReason[]): Promise<void> {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
     const tick = this.#bridge.currentTick()
     try {
-      await this.#runTurnBody()
+      await this.#runTurnBody(wake)
     } catch (err) {
       this.#llm.alert('turn_crash', messageOf(err))
       this.#clock.lastTurnTick = tick + this.#config.dozeTicks
@@ -755,16 +1087,21 @@ export class AgentRuntime {
     }
   }
 
-  async #runTurnBody(): Promise<void> {
+  async #runTurnBody(wake: readonly WakeReason[]): Promise<void> {
     this.#reframedThisTurn = false
     const tick = this.#bridge.currentTick()
     const packet = this.#bridge.perception(this.#agentId)
     const day = Math.floor(tick / MINUTES_PER_DAY)
+    // Read every turn and said only in the morning: the line is a cue, and the same reading is
+    // what tells an act of `leave_town` with nothing behind it from one the town drove.
+    this.#roadCause = this.#whyTheRoad(tick)
 
     // `Required` on purpose: a road the prose reads and the runtime forgets to wire is a
     // sentence no mind ever sees, and it fails as silence rather than as an error.
     const world: Required<ProseWorld> = {
       isWalkable: (x: number, y: number) => this.#bridge.isWalkable(x, y),
+      canWalkTo: (mark: WalkMark) => this.#bridge.canWalkTo(this.#agentId, mark),
+      footingNear: (x: number, y: number) => this.#bridge.footingNear(this.#agentId, x, y),
       isEdible: (kind: string) => this.#bridge.isEdible(kind),
       waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
       nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
@@ -785,21 +1122,31 @@ export class AgentRuntime {
     )
     // The prompt keeps another mouth's bytes out of the narrator's block; this mind's own
     // memory still holds the whole moment.
-    const heard = heardProse(packet)
+    const heard = heardProse(packet, this.#heardTold)
+    // Rebuilt from the window, so a key that has aged out of it is gone from here too.
+    this.#heardTold = new Set(packet.heard.map(heardKey))
     const moment = heard.length > 0 ? `${prose} ${heard}` : prose
     this.#prevMomentSentences = appendMoment(this.#dayLog, this.#prevMomentSentences, moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
     // hands can make is a standing fact about the world, not something that happened today.
     const canMake = this.#bridge.makeables()
+    const doorstep = doorstepLine(packet, this.#doorstepSaidTick)
+    if (doorstep.length > 0) this.#doorstepSaidTick = tick
+    const known = this.#bridge.knownPlaces(this.#agentId)
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
       roadLine(canMake, packet, world),
       valleyExtentLine(world),
-      placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
+      placesKnownLine(known, packet),
+      walkTargetsLine(known, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
+      doorstep,
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
+      gatheringLine(packet, tick),
+      roadOutLine(wake.includes('morning') ? this.#roadCause : null),
+      wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]
       .filter((p) => p.length > 0)
       .join(' ')
@@ -824,6 +1171,12 @@ export class AgentRuntime {
 
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
+      ...(this.#roster === null ? {} : { roster: this.#roster() }),
+      ...(this.#customs === null ? {} : { customs: this.#customs() }),
+      ...(this.#habits === null ? {} : { habits: this.#habits() }),
+      laws: this.#bridge.lawTexts(),
+      tabled: this.#bridge.tabledLines(),
+      ...(this.#frontier === null ? {} : { frontier: this.#frontier() }),
       identity: this.#identity,
       personality: {
         doc: this.#personality.current().doc,
@@ -841,6 +1194,9 @@ export class AgentRuntime {
       underway: this.#underway(),
     }
     let assembled = assemblePrompt(blocks)
+    // Steps still queued from the plan this call may be about to replace: what a paid call
+    // throws away is only visible against what was already running.
+    const priorStepsLeft = this.#plan.queue.length
 
     let turn: Turn
     try {
@@ -852,10 +1208,15 @@ export class AgentRuntime {
         this.#dayLog = compactDayLog(this.#dayLog, summary.text)
         assembled = assemblePrompt({ ...blocks, dayLog: this.#dayLog })
       }
-      let answer = await this.#ask(assembled)
+      const bill: CallBill = {
+        wakeReason: wake[0] ?? null,
+        wakeReasons: wake,
+        blockTokens: { ...assembled.blockTokens, _priorStepsLeft: priorStepsLeft },
+      }
+      let answer = await this.#ask(assembled, bill)
       // A blank answer is not a wrong answer. There is nothing to correct, so the honest
       // retry is the same request again — byte-identical, and so still a cached prefix.
-      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled)
+      if (isBlankAnswer(answer.raw)) answer = await this.#ask(assembled, bill)
       if (isBlankAnswer(answer.raw)) {
         // Twice nothing leaves the turn UNSPENT: no invented thought, no turn counted. The
         // doze is the back-pressure, so a silent back end is not hammered.
@@ -869,7 +1230,7 @@ export class AgentRuntime {
         // A shape the schema refused comes back as the provider's own bytes; an act with
         // nothing in it parsed cleanly, so the answer itself is what goes back.
         (issues) =>
-          this.#repair(assembled, badText.length > 0 ? badText : JSON.stringify(raw), issues),
+          this.#repair(assembled, badText.length > 0 ? badText : JSON.stringify(raw), issues, bill),
         (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
@@ -886,16 +1247,24 @@ export class AgentRuntime {
     // silence when a plan was already carrying the body.
     const acted = (turn.action ?? null) !== null
     const spoke = turnSpeaks(turn)
-    this.#llm.noteTurnOutcome({
-      acted,
-      spoke,
-      planContinued:
-        !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
+    // The ledger must never cost the world a turn it has already paid for: a busy database here
+    // would throw the mind's answer away between the model and the act.
+    this.#book(() => {
+      this.#llm.noteCallBill({ _planSize: turn.plan?.length ?? 0 })
+      this.#llm.noteTurnOutcome({
+        acted,
+        spoke,
+        planContinued:
+          !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
+      })
     })
     // Read once: a cast back that has been answered is not answered again next turn, and a
     // refusal the mind has now been told about is not told twice.
     this.#pendingRecall = null
     this.#lastOutcome = null
+    // The body died while the provider was thinking. The call is paid for and booked; a corpse
+    // still acts on nothing, thinks out loud to nobody and writes in no book.
+    if (!this.#started) return
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
@@ -910,12 +1279,16 @@ export class AgentRuntime {
 
   // One ask, and what came back of it: the parsed answer, plus the raw text when the answer
   // did not fit the shape, which is what a repair needs to quote back.
-  async #ask(assembled: AssembledPrompt): Promise<{ raw: unknown; badText: string }> {
+  async #ask(
+    assembled: AssembledPrompt,
+    bill: CallBill,
+  ): Promise<{ raw: unknown; badText: string }> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchemaActionRequired,
+        schema: StrictTurnSchema,
         system: assembled.system,
         messages: assembled.messages,
+        bill,
       })
       return { raw: value, badText: '' }
     } catch (err) {
@@ -927,16 +1300,22 @@ export class AgentRuntime {
 
   // The bad output goes back as the assistant's own words, the correction as
   // a user message — never a correction spoken in the assistant's voice.
-  async #repair(assembled: AssembledPrompt, badText: string, issues: string): Promise<unknown> {
+  async #repair(
+    assembled: AssembledPrompt,
+    badText: string,
+    issues: string,
+    bill: CallBill,
+  ): Promise<unknown> {
     try {
       const { value } = await this.#llm.object({
-        schema: TurnSchemaActionRequired,
+        schema: StrictTurnSchema,
         system: assembled.system,
         messages: [
           ...assembled.messages,
           { role: 'assistant', content: badText.length > 0 ? badText : '…' },
           { role: 'user', content: `Your answer was rejected. Fix it:\n${issues}` },
         ],
+        bill,
       })
       return value
     } catch (err) {
@@ -964,7 +1343,12 @@ export class AgentRuntime {
       importance: turn.importance,
       tags: EMPTY_TAGS,
     })
-    this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
+    this.#onThought?.({
+      tick,
+      agentId: this.#agentId,
+      text: turn.thought,
+      importance: turn.importance,
+    })
 
     // The beat is spent casting back: whatever else the answer carried is let go, plan aside.
     if (recalled !== null) {
@@ -997,7 +1381,7 @@ export class AgentRuntime {
             ? turn.action.params.description
             : null
       if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
-        await this.#adjudicateFreeform(attempt)
+        await this.#adjudicateFreeform(attempt, true)
       } else {
         const intent: Intent =
           'freeform' in turn.action
@@ -1032,18 +1416,55 @@ export class AgentRuntime {
     }
   }
 
+  /** A tie nothing has fed for seven sim-days closes, and the mind remembers letting it go. It
+   *  costs no call, so a night with no reflection in it still lets go. */
+  async #letGoOfStaleTies(): Promise<void> {
+    const ties = this.#ties
+    if (ties === null) return
+    const tick = this.#bridge.currentTick()
+    try {
+      for (const t of ties.store.letGo(tick)) {
+        const who = this.#bridge.agentFacts(t.personId)?.name ?? t.personId
+        // Witnessed, folded to nothing: the bond graph reads it off the log, and a promise
+        // nobody ever settled is the only producer `promise_broken` has.
+        this.#bridge.announce('tie_let_go', {
+          agentId: this.#agentId,
+          personId: t.personId,
+          kind: t.kind,
+        })
+        await this.#mem!.insertMemory({
+          tick,
+          kind: 'reflection',
+          text: `You have let go of what was between you and ${who}: ${t.text}`,
+          importance: LET_GO_IMPORTANCE,
+          tags: { ...EMPTY_TAGS, people: [who] },
+        })
+      }
+    } catch (err) {
+      this.#llm.alert('tie_let_go_failed', messageOf(err))
+    }
+  }
+
   async #runNight(day: number): Promise<void> {
     if (this.#reflectedNight === day) return
     this.#reflectedNight = day
-    if (this.#reflectionLlm === null) return
+    await this.#letGoOfStaleTies()
+    if (this.#reflectionLlm === null) {
+      this.#nightWritten = day
+      return
+    }
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
+    const ties = this.#ties
     try {
       await runSleepReflection({
         mem: this.#mem!,
         personality: this.#personality,
         llm: this.#reflectionLlm,
         day,
+        ...(ties === null
+          ? {}
+          : { ties: { store: ties.store, cast: ties.cast(), tick: this.#bridge.currentTick() } }),
         alert: (kind, detail) => {
           this.#llm.alert(kind, detail)
         },
@@ -1051,6 +1472,7 @@ export class AgentRuntime {
     } catch (err) {
       this.#llm.alert('reflection_failed', messageOf(err))
     }
+    this.#nightWritten = day
     try {
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({
@@ -1069,21 +1491,53 @@ export class AgentRuntime {
     }
   }
 
+  /** What this mind holds about the people it can see, keyed by the name the ledger is keyed by.
+   *  It rides the "people here" line because that line changes when somebody arrives, not every
+   *  turn: a tie sits inside the prefix the cache keeps, above the memories that do change. */
+  #tiesByName(): Map<string, string> {
+    const ties = this.#ties
+    if (ties === null) return new Map()
+    const nameOf = new Map(ties.cast().map((p) => [p.id, p.name]))
+    const held = new Map<string, string[]>()
+    for (const t of ties.store.open()) {
+      const name = nameOf.get(t.personId)
+      if (name === undefined) continue
+      const rows = held.get(name) ?? []
+      if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]}: ${t.text}`)
+      held.set(name, rows)
+    }
+    return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join('; ')}.`]))
+  }
+
   #buildLedgers(people: string[]): { name: string; doc: string }[] {
+    const ties = this.#tiesByName()
     const out: { name: string; doc: string }[] = []
     for (const person of people) {
-      const ledger = this.#mem!.getLedger(person)
-      if (ledger) out.push({ name: person, doc: ledger.doc })
+      const doc = [this.#mem!.getLedger(person)?.doc ?? '', ties.get(person) ?? '']
+        .filter((p) => p.length > 0)
+        .join(' ')
+      if (doc.length > 0) out.push({ name: person, doc })
     }
     return out
   }
 
-  #writeActionMemory(text: string): Promise<number> {
+  /** Bookkeeping around a turn the town has already been billed for. A method the client never
+   *  grew is a type error now, so what is left here is a database too busy to write. */
+  #book(write: () => void): void {
+    try {
+      write()
+    } catch (err) {
+      this.#llm.alert('ledger_write_failed', messageOf(err))
+    }
+  }
+
+  #writeActionMemory(text: string, importance = REFUSAL_IMPORTANCE): Promise<number | null> {
+    if (this.#alreadyHeld(text)) return Promise.resolve(null)
     return this.#mem!.insertMemory({
       tick: this.#bridge.currentTick(),
       kind: 'action',
       text,
-      importance: 3,
+      importance,
       tags: EMPTY_TAGS,
     })
   }

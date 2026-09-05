@@ -19,6 +19,7 @@ import type { BubbleLayer } from './bubbles.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
   applyDepthOrder,
+  createDepthGate,
   createLayers,
   createScreenLayers,
   type DepthCounts,
@@ -61,6 +62,13 @@ export type Scene = {
   /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
    *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
   textScale: number
+  /** What the viewer has picked, so a label layer can stand down for the one thing that already
+   *  wears a nameplate. Written onto the handle rather than passed as a prop, the way
+   *  `textScale` is: the layers live in a Pixi closure React never re-renders. */
+  pickedId: string | null
+  /** Who the camera is on when nobody has picked: the auto-director's subject, written here for
+   *  the same reason `pickedId` is — the layers live in a Pixi closure React never re-renders. */
+  cameraSubject: string | null
   world: Container
   /** the eight named layers — the one place that decides what is drawn over what */
   layers: LayerSet
@@ -121,9 +129,6 @@ export type Scene = {
   wasDrag(): boolean
   /** world-space anchor for an agent's sprite; wired by StageMount once layers exist */
   anchorOf?: (agentId: string) => { x: number; y: number } | null
-  /** How far into their current job this person is, 0..1, or null when there is none. Set by
-   *  the act layer, read by the overhead slot the track wraps. */
-  actFraction?: (agentId: string) => number | null
   /** Where a subject stands, in the space `tileToScreen` returns: a body's own sprite anchor
    *  (the interpolated step, not the record's tile) and a building's site. */
   pointOf(kind: 'agent' | 'structure', id: string): { sx: number; sy: number } | null
@@ -192,6 +197,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
   const depthSources = new Set<() => DepthEntry[]>()
+  const depthEntries: DepthEntry[] = []
+  const depthMoved = createDepthGate()
   // what the last frame drew and what it skipped — a cull nobody can count is a claim
   let lastCounts: DepthCounts = { drawn: 0, culled: 0 }
 
@@ -290,6 +297,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     app,
     setTicking: clock.set,
     textScale: 1,
+    pickedId: null,
+    cameraSubject: null,
     world,
     layers,
     graded,
@@ -312,9 +321,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       return at === null ? null : { sx: at.x, sy: at.y }
     },
     sortDepth: () => {
-      const entries: DepthEntry[] = []
-      for (const fn of depthSources) for (const e of fn()) entries.push(e)
-      lastCounts = applyDepthOrder(entries, viewRect())
+      depthEntries.length = 0
+      for (const fn of depthSources) for (const e of fn()) depthEntries.push(e)
+      const view = viewRect()
+      // Nothing moved, so the order it had is the order it wants.
+      if (!depthMoved(depthEntries, view)) return
+      lastCounts = applyDepthOrder(depthEntries, view)
     },
     depthCounts: () => lastCounts,
     rebakeGround,

@@ -1,8 +1,16 @@
 import { type EventStore } from '@sj/engine/store'
 import {
+  AgentArrived,
   ambientTempAt,
   composePerception,
+  effectiveConfig,
+  headcount,
+  mintId,
+  roadRimOf,
+  spoilageFor,
   groundForBuilding,
+  hears,
+  townSquareOf,
   unfinishedWork,
   type StandingWalls,
   FORAGEABLE_YIELD,
@@ -11,22 +19,38 @@ import {
   isFoodKind,
   FUEL_KIND,
   isPassable,
+  LAWS_SHOWN,
   loneCandidateFor,
   distantWater,
+  firstReachable,
   makeables,
   naturalPlaces,
   placeName,
   recipeTileKind,
+  SQUARE_RADIUS,
+  standingLaws,
+  tabledLaws,
+  type TabledLaw,
   submitIntent,
+  walkDestination,
   waterWithinReach,
   WELL_KIND,
   type TickHandler,
   type TickLoop,
   type WorldState,
 } from '@sj/engine'
-import type { Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
-import { isWet, isWoody, type SimConfig, type SimEvent } from '@sj/shared'
-import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
+import type { Law, Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
+import {
+  isWet,
+  isWoody,
+  MINUTES_PER_DAY,
+  PRESENCE_EVENT_TYPES,
+  RELATIONSHIP_EVENT_TYPES,
+  type SimConfig,
+  type SimEvent,
+  weekdayFromTick,
+} from '@sj/shared'
+import type { KnownPlace, PerceptionPacket, SourceKind, WalkMark } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // How far off a body still picks water out of the middle distance.
@@ -40,7 +64,7 @@ export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredom
 export type Intent = { verb: string; params: Record<string, unknown> }
 export type SubmitResult = { ok: true } | { ok: false; reason: string }
 
-export const ROLLED_BACK = 'the moment came apart'
+export const ROLLED_BACK = 'nothing came of the moment'
 
 type QueuedSubmit = {
   agentId: string
@@ -100,6 +124,7 @@ function reconcile(
       activity: raw.self.activity,
       ...(raw.self.activityToward === undefined ? {} : { activityToward: raw.self.activityToward }),
       ...(raw.self.inside === undefined ? {} : { inside: raw.self.inside }),
+      ...(raw.self.doorstep === undefined ? {} : { doorstep: raw.self.doorstep }),
       inventory: raw.self.inventory.map((i) => ({
         id: i.id,
         kind: i.kind,
@@ -133,6 +158,7 @@ function reconcile(
       forageables: raw.visible.forageables,
     },
     reach: raw.reach,
+    stores: raw.stores,
     heard: raw.heard,
     seen: raw.seen,
     feltEvents: raw.feltEvents,
@@ -148,6 +174,7 @@ export class EngineBridge {
   #announcements: { type: string; payload: Record<string, unknown> }[] = []
   #tickCallbacks: ((tick: number) => void)[] = []
   #window: SimEvent[] = []
+  #windowTick: number | null = null
   #lastSeq = 0
 
   constructor(opts: {
@@ -214,6 +241,116 @@ export class EngineBridge {
     this.#announcements.push({ type, payload })
   }
 
+  /** Who would hear this body speak from where it stands, itself excluded. The scene's own
+   *  membership test, so the ear that opens a scene and the ear that leaves one read one rule. */
+  earshot(agentId: string): string[] {
+    const state = this.#loop.state
+    const speaker = state.agents[agentId]
+    if (speaker?.alive !== true) return []
+    const spoken = {
+      x: speaker.x,
+      y: speaker.y,
+      ...(speaker.insideId === undefined ? {} : { insideId: speaker.insideId }),
+    }
+    return Object.keys(state.agents)
+      .sort()
+      .filter((id) => id !== agentId && state.agents[id]!.alive)
+      .filter((id) => hears(state, this.#simConfig, spoken, id))
+  }
+
+  /** The closest of these bodies to this one, by the block distance the rest of the world
+   *  measures with. Ties by id, so two people equally near never decide it differently twice. */
+  nearestOf(agentId: string, candidates: readonly string[]): string | null {
+    const state = this.#loop.state
+    const self = state.agents[agentId]
+    if (self === undefined) return null
+    let best: string | null = null
+    let bestD = Infinity
+    for (const id of [...candidates].sort()) {
+      const other = state.agents[id]
+      if (other === undefined) continue
+      const d = Math.abs(other.x - self.x) + Math.abs(other.y - self.y)
+      if (d >= bestD) continue
+      bestD = d
+      best = id
+    }
+    return best
+  }
+
+  /** Everyone who has sung, danced or mourned on the plaza inside the recent window. A crowd
+   *  the town can see is what turns two people talking into a gathering. */
+  expressersAtSquare(radius = SQUARE_RADIUS): string[] {
+    const square = townSquareOf(this.#loop.state)
+    if (square === null) return []
+    const seen = new Set<string>()
+    for (const ev of this.#recentEvents()) {
+      if (ev.type !== 'agent_expressed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown; x?: unknown; y?: unknown }
+      if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+      if (!p.verb.startsWith('express:')) continue
+      if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+      if (Math.abs(p.x - square.x) > radius || Math.abs(p.y - square.y) > radius) continue
+      seen.add(p.agentId)
+    }
+    return [...seen].sort()
+  }
+
+  /** Every rule the town still holds itself to, in the order it agreed them. */
+  socialLaws(): Law[] {
+    return standingLaws(this.#loop.state)
+  }
+
+  /** What a mind is told the town agreed: the sentences alone, the newest handful of them, in
+   *  the order they were agreed. Never a number and never an id — a rule is quoted by its words
+   *  or it is not in the prompt at all. */
+  lawTexts(): string[] {
+    return this.socialLaws()
+      .slice(-LAWS_SHOWN)
+      .map((l) => l.text)
+  }
+
+  /** Rules a council was for, each waiting for a vote on a later day, oldest first. */
+  tabledLaws(): TabledLaw[] {
+    return tabledLaws(this.#loop.state)
+  }
+
+  /** The same, as a mind reads them: who put it, on what day, and the words. */
+  tabledLines(): string[] {
+    return this.tabledLaws().map((law) => {
+      const by = this.#loop.state.agents[law.proposedBy]?.name ?? 'somebody'
+      return `${by} put this to the town on ${weekdayFromTick(law.tabledTick)}, and the room was for it: "${law.text}" It becomes the rule if the next gathering votes for it.`
+    })
+  }
+
+  /** The roofs the whole town uses: everything standing that nobody owns. What a rule may point
+   *  at, and the only buildings the court is allowed to name in one. */
+  publicPlaces(): { id: string; kind: string; name?: string }[] {
+    const state = this.#loop.state
+    return Object.keys(state.structures)
+      .sort()
+      .flatMap((id) => {
+        const s = state.structures[id]!
+        if (s.owner !== undefined || s.stage !== 'complete') return []
+        const name = placeName(s)
+        return [{ id: s.id, kind: s.kind, ...(name === undefined ? {} : { name }) }]
+      })
+  }
+
+  /** Whoever aimed an `express:*` at this body inside the recent window. Perception reports
+   *  that a thing was done, never that it was done to you, and only the second feeds a want. */
+  expressedAt(agentId: string): string[] {
+    const at = new Set<string>()
+    for (const ev of this.#recentEvents()) {
+      if (ev.type !== 'agent_expressed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown; targetId?: unknown }
+      if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
+      if (!p.verb.startsWith('express:') || p.agentId === agentId) continue
+      if (p.targetId !== agentId) continue
+      at.add(p.agentId)
+    }
+    return [...at].sort()
+  }
+
   submit(
     agentId: string,
     intent: Intent,
@@ -244,6 +381,18 @@ export class EngineBridge {
   // `agent_died` leaves the body in world state for good, so absence is not the question.
   isAlive(agentId: string): boolean {
     return this.#loop.state.agents[agentId]?.alive === true
+  }
+
+  // `asleep` is only ever set by the sleep verb, so a body in bed put itself there. A scene
+  // reads this and never the hour: going to bed is a fact about people.
+  isAwake(agentId: string): boolean {
+    return this.#loop.state.agents[agentId]?.asleep === false
+  }
+
+  /** What this body has left in it, 0–100. The one body fact a scene line carries: a mind still
+   *  talking at midnight is told how tired it is, and answers that for itself. */
+  energyOf(agentId: string): number {
+    return this.#loop.state.agents[agentId]?.needs.energy ?? 100
   }
 
   // World answers for perception prose: open ground and food kinds, straight
@@ -289,7 +438,7 @@ export class EngineBridge {
     const a = state.agents[agentId]
     if (a === undefined) return []
     return [
-      ...naturalPlaces(state, a.x, a.y),
+      ...naturalPlaces(state, a.x, a.y).map((p) => ({ ...p, natural: true })),
       ...(a.knownPlaces ?? []).flatMap((id) => {
         const s = state.structures[id]
         if (s === undefined) return []
@@ -297,6 +446,37 @@ export class EngineBridge {
         return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(name === undefined ? {} : { name }) }]
       }),
     ]
+  }
+
+  /** Whether the walk verb would take this mark from where this body stands. The seam itself is
+   *  the judge, so a target the prose offers can never be one the world turns away. */
+  canWalkTo(agentId: string, mark: WalkMark): boolean {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined || a.insideId !== undefined) return false
+    const to = walkDestination(state, this.#simConfig, agentId, mark)
+    // A mark that settles on the tile underfoot is refused as the non-walk it is, so it is not
+    // one of the marks this body can walk to either.
+    return !('refusal' in to) && !(to.x === a.x && to.y === a.y)
+  }
+
+  /** The nearest ground beside a spot that these legs can reach, and the spot itself when a foot
+   *  can hold it. Water and a well are tiles nobody stands on, so the coordinates the roads name
+   *  are marks a walk refuses. */
+  footingNear(agentId: string, x: number, y: number): { x: number; y: number } | null {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined || a.insideId !== undefined) return null
+    const ring: { x: number; y: number }[] = []
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const p = { x: x + dx, y: y + dy }
+        if ((p.x !== a.x || p.y !== a.y) && isPassable(state, p.x, p.y)) ring.push(p)
+      }
+    }
+    const near = (p: { x: number; y: number }): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+    ring.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+    return firstReachable(state, a, ring, this.#simConfig)
   }
 
   // The other place work can go: free ground moves to a fresh plot the moment somebody plants
@@ -484,12 +664,152 @@ export class EngineBridge {
     return this.#loop.tick
   }
 
+  /** The seq the log stands at, for a caller that means to read forward from here and not over
+   *  a day it was not there for. */
+  lastSeq(): number {
+    return this.#store.lastSeq()
+  }
+
+  /** Whoever this body belongs to, or nobody. The world's only word on it: a partnership is
+   *  two consents in the log, and this is what they folded to. */
+  partnerOf(agentId: string): string | null {
+    return this.#loop.state.agents[agentId]?.partnerId ?? null
+  }
+
+  /** The roof this body stands under, in the town's own word for it. Null under open sky. */
+  roofOf(agentId: string): string | null {
+    const inside = this.#loop.state.agents[agentId]?.insideId
+    const roof = inside === undefined ? undefined : this.#loop.state.structures[inside]
+    return roof === undefined ? null : (placeName(roof) ?? roof.kind)
+  }
+
+  /** The five relationship events since `afterSeq`, oldest first, the birth that comes of one,
+   *  and the two that change who is in the valley at all. Read off the same window perception
+   *  is composed from. */
+  relationshipEventsSince(afterSeq: number): SimEvent[] {
+    return this.#recentEvents().filter(
+      (ev) =>
+        ev.seq > afterSeq &&
+        (RELATIONSHIP_EVENT_TYPES.includes(ev.type as (typeof RELATIONSHIP_EVENT_TYPES)[number]) ||
+          PRESENCE_EVENT_TYPES.includes(ev.type as (typeof PRESENCE_EVENT_TYPES)[number]) ||
+          ev.type === 'agent_born'),
+    )
+  }
+
+  /** How many people the valley is holding, unborn included. The one number the ceiling is
+   *  measured against, wherever it is measured. */
+  headcount(): number {
+    return headcount(this.#loop.state)
+  }
+
+  /** The ceiling as the world's own laws have it now, which is what an operator's change moved. */
+  maxMinds(): number {
+    return effectiveConfig(this.#simConfig, this.#loop.state.laws).population.maxMinds
+  }
+
+  /** Where the valley road meets the edge of the map. Null for a world with no town. */
+  roadRim(): { x: number; y: number } | null {
+    return roadRimOf(this.#loop.state, this.#simConfig)
+  }
+
+  /** Whether this world holds a body of this id at all — living, dead or gone down the road. */
+  hasBody(agentId: string): boolean {
+    return this.#loop.state.agents[agentId] !== undefined
+  }
+
+  /** The next id this world will mint, for an emitter that has to name a thing before the
+   *  fold has seen the one before it. */
+  mintId(prefix: string, offset = 0): string {
+    return mintId(this.#loop.state, prefix, offset)
+  }
+
+  /** The counter itself, for a cadence that must be read off the world and never rolled. */
+  nextEntityId(): number {
+    return this.#loop.state.counters.nextEntityId
+  }
+
+  /** How long a thing of this kind keeps, stamped the way the world stamps its own. */
+  spoilage(kind: string): { spoilage?: { spawnDay: number; days: number } } {
+    return spoilageFor(this.#loop.state, kind, this.#simConfig)
+  }
+
+  /** Everyone who came up the road and has not yet stood in a talk. Read off the whole log,
+   *  so a restart rebuilds exactly the set the run before it was carrying. */
+  strangersSoFar(): string[] {
+    const met = new Set<string>()
+    for (const ev of this.#store.readTypeFrom(0, 'scene_opened')) {
+      const p = ev.payload as { participants?: unknown }
+      if (!Array.isArray(p.participants)) continue
+      for (const id of p.participants) if (typeof id === 'string') met.add(id)
+    }
+    return this.#store
+      .readTypeFrom(0, 'agent_arrived')
+      .flatMap((ev) => {
+        const p = AgentArrived.safeParse(ev.payload)
+        return p.success ? [p.data.id] : []
+      })
+      .filter((id) => !met.has(id))
+  }
+
+  /** A partner of this body who went down the valley road since `sinceTick`: the departure the
+   *  log holds, matched to the dissolution that same act emitted. Names and days, never ids. */
+  partnersGoneSince(agentId: string, sinceTick: number): { name: string; day: number }[] {
+    const from = this.#store.lastSeqThroughTick(sinceTick)
+    const mine = new Set<string>()
+    for (const ev of this.#store.readTypeFrom(from, 'partnership_dissolved')) {
+      const p = ev.payload as { aId?: unknown; bId?: unknown; byId?: unknown }
+      if (typeof p.byId !== 'string') continue
+      if (p.aId === agentId || p.bId === agentId) mine.add(p.byId)
+    }
+    const out: { name: string; day: number }[] = []
+    for (const ev of this.#store.readTypeFrom(from, 'agent_departed')) {
+      const p = ev.payload as { agentId?: unknown }
+      if (typeof p.agentId !== 'string' || !mine.has(p.agentId)) continue
+      const body = this.#loop.state.agents[p.agentId]
+      if (body === undefined) continue
+      out.push({ name: body.name, day: Math.floor(ev.tick / MINUTES_PER_DAY) })
+    }
+    return out
+  }
+
+  /** How many times this body was seen doing what the town had agreed against, since a tick.
+   *  Unwitnessed does not count: being seen is the whole of what a forbid costs. */
+  breachesOf(agentId: string, sinceTick: number): number {
+    let n = 0
+    for (const ev of this.#store.readTypeFrom(
+      this.#store.lastSeqThroughTick(sinceTick),
+      'law_broken',
+    )) {
+      const p = ev.payload as { agentId?: unknown; witnesses?: unknown }
+      if (p.agentId !== agentId) continue
+      if (Array.isArray(p.witnesses) && p.witnesses.length > 0) n += 1
+    }
+    return n
+  }
+
+  /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same
+   *  window perception is composed from, so nothing reaches a mind before it could have felt it. */
+  completedSince(agentId: string, afterSeq: number): { seq: number; verb: string }[] {
+    const done: { seq: number; verb: string }[] = []
+    for (const ev of this.#window) {
+      if (ev.seq <= afterSeq || ev.type !== 'action_completed') continue
+      const p = ev.payload as { agentId?: unknown; verb?: unknown }
+      if (p.agentId !== agentId || typeof p.verb !== 'string') continue
+      done.push({ seq: ev.seq, verb: p.verb })
+    }
+    return done
+  }
+
+  // The log is appended to inside the tick, and every reader of the window runs after it: a
+  // dozen minds looking twice apiece at one tick all see what the first look already read.
   #recentEvents(): SimEvent[] {
+    if (this.#windowTick === this.#loop.tick) return this.#window
     const cutoff = this.#loop.tick - this.#recentWindowTicks
     const fresh = this.#store.readFrom(this.#lastSeq)
     this.#lastSeq = this.#store.lastSeq()
     if (fresh.length > 0) this.#window.push(...fresh)
     this.#window = this.#window.filter((ev) => ev.tick > cutoff)
+    this.#windowTick = this.#loop.tick
     return this.#window
   }
 }

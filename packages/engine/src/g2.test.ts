@@ -3,7 +3,13 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { dayPhaseFromTick, SimConfigSchema, stateHash, type SimEvent } from '@sj/shared'
+import {
+  dayPhaseFromTick,
+  DURATION_TICKS,
+  SimConfigSchema,
+  stateHash,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type WorldState } from './state.js'
 import { openDb } from './db.js'
 import { fold } from './fold.js'
@@ -31,8 +37,13 @@ import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs/index.js'
 import { changesOf } from './testutil/world.js'
 // Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
-// witness, regrowth and desire paths are all live on the 3-day run.
-const G2_CONFIG = SimConfigSchema.parse({})
+// witness, regrowth and desire paths are all live on the 3-day run. Two dials are held at their
+// pre-D1 speed: D1 put a stomach on a week's clock and a poisoning on a day and a half, and this
+// gate measures the machinery a dying body sets off — collapse, cause, grave — inside three days.
+const G2_CONFIG = SimConfigSchema.parse({
+  needs: { hungerDecayPerTick: 0.021 },
+  mortality: { drainPerTick: { poison: 0.12 } },
+})
 
 const SEED = 'g2-scripted'
 const TOTAL_TICKS = 4320 // 3 sim days
@@ -183,9 +194,13 @@ describe('GATE G2: 3-day scripted world run', () => {
     // Ownership: the Builder owns the house he raised, and the Fisher owns what he pulled out.
     const house = Object.values(state.structures).find((s) => s.kind === 'house')!
     expect(house.owner).toBe(BUILDER)
-    const caught = Object.values(state.items).filter((i) => i.kind === 'fish')
+    // Read off the catch, not off the larder: since the ground halves a shelf life, a
+    // three-day run can end with every fish it ever caught already turned.
+    const caught = evs.filter(
+      (e) => e.type === 'item_spawned' && (e.payload as Payload).kind === 'fish',
+    )
     expect(caught.length).toBeGreaterThan(0)
-    for (const f of caught) expect(f.owner).toBe(FISHER)
+    for (const f of caught) expect((f.payload as Payload).owner).toBe(FISHER)
     expect(evs.some((e) => e.type === 'item_owner_changed')).toBe(true)
 
     // The bed law: the Builder steps through his own door and lies down inside it.
@@ -288,7 +303,8 @@ describe('GATE G2: 3-day scripted world run', () => {
       return { taken, watched: composePerception(state, G2_CONFIG, KEEPER, taken.slice(-1)).seen }
     }
 
-    const night = seen(NIGHT_THEFT_TICK + 1)
+    // A taking is a moment, so the hand closes the tick after that.
+    const night = seen(NIGHT_THEFT_TICK + DURATION_TICKS.moment)
     expect(night.taken).toHaveLength(1)
     expect(night.taken[0]!.payload).toMatchObject({
       itemId: STOLEN_ITEM,
@@ -298,7 +314,7 @@ describe('GATE G2: 3-day scripted world run', () => {
     expect(dayPhaseFromTick(night.taken[0]!.tick)).toBe('night')
     expect(night.watched).toEqual([])
 
-    const noon = seen(NOON_THEFT_TICK + 1)
+    const noon = seen(NOON_THEFT_TICK + DURATION_TICKS.moment)
     expect(noon.taken).toHaveLength(2)
     expect(dayPhaseFromTick(noon.taken[1]!.tick)).toBe('day')
     expect(noon.watched).toContainEqual({

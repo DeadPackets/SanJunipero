@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FELT_TAGS, MYSTERIES } from '@sj/engine'
+import { FELT_TAGS, LAWS_SHOWN, LAW_TEXT_MAX, MYSTERIES } from '@sj/engine'
 import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
-import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
+import { assemblePrompt, compactDayLog, OWN_WORDS_SHOWN, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
@@ -150,7 +150,7 @@ describe('human framing guard', () => {
 describe('perceptionToProse: the ground says what it is, and nothing about what to do', () => {
   // The engine may state a physical fact. The moment it states a preference it is a rule.
   const NUDGES = /\b(should|ought|better site|recommended|recommend|ideal|best place|advise)\b/i
-  const ROAD_CLAUSE = 'Carts and feet reach this spot easily.'
+  const ROAD_CLAUSE = 'This spot is easy to reach on foot or by cart.'
   const onRoad = { ...quietMeadowPacket, ground: { wellTravelled: true as const } }
 
   it('renders the clause once for well-travelled ground and not at all otherwise', () => {
@@ -168,7 +168,7 @@ describe('perceptionToProse: the ground says what it is, and nothing about what 
 })
 
 describe("perceptionToProse: a walk that stops short says so, in a body's words", () => {
-  const UNCLEAR = 'The way is unclear from here.'
+  const UNCLEAR = 'You are not sure of the way from here.'
   const MECHANICS = /\b(path|node|budget|A\*|search|route|cap|capped|partial|unreachable)\b/i
   const cutShort = { ...quietMeadowPacket, wayUnclear: true as const }
 
@@ -227,13 +227,16 @@ describe('perceptionToProse', () => {
     ])
   })
 
-  it('★ two lines at most, and one is said just once', () => {
-    const said = ['first', 'second', 'third', 'fourth']
+  // Four now, the scene path's own window: two lines back cannot show a rut four turns wide.
+  it('★ four lines at most, and one is said just once', () => {
+    const said = ['first', 'second', 'third', 'fourth', 'fifth']
     const a = assemblePrompt(fixtureBlocks({ now: { prose: 'The sun stands high.', said } }))
     const block = a.messages.at(-1)!.content
-    expect(block.split('\n')).toHaveLength(2)
-    expect(block).not.toContain('second')
-    expect(block).toBe('You said: "third"\nYou just said: "fourth"')
+    expect(block.split('\n')).toHaveLength(OWN_WORDS_SHOWN)
+    expect(block).not.toContain('first')
+    expect(block).toBe(
+      'You said: "second"\nYou said: "third"\nYou said: "fourth"\nYou just said: "fifth"',
+    )
 
     const one = assemblePrompt(
       fixtureBlocks({ now: { prose: 'The sun stands high.', said: ['only'] } }),
@@ -332,7 +335,7 @@ describe('perceptionToProse', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['you_collapsed'] }, alert)
     expect(prose).toContain(FELT_EVENT_PROSE.you_collapsed)
-    expect(prose).not.toContain('You sense something change nearby.')
+    expect(prose).not.toContain('Something nearby has changed.')
     expect(alert).not.toHaveBeenCalled()
     expect(FELT_EVENT_PROSE.you_collapsed).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -346,7 +349,7 @@ describe('perceptionToProse', () => {
       const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [tag] }, alert)
       expect(FELT_EVENT_PROSE[tag], `no prose for felt tag ${tag}`).toBeTruthy()
       expect(prose, tag).toContain(FELT_EVENT_PROSE[tag])
-      expect(prose, tag).not.toContain('You sense something change nearby.')
+      expect(prose, tag).not.toContain('Something nearby has changed.')
       expect(alert, tag).not.toHaveBeenCalled()
       expect(FELT_EVENT_PROSE[tag]).not.toMatch(FORBIDDEN_FRAMING)
     }
@@ -391,8 +394,8 @@ describe('perceptionToProse', () => {
         ],
       },
     })
-    expect(prose).toContain("basket (item_3) at (12, 10); Rahel's, marked by Yusuf")
-    expect(prose).toContain("carrying 1 plank (item_9); Bex's")
+    expect(prose).toContain("basket (item_3) close to the south; Rahel's, marked by Yusuf")
+    expect(prose).toContain("hold plank ×1 (item_9; Bex's)")
   })
 
   it('leaves an unclaimed thing exactly as it always read', () => {
@@ -403,7 +406,7 @@ describe('perceptionToProse', () => {
         items: [{ id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 } }],
       },
     })
-    expect(prose).toContain('You can see 1 basket (item_3) at (12, 10).')
+    expect(prose).toContain('You can see 1 basket (item_3) close to the south.')
     expect(prose).not.toContain('—')
   })
 
@@ -416,7 +419,7 @@ describe('perceptionToProse', () => {
         { kind: 'mystery', mystery: mystery.kind, prose: mystery.prose },
       ],
     })
-    expect(prose).toContain("You watch Cass take Bex's plank.")
+    expect(prose).toContain("You see Cass take Bex's plank.")
     expect(prose).toContain(mystery.prose)
     expect(prose).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -424,7 +427,7 @@ describe('perceptionToProse', () => {
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['quantum_flux'] }, alert)
-    expect(prose).toContain('You sense something change nearby.')
+    expect(prose).toContain('Something nearby has changed.')
     expect(alert).toHaveBeenCalledTimes(1)
     expect(alert).toHaveBeenCalledWith('unknown felt tag: quantum_flux')
   })
@@ -440,7 +443,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(packet)).toContain('Hunger is all you can think about.')
+    expect(perceptionToProse(packet)).toContain('You are starving and can think about little else.')
   })
 
   it('renders the shared calendar — the day, the part of it, and the season', () => {
@@ -512,8 +515,7 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('carrying')
-    expect(prose).toContain('3 bread')
+    expect(prose).toContain('Your hands hold bread ×3 (b1)')
   })
 
   it('renders collapse and severe hunger', () => {
@@ -530,7 +532,7 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('collapsed')
-    expect(prose).toContain('Hunger is all you can think about.')
+    expect(prose).toContain('You are starving and can think about little else.')
   })
 
   it('never mentions the sun at night', () => {
@@ -544,7 +546,7 @@ describe('perceptionToProse', () => {
     expect(prose).toContain('clear')
   })
 
-  it('renders self position and visible coordinates with marks', () => {
+  it('renders self position, and the things it can see by mark and bearing', () => {
     const packet = {
       ...quietMeadowPacket,
       visible: {
@@ -567,8 +569,9 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('You stand at (12, 9)')
-    expect(prose).toContain('storehouse (structure_1) stands at (14, 9)')
-    expect(prose).toContain('20 bread (item_1) at (13, 9)')
+    expect(prose).toContain('storehouse (structure_1) stands close to the east')
+    expect(prose).toContain('20 bread (item_1) close to the east')
+    // A crop is not nameable to a walk, so the ground it grows on is still the whole of the road.
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
 
@@ -582,10 +585,10 @@ describe('perceptionToProse', () => {
           body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] },
         },
       })
-    expect(ailing('poison', 1)).toContain('something you ate has gone against you')
+    expect(ailing('poison', 1)).toContain('Something you ate has made you ill')
     expect(ailing('poison', 1)).not.toContain('It is very bad')
     expect(ailing('illness', 4)).toContain('It is very bad.')
-    expect(ailing('fatigue', 2)).toContain('A tiredness sits in your bones')
+    expect(ailing('fatigue', 2)).toContain('You are tired in a way that sleep has not fixed')
     // Whatever the severity, the sentences it adds carry no digit at all.
     const sentences = (p: string): string[] => p.split('. ')
     const base = sentences(perceptionToProse(quietMeadowPacket))
@@ -623,7 +626,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(collapsing)).toContain('sleep is taking you where you stand')
+    expect(perceptionToProse(collapsing)).toContain('You will fall asleep where you stand')
   })
 
   it('renders structure footprint and advises walking beside it', () => {
@@ -648,12 +651,12 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('storehouse (structure_1) stands at (10, 10)')
+    expect(prose).toContain('storehouse (structure_1) stands close to the south-west')
     expect(prose).toContain('2 tiles wide and 1 tile tall')
-    expect(prose).toContain('walk to a tile beside it')
+    expect(prose).toContain('walk to it and you end up beside it')
   })
 
-  it('offers the nearest open tile beside a structure when the world can be asked', () => {
+  it('says when nothing beside a structure can hold a body, and offers no tile either way', () => {
     const packet = {
       ...quietMeadowPacket,
       visible: {
@@ -674,20 +677,20 @@ describe('perceptionToProse', () => {
         crops: [],
       },
     }
-    // Self is at (12, 9): with all neighbors open, (11, 9) is nearest.
+    // Which tile is the walk's to pick, so the sentence turns only on whether one exists at all.
     const open = perceptionToProse(packet, undefined, { isWalkable: () => true })
-    expect(open).toContain('you could stand beside it at (11, 9)')
-    expect(open).not.toContain('walk to a tile beside it')
+    expect(open).toContain('walk to it and you end up beside it')
+    expect(open).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
 
-    // Only (10, 11) is open ground; the offer must skip blocked tiles.
+    // One tile of open ground is ground enough, and it is still never named.
     const oneGap = perceptionToProse(packet, undefined, {
       isWalkable: (x, y) => x === 10 && y === 11,
     })
-    expect(oneGap).toContain('you could stand beside it at (10, 11)')
+    expect(oneGap).toContain('walk to it and you end up beside it')
 
     // No open ground at all: say so instead of pointing at a wall.
     const walled = perceptionToProse(packet, undefined, { isWalkable: () => false })
-    expect(walled).toContain('no open ground lies beside it')
+    expect(walled).toContain('there is no open ground beside it')
   })
 
   it('names the food in hand when hunger gnaws (g3 round 6)', () => {
@@ -707,7 +710,7 @@ describe('perceptionToProse', () => {
     }
     const isEdible = (kind: string) => kind === 'bread'
     expect(perceptionToProse(hungry, undefined, { isEdible })).toContain(
-      'Your satchel holds bread (b1). You could eat it now.',
+      'You are carrying bread (b1). You could eat it now.',
     )
 
     // Sated: no nagging about the satchel.
@@ -749,8 +752,8 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('Nadia (nadia) lies collapsed at (16, 10)')
-    expect(prose).toContain('Edda (edda) sleeps at (15, 11)')
+    expect(prose).toContain('Nadia (nadia) lies collapsed close to the east')
+    expect(prose).toContain('Edda (edda) sleeps close to the south-east')
   })
 
   it('renders self stance by asleep/collapsed state', () => {
@@ -828,7 +831,7 @@ describe('compaction', () => {
 
     const compacted = compactDayLog(dayLog, 'the day blurred into chores and quiet hours.')
     expect(compacted.length).toBe(11)
-    expect(compacted[0]).toContain('Your mind wanders')
+    expect(compacted[0]).toContain('Looking back over the day')
     expect(compacted[0]).toContain('the day blurred into chores and quiet hours.')
     expect(compacted.slice(1)).toEqual(dayLog.slice(-10))
   })
@@ -960,7 +963,7 @@ describe('the book a mind can turn back to', () => {
       }),
     )
     expect(a.messages[0]!.content).toBe(
-      'You turn back the pages of your own book:\n' +
+      'What you have written in your own book:\n' +
         'Day 3: The roof held through the storm.\n' +
         'Day 5: Nadia brought bread again.',
     )
@@ -971,7 +974,9 @@ describe('the book a mind can turn back to', () => {
   it('says nothing at all when nothing is written yet', () => {
     const a = assemblePrompt(fixtureBlocks({ journal: [] }))
     expect(a.messages).toHaveLength(3)
-    expect(serialize(fixtureBlocks({ journal: [] }))).not.toContain('turn back the pages')
+    expect(serialize(fixtureBlocks({ journal: [] }))).not.toContain(
+      'What you have written in your own book',
+    )
   })
 
   it('shows at most the last five pages, and never a tick number', () => {
@@ -1029,7 +1034,7 @@ describe('what a spent beat brings back', () => {
     )
     const block = a.messages[2]!.content
     expect(block).toBe(
-      'You cast your mind back to the night the river rose. What comes back:\n' +
+      'You think back to the night the river rose. What comes back:\n' +
         'The water came over the fork by dawn.\n' +
         'Omar carried the child out.',
     )
@@ -1039,7 +1044,7 @@ describe('what a spent beat brings back', () => {
 
   it('says nothing comes back rather than leaving the asking unanswered', () => {
     const a = assemblePrompt(fixtureBlocks({ recalled: { query: 'my mother', memories: [] } }))
-    expect(a.messages[2]!.content).toBe('You cast your mind back to my mother. Nothing comes back.')
+    expect(a.messages[2]!.content).toBe('You think back to my mother. Nothing comes back.')
   })
 
   it('adds no message at all on a turn that cast nothing back', () => {
@@ -1052,13 +1057,13 @@ describe('a mind that is already in the middle of something', () => {
     const a = assemblePrompt(fixtureBlocks({ underway: { what: 'walk 62 70', step: 2, of: 4 } }))
     const last = a.messages.at(-1)!.content
     expect(last).toContain('You are in the middle of: walk 62 70 (step 2 of 4).')
-    expect(last).toContain('Answer wait and it goes on.')
+    expect(last).toContain('Answer wait and it carries on.')
   })
 
   it('prints no step for a one-act plan, and nothing at all for a mind with its hands free', () => {
     const one = fixtureBlocks({ underway: { what: 'eat item_bread', step: 1, of: 1 } })
     expect(assemblePrompt(one).messages.at(-1)!.content).toContain(
-      'You are in the middle of: eat item_bread. Your body',
+      'You are in the middle of: eat item_bread. You keep at it',
     )
     expect(assemblePrompt(fixtureBlocks()).messages).toHaveLength(3)
   })
@@ -1070,12 +1075,12 @@ describe('the refusal the next turn is actually told about', () => {
   const line = lastTurnLine('eat', 'the food must be in your hands')
 
   it("says the verb and the reason the engine gave, in the engine's own words", () => {
-    expect(line).toBe('Last turn: eat did not take — the food must be in your hands.')
+    expect(line).toBe('Last turn: eat did not work: the food must be in your hands.')
   })
 
   it('flattens a reason spelled the way only a schema spells it', () => {
     expect(lastTurnLine('stow', 'needs {itemId, structureId}')).toBe(
-      `Last turn: stow did not take — ${OPAQUE_REFUSAL}.`,
+      `Last turn: stow did not work: ${OPAQUE_REFUSAL}.`,
     )
   })
 
@@ -1102,12 +1107,281 @@ describe('the refusal the next turn is actually told about', () => {
 
   it("names the words the mind used when there was no verb, not a schema's blank", () => {
     expect(lastTurnLine(TRIED_FREEFORM, 'the reeds will not hold that shape')).toBe(
-      'Last turn: what you tried did not take — the reeds will not hold that shape.',
+      'Last turn: what you tried did not work: the reeds will not hold that shape.',
     )
   })
 
   it('is clean prompt text under both standing laws', () => {
     expect(scanPromptForGlassLeak(line)).toEqual([])
     expect(FORBIDDEN_FRAMING.test(line)).toBe(false)
+  })
+})
+
+// A town notices a habit when it has words for it. The words are the town's; what kind of thing
+// the recognizer decided it is stays behind the glass.
+describe('what the town has named', () => {
+  const said = (customs: string[]): string => assemblePrompt(fixtureBlocks({ customs })).system
+
+  it('★ says the town’s habits after its names, in the same town-wide block, and leaks nothing', () => {
+    const habit =
+      '3 of you have gathered at the same spot near (30, 30) on 3 different days. Nobody has given it a name yet.'
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], habits: [habit] }),
+    ).system
+    expect(system).toContain(`The town has taken to the Long Turning.\n${habit}`)
+    expect(scanPromptForGlassLeak(system)).toEqual([])
+    expect(assemblePrompt(fixtureBlocks({ habits: [habit] })).system).toContain(habit)
+  })
+
+  it('says the names the town gave, and nothing when it gave none', () => {
+    expect(said(['Long Turning'])).toContain('The town has taken to the Long Turning.')
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+  })
+
+  it('reads as a sentence when there are several', () => {
+    expect(said(['Long Turning', 'Ash Walk', 'Quiet Hour'])).toContain(
+      'The town has taken to the Long Turning, the Ash Walk and the Quiet Hour.',
+    )
+  })
+
+  it('sits beside the roster, above anything one mind alone knows', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({
+        customs: ['Long Turning'],
+        roster: [
+          {
+            id: 'recipe:smoke_fish',
+            name: 'Smoke Fish Over Green Wood',
+            gloss: 'Hang the catch in green-wood smoke so it keeps',
+            reads: [],
+          },
+        ],
+      }),
+    ).system
+    expect(system.indexOf('Smoke Fish')).toBeLessThan(system.indexOf('The town has taken to'))
+    expect(system.indexOf('The town has taken to')).toBeLessThan(system.indexOf('Name: Tamar'))
+  })
+
+  // The line a mind reads is scanned, not the table behind it: this fails the day a type word
+  // reaches the render.
+  it('leaks no word the recognizer uses for what it recognized', () => {
+    const system = said(['Long Turning', 'Ash Walk'])
+    expect(scanPromptForGlassLeak(system)).toEqual([])
+    for (const leak of ['festival', 'faith', 'council', 'market', 'custom']) {
+      expect(scanPromptForGlassLeak(`The town has taken to the ${leak}.`), leak).toContain(leak)
+    }
+  })
+})
+
+// ★ WHAT STANDS WITHIN REACH. Rehearsals 4 through 7 produced 665 acts a day and not one
+// construct, and the reason was not the court: it was handed this list on every ruling, while a
+// mind was shown only what already works. Nobody proposes a thing they have never been told is
+// there, so nobody ever did — the one invention the court saw was a mind mistyping `wait`.
+describe('what stands within reach', () => {
+  const said = (frontier: string[]): string => assemblePrompt(fixtureBlocks({ frontier })).system
+
+  it('names the unearned rungs and invites a mind to be the first at one', () => {
+    const system = said(['A store held in common'])
+    expect(system).toContain('Nobody here has done any of these')
+    expect(system).toContain('a store held in common')
+    expect(system).toContain('Say what you want to do in your own words and try it.')
+  })
+
+  it('reads as a sentence when there are several, and says nothing when there are none', () => {
+    expect(said(['A turn agreed for the fields', 'A store held in common'])).toContain(
+      'a turn agreed for the fields and a store held in common',
+    )
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+  })
+
+  // It changes only when a craft is codified, so it belongs with the roster and the customs in
+  // the half of the prompt the cache keeps, never in the half that turns over every tick.
+  it('sits with the other things the whole town knows, above one mind’s own name', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], frontier: ['A store held in common'] }),
+    ).system
+    expect(system.indexOf('The town has taken to')).toBeLessThan(
+      system.indexOf('Nobody here has done any of these'),
+    )
+    expect(system.indexOf('Nobody here has done any of these')).toBeLessThan(
+      system.indexOf('Name: Tamar'),
+    )
+  })
+
+  // The codex authors these names in the town's own words, but the line a mind reads is what
+  // gets scanned — an id slipping through would put `common_store` in front of a mind.
+  it('leaks no word from the plane that keeps the ladder', () => {
+    expect(
+      scanPromptForGlassLeak(said(['A store held in common', 'A turn agreed for the fields'])),
+    ).toEqual([])
+  })
+})
+
+describe('what the town has agreed', () => {
+  const LAW = 'Nobody takes from the store after dark.'
+  const said = (laws: string[]): string => assemblePrompt(fixtureBlocks({ laws })).system
+
+  it('quotes the sentences the town actually said', () => {
+    expect(said([LAW])).toContain('The town has agreed on these and holds each other to them:')
+    expect(said([LAW])).toContain(`"${LAW}"`)
+  })
+
+  it('sends the same bytes it always did while the town has agreed nothing', () => {
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+    expect(assemblePrompt(fixtureBlocks({ laws: [] })).blockTokens.laws).toBeUndefined()
+  })
+
+  it('shows the newest eight and no more, however many stand', () => {
+    const many = Array.from({ length: 12 }, (_, i) => `Rule number ${i} stands.`)
+    const system = said(many)
+    expect(system).not.toContain('Rule number 3 stands.')
+    expect(system).toContain('Rule number 4 stands.')
+    expect(system).toContain('Rule number 11 stands.')
+  })
+
+  it('renders no line longer than a rule is allowed to be', () => {
+    const system = said(['x'.repeat(400)])
+    for (const line of system.split('\n').filter((l) => l.startsWith('"'))) {
+      expect(line.length).toBeLessThanOrEqual(LAW_TEXT_MAX + 2)
+    }
+  })
+
+  it('costs what eight sentences cost, and not a token more', () => {
+    const many = Array.from({ length: 12 }, () => 'y'.repeat(LAW_TEXT_MAX))
+    expect(assemblePrompt(fixtureBlocks({ laws: many })).blockTokens.laws).toBeLessThanOrEqual(
+      LAWS_SHOWN * 32 + 16,
+    )
+  })
+
+  it('sits after what the town has named and above one mind’s own name', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], laws: [LAW], frontier: ['A store in common'] }),
+    ).system
+    expect(system.indexOf('The town has taken to')).toBeLessThan(
+      system.indexOf('The town has agreed on these'),
+    )
+    expect(system.indexOf('The town has agreed on these')).toBeLessThan(
+      system.indexOf('Nobody here has done any of these'),
+    )
+    expect(system.indexOf('The town has agreed on these')).toBeLessThan(
+      system.indexOf('Name: Tamar'),
+    )
+  })
+
+  // A rule has an id and a number of its own, and a mind may hear neither: the words alone.
+  it('hands over no word from the plane that keeps the rules', () => {
+    expect(scanPromptForGlassLeak(said([LAW, 'One sack each from the store.']))).toEqual([])
+    expect(said([LAW])).not.toContain('law_')
+  })
+})
+
+// The prompt's bill, itemised: which block bought which tokens, and which of them the cache
+// can keep. Measurement only — nothing here changes a byte a mind reads.
+describe('blockTokens', () => {
+  function commonPrefixLength(a: string, b: string): number {
+    let i = 0
+    while (i < a.length && i < b.length && a[i] === b[i]) i += 1
+    return i
+  }
+
+  const NAMED = [
+    'shared',
+    'roster',
+    'customs',
+    'laws',
+    'identity',
+    'personality',
+    'journal',
+    'dayLog',
+    'scene',
+    'recalled',
+    'lastOutcome',
+    'now',
+    'heard',
+    'said',
+    'underway',
+  ]
+
+  it('carries an entry for every block it rendered and none for one it skipped', () => {
+    const a = assemblePrompt(fixtureBlocks())
+    expect(Object.keys(a.blockTokens).sort()).toEqual(
+      ['shared', 'identity', 'personality', 'dayLog', 'scene', 'now'].sort(),
+    )
+
+    const full = assemblePrompt(
+      fixtureBlocks({
+        roster: [
+          {
+            id: 'recipe:smoke_fish',
+            name: 'Smoke Fish Over Green Wood',
+            gloss: 'Hang the catch in green-wood smoke so it keeps',
+            reads: [],
+          },
+        ],
+        customs: ['Long Turning'],
+        laws: ['Nobody takes what is not theirs.'],
+        journal: [{ day: 2, text: 'The weir held.' }],
+        recalled: { query: 'my mother', memories: ['She kept bees.'] },
+        lastOutcome: lastTurnLine('eat', 'the food must be in your hands'),
+        now: { prose: 'The sun is high.', heard: 'You hear Nadia say: "Bread?"', said: ['Aye.'] },
+        underway: { what: 'walk 62 70', step: 2, of: 4 },
+      }),
+    )
+    expect(Object.keys(full.blockTokens).sort()).toEqual([...NAMED].sort())
+    for (const n of NAMED) expect(full.blockTokens[n]).toBeGreaterThan(0)
+  })
+
+  it('sums to within 1% of estTokens, so no block escapes the bill', () => {
+    for (const blocks of [
+      fixtureBlocks(),
+      fixtureBlocks({
+        journal: [{ day: 2, text: 'The weir held.' }],
+        underway: { what: 'walk 62 70', step: 2, of: 4 },
+      }),
+    ]) {
+      const a = assemblePrompt(blocks)
+      const summed = Object.values(a.blockTokens).reduce((t, n) => t + n, 0)
+      expect(Math.abs(summed - a.estTokens) / a.estTokens).toBeLessThan(0.01)
+    }
+  })
+
+  // The whole cache rests on this: `shared` is the only stretch that is byte-identical for all
+  // twelve minds, so anything per-mind put in front of it costs every mind its warm prefix.
+  it('measures the same shared prefix for two minds with nothing else in common', () => {
+    const other = assemblePrompt(
+      fixtureBlocks({
+        identity: {
+          name: 'Halim',
+          age: 61,
+          backstory: 'I dug the second well and buried two of the men who helped.',
+          temperament: 'dry and watchful',
+          voiceCard: {
+            register: 'clipped',
+            rhythm: 'one clause, then silence',
+            tics: ['counts on his fingers'],
+            neverSays: ['perhaps'],
+            exampleLines: ['It holds or it does not.'],
+          },
+        },
+        personality: {
+          doc: {
+            temperament: 'dry and watchful',
+            values: ['water', 'a straight answer'],
+            beliefs: ['the valley remembers'],
+            current: { mood: 'wary', worries: ['the second well'], goals: ['sink a third'] },
+          },
+          autobiography: ['I have not left this valley since the year of the flood.'],
+        },
+      }),
+    )
+    const tamar = assemblePrompt(fixtureBlocks())
+
+    expect(other.blockTokens.shared).toBe(tamar.blockTokens.shared)
+    expect(other.blockTokens.identity).not.toBe(tamar.blockTokens.identity)
+    // Byte-identical, and first: the two systems agree for at least as far as `shared` reaches.
+    expect(commonPrefixLength(tamar.system, other.system)).toBeGreaterThanOrEqual(
+      4 * tamar.blockTokens.shared! - 3,
+    )
+    expect(tamar.system.startsWith(RULES_OF_BEING)).toBe(true)
   })
 })

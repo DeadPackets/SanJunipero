@@ -36,6 +36,14 @@ export const STAKES_WEIGHT: Record<string, number> = {
   crop_harvested: 0.5,
   agent_fell_ill: 1,
   agent_recovered: 0.5,
+  // What the town DECIDED is at stake too. The live scorer's weights at this table's unit
+  // (@sj/shared BODY_TERMS ÷ 6), so a day of rules and partings is not a day of nothing.
+  agent_born: 3,
+  partnership_dissolved: 2.3,
+  law_ratified: 2,
+  partnership_formed: 2,
+  discovery_made: 1.7,
+  law_broken: 1.5,
 }
 
 // events: the day's events; only those whose seq is in scene.eventIds are scored

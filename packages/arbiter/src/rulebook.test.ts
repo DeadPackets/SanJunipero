@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
-import { openArbiterDb } from './schema.js'
+import { migrateArbiterTables, openArbiterDb } from './schema.js'
 import { RulebookStore, normalizeIntent, slugify } from './rulebook.js'
 import type { Recipe } from './verdict.js'
 
 const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
-  durationTicks: 6,
+  takes: 'minutes',
   costs: [{ kind: 'firewood', qty: 1 }],
   requires: [{ type: 'held_item', kind: 'clay_pot', qty: 1 }],
   outcomeTable: [
@@ -15,7 +15,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'The water boils away, leaving a crust of salt.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -82,6 +82,30 @@ describe('RulebookStore', () => {
     expect(row).not.toBeNull()
     expect(row!.revertedAtTick).toBe(500)
     expect(row!.revertedReason).toBe('physics wrong')
+  })
+
+  it('counts the minting as a use, and touch() moves the last use forward', () => {
+    const { store } = makeStore()
+    store.insert(boilSaltRecipe, 100)
+    expect(store.byId('recipe:boil_salt')!.lastUsedTick).toBe(100)
+    expect(store.unusedSince(101).map((r) => r.recipeId)).toEqual(['recipe:boil_salt'])
+    store.touch('recipe:boil_salt', 500)
+    expect(store.byId('recipe:boil_salt')!.lastUsedTick).toBe(500)
+    expect(store.unusedSince(101)).toEqual([])
+    expect(store.unusedSince(501)).toHaveLength(1)
+    store.revert('recipe:boil_salt', 'gone', 600)
+    expect(store.unusedSince(9999)).toEqual([])
+  })
+
+  it('reads a row minted before last use was kept as used at its minting', () => {
+    const { db, store } = makeStore()
+    db.exec('ALTER TABLE rulebook DROP COLUMN last_used_tick')
+    db.prepare(
+      `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick)
+       VALUES ('recipe:old', 'Old', 'old', '{}', 'recipe:old', 7)`,
+    ).run()
+    migrateArbiterTables(db)
+    expect(store.byId('recipe:old')!.lastUsedTick).toBe(7)
   })
 
   it('throws on duplicate insert of the same recipeId (UNIQUE)', () => {

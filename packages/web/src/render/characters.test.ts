@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
-import type { WorldStore } from '../state/worldStore.js'
+import type { TownScene, WorldStore } from '../state/worldStore.js'
 
 vi.mock('pixi.js', () => {
   class Point {
@@ -135,11 +135,11 @@ vi.mock('pixi.js', () => {
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
 import { CELL, CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { characterCell, createCharacterLayer } from './characters.js'
-import { ZOOM_STOPS } from './camera.js'
+import { ZOOM_STOPS, type ZoomStop } from './camera.js'
 import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
 import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
-import { feetOf, tileToScreen } from './iso.js'
+import { FACINGS, feetOf, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
 
@@ -174,15 +174,25 @@ function makeAgent(id: string, x: number, y: number): MutableAgents[string] {
   } as MutableAgents[string]
 }
 
-function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: SimEvent[]) => void } {
+function makeStore(agents: MutableAgents): {
+  store: WorldStore
+  emit: (evts: SimEvent[]) => void
+  setScene: (s: TownScene | null) => void
+  setMoving: (v: boolean) => void
+} {
   const handlers = new Set<(evts: SimEvent[]) => void>()
+  let scene: TownScene | null = null
+  let moving = true
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
-    getMode: () => ({ live: true as const }),
+    getMode: () =>
+      moving ? { live: true as const } : { live: false as const, replaying: false, tick: 0 },
+    timeMoving: () => moving,
     getTick: () => 0,
     latestThought: () => null,
     thoughtsLog: () => [],
     recentEvents: () => [],
+    getScene: () => scene,
     assetsSeq: () => 0,
     assetRecords: () => [],
     applyServer: () => {},
@@ -194,6 +204,12 @@ function makeStore(agents: MutableAgents): { store: WorldStore; emit: (evts: Sim
   } as unknown as WorldStore
   return {
     store,
+    setScene: (s) => {
+      scene = s
+    },
+    setMoving: (v) => {
+      moving = v
+    },
     emit: (evts) => {
       for (const fn of handlers) fn(evts)
     },
@@ -219,6 +235,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     layers,
     entities: layers.entities,
     getZoom: () => 1,
+    getZoomStop: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
     tags: { occupied: () => [], show: () => {}, hide: () => {} },
@@ -261,12 +278,12 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
     layer = createCharacterLayer(scene, made.book, store, () => {})
   })
 
-  it('two ticks add exactly 3 display objects per agent, not 3 per agent per tick', () => {
+  it('two ticks add exactly 4 display objects per agent, not 4 per agent per tick', () => {
     layer.tick(1000)
     layer.tick(1016)
-    // ★ THREE, not four: the hover plate is ONE for the whole stage now, owned by the tooltip
-    // layer, so a body carries a sprite, a shadow and its overhead slot and nothing else.
-    expect(placed(scene)).toHaveLength(2 * 3)
+    // ★ The hover plate is ONE for the whole stage, owned by the tooltip layer, so a body
+    // carries a sprite, a shadow, its overhead slot and its floor ring — and nothing else.
+    expect(placed(scene)).toHaveLength(2 * 4)
   })
 
   it('puts each companion in the layer that owns it, never in the depth sort', () => {
@@ -374,19 +391,33 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   it('asks the label layer for the hover plate, rather than keeping one per body', () => {
     const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
     expect(src).toContain("scene.tags.show(\n          'hover',")
-    expect(src).toContain("hoverPlate(state, 'agent', a.id)")
+    expect(src).toContain("hoverPlate(state, 'agent', a.id,")
     expect(src).not.toContain('createPlate')
     // ...and the head box it may flip above measures what is actually drawn up there
     expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
   })
 
-  it('removing an agent destroys its 3 objects and drops the entry', () => {
+  // ★ Pixi v8's Texture registers a `resize` listener on its source through the constructor's
+  // own setter, and only `destroy()` takes it off. An uncached slice therefore leaves a
+  // permanent listener AND a strong reference on the long-lived atlas, per kind change.
+  it('★ cuts an emote frame once for the layer, not once per kind change', () => {
+    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+    const setGlyph = /const setGlyph = [\s\S]*?\n  \}/.exec(src)![0]
+    expect(setGlyph).toContain('cached(')
+    // there are only EMOTE_KINDS.length distinct frames in the whole atlas
+    expect(setGlyph).toContain('`emote:${kind}`')
+    expect(setGlyph, 'a bare Texture here is one that is never freed').not.toMatch(
+      /=\s*new Texture\(/,
+    )
+  })
+
+  it('removing an agent destroys its 4 objects and drops the entry', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('omar') as unknown as InstanceType<typeof MockSprite>
     expect(sprite).not.toBeNull()
     delete agents.omar
     layer.tick(1016)
-    expect(placed(scene)).toHaveLength(3)
+    expect(placed(scene)).toHaveLength(4)
     expect(sprite.destroyed).toBe(true)
     expect(layer.getSprite('omar')).toBeNull()
   })
@@ -455,9 +486,10 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
     layer: ReturnType<typeof createCharacterLayer>
     emit: (evts: SimEvent[]) => void
     at: (ms: number, evts?: SimEvent[]) => void
+    setMoving: (v: boolean) => void
   }> {
     const scene = makeScene()
-    const { store, emit } = makeStore(agents)
+    const { store, emit, setMoving } = makeStore(agents)
     ;(store as unknown as { getConfig: () => unknown }).getConfig = () => config
     const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
     await Promise.resolve()
@@ -470,11 +502,32 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
       if (evts !== undefined) emit(evts)
       layer.tick(ms)
     }
-    return { scene, layer, emit, at }
+    return { scene, layer, emit, at, setMoving }
   }
 
   const moved = (id: string, x: number, y: number, tick: number): SimEvent =>
     ({ type: 'agent_moved', tick, payload: { id, x, y } }) as unknown as SimEvent
+
+  // ★ The guard used to ask "is this live?". A replay is not live and its bodies must still walk;
+  // only a STILL scrub is a fact to be drawn where the record put it.
+  it('★ a replay walks a body, and only a still scrub drops it on the record tile', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const { scene, at, setMoving } = await rig(agents)
+      agents.nadia!.x = 1
+      at(400, [moved('nadia', 1, 0, 1)])
+      agents.nadia!.x = 2
+      at(800, [moved('nadia', 2, 0, 2)])
+      agents.nadia!.x = 3
+      at(1200, [moved('nadia', 3, 0, 3)])
+      // time is moving: the body is on its way to the tile the record already names
+      expect(drawnTile(scene, 'nadia').x).toBeLessThan(3)
+
+      setMoving(false)
+      at(1200)
+      expect(drawnTile(scene, 'nadia').x).toBeCloseTo(3, 3)
+    })()
+  })
 
   it('★ a body that stood still for a minute does NOT spend four seconds on its next tile', () => {
     return (async () => {
@@ -808,18 +861,20 @@ type MockSpriteT = {
   hitArea: { points: number[] } | null
 }
 /** `Scene.sortDepth` returns `void` in the product; the mock returns the entries, so the type has to be replaced rather than intersected. */
-type PickScene = Omit<Scene, 'sortDepth' | 'getZoom'> & {
+type PickScene = Omit<Scene, 'sortDepth' | 'getZoom' | 'getZoomStop'> & {
   sortDepth: () => { box: DepthBox; node: MockSpriteT }[]
   getZoom: () => number
+  getZoomStop: () => ZoomStop
 }
 
 describe('★ five people on one tile are five separate hit targets', () => {
   const NAMES = ['amara', 'nadia', 'omar', 'salma', 'yusuf']
 
   /** A scene whose zoom the test can move, so the 24 px floor is exercised where it is live. */
-  function zoomableScene(zoom: number): PickScene {
+  function zoomableScene(zoom: ZoomStop): PickScene {
     const s = makeScene() as unknown as PickScene
     s.getZoom = () => zoom
+    s.getZoomStop = () => zoom
     return s
   }
 
@@ -960,5 +1015,148 @@ describe('★ five people on one tile are five separate hit targets', () => {
     }
     expect(checked, 'the capsules never overlapped — this test proved nothing').toBeGreaterThan(500)
     layer.destroy()
+  })
+})
+
+// ★ A scene's turn-taking is on the BODIES, not only in the boxes over them: the ring says who
+// is holding the floor and the shoulders say the two of them are talking to each other.
+describe('★ the floor ring and the facing, through the real layer', () => {
+  const FADE_MS = 200 // longer than the reveal band, so the fade has finished
+
+  let clockMs = 0
+  beforeEach(() => {
+    clockMs = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clockMs)
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const spoke = (agentId: string, x: number, y: number): SimEvent =>
+    ({ type: 'agent_spoke', tick: 1, payload: { agentId, x, y, text: 'a line' } }) as SimEvent
+
+  const openScene = (participants: string[]): TownScene => ({
+    id: 'sc_1',
+    kind: 'talk',
+    participants,
+    topic: 'the well',
+    stakes: 4,
+    open: true,
+  })
+
+  /** The floor rings in the ground layer, in the order the bodies were made: amara, then salma. */
+  const rings = (scene: Scene): { alpha: number; visible: boolean }[] =>
+    (scene.layers as unknown as Record<string, { children: { alpha: number; visible: boolean }[] }>)
+      .groundDecal!.children
+
+  const facingOf = (layer: ReturnType<typeof createCharacterLayer>, id: string): string | null => {
+    const s = layer.getSprite(id) as unknown as { texture: { frame?: { x: number } } } | null
+    const x = s?.texture.frame?.x
+    return x === undefined ? null : (FACINGS[x / CELL] ?? null)
+  }
+
+  async function rig(): Promise<{
+    scene: Scene
+    layer: ReturnType<typeof createCharacterLayer>
+    setScene: (s: TownScene | null) => void
+    say: (who: string, x: number, atMs: number) => void
+  }> {
+    // Two tiles apart on one row, so their facings are opposite and unambiguous.
+    const agents: MutableAgents = {
+      amara: makeBodyAgent('amara', 0, 0),
+      salma: makeBodyAgent('salma', 2, 0),
+    }
+    const scene = makeScene()
+    const { store, emit, setScene } = makeStore(agents)
+    ;(store as unknown as { getConfig: () => unknown }).getConfig = () => null
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    layer.tick(0)
+    await Promise.resolve()
+    await Promise.resolve()
+    layer.tick(0)
+    return {
+      scene,
+      layer,
+      setScene,
+      say: (who, x, atMs) => {
+        clockMs = atMs
+        emit([spoke(who, x, 0)])
+        layer.tick(atMs)
+        layer.tick(atMs + FADE_MS)
+      },
+    }
+  }
+
+  it('★ rings nobody until a scene is open, whoever is talking', async () => {
+    const { scene, say } = await rig()
+    say('amara', 0, 1000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+    expect(rings(scene).every((r) => !r.visible)).toBe(true)
+  })
+
+  it('★ moves the ring from body to body as the exchange alternates', async () => {
+    const { scene, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+
+    say('amara', 0, 1000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([1, 0])
+
+    say('salma', 2, 2000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 1])
+
+    say('amara', 0, 3000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([1, 0])
+  })
+
+  it('★ turns the two of them toward each other while the scene runs', async () => {
+    const { layer, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    // amara at (0,0) and salma at (2,0): each faces the other across the screen's x
+    say('amara', 0, 1000)
+    expect(facingOf(layer, 'salma')).toBe('nw')
+    say('salma', 2, 2000)
+    expect(facingOf(layer, 'amara')).toBe('se')
+    expect(facingOf(layer, 'salma')).toBe('nw')
+  })
+
+  it('★ takes the ring back when the scene closes', async () => {
+    const { scene, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    say('amara', 0, 1000)
+    expect(rings(scene)[0]!.alpha).toBe(1)
+
+    setScene({ ...openScene(['amara', 'salma']), open: false, summary: 'They agreed.' })
+    say('amara', 0, 2000)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+  })
+
+  it('rings nobody in a scene where nobody has spoken yet', async () => {
+    const { scene, layer, setScene } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    layer.tick(1000)
+    layer.tick(1000 + FADE_MS)
+    expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+  })
+})
+
+// ── ★ GOLDEN HOUR ON THE GROUND (task 18) ────────────────────────────────────────────────
+
+describe('★ the contact shadow reads the sun the arc draws', () => {
+  const shadowSrc = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+
+  it('★ takes the cast off `skyModel`, so the arc and the ground agree about the hour', () => {
+    expect(shadowSrc).toContain("from '../ui/skyModel.js'")
+    expect(shadowSrc).toMatch(/const sun = shadowCast\(nowTick\)/)
+    expect(shadowSrc).toContain('e.shadow.position.set(sx + sun.dx, sy)')
+    expect(shadowSrc).toContain('e.shadow.scale.set(sun.scaleX, sun.scaleY)')
+    expect(shadowSrc).toContain('e.shadow.alpha = SHADOW_ALPHA * sun.alpha')
+  })
+
+  // ★ ONE READ FOR THE WHOLE CAST. The sun's height is a function of the minute, not of who is
+  // standing in it, so asking it per body would be twelve calls a frame for one answer.
+  it('★ asks once a frame, outside the loop over the bodies', () => {
+    const after = shadowSrc.slice(shadowSrc.indexOf('const sun = shadowCast'))
+    expect(after.indexOf('for (const { a, e, pos, bobY } of drawing)')).toBeGreaterThan(0)
+    expect(shadowSrc.split('shadowCast(')).toHaveLength(2) // exactly one call in the file
   })
 })

@@ -10,7 +10,13 @@ import {
   submitIntent,
   type WorldState,
 } from '@sj/engine'
-import { CITY_ANCHOR_DEFAULT, DEFAULT_CONFIG, FOUNDER_IDS, type SimEvent } from '@sj/shared'
+import {
+  CITY_ANCHOR_DEFAULT,
+  DEFAULT_CONFIG,
+  FOUNDER_IDS,
+  FOUNDER_SEATS,
+  type SimEvent,
+} from '@sj/shared'
 import { makeablesLine, perceptionToProse, type PerceptionPacket } from './prose.js'
 import { CAPABILITIES } from './rulesOfBeing.js'
 
@@ -26,15 +32,19 @@ const MORNING_TICK = 420
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
 
-// The genesis town with its five founders each at their own doorway — the exact opening
-// position `g11-deepworld.ts` builds before the first turn is asked for.
+// The five doorways the diagnosis was taken at. The seven who joined the founding since are
+// spawned below and take no part in the numbers, which are a record of that morning.
+const FIVE = FOUNDER_IDS.slice(0, 5)
+
+// The genesis town with its founders each at their own doorway — the exact opening position
+// `g11-deepworld.ts` builds before the first turn is asked for.
 function genesisTown(): WorldState {
   const g = makeGenesisWorld(CFG)
   let s = genesisState(CFG, g.terrain)
   for (const e of g.events) s = fold(s, ev(e.type, e.payload), CFG)
   for (const id of FOUNDER_IDS) {
-    const house = Object.values(s.structures).find((st) => st.kind === 'house' && st.owner === id)
-    const door = house === undefined ? null : doorTile(s, house)
+    const roof = Object.values(s.structures).find((st) => st.name === FOUNDER_SEATS[id])
+    const door = roof === undefined ? null : doorTile(s, roof)
     if (door === null) throw new Error(`no doorway for ${id}`)
     s = fold(s, ev('agent_spawned', { id, name: id, x: door.x, y: door.y, ageDays: 10000 }), CFG)
   }
@@ -103,7 +113,7 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
       { x: 59, y: 92 },
       { x: 71, y: 96 },
     ]
-    const nearest = FOUNDER_IDS.map((id) => {
+    const nearest = FIVE.map((id) => {
       const d = authored.map((b) => walk(s, id, b.x, b.y)).filter((n): n is number => n !== null)
       return Math.min(...d)
     })
@@ -116,10 +126,8 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
   it('R14: the town keeps its own meadow, and the far bank is still a bridge away', () => {
     const s = genesisTown()
     // Every founder is a quarter-hour from a bush and from herbs, across two blocks now.
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([
-      10, 11, 13, 13, 10,
-    ])
-    expect(FOUNDER_IDS.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([11, 12, 13, 15, 8])
+    expect(FIVE.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([10, 11, 13, 13, 10])
+    expect(FIVE.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([11, 12, 13, 15, 8])
     // And nothing over the water moved: the west bank answers a capped search, as it always did.
     for (const [x, y] of [
       [45, 62],
@@ -154,7 +162,7 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
   it('no animal worth eating is in sight on the first morning, and none was brought nearer', () => {
     const s = genesisTown()
     // Three of the five wake with something alive in view, but that is a hunt and not a meal.
-    const inSight = FOUNDER_IDS.map((id) =>
+    const inSight = FIVE.map((id) =>
       composePerception(s, CFG, id, [])
         .visible.fauna.map((f) => f.kind)
         .sort(),
@@ -174,7 +182,7 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     // `forage` wants a nodeId, and a mark is known only once a body stands beside the thing.
     expect(CFG.movement.sightRadius).toBe(12)
     const s = genesisTown()
-    for (const id of FOUNDER_IDS) {
+    for (const id of FIVE) {
       const seen = composePerception(s, CFG, id, []).visible.forageables
       expect(seen.length).toBeGreaterThanOrEqual(2)
       // And what a mind is handed is a phrase and a mark, not a count of what is left in it.
@@ -206,11 +214,11 @@ describe('R21 candidate 2 — "perception omits it": CONFIRMED', () => {
     // band, and nothing about the body under it. It now gets the ailment too, in words.
     expect(salma!.condition).toBe('flushed with fever')
     expect(proseFor(sick, 'omar')).toContain(
-      'salma (salma) stands at (74, 113), flushed with fever.',
+      'salma (salma) stands close to the east, flushed with fever.',
     )
 
     // And a town with nothing wrong with it reads exactly as it always did.
-    expect(proseFor(s, 'omar')).toContain('salma (salma) stands at (74, 113).')
+    expect(proseFor(s, 'omar')).toContain('salma (salma) stands close to the east.')
   })
 })
 
@@ -235,10 +243,15 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     }
     const prose = proseFor(inside, 'nadia')
     // R21-A. No line said she was under a roof, and the roof line sent her to its own doorway.
-    expect(prose).toContain(`You stand inside the house (${house.id}) at (79, 99).`)
-    expect(prose).toContain('Four walls are around you')
-    expect(prose).toContain('this is the roof you are under; the way out is at (81, 99).')
-    expect(prose).not.toContain('stand there and you can go in')
+    // Whose roof, not just which: the `lie_with` gate reads the owner and nothing said it.
+    expect(prose).toContain(`You stand inside your own house (${house.id}) at (79, 99).`)
+    expect(prose).toContain('While you are in here you cannot walk anywhere')
+    // ★ THE ONE DOOR TILE THAT STAYS. Walking is refused indoors and `exit` takes no mark, so no
+    // walk can be aimed at this pair: it says where the body comes out, and the roof line, which
+    // used to repeat it, now only says which roof it is.
+    expect(prose).toContain('the doorway at (81, 99) is the way back out')
+    expect(prose).toContain('this is the building you are in.')
+    expect(prose).not.toContain('walk to it and you can go in')
     // The world's answer to the instruction that used to be given: both acts now stand, the
     // first because she is already under that roof, the second by way of its door.
     expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id }).ok).toBe(true)
@@ -262,9 +275,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const p = composePerception(walking, CFG, 'nadia', [])
     expect(p.self.activity).toBe('walk')
     expect(p.self.activityToward).toEqual({ x: 68, y: 47 })
-    expect(proseFor(walking, 'nadia')).toContain(
-      'Your legs are already carrying you toward (68, 47)',
-    )
+    expect(proseFor(walking, 'nadia')).toContain('You are already walking toward (68, 47)')
 
     // A pair of hands busy with something that is not a walk says so without a destination.
     const cutting: WorldState = {
@@ -274,7 +285,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
         nadia: { ...s.agents.nadia!, activity: { verb: 'chop', params: {}, ticksRemaining: 8 } },
       },
     }
-    expect(proseFor(cutting, 'nadia')).toContain('you are partway through chop')
+    expect(proseFor(cutting, 'nadia')).toContain('You are partway through chop')
   })
 
   it('thirst is given a road and hunger is not, and the run drank fifteen times and ate once', () => {
@@ -290,10 +301,10 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...WORLD,
       nearestFood: () => ({ x: 68, y: 60, kind: 'bread' }),
     })
-    expect(prose).toContain('The nearest water you know of lies at (50, 62)')
+    expect(prose).toContain('The nearest water you know of is at (50, 62)')
     // R21-B. The stomach used to get a sensation and no road; it now gets the road thirst
     // has had, and only when the hands are empty.
-    expect(prose).toContain('Hunger is all you can think about.')
+    expect(prose).toContain('You are starving and can think about little else.')
     expect(prose).toContain('The nearest food you know of is bread at (68, 60).')
 
     // A hand already holding a loaf is told about the loaf, not sent across town for one.
@@ -308,7 +319,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...WORLD,
       nearestFood: () => ({ x: 0, y: 0, kind: 'berries' }),
     })
-    expect(fed).toContain('Your satchel holds bread (held_loaf). You could eat it now.')
+    expect(fed).toContain('You are carrying bread (held_loaf). You could eat it now.')
     expect(fed).not.toContain('The nearest food you know of')
   })
 
@@ -323,7 +334,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       },
     }
     const prose = perceptionToProse(prosePacket(lonely, 'nadia'), undefined, world)
-    expect(prose).toContain('Loneliness settles over you.')
+    expect(prose).toContain('You feel lonely.')
     expect(prose).toContain('The nearest person you know of is Omar, at (62, 55).')
 
     // One road a turn: a dry throat outranks a lonely one and the social line goes quiet.
@@ -332,7 +343,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       agents: { ...lonely.agents, nadia: { ...lonely.agents.nadia!, thirst: 10 } },
     }
     const thirsty = perceptionToProse(prosePacket(dry, 'nadia'), undefined, world)
-    expect(thirsty).toContain('The nearest water you know of lies at (50, 62)')
+    expect(thirsty).toContain('The nearest water you know of is at (50, 62)')
     expect(thirsty).not.toContain('The nearest person you know of')
   })
 
@@ -378,17 +389,20 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(CAPABILITIES).toContain('give kind, the thing to raise')
     expect(CAPABILITIES).toContain('give recipe, the name of what you shape')
     // Not one buildable kind, and only the two recipes whose product another verb needs in hand.
-    for (const noun of [...buildable, 'plank', 'cloth', 'stew']) {
+    // `house` and `storehouse` are the exception: both are named as the places a thing keeps,
+    // which is a rule of being about the ground and not a vocabulary for raising anything.
+    const keepers = new Set(['house', 'storehouse'])
+    for (const noun of [...buildable.filter((k) => !keepers.has(k)), 'plank', 'cloth', 'stew']) {
       expect(CAPABILITIES.includes(noun)).toBe(false)
     }
     expect(CAPABILITIES).toContain('the garment you hold')
     expect(CAPABILITIES).toContain('the torch or lamp you hold')
     const s = genesisTown()
-    const everyProse = FOUNDER_IDS.map((id) => proseFor(s, id)).join(' ')
+    const everyProse = FIVE.map((id) => proseFor(s, id)).join(' ')
     // The id is READ from the world, not retyped: a template edit renumbers the mints. A named
     // place is called by its name now, so the sentence opens with what the town calls it.
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!
-    expect(everyProse).toContain(`The well (${well.id}) stands at`)
+    expect(everyProse).toContain(`The well (${well.id}) stands `)
     for (const noun of ['house', 'bridge', 'grave', ...craftable, 'stew', 'torch']) {
       expect(everyProse).not.toMatch(
         new RegExp(`(build|craft|raise|shape|make)[^.]{0,40}${noun}`, 'i'),
@@ -421,7 +435,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     [
       'build',
       { kind: 'cottage' },
-      'the town keeps ground for a cottage — go and stand at (100, 88)',
+      'the town keeps ground for a cottage — go and stand at (94, 94)',
     ],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (67, 75)'],
     [
@@ -450,13 +464,18 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
 
   // A body beside walls of the kind it means to raise resumes them, and resuming spends nothing.
   it('★ walls within reach are not a refusal any more — they are the job', () => {
-    const s = genesisTown()
-    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'house' })
+    // Every seated roof stands now (D1), so the walls a body can join are the farmhouse's: put
+    // her at its door, which is where a founder who means to raise it would be standing.
+    const base = genesisTown()
+    const farmhouse = Object.values(base.structures).find((st) => st.kind === 'farmhouse')!
+    const door = doorTile(base, farmhouse)!
+    const s = fold(base, ev('agent_moved', { id: 'amara', x: door.x, y: door.y }), CFG)
+    const r = submitIntent(s, CFG, 'amara', 'build', { kind: 'farmhouse' })
     expect(r.ok, r.ok ? '' : r.reason).toBe(true)
     // No `structure_planned`: she joined what stood rather than claiming fresh ground.
     expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
     const started = r.ok ? (r.events[0]!.payload as { duration: number }) : { duration: -1 }
-    expect(started.duration, 'a whole house, not the roof that is missing').toBeLessThan(2880)
+    expect(started.duration, 'a whole farmhouse, not the roof that is missing').toBeLessThan(5760)
   })
 
   it('the refusals that were already honest are left exactly as they were', () => {
@@ -497,7 +516,7 @@ describe('R21 — the shape of the founding site, so the abundance pass has a ba
   it('five doorways, and the anchor the template was laid from', () => {
     const s = genesisTown()
     expect(CITY_ANCHOR_DEFAULT).toEqual({ x: 43, y: 56 })
-    expect(FOUNDER_IDS.map((id) => [s.agents[id]!.x, s.agents[id]!.y])).toEqual([
+    expect(FIVE.map((id) => [s.agents[id]!.x, s.agents[id]!.y])).toEqual([
       [81, 68],
       [67, 75],
       [81, 99],

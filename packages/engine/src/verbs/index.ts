@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { FAUNA_YIELD, type FaunaKind } from '../data/faunaDefs.js'
 import { FORAGEABLE_YIELD } from '../data/forageables.js'
-import { WalkParams, WalkToPlace } from '../events.def.js'
+import { WalkParams, WalkToPerson, WalkToPlace, WalkToThing } from '../events.def.js'
 import {
   FISH_KIND,
   FORAGE_KIND,
@@ -12,9 +12,17 @@ import {
 } from '../food.js'
 import { placesNamedAloud } from '../earshot.js'
 import { naturalFeatureAt, type NaturalFeature } from '../geography.js'
-import { doorTile, occupantsOf, perimeter, roomIsFull, sameInterior } from '../interiors.js'
+import {
+  doorTile,
+  isYourRoof,
+  occupantsOf,
+  perimeter,
+  roomIsFull,
+  sameInterior,
+} from '../interiors.js'
 import {
   findPath,
+  firstReachable,
   isPassable,
   pathCtx,
   searchToward,
@@ -31,7 +39,10 @@ import {
   type TileId,
   type WorldState,
 } from '../state.js'
+import { ageBand } from '../systems/aging.js'
+import { roadRimOf } from '../town.js'
 import { fleeTo } from '../systems/fauna.js'
+import { CONCEPTION_CHANCE_PER_ACT, motherAndFather } from '../systems/reproduction.js'
 import { isSpoiling, spoilageFor } from '../systems/spoilage.js'
 import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from '../systems/warmth.js'
 import {
@@ -51,6 +62,7 @@ import {
   type PendingEvent,
 } from './common.js'
 import { buildTicks, buildableRecipe, craftRoutes, shortOf, type SeedRecipe } from './craft.js'
+import { bindObjectParam, unbindObjectParam } from './objectParam.js'
 import {
   CITY_HEARTH_KIND,
   MINUTES_PER_DAY,
@@ -71,6 +83,14 @@ import {
   sanitizeSpokenText,
   simTimeFromTick,
   structureGlowRadius,
+  ticksFor,
+  verbPhrase,
+  visionRadiusAt,
+  INVITATION_STANDS_TICKS,
+  WANTS_DISCOVERING,
+  type ClosedKey,
+  type DurationWord,
+  type InvitationVerb,
   type SimConfig,
 } from '@sj/shared'
 
@@ -78,6 +98,7 @@ export type VerbKind =
   | 'walk'
   | 'sleep'
   | 'wake'
+  | 'stop'
   | 'enter'
   | 'exit'
   | 'eat'
@@ -109,28 +130,11 @@ export type VerbKind =
   | 'inscribe'
   | 'teach'
   | 'attack'
-  | 'experiment'
-
-// Named rather than an open `z.record`, whose `propertyNames` a grammar-constrained decoder
-// refuses. Loose, so a verb minted at runtime can still be handed a parameter nobody listed.
-// Every named string is non-empty: the world refuses a blank one a beat later, so the decoder
-// is told up front. Probed against the pinned back end; `minLength` survives its grammar.
-const nonEmpty = z.string().min(1).optional()
-export const IntentParamsSchema = z.looseObject({
-  x: z.number().optional(),
-  y: z.number().optional(),
-  itemId: nonEmpty,
-  structureId: nonEmpty,
-  targetId: nonEmpty,
-  cropId: nonEmpty,
-  nodeId: nonEmpty,
-  faunaId: nonEmpty,
-  kind: nonEmpty,
-  recipe: nonEmpty,
-  track: nonEmpty,
-  text: nonEmpty,
-  description: nonEmpty,
-})
+  | 'court'
+  | 'propose'
+  | 'lie_with'
+  | 'leave_partner'
+  | 'leave_town'
 
 export type VerbDef = {
   kind: string
@@ -154,6 +158,9 @@ export type VerbDef = {
     agentId: string,
     params: Record<string, unknown>,
   ): number
+  /** The word this act's length was chosen as, when it was chosen as a word at all. The few
+   *  verbs whose clock is worked out from the world — walk, build, pave, chop — leave it absent. */
+  takes?: DurationWord
   onStart?(
     state: WorldState,
     config: SimConfig,
@@ -182,12 +189,44 @@ export type VerbDef = {
     params: Record<string, unknown>,
   ): Record<string, unknown>
   skill?: { track: string; xp: number }
+  /** Work done with the eyes on a thing outside the body, so an unlit night lengthens its clock.
+   *  Every other property of an act lives on the act; this one used to live in a set of five
+   *  names, which no verb the town invented could ever join. */
+  needsLight?: boolean
+  /** The schema `validate` parses, kept on the verb so the intent seam can take an act down to
+   *  the keys this verb reads. Every one is strict, and a mind fills in more than it is asked. */
+  params?: z.ZodObject<z.ZodRawShape>
+  /** The closed keys a minted verb's charter reads, carried so registration can bind its object
+   *  the way the built-in rows do. Built-ins leave it absent: their rows are hand-tuned. */
+  reads?: readonly ClosedKey[]
   rngStream?: string
 }
 
-// Fills the one default nearly every verb repeats: a one-tick duration.
-function makeVerb(spec: Omit<VerbDef, 'duration'> & Partial<Pick<VerbDef, 'duration'>>): VerbDef {
-  return { duration: () => 1, ...spec }
+/** The keys an act of this verb is read for, off the verb's own schema — or off a minted verb's
+ *  charter. Asked of the verb rather than written down, because a second list is one that drifts. */
+export function keysFor(def: VerbDef): readonly string[] | undefined {
+  return def.params === undefined ? def.reads : Object.keys(def.params.shape)
+}
+
+/** The act with the keys this verb never reads taken off. Every params schema is strict and a
+ *  mind answers wide, so the surplus refused acts in words that blamed the name they had written. */
+export function asRead(def: VerbDef, params: Record<string, unknown>): Record<string, unknown> {
+  const keys = keysFor(def)
+  if (keys === undefined) return params
+  return Object.fromEntries(Object.entries(params).filter(([key]) => keys.includes(key)))
+}
+
+// Every act says how long it takes, and says it in one of six words or works it out from the
+// world. There is no default: an act with no answer to this is what left a mind idle 94% of its
+// waking life, so it is now a type error rather than a minute.
+type VerbSpec =
+  | (Omit<VerbDef, 'duration' | 'takes'> & { takes: DurationWord })
+  | (Omit<VerbDef, 'takes'> & { takes?: never })
+
+function makeVerb(spec: VerbSpec): VerbDef {
+  if (spec.takes === undefined) return spec
+  const { takes } = spec
+  return { ...spec, takes, duration: () => ticksFor(takes) }
 }
 
 // Adjacent = Chebyshev distance <= 1 to any footprint tile (standing on it counts).
@@ -247,8 +286,7 @@ function nearestReachable(
   const sorted = [...tiles].sort(
     (p, q) => rank(p) - rank(q) || near(p) - near(q) || p.y - q.y || p.x - q.x,
   )
-  for (const t of sorted) if (findPath(state, a, t, config) !== null) return t
-  return { refusal: 'no path to that spot' }
+  return firstReachable(state, a, sorted, config) ?? { refusal: 'no path to that spot' }
 }
 
 // What the world says when the legs cannot start at all. Said in the place where it is true:
@@ -313,9 +351,70 @@ function featureDestination(
   return 'refusal' in to ? { refusal: `there is no way to ${f.name} from this side` } : to
 }
 
-/** Where a walk ends, from either way of naming it. A named place resolves to open ground beside
- *  it that this body can actually reach; the refusal comes from here too, so the seam that
- *  settles the act and the test that judges it can never disagree. */
+/** Whether this body's eyes reach that tile: the same horizon and the same light the packet is
+ *  built on, so a mark a mind can name is exactly a mark it was shown. */
+function withinSight(state: WorldState, config: SimConfig, a: AgentBody, at: Point): boolean {
+  return (
+    Math.hypot(at.x - a.x, at.y - a.y) <= visionRadiusAt(state, a, at.x, at.y, state.tick, config)
+  )
+}
+
+/** Where a walk after a person ends: ground beside them this body can reach. They move, so this
+ *  is asked again every tick the chase runs, and only ever off where they are standing now. */
+function personDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  targetId: string,
+): Point | { refusal: string } {
+  if (targetId === agentId) return { refusal: 'you are already where you are' }
+  const target = state.agents[targetId]
+  const a = state.agents[agentId]!
+  if (!target?.alive) return { refusal: 'there is no one by that name to walk to' }
+  if (!sameInterior(state, agentId, targetId) || !withinSight(state, config, a, target)) {
+    return { refusal: 'you cannot see them from here' }
+  }
+  const ctx = pathCtx(state, config)
+  const ring: Point[] = []
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const p = { x: target.x + dx, y: target.y + dy }
+      if (p.x === a.x && p.y === a.y) return p
+      if (dx === 0 && dy === 0) continue
+      if (isPassable(state, p.x, p.y, ctx)) ring.push(p)
+    }
+  }
+  const to = nearestReachable(state, config, a, ring)
+  return 'refusal' in to ? { refusal: 'there is no way to them from here' } : to
+}
+
+/** Where a walk after a thing ends: the spot `take` will lift it from. `take`'s own validate is
+ *  the judge, asked from each candidate tile, so the walk and the taking cannot drift apart. */
+function thingDestination(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  itemId: string,
+): Point | { refusal: string } {
+  const item = state.items[itemId]
+  const a = state.agents[agentId]!
+  if (item === undefined) return { refusal: 'there is no such thing to walk to' }
+  if (item.loc.t === 'agent') {
+    return { refusal: item.loc.id === agentId ? 'you are holding that' : 'someone is holding that' }
+  }
+  const s = item.loc.t === 'structure' ? state.structures[item.loc.id] : undefined
+  const at = item.loc.t === 'tile' ? { x: item.loc.x, y: item.loc.y } : s
+  if (at === undefined) return { refusal: 'there is no such thing to walk to' }
+  if (!withinSight(state, config, a, at)) return { refusal: 'you cannot see it from here' }
+  const lift = (from: Point): boolean =>
+    VERBS.take!.validate(bodyAt(state, agentId, from), config, agentId, { itemId }) === null
+  const spot = standingSpotFor(state, config, a, at, lift, pathCtx(state, config))
+  return spot ?? { refusal: 'there is no way to it from here' }
+}
+
+/** Where a walk ends, from any of the four ways of naming it. A named mark resolves to open
+ *  ground beside it that this body can actually reach; the refusal comes from here too, so the
+ *  seam that settles the act and the test that judges it can never disagree. */
 export function walkDestination(
   state: WorldState,
   config: SimConfig,
@@ -323,35 +422,51 @@ export function walkDestination(
   params: Record<string, unknown>,
 ): { x: number; y: number } | { refusal: string } {
   const a = state.agents[agentId]!
+  // A mark the mind named beats the numbers it guessed, and so does that mark's refusal. Each
+  // schema is strict, so a mark handed over WITH guessed numbers parses as neither: read it alone.
+  const person = WalkToPerson.safeParse({ targetId: params.targetId })
+  if (person.success) return personDestination(state, config, agentId, person.data.targetId)
+  const thing = WalkToThing.safeParse({ itemId: params.itemId })
+  if (thing.success) return thingDestination(state, config, agentId, thing.data.itemId)
+  const named = WalkToPlace.safeParse({ structureId: params.structureId })
+  if (named.success) return placeDestination(state, config, a, agentId, named.data.structureId)
+
   const tile = WalkParams.safeParse(params)
-  if (tile.success) {
-    const want = tile.data
-    // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
-    // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
-    // ground the world does not have makes A* exhaust its whole budget before it answers.
-    const to = {
-      x: clamp(want.x, 0, state.terrain[0]!.length - 1),
-      y: clamp(want.y, 0, state.terrain.length - 1),
-    }
-    const offMap = to.x !== want.x || to.y !== want.y
-    // A mark with no footing under it is a mark named wrong, and the affordance block says so —
-    // except at the rim, where the last ground the legs can hold is the whole of the answer:
-    // there is nothing further out to name instead, so a refusal there teaches nothing. A
-    // clamped mark is always on the rim, which is why `offMap` has nothing to add here.
-    if (!isMapRim(state, to.x, to.y) && !isPassable(state, to.x, to.y))
-      return { refusal: 'no path to that spot' }
-    if (findPath(state, a, to, config) !== null) return to
-    return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
+  if (!tile.success) return { refusal: 'a walk needs a place to end' }
+  const want = tile.data
+  // Off the map is the one a mind loops on, having no way to see the edge it keeps walking at.
+  // Pulling the mark to the edge first keeps the common case one ordinary search: aiming at
+  // ground the world does not have makes A* exhaust its whole budget before it answers.
+  const to = {
+    x: clamp(want.x, 0, state.terrain[0]!.length - 1),
+    y: clamp(want.y, 0, state.terrain.length - 1),
   }
-  const named = WalkToPlace.safeParse(params)
-  if (!named.success) return { refusal: 'a walk needs a place to end' }
+  const offMap = to.x !== want.x || to.y !== want.y
+  // A mark with no footing under it is a mark named wrong, and the affordance block says so —
+  // except at the rim, where the last ground the legs can hold is the whole of the answer:
+  // there is nothing further out to name instead, so a refusal there teaches nothing. A
+  // clamped mark is always on the rim, which is why `offMap` has nothing to add here.
+  if (!isMapRim(state, to.x, to.y) && !isPassable(state, to.x, to.y))
+    return { refusal: 'no path to that spot' }
+  if (findPath(state, a, to, config) !== null) return to
+  return settleToward(state, config, a, to, offMap ? WALK_OFF_MAP : WALK_NO_ROAD)
+}
+
+function placeDestination(
+  state: WorldState,
+  config: SimConfig,
+  a: AgentBody,
+  agentId: string,
+  structureId: string,
+): { x: number; y: number } | { refusal: string } {
   // A landmark before a roof: nobody has to be shown the river they live beside, so there is no
   // knownPlaces row to check — the ground itself is what says whether this valley has one.
-  const natural = naturalFeatureAt(state, named.data.structureId, a.x, a.y)
+  const natural = naturalFeatureAt(state, structureId, a.x, a.y)
   if (natural !== null) return featureDestination(state, config, a, natural.at, natural.feature)
-  const s = state.structures[named.data.structureId]
-  // Known, not merely standing: a mark a mind was never shown is a place it cannot name.
-  if (s === undefined || !(a.knownPlaces ?? []).includes(s.id))
+  const s = state.structures[structureId]
+  // Known, not merely standing: a mark a mind was never shown is a place it cannot name — save
+  // for a roof of its own, which nobody has to be shown the way home to.
+  if (s === undefined || !((a.knownPlaces ?? []).includes(s.id) || isYourRoof(state, agentId, s)))
     return { refusal: 'you know no such place' }
   // `perimeter` is the codebase's one ring, so the tile a walk lands on and the door `enter`
   // measures against are picked off the same tiles in the same order.
@@ -497,6 +612,12 @@ export function approachFor(
   const acts = (from: Point): boolean =>
     (from.x !== a.x || from.y !== a.y) &&
     def.validate(bodyAt(state, agentId, from), config, agentId, params) === null
+  // The one act whose mark is not a thing in the world but the world's own edge: where the road
+  // leaves the valley. Nothing in `params` can point at it, so it is asked for by name.
+  if (verb === 'leave_town') {
+    const rim = roadRimOf(state, config)
+    return rim !== null && acts(rim) ? rim : null
+  }
   const ctx = pathCtx(state, config)
   const marks = marksOf(state, params)
   for (const at of marks) {
@@ -519,11 +640,15 @@ export function approachFor(
 
 const walk: VerbDef = makeVerb({
   kind: 'walk',
+  params: WalkParams,
   validate(state, config, agentId, params) {
     const a = state.agents[agentId]!
     if (a.insideId !== undefined) return 'you are indoors; step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
+    // 90 of rehearsal 7's 360 walks were this: a body setting off for the tile under its own
+    // feet. `settled` turns it into the no-time act it is rather than a journey of length zero.
+    if (a.x === to.x && a.y === to.y) return 'you are already standing there'
     if (isCrawl(state, agentId) && (Math.abs(to.x - a.x) > 1 || Math.abs(to.y - a.y) > 1)) {
       return 'you can only drag yourself to a tile you could touch'
     }
@@ -531,6 +656,15 @@ const walk: VerbDef = makeVerb({
     // still have to be judged, and they are judged the way they always were.
     if (findPath(state, a, to, config) === null) return 'no path to that spot'
     return null
+  },
+  // The case the contract on `settled` is written from: a walk to the tile underfoot. Read off
+  // the act's own two numbers, which the seam has already settled a named place down to — the
+  // fold lays the path again from those, and a second reading of the name can answer elsewhere.
+  settled(state, _config, agentId, params) {
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return false
+    const p = WalkParams.safeParse(params)
+    return p.success && a.x === p.data.x && a.y === p.data.y
   },
   duration(state, config, agentId, params) {
     const p = WalkParams.parse(params)
@@ -589,6 +723,7 @@ function mayLieDownRough(state: WorldState, config: SimConfig, agentId: string):
 
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
+  takes: 'moment',
   validate(state, config, agentId) {
     const a = state.agents[agentId]!
     if (a.asleep) return 'already asleep'
@@ -615,6 +750,8 @@ export const EnterParams = z.object({ structureId: z.string() }).strict()
 
 const enter: VerbDef = makeVerb({
   kind: 'enter',
+  params: EnterParams,
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = EnterParams.safeParse(params)
     if (!p.success) return 'going inside needs the building you mean'
@@ -643,7 +780,8 @@ const enter: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = EnterParams.parse(params)
     const s = state.structures[p.structureId]
-    const door = s ? doorTile(state, s) : null
+    if (!s || roomIsFull(state, s)) return []
+    const door = doorTile(state, s)
     if (!door) return []
     return [
       { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
@@ -654,6 +792,7 @@ const enter: VerbDef = makeVerb({
 
 const exit: VerbDef = makeVerb({
   kind: 'exit',
+  takes: 'moment',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.insideId === undefined ? 'not inside anything' : null
   },
@@ -666,9 +805,28 @@ const exit: VerbDef = makeVerb({
   },
 })
 
+/** What the log records when an act is set down before its time. Who took the hands off it is
+ *  the mind's own business, and it is told that in words of its own. */
+export const ACT_SET_DOWN = 'you set it down'
+
+// The one verb that reaches into an act already running, and it uses no hands. It yields
+// nothing: what the act had already put into the world it keeps, and half a cast is no fish.
+const stop: VerbDef = makeVerb({
+  kind: 'stop',
+  takes: 'moment',
+  validate: () => null,
+  atOnce(state, _config, agentId) {
+    return state.agents[agentId]?.activity
+      ? [{ type: 'action_interrupted', payload: { agentId, reason: ACT_SET_DOWN } }]
+      : []
+  },
+  onComplete: () => [],
+})
+
 // submitIntent already prepends agent_woke for any intent from a sleeper.
 const wake: VerbDef = makeVerb({
   kind: 'wake',
+  takes: 'moment',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.asleep ? null : 'not asleep'
   },
@@ -736,7 +894,13 @@ function swallowEvents(
       type: 'needs_changed',
       payload: {
         id: eaterId,
-        changes: [{ need: 'hunger', delta: mealRestore(state, config, eaterId, item.kind) }],
+        changes: [
+          {
+            need: 'hunger',
+            delta: mealRestore(state, config, eaterId, item.kind),
+            reason: 'meal',
+          },
+        ],
       },
     },
   ]
@@ -744,6 +908,8 @@ function swallowEvents(
 
 const eat: VerbDef = makeVerb({
   kind: 'eat',
+  params: EatParams,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = EatParams.safeParse(params)
     if (!p.success) return 'eating needs the food named'
@@ -778,12 +944,11 @@ const eat: VerbDef = makeVerb({
 
 export const TendParams = z.object({ targetId: z.string(), itemId: z.string().optional() }).strict()
 
-// An hour, not a scribble: three ticks, the carving precedent.
-const TEND_TICKS = 3
-
 const tend: VerbDef = makeVerb({
   kind: 'tend',
-  duration: () => TEND_TICKS,
+  params: TendParams,
+  // An hour, not a scribble — which is what the three ticks here always meant to say.
+  takes: 'hour',
   validate(state, config, agentId, params) {
     const p = TendParams.safeParse(params)
     if (!p.success) return 'tending needs someone to tend'
@@ -857,6 +1022,8 @@ export const DrinkParams = z.object({ itemId: z.string().optional() }).strict()
 
 const drink: VerbDef = makeVerb({
   kind: 'drink',
+  params: DrinkParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DrinkParams.safeParse(params)
     if (!p.success) return 'drinking takes water at your side, or the vessel you name'
@@ -890,6 +1057,8 @@ export const FillParams = z.object({ itemId: z.string() }).strict()
 
 const fill: VerbDef = makeVerb({
   kind: 'fill',
+  params: FillParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = FillParams.safeParse(params)
     if (!p.success) return 'filling needs the vessel named'
@@ -919,6 +1088,8 @@ export function isWearable(config: SimConfig, kind: string): boolean {
 
 const wear: VerbDef = makeVerb({
   kind: 'wear',
+  params: WearParams,
+  takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = WearParams.safeParse(params)
     if (!p.success) return 'wearing needs the garment named'
@@ -945,6 +1116,7 @@ const wear: VerbDef = makeVerb({
 
 const doff: VerbDef = makeVerb({
   kind: 'doff',
+  takes: 'minutes',
   validate(state, _config, agentId) {
     return state.agents[agentId]!.equipped?.body === undefined
       ? 'you are not wearing anything'
@@ -995,6 +1167,8 @@ function heldLight(
 
 const kindle: VerbDef = makeVerb({
   kind: 'kindle',
+  params: KindleParams,
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'kindling needs the torch or lamp named'
@@ -1019,6 +1193,8 @@ const kindle: VerbDef = makeVerb({
 
 const snuff: VerbDef = makeVerb({
   kind: 'snuff',
+  params: KindleParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = KindleParams.safeParse(params)
     if (!p.success) return 'snuffing needs the lit thing named'
@@ -1058,6 +1234,8 @@ export function isRoofedFire(config: SimConfig, kind: string): boolean {
 
 const stoke: VerbDef = makeVerb({
   kind: 'stoke',
+  params: StokeParams,
+  takes: 'minutes',
   validate(state, config, agentId, params) {
     const p = StokeParams.safeParse(params)
     if (!p.success) return 'stoking needs the fire named'
@@ -1115,6 +1293,9 @@ export function skillLevel(
 
 const till: VerbDef = makeVerb({
   kind: 'till',
+  params: TileParams,
+  needsLight: true,
+  takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'tilling needs a patch of ground to break'
@@ -1146,14 +1327,14 @@ const till: VerbDef = makeVerb({
   skill: { track: 'farming', xp: 1 },
 })
 
-// Digging is slower than scratching a furrow: four ticks with a spade's worth of effort.
-const DIG_CHANNEL_TICKS = 4
-
 // Water only runs downhill from water. A channel spreads one tile at a time from the river
 // or from what has already been cut, which is why irrigation is a project and not a wish.
 const digChannel: VerbDef = makeVerb({
   kind: 'dig_channel',
-  duration: () => DIG_CHANNEL_TICKS,
+  params: TileParams,
+  needsLight: true,
+  // Slower than scratching a furrow: a spade's worth of effort against the till beside it.
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'a channel needs a patch of ground to cut'
@@ -1193,11 +1374,13 @@ const digChannel: VerbDef = makeVerb({
 
 const plant: VerbDef = makeVerb({
   kind: 'plant',
+  params: PlantParams,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = PlantParams.safeParse(params)
     if (!p.success) return 'planting needs ground and a seed to sow'
     if (tileAt(state, p.data.x, p.data.y) !== 6) return 'crops need farmland'
-    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind}`
+    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind} — ${WANTS_DISCOVERING}`
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to plant'
     for (const c of Object.values(state.crops)) {
       if (!c.withered && c.x === p.data.x && c.y === p.data.y) return 'that plot is already planted'
@@ -1206,6 +1389,8 @@ const plant: VerbDef = makeVerb({
   },
   onComplete(state, _config, _agentId, params) {
     const p = PlantParams.parse(params)
+    if (tileAt(state, p.x, p.y) !== 6) return []
+    if (Object.values(state.crops).some((c) => !c.withered && c.x === p.x && c.y === p.y)) return []
     const plantedDay = Math.floor(state.tick / MINUTES_PER_DAY)
     return [
       {
@@ -1219,6 +1404,8 @@ const plant: VerbDef = makeVerb({
 
 const harvest: VerbDef = makeVerb({
   kind: 'harvest',
+  params: HarvestParams,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = HarvestParams.safeParse(params)
     if (!p.success) return 'harvesting needs the ripe plant named'
@@ -1232,8 +1419,10 @@ const harvest: VerbDef = makeVerb({
   },
   onComplete(state, config, agentId, params) {
     const p = HarvestParams.parse(params)
-    const crop = state.crops[p.cropId]!
-    const def = config.crops[crop.kind]!
+    const crop = state.crops[p.cropId]
+    if (!crop || crop.withered) return []
+    const def = config.crops[crop.kind]
+    if (!def) return []
     // Water near the roots is worth more than skill at the sickle: the ground decides the number.
     const qty = Math.floor(def.yield * fertilityAt(state.terrain, crop.x, crop.y, config))
     return [
@@ -1294,6 +1483,8 @@ export function fishCatchChance(
 
 const fish: VerbDef = makeVerb({
   kind: 'fish',
+  params: TileParams,
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = TileParams.safeParse(params)
     if (!p.success) return 'fishing needs the water to cast into'
@@ -1368,6 +1559,10 @@ export function huntChance(
 
 const hunt: VerbDef = makeVerb({
   kind: 'hunt',
+  params: HuntParams,
+  // The strike, not the stalk: this verb asks the animal to be at your side already, and fauna
+  // flee every fauna.movePeriodTicks. Anything longer is a hunt no body could ever land.
+  takes: 'moment',
   validate(state, config, agentId, params) {
     const p = HuntParams.safeParse(params)
     if (!p.success) return 'a hunt needs the animal named'
@@ -1423,6 +1618,8 @@ export const ForageParams = z.object({ nodeId: z.string().optional() }).strict()
 
 const forage: VerbDef = makeVerb({
   kind: 'forage',
+  params: ForageParams,
+  takes: 'hour',
   validate(state, _config, agentId, params) {
     const p = ForageParams.safeParse(params)
     if (!p.success) return 'foraging takes the patch you mean, or nothing at all'
@@ -1525,10 +1722,17 @@ export const ExtinguishParams = z.object({ structureId: z.string() }).strict()
 
 const build: VerbDef = makeVerb({
   kind: 'build',
+  params: BuildParams,
+  needsLight: true,
   validate(state, config, agentId, params) {
     const kind = (params as { kind?: unknown }).kind
     if (typeof kind !== 'string') return BUILD_NEEDS_A_THING_AND_A_PLACE
-    if (buildableRecipe(config, kind) === null) return `cannot build a ${kind}`
+    // A row that exists with no inputs is a thing the world places and nobody builds — a grave.
+    // Only a name the config has never heard of is a proposal the court should hear.
+    if (buildableRecipe(config, kind) === null)
+      return config.structures.recipes[kind] === undefined
+        ? `cannot build a ${kind} — ${WANTS_DISCOVERING}`
+        : `cannot build a ${kind}`
     const plotted = buildIsPlotted(state, config, kind)
     const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
     // ★ THE LOUD HALF. The prompt tells a mind that a roof goes where the town has ground for
@@ -1670,7 +1874,7 @@ function chosenRoute(
   // the craft not existing look the same from here, so name both ways out.
   if (routes.length === 0) {
     return {
-      refusal: `no such recipe: ${name} — perhaps someone nearby knows how, or it wants discovering.`,
+      refusal: `no such recipe: ${name} — ${WANTS_DISCOVERING}`,
     }
   }
   let asNamed: string | null = null
@@ -1684,6 +1888,9 @@ function chosenRoute(
 
 const craft: VerbDef = makeVerb({
   kind: 'craft',
+  params: CraftParams,
+  needsLight: true,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'crafting needs the thing to shape named'
@@ -1730,6 +1937,8 @@ const craft: VerbDef = makeVerb({
 
 const extinguish: VerbDef = makeVerb({
   kind: 'extinguish',
+  params: ExtinguishParams,
+  takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ExtinguishParams.safeParse(params)
     if (!p.success) return 'putting a fire out needs the burning thing named'
@@ -1751,6 +1960,8 @@ export const STONE_KIND = 'stone'
 // A road is not something the map has; it is something somebody carried stone for.
 const pave: VerbDef = makeVerb({
   kind: 'pave',
+  params: TileParams,
+  needsLight: true,
   duration: (_state, config) => config.roads.paveDurationTicks,
   validate(state, config, agentId, params) {
     if (!config.roads.enabled) return 'your hands find no way to lay a road here'
@@ -1784,12 +1995,13 @@ const pave: VerbDef = makeVerb({
 
 // A sapling is not timber yet: clearing one costs the swing and yields nothing. Either way the
 // ground goes back to grass, which is what makes the regrowth cycle a cycle and not an ornament.
-export const CLEAR_TICKS = 4
-export const FELL_TICKS = 30
+export const CLEAR_TICKS = ticksFor('minutes')
+export const FELL_TICKS = ticksFor('hour')
 export const TIMBER_PER_TREE = 2
 
 const chop: VerbDef = makeVerb({
   kind: 'chop',
+  params: TileParams,
   duration(state, _config, _agentId, params) {
     const p = TileParams.parse(params)
     return tileAt(state, p.x, p.y) === T_FOREST ? FELL_TICKS : CLEAR_TICKS
@@ -1847,6 +2059,8 @@ function heldBuckets(state: WorldState, agentId: string) {
 // bucket line is a thing the town has to organise for itself.
 const douse: VerbDef = makeVerb({
   kind: 'douse',
+  params: DouseParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DouseParams.safeParse(params)
     if (!p.success) return 'dousing needs the burning ground named'
@@ -1917,6 +2131,8 @@ const spoken = (
 
 const speak: VerbDef = makeVerb({
   kind: 'speak',
+  params: SpeakParams,
+  takes: 'moment',
   validate(_state, _config, _agentId, params) {
     const p = SpeakParams.safeParse(params)
     // Length is refused in the town's own words: the refusal becomes a memory the mind reads
@@ -1936,6 +2152,8 @@ const speak: VerbDef = makeVerb({
 
 const give: VerbDef = makeVerb({
   kind: 'give',
+  params: GiveParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = GiveParams.safeParse(params)
     if (!p.success) return 'giving needs the thing and the person to hand it to'
@@ -2012,6 +2230,8 @@ function liftEvents(
 
 const take: VerbDef = makeVerb({
   kind: 'take',
+  params: TakeParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
     if (!p.success) return 'taking needs the thing to lift'
@@ -2035,6 +2255,8 @@ const take: VerbDef = makeVerb({
 // untouched — setting a thing down is not parting with it.
 const drop: VerbDef = makeVerb({
   kind: 'drop',
+  params: DropParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = DropParams.safeParse(params)
     if (!p.success) return 'setting a thing down needs the thing named'
@@ -2063,6 +2285,8 @@ export const StowParams = z.object({ itemId: z.string(), structureId: z.string()
 
 const stow: VerbDef = makeVerb({
   kind: 'stow',
+  params: StowParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = StowParams.safeParse(params)
     if (!p.success) return 'stowing needs the thing and the store to leave it in'
@@ -2102,9 +2326,11 @@ export const InscribeParams = z
   })
   .strict()
 
-// Writing on something nobody can pocket. Three ticks, because carving is not scribbling.
+// Writing on something nobody can pocket, and carving is not scribbling.
 const inscribe: VerbDef = makeVerb({
   kind: 'inscribe',
+  params: InscribeParams,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     if (!config.inscription.enabled) return 'your hands find no way to mark this'
     const p = InscribeParams.safeParse(params)
@@ -2117,9 +2343,6 @@ const inscribe: VerbDef = makeVerb({
     if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to mark it'
     return null
-  },
-  duration() {
-    return 3
   },
   onComplete(state, _config, agentId, params) {
     const p = InscribeParams.parse(params)
@@ -2135,6 +2358,8 @@ const inscribe: VerbDef = makeVerb({
 
 const write: VerbDef = makeVerb({
   kind: 'write',
+  params: WriteParams,
+  takes: 'half_hour',
   validate(state, _config, agentId, params) {
     const p = WriteParams.safeParse(params)
     if (!p.success) return 'writing needs words to set down'
@@ -2171,6 +2396,8 @@ const write: VerbDef = makeVerb({
 
 const read: VerbDef = makeVerb({
   kind: 'read',
+  params: ReadParams,
+  takes: 'minutes',
   validate(state, _config, agentId, params) {
     const p = ReadParams.safeParse(params)
     if (!p.success) return 'reading needs the writing named'
@@ -2191,6 +2418,8 @@ const read: VerbDef = makeVerb({
 
 const teach: VerbDef = makeVerb({
   kind: 'teach',
+  params: TeachParams,
+  takes: 'half_hour',
   validate(state, config, agentId, params) {
     const p = TeachParams.safeParse(params)
     if (!p.success) return 'teaching needs someone to teach and a craft to pass on'
@@ -2201,7 +2430,8 @@ const teach: VerbDef = makeVerb({
       far: 'not adjacent to teach',
     })
     if (bad) return bad
-    if (!config.skills.tracks.includes(p.data.track)) return `no such skill: ${p.data.track}`
+    if (!config.skills.tracks.includes(p.data.track))
+      return `no such skill: ${p.data.track} — ${WANTS_DISCOVERING}`
     if ((state.agents[agentId]!.skills[p.data.track] ?? 0) === 0) return 'nothing to teach'
     return null
   },
@@ -2226,6 +2456,8 @@ const INJURY_SEVERITY: Readonly<Record<'minor' | 'serious' | 'grave', number>> =
 
 const attack: VerbDef = makeVerb({
   kind: 'attack',
+  params: AttackParams,
+  takes: 'moment',
   validate(state, _config, agentId, params) {
     const p = AttackParams.safeParse(params)
     if (!p.success) return 'a blow needs someone to strike'
@@ -2275,13 +2507,206 @@ const attack: VerbDef = makeVerb({
   rngStream: 'combat',
 })
 
-const experiment: VerbDef = makeVerb({
-  kind: 'experiment',
-  validate() {
-    return 'You lack the knowledge to attempt this. Perhaps someone in the town knows how.'
+// One schema for all four: every one of them is aimed at exactly one other person.
+export const CourtParams = z.object({ targetId: z.string() }).strict()
+
+// Parent, child, or a parent in common. The engine only knows the `parents` it wrote itself;
+// a founder's persona kin is a tie the prompt renders, not a wall the world can hold up.
+function bloodKin(a: AgentBody, b: AgentBody): boolean {
+  if (a.parents?.includes(b.id) === true || b.parents?.includes(a.id) === true) return true
+  return a.parents !== undefined && b.parents !== undefined
+    ? a.parents.some((id) => b.parents!.includes(id))
+    : false
+}
+
+/** Five to eight separate days walked out together before a proposal can be said yes to. Drawn
+ *  from the pair's names, so every couple has its own number and the median sits near a week. */
+export const WALK_OUTS_BEFORE_PROPOSAL = { least: 5, most: 8 } as const
+export function walkOutsBeforeProposal(aId: string, bId: string): number {
+  let h = 2166136261
+  for (const ch of [aId, bId].sort().join('+')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  const span = WALK_OUTS_BEFORE_PROPOSAL.most - WALK_OUTS_BEFORE_PROPOSAL.least + 1
+  return WALK_OUTS_BEFORE_PROPOSAL.least + ((h >>> 0) % span)
+}
+
+/** Everything the three invitation verbs refuse for, in one order, said in the town's words. */
+function askable(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  params: Record<string, unknown>,
+  verb: InvitationVerb,
+): string | null {
+  const p = CourtParams.safeParse(params)
+  if (!p.success) return `${verbPhrase(verb)} needs someone to ask`
+  const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
+    self: 'you cannot ask yourself',
+    gone: 'no one there to ask',
+    far: 'not close enough to ask',
+  })
+  if (bad) return bad
+  const me = state.agents[agentId]!
+  const target = state.agents[p.data.targetId]!
+  if (target.asleep) return 'they are asleep'
+  for (const body of [me, target]) {
+    if (ageBand(config, body.ageDays) === 'child') return 'that is not for a child'
+  }
+  if (bloodKin(me, target)) return 'they are your own blood'
+  if (verb === 'court') {
+    const today = Math.floor(state.tick / MINUTES_PER_DAY)
+    if (me.courted?.withId === target.id && me.courted.day === today)
+      return 'you walked out together already today'
+    return null
+  }
+  if (verb === 'propose') {
+    if (me.partnerId !== undefined) return 'you already have a partner'
+    if (target.partnerId !== undefined) return 'they already have a partner'
+    const together = me.walkOuts?.[target.id] ?? 0
+    if (together < walkOutsBeforeProposal(agentId, target.id))
+      return together === 0
+        ? 'too soon: you have never walked out together'
+        : `too soon: you have only walked out together ${together} ${together === 1 ? 'day' : 'days'}`
+    return null
+  }
+  // lie_with, the only ask left
+  const roof = me.insideId === undefined ? undefined : state.structures[me.insideId]
+  const own =
+    roof !== undefined &&
+    me.insideId === target.insideId &&
+    config.structures.privateKinds.includes(roof.kind) &&
+    (roof.owner === undefined || roof.owner === agentId || roof.owner === target.id)
+  if (!own) return 'not under a roof of your own'
+  // Only the answer needs two free pairs of hands: the ask itself is a word, and words are free.
+  if (isAcceptance(state, agentId, target.id, verb)) {
+    if (me.activity) return 'your hands are full'
+    if (target.activity) return 'their hands are full'
+  }
+  return null
+}
+
+/** The same verb, aimed back, inside the window: two intents in the log are the two consents. */
+function isAcceptance(
+  state: WorldState,
+  agentId: string,
+  targetId: string,
+  verb: InvitationVerb,
+): boolean {
+  const asked = state.agents[agentId]?.asked
+  if (asked?.byId !== targetId || asked.verb !== verb) return false
+  return state.tick - asked.tick <= INVITATION_STANDS_TICKS
+}
+
+const invitationVerb = (
+  verb: InvitationVerb,
+  consummate: (agentId: string, targetId: string) => PendingEvent[],
+): VerbDef =>
+  makeVerb({
+    kind: verb,
+    params: CourtParams,
+    takes: 'moment',
+    validate(state, config, agentId, params) {
+      return askable(state, config, agentId, params, verb)
+    },
+    atOnce(state, _config, agentId, params) {
+      const p = CourtParams.parse(params)
+      if (!isAcceptance(state, agentId, p.targetId, verb)) {
+        return [{ type: 'invited', payload: { agentId: p.targetId, byId: agentId, verb } }]
+      }
+      return [
+        { type: 'invitation_accepted', payload: { agentId, byId: p.targetId, verb } },
+        ...consummate(agentId, p.targetId),
+      ]
+    },
+    onComplete() {
+      return []
+    },
+  })
+
+const court = invitationVerb('court', () => [])
+
+const propose = invitationVerb('propose', (agentId, targetId) => {
+  const [aId, bId] = [agentId, targetId].sort()
+  return [{ type: 'partnership_formed', payload: { aId, bId } }]
+})
+
+const lieWith: VerbDef = {
+  ...invitationVerb('lie_with', (agentId, targetId) =>
+    [
+      [agentId, targetId],
+      [targetId, agentId],
+    ].map(([id, other]) => ({
+      type: 'action_started',
+      payload: {
+        agentId: id,
+        verb: 'lie_with',
+        params: { targetId: other },
+        duration: ticksFor('hour'),
+      },
+    })),
+  ),
+  // The one roll the town does not schedule: it is drawn once, by the lower id, when both
+  // bodies have seen the hour out. An interrupted partner is no roll at all.
+  onComplete(state, config, agentId, params, rng) {
+    const p = CourtParams.parse(params)
+    if (agentId >= p.targetId) return []
+    const other = state.agents[p.targetId]
+    if (!other?.alive) return []
+    if (other.activity?.verb !== 'lie_with' || other.activity.params.targetId !== agentId) return []
+    const pair = motherAndFather(state, config, agentId, p.targetId)
+    if (!pair) return []
+    if (rng.next() >= CONCEPTION_CHANCE_PER_ACT) return []
+    return [
+      {
+        type: 'agent_conceived',
+        payload: { ...pair, day: Math.floor(state.tick / MINUTES_PER_DAY) },
+      },
+    ]
+  },
+  rngStream: 'reproduction',
+}
+
+// No answer is asked for and none is waited on: a person may leave, and the other learns of it.
+const leavePartner: VerbDef = makeVerb({
+  kind: 'leave_partner',
+  params: CourtParams,
+  takes: 'moment',
+  validate(state, _config, agentId, params) {
+    const p = CourtParams.safeParse(params)
+    if (!p.success) return 'leaving needs the partner named'
+    if (state.agents[agentId]!.partnerId !== p.data.targetId) return 'you have no such partner'
+    return null
+  },
+  atOnce(_state, _config, agentId, params) {
+    const p = CourtParams.parse(params)
+    const [aId, bId] = [agentId, p.targetId].sort()
+    return [{ type: 'partnership_dissolved', payload: { aId, bId, byId: agentId } }]
   },
   onComplete() {
     return []
+  },
+})
+
+// The road out. No answer is asked of anybody, and there is no coming back: the body walks to
+// the valley's edge and off the end of the town's story.
+const leaveTown: VerbDef = makeVerb({
+  kind: 'leave_town',
+  params: z.object({}).strict(),
+  takes: 'minutes',
+  validate(state, _config, agentId) {
+    const a = state.agents[agentId]!
+    if (a.insideId !== undefined) return 'you are indoors; step outside first'
+    if (!isMapRim(state, a.x, a.y)) return "you are not at the valley's edge"
+    return null
+  },
+  onComplete(state, _config, agentId) {
+    const a = state.agents[agentId]!
+    const out: PendingEvent[] = []
+    if (a.partnerId !== undefined) {
+      const [aId, bId] = [agentId, a.partnerId].sort()
+      out.push({ type: 'partnership_dissolved', payload: { aId, bId, byId: agentId } })
+    }
+    out.push({ type: 'agent_departed', payload: { agentId } })
+    return out
   },
 })
 
@@ -2289,6 +2714,7 @@ export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
   wake,
+  stop,
   enter,
   exit,
   eat,
@@ -2323,17 +2749,24 @@ export const VERBS: Record<string, VerbDef> = {
   inscribe,
   teach,
   attack,
-  experiment,
+  court,
+  propose,
+  lie_with: lieWith,
+  leave_partner: leavePartner,
+  leave_town: leaveTown,
 }
 
-// Hot-registration seam: codified recipe verbs join the live registry by kind id.
+// Hot-registration seam: codified recipe verbs join the live registry by kind id, and bring
+// the binding row that keeps a first blank-object use from being refused.
 export function registerVerb(def: VerbDef): void {
   if (VERBS[def.kind]) throw new Error(`already registered: ${def.kind}`)
   VERBS[def.kind] = def
+  if (def.reads !== undefined) bindObjectParam(def.kind, def.reads)
 }
 
 export function unregisterVerb(kind: string): void {
   delete VERBS[kind] // eslint-disable-line @typescript-eslint/no-dynamic-delete -- a registry key removal
+  unbindObjectParam(kind)
 }
 
 /** On a plot there is no coordinate to look the walls up by, so it is the walls this body began
@@ -2402,6 +2835,63 @@ export function stepWalk(state: WorldState, agentId: string): PendingEvent[] {
     return [{ type: 'action_interrupted', payload: { agentId, reason: 'blocked' } }]
   }
   return [{ type: 'action_progressed', payload: { agentId, ticks: 1 } }, ...moves]
+}
+
+// Half a sim-hour. A body crosses the whole valley in about twenty-six ticks at three tiles a
+// tick, so this is one crossing and a little more: you may follow somebody across the town once.
+const CHASE_MAX_TICKS = 30
+// Two widening ticks is somebody stepping round a wall. Three running is somebody leaving.
+const CHASE_GIVE_UP_GROWTH = 3
+
+/** What the mind is told when it stops following: a sentence, not a machinery word. */
+export const WALK_LOST_THEM = 'you lost them'
+
+/** One tick of a walk that named a person. They move, so the legs are re-aimed at where they
+ *  are standing now; the walk ends the moment this body is beside them, and is given up when
+ *  the following has run long enough or the gap has widened three ticks running.
+ *  Null whenever this walk is not a chase, and then the ordinary step runs instead. */
+export function chaseStep(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+): PendingEvent[] | null {
+  const a = state.agents[agentId]
+  const act = a?.activity
+  if (!a || act?.verb !== 'walk') return null
+  const targetId = act.params.targetId
+  // A body that cannot stand cannot follow anybody: a crawl keeps the one tile and the price in
+  // ticks it always had, and the ordinary step below is what charges it.
+  if (typeof targetId !== 'string' || isCrawl(state, agentId)) return null
+  const target = state.agents[targetId]
+  const lost: PendingEvent[] = [
+    { type: 'action_interrupted', payload: { agentId, reason: WALK_LOST_THEM } },
+  ]
+  if (!target?.alive) return lost
+  const gap = Math.max(Math.abs(a.x - target.x), Math.abs(a.y - target.y))
+  // Beside them is the whole of the point, whatever the clock still says. The clock is run down
+  // rather than the act completed here, so a composed walk still runs the act it was set going for.
+  if (gap <= 1) {
+    return [{ type: 'action_progressed', payload: { agentId, ticks: act.ticksRemaining } }]
+  }
+  const was = act.chase ?? { ticks: 0, grew: 0, gap }
+  const chase = { ticks: was.ticks + 1, grew: gap > was.gap ? was.grew + 1 : 0, gap }
+  if (chase.ticks > CHASE_MAX_TICKS || chase.grew >= CHASE_GIVE_UP_GROWTH) return lost
+  const to = personDestination(state, config, agentId, targetId)
+  if ('refusal' in to) return lost
+  const path = findPath(state, a, to, config)
+  if (path === null || path.length === 0) return lost
+  // The legs take their stride off the body's own speed rather than off a clock. A chase has no
+  // honest clock: the route is thrown away and laid again every tick, so nothing counts down and
+  // the only ways out are being beside them and giving up, both above.
+  const stride = Math.min(path.length, tilesPerTick(state, config, agentId))
+  const moves: PendingEvent[] = []
+  for (const [nx, ny] of path.slice(0, stride)) {
+    if (!isPassable(state, nx, ny)) break
+    moves.push({ type: 'agent_moved', payload: { id: agentId, x: nx, y: ny } })
+  }
+  if (moves.length === 0) return lost
+  const ticks = Math.max(walkTicks(path.length, tilesPerTick(state, config, agentId)), 1)
+  return [{ type: 'walk_reaimed', payload: { agentId, x: to.x, y: to.y, ticks, chase } }, ...moves]
 }
 
 // Their surface stays part of `verbs`.

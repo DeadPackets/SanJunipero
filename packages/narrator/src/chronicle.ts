@@ -256,7 +256,8 @@ export async function renderChapter(deps: {
   alert?: ((d: string) => void) | undefined
 }): Promise<ChapterRow> {
   const { store, llm, day, scenes } = deps
-  const sceneIds = store.insertScenes(scenes)
+  // The rooms are written down only once the chapter is in hand: a render that fails would
+  // otherwise leave them behind, and `chapters.day` — the idempotence — never sees them.
   const summary = await llm.summarizeChapter(
     sceneDigests(scenes, deps.typeCounts ?? (() => ({})), deps.look ?? {}),
     deps.cast ?? [],
@@ -272,6 +273,7 @@ export async function renderChapter(deps: {
     citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
   const grounded = withoutStrangers(deps, `chapter for day ${day}`, seen.text, deps.cast ?? [])
   const text = publishClean(deps, `chapter for day ${day}`, grounded)
+  const sceneIds = store.insertScenes(scenes)
   const id = store.insertChapter({ day, title: summary.title, text, citations, sceneIds })
   return { id, day, title: summary.title, text, citations, sceneIds }
 }
@@ -285,6 +287,7 @@ export async function renderEra(deps: {
   endDay: number
   chapters: ChapterRow[]
   validEventIds: number[]
+  cast?: readonly CastMember[] | undefined
   alert?: ((d: string) => void) | undefined
 }): Promise<EraRow> {
   const { store, startDay, endDay, chapters } = deps
@@ -310,7 +313,8 @@ export async function renderEra(deps: {
     )
   let citations = seen.citations
   if (citations.length === 0) citations = chapters[0]!.citations.slice(0, 1)
-  const text = publishClean(deps, `era days ${startDay}-${endDay}`, seen.text)
+  const where = `era days ${startDay}-${endDay}`
+  const text = publishClean(deps, where, withoutStrangers(deps, where, seen.text, deps.cast ?? []))
   const id = store.insertEra({
     startDay,
     endDay,

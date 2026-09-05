@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
   MINUTES_PER_DAY,
   SimConfigSchema,
@@ -58,7 +59,11 @@ function withFauna(
 }
 
 function withAgent(s: WorldState, x: number, y: number, config = CFG): WorldState {
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
 }
 
 // One tick of the world at `tick`, with the rolls handed in.

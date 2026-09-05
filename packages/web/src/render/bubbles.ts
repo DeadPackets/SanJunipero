@@ -2,7 +2,15 @@ import { Assets, Container, Graphics, Texture } from 'pixi.js'
 import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
-import { createWorldLabel } from './worldLabel.js'
+import { createWorldLabel, type WorldLabel } from './worldLabel.js'
+import {
+  PRIOR_ALPHA,
+  PRIOR_HOLD_MS,
+  fateOfPriorLine,
+  thoughtsToEnd,
+  typedChars,
+  typingMs,
+} from './converse.js'
 import {
   BUBBLE_EDGE,
   BUBBLE_PAD,
@@ -25,14 +33,21 @@ import {
   type BubbleSide,
 } from './textFaces.js'
 import { over } from './legibility.js'
-import { overlaps, placeTag, type Rect } from './tooltip.js'
+import {
+  EDGE_PAD_PX,
+  MAX_STACK_STEPS,
+  STACK_STEP_PX,
+  overlaps,
+  placeTag,
+  type Rect,
+} from './tooltip.js'
 import { rectInView } from './cull.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { characterArt, fadeArtIn } from './textures.js'
 import { MOTION, progress } from '../ui/motion.js'
-import { characterCell } from './characters.js'
+import { characterCell, rendersOnMap } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 
@@ -41,16 +56,17 @@ import type { Scene } from './scene.js'
 export { SPEECH_MAX_CHARS } from '@sj/shared'
 
 export const SPEECH_MS_BASE = 3500
-/** A longer line is held longer, all the way to the ceiling: 240 characters is about forty
- *  words, and forty words at a comfortable reading pace is the 13s this adds up to. */
-export const SPEECH_MS_PER_CHAR = 40
+/** ★ A READ WINDOW THAT EXISTS. Life was 3500ms + 40 a character of the WHOLE utterance, which
+ *  left 4.5s to read the 240 the ceiling allows — 53 characters a second, against a human rate
+ *  near 18. It is bought per SHOWN character now, and the typing is paid for on top of it. */
+export const READ_MS_PER_CHAR = 55
 const THOUGHT_DRIFT_PX = 2
 
-/** ★ NOTHING IS CUT. The box wrapped at 210 world px — thirteen characters a line in Press
- *  Start 2P at 16px — and stopped at two lines, so a spoken line arrived as "Sit down, Sa…" and
- *  the other sixty-six characters were never seen by anyone. Double the width, no line ceiling,
- *  and the SANITIZER's own bound is the only one left: an utterance reaches this layer already
- *  cut to `SPEECH_MAX_CHARS`, and the box grows to whatever came. */
+/** ★ NOTHING IS CUT AT THE EVENT. The box wrapped at 210 world px — thirteen characters a line
+ *  in Press Start 2P at 16px — and stopped at two lines, so a spoken line arrived as "Sit down,
+ *  Sa…" and the other sixty-six characters were never seen by anyone. Double the width, and the
+ *  Chronicle keeps every character an utterance came with; `BUBBLE_MAX_LINES` cuts the DRAWING
+ *  only. */
 export const BUBBLE_MAX_PX = 420
 export const BUBBLE_FONT_PX = faceFor('speech').size
 export const BUBBLE_LINE_H = Math.max(WORLD_TEXT_LINE_H, BUBBLE_FONT_PX + 4)
@@ -65,8 +81,11 @@ export const BUBBLE_FADE_MS = MOTION.reveal.ms
  *  5.19:1, and a raw hue at 0.15 drops pure red to 4.12:1. */
 const SPEAKER_WASH = 0.5
 
-export function bubbleLife(text: string): number {
-  return SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * Math.min(text.length, SPEECH_MAX_CHARS)
+/** How long a box holding `shown` stands: long enough to type it, then long enough to read it.
+ *  A thought is not spoken, so it is not typed either. */
+export function bubbleLife(shown: string, isThought = false): number {
+  const typing = isThought ? 0 : typingMs(shown.length)
+  return typing + SPEECH_MS_BASE + READ_MS_PER_CHAR * shown.length
 }
 
 export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
@@ -92,6 +111,20 @@ export function wrapBubble(text: string, maxChars = WRAP_CHARS): string[] {
   }
   if (line.length > 0) lines.push(line)
   return lines
+}
+
+/** ★ A BUBBLE IS A LINE, NOT A PAGE. 240 characters wrapped to eleven of them and stood a slab
+ *  over a third of the frame that nobody could read before it went. The rest is on the paper,
+ *  which is where a viewer goes to read a speech twice.
+ *  Four, not three: the gate rehearsal's 348 spoken lines have a median of 92 characters, which
+ *  three lines cut and four hold whole. Three elided 68% of everything said. */
+export const BUBBLE_MAX_LINES = 4
+
+export function capLines(lines: readonly string[], maxChars: number): string[] {
+  if (lines.length <= BUBBLE_MAX_LINES) return [...lines]
+  const kept = lines.slice(0, BUBBLE_MAX_LINES)
+  kept[BUBBLE_MAX_LINES - 1] = `${kept[BUBBLE_MAX_LINES - 1]!.slice(0, maxChars - 1).trimEnd()}…`
+  return kept
 }
 
 const TINT_BUCKET_BITS = 3
@@ -140,21 +173,38 @@ export function speakerWash(rgb: number): number {
   return over(0xffffff, (lift(r) << 16) | (lift(g) << 8) | lift(b), SPEAKER_WASH)
 }
 
+/** How far a box floats over the head it belongs to. */
+export const BUBBLE_LIFT_PX = 18
+
+/** `tick` is the only reaper and it stops with `requestAnimationFrame`, so a hidden tab would
+ *  stack every line twelve minds say for as long as it is hidden. Twice the on-screen most. */
+export const BUBBLE_CAP = 24
+
 /** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
  *  of speech and it read as a town where only three people ever talk; the placer already drops
- *  what it cannot fit. One pass, no sort — this ran per frame. */
+ *  what it cannot fit. One pass, no sort — this ran per frame.
+ *
+ *  ★ Take each SPEAKER's own feet, never the anchor a box floats from: culling on that point
+ *  put a "…" on anybody standing in the top 70 world px of the view. */
 export function inViewSpeakers(
   want: readonly { id: string; sx: number; sy: number }[],
   view: Rect,
 ): Set<string> {
   const out = new Set<string>()
-  for (const b of want) if (rectInView(b.sx, b.sy, b.sx, b.sy, view, 0)) out.add(b.id)
+  for (const b of want) {
+    if (rectInView(b.sx, b.sy - CHAR_TARGET_PX, b.sx, b.sy, view, 0)) out.add(b.id)
+  }
   return out
 }
 
 export function bubbleShown(zoom: number, inView: boolean): boolean {
   return inView && zoom > GLYPH_ZOOM
 }
+
+/** ★ NO PAPER BEFORE THE INK. The box is cut to the WHOLE line and the label then emptied, so a
+ *  speech bubble opened as a blank slab and stood there for as long as its first character took
+ *  to arrive. The paper is not there until something is written on it. */
+export const bubbleInked = (typed: number): boolean => typed > 0
 
 /** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
  *  a "…" pinned to the viewport corner with nobody under it. */
@@ -172,6 +222,30 @@ export function bubbleAlpha(msLeft: number): number {
   return 1 - progress('reveal', 0, BUBBLE_FADE_MS - msLeft)
 }
 
+const pin = (v: number, lo: number, hi: number): number =>
+  lo > hi ? lo : Math.min(Math.max(v, lo), hi)
+
+/** ★ THE WHOLE BOX STAYS IN THE PICTURE. `placeTag` clamps and THEN steps clear, and its step is
+ *  away from the anchor — so a tall box pinned at the top edge was pushed up, clamped back to the
+ *  same place, and left composited over the box below it. This runs after that step, and a box
+ *  the view moved is walked DOWN past whatever it landed on. */
+export function clampBubble(rect: Rect, view: Rect, taken: readonly Rect[]): Rect {
+  const fit = (r: Rect): Rect => ({
+    ...r,
+    x: pin(r.x, view.x + EDGE_PAD_PX, view.x + view.w - EDGE_PAD_PX - r.w),
+    y: pin(r.y, view.y + EDGE_PAD_PX, view.y + view.h - EDGE_PAD_PX - r.h),
+  })
+  let out = fit(rect)
+  for (let step = 0; step < MAX_STACK_STEPS; step++) {
+    const hit = taken.filter((o) => overlaps(out, o))
+    if (hit.length === 0) break
+    const next = fit({ ...out, y: Math.max(...hit.map((o) => o.y + o.h)) + STACK_STEP_PX })
+    if (next.y <= out.y) break // the view has no room left below: nowhere better to put it
+    out = next
+  }
+  return out
+}
+
 /** De-conflicts the whole live set through `placeTag` in the layer's own arrival order, so a bubble does not jump about while the one beside it is dying. */
 export function placeBubbles(
   want: readonly { id: string; sx: number; sy: number; size: { w: number; h: number } }[],
@@ -187,9 +261,13 @@ export function placeBubbles(
       view,
       taken,
     )
-    const rect = { x: at.sx - b.size.w / 2, y: at.sy, w: b.size.w, h: b.size.h }
+    const rect = clampBubble(
+      { x: at.sx - b.size.w / 2, y: at.sy, w: b.size.w, h: b.size.h },
+      view,
+      taken,
+    )
     taken.push(rect)
-    out.push({ id: b.id, sx: at.sx, sy: at.sy, side: at.side, rect })
+    out.push({ id: b.id, sx: rect.x + rect.w / 2, sy: rect.y, side: at.side, rect })
   }
   return out
 }
@@ -216,6 +294,13 @@ type Bubble = {
   box: Container
   glyph: Graphics
   tail: Graphics
+  /** the whole line, and how much of it has been set — the box is cut to the WHOLE line, so a
+   *  reveal never moves the paper it is written on */
+  label: WorldLabel
+  full: string
+  typed: number
+  /** when this line stopped being the one being said, or null while it still is */
+  dimMs: number | null
   /** the paper this one was drawn on, so a tail redrawn later matches its own box */
   fill: number
   w: number
@@ -290,6 +375,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     box: Container
     glyph: Graphics
     tail: Graphics
+    label: WorldLabel
+    full: string
+    typed: number
     fill: number
     w: number
     h: number
@@ -298,11 +386,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     node.eventMode = 'none' // bubbles float over heads — never block a character click
     const role = isThought ? 'thought' : 'speech'
     const face = faceFor(role)
-    const lines = wrapBubble(
-      text.slice(0, SPEECH_MAX_CHARS),
-      wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX),
-    )
-    const label = createWorldLabel(lines.join('\n'), {
+    const wrapAt = wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX)
+    const lines = capLines(wrapBubble(text.slice(0, SPEECH_MAX_CHARS), wrapAt), wrapAt)
+    // Cut to the WHOLE line, then set to what has been typed: a box that grew with its own
+    // sentence would move the paper under the reader.
+    const full = lines.join('\n')
+    const label = createWorldLabel(full, {
       fontFamily: face.family,
       fontSize: face.size,
       fill: isThought ? THOUGHT_INK : SPEECH_INK,
@@ -311,6 +400,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     })
     const w = Math.ceil(label.width) + 2 * BUBBLE_PAD
     const h = Math.ceil(label.height) + 2 * BUBBLE_PAD
+    // A thought is not spoken, so it is not typed either.
+    const typed = isThought ? full.length : 0
+    if (typed !== full.length) label.text = ''
+    node.visible = bubbleInked(typed)
 
     // A THOUGHT IS A DIFFERENT MATERIAL, NEVER A THINNER ONE. Different paper, a dotted rim
     // and no tail at all — shape and paper, not `alpha: 0.55`.
@@ -337,14 +430,28 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     const glyph = glyphNode(isThought)
     glyph.visible = false
     node.addChild(box, glyph)
-    return { node, box, glyph, tail, fill, w, h }
+    return { node, box, glyph, tail, label, full, typed, fill, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
     if (isThought && thoughtsHidden(graveTone, viewer)) return // speech is world fact and passes
     const state = store.getState()
-    if (state?.agents[agentId] === undefined) return // visible agents only
+    const speaker = state?.agents[agentId]
+    if (speaker === undefined || !rendersOnMap(speaker)) return // visible agents only
     const now = performance.now()
+    if (isThought) {
+      const live = bubbles.filter((b) => b.isThought)
+      for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now
+    } else {
+      for (const b of bubbles) {
+        const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)
+        if (fate === 'end') b.dieMs = now
+        else if (fate === 'dim') {
+          b.dimMs = now
+          b.dieMs = now + PRIOR_HOLD_MS
+        }
+      }
+    }
     const built = build(agentId, text, isThought)
     scene.layers.bubbles.addChild(built.node)
     fadeArtIn(built.node) // NOTHING POPS IN — speech included
@@ -352,10 +459,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       agentId,
       ...built,
       bornMs: now,
-      dieMs: now + bubbleLife(text),
+      dieMs: now + bubbleLife(built.full, isThought),
       isThought,
+      dimMs: null,
       side: 'above',
     })
+    while (bubbles.length > BUBBLE_CAP) bubbles.shift()!.node.destroy({ children: true })
   }
 
   return {
@@ -381,9 +490,19 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       const inv = worldTextScale(zoom) * scene.textScale
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
-        if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
+        const said = state?.agents[b.agentId]
+        if (nowMs >= b.dieMs || said === undefined || !rendersOnMap(said)) {
           b.node.destroy({ children: true })
           bubbles.splice(i, 1)
+          continue
+        }
+        // Set only when the count moves: 28 texture rebuilds a second, not one a frame.
+        if (b.typed < b.full.length) {
+          const n = typedChars(b.full.length, nowMs - b.bornMs)
+          if (n !== b.typed) {
+            b.typed = n
+            b.label.text = b.full.slice(0, n)
+          }
         }
       }
       // Where each one WANTS to be, then one placement pass over the whole live set: a bubble
@@ -397,9 +516,10 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const drift = b.isThought
           ? (THOUGHT_DRIFT_PX * (nowMs - b.bornMs)) / (b.dieMs - b.bornMs)
           : 0
-        return { id: String(i), sx, sy: sy - CHAR_TARGET_PX - 18 - drift }
+        return { id: String(i), sx, sy, drift }
       })
       const view = scene.viewRect()
+      // The SPEAKER, not the box that floats over them: the lift belongs to the placement below.
       const seen = inViewSpeakers(at, view)
       const want = at.map((p, i) => {
         const b = bubbles[i]!
@@ -407,7 +527,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         b.box.visible = shown
         b.glyph.visible = !shown
         return {
-          ...p,
+          id: p.id,
+          sx: p.sx,
+          sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift,
           size: shown ? { w: b.w * inv, h: b.h * inv } : { w: GLYPH_W * inv, h: GLYPH_H * inv },
         }
       })
@@ -417,11 +539,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const b = bubbles[i]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's
         const p = want[i]!
-        b.node.visible = onLeash(placed.rect, p.sx, p.sy, p.size)
+        b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)
         if (!b.node.visible) continue
         // the last frames fade; the fade-in is a rAF on the node and is left alone once done
         const leaving = bubbleAlpha(b.dieMs - nowMs)
-        if (leaving < 1) b.node.alpha = leaving
+        const dim = b.dimMs === null ? 1 : PRIOR_ALPHA
+        if (leaving < 1 || dim < 1) b.node.alpha = Math.min(dim, leaving)
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {

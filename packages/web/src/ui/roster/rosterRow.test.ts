@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   bondFrom,
+  DAYS_PER_YEAR,
   type AssetRecord,
   type Bond,
   type BondsResponse,
@@ -110,7 +111,7 @@ function world(seeds: AgentSeed[], structures: Structure[] = [], tick = 0): Worl
       y: s.y ?? 0,
       alive: s.alive ?? true,
       asleep: s.asleep ?? false,
-      ageDays: s.ageDays ?? 30 * 364,
+      ageDays: s.ageDays ?? 30 * DAYS_PER_YEAR,
       needs: { hunger: 80, energy: 80, warmth: 80, social: 80 },
       hp: 100,
       injuries: [],

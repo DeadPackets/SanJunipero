@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type Database from 'better-sqlite3'
 import { openAgentDb } from './schema.js'
-import { MemoryStore, type MemoryTags } from './store.js'
+import { MemoryStore, type MemoryKind, type MemoryTags } from './store.js'
 import { FakeEmbedder } from '@sj/llm/testutil'
 import {
   DEFAULT_WEIGHTS,
@@ -11,6 +11,7 @@ import {
   keywords,
   retrieveAmbient,
   retrieveRecall,
+  type SceneCues,
 } from './retrieve.js'
 
 const TICKS_PER_DAY = 1440
@@ -158,7 +159,7 @@ describe('hybrid retrieval', () => {
       tags: EMPTY_TAGS,
     })
     const newer = await store.insertMemory({
-      tick: now,
+      tick: now - 1,
       kind: 'perception',
       text,
       importance: 5,
@@ -170,6 +171,7 @@ describe('hybrid retrieval', () => {
       now,
     )
     const ids = results.map((r) => r.id)
+    expect(ids).toContain(newer)
     expect(ids.indexOf(newer)).toBeLessThan(ids.indexOf(old))
   })
 
@@ -378,7 +380,7 @@ describe('hybrid retrieval', () => {
 
   it('caps the tag pool, so a long-tagged history does not grow the candidate set', async () => {
     const { store } = await makeStore()
-    const now = 400
+    const now = 2 * TICKS_PER_DAY
     for (let i = 0; i < 300; i += 1) {
       await store.insertMemory({
         tick: i,
@@ -395,6 +397,106 @@ describe('hybrid retrieval', () => {
       return inner(ids)
     }
     await retrieveAmbient(store, { people: ['yusuf'], place: null, topics: [] }, now)
+    expect(candidateCount).toBeGreaterThan(0)
     expect(candidateCount).toBeLessThanOrEqual(150)
+  })
+})
+
+// The prompt already carries today's perceptions, in order, as the day log. Serving them back
+// under "What you remember" spent the ambient slots on the message before.
+describe('today’s perceptions are the day log, not memory', () => {
+  const NOW = 5 * TICKS_PER_DAY + 600
+  const PLACE_CUE: SceneCues = { people: [], place: 'storehouse', topics: [] }
+  const AT_STOREHOUSE: MemoryTags = { people: [], place: 'storehouse', objects: [], topics: [] }
+
+  /** Leaves the tag as the only way in. */
+  function dropFromVec(db: Database.Database, id: number): void {
+    db.prepare('DELETE FROM memory_vec WHERE rowid = ?').run(BigInt(id))
+  }
+
+  /** fts5 external-content delete: the row keeps its text, the index forgets it. */
+  function dropFromFts(db: Database.Database, id: number, text: string): void {
+    db.prepare("INSERT INTO memories_fts(memories_fts, rowid, text) VALUES('delete', ?, ?)").run(
+      id,
+      text,
+    )
+  }
+
+  it('an ambient pass drops it and a recall pass still reaches it', async () => {
+    const { store } = await makeStore()
+    const id = await store.insertMemory({
+      tick: NOW - 60,
+      kind: 'perception',
+      text: 'the storehouse door swung in the wind',
+      importance: 5,
+      tags: AT_STOREHOUSE,
+    })
+    expect((await retrieveAmbient(store, PLACE_CUE, NOW)).map((r) => r.id)).not.toContain(id)
+    expect((await retrieveRecall(store, 'storehouse', NOW)).map((r) => r.id)).toContain(id)
+  })
+
+  // One test per candidate query. Each leaves exactly one pool able to admit the row, so a
+  // predicate missing from that pool shows up here rather than hiding behind another branch.
+  it('the FTS pool carries the predicate', async () => {
+    const { db, store } = await makeStore()
+    const text = 'the storehouse door swung in the wind'
+    const id = await store.insertMemory({
+      tick: NOW - 60,
+      kind: 'perception',
+      text,
+      importance: 5,
+      tags: EMPTY_TAGS,
+    })
+    dropFromVec(db, id)
+    expect((await retrieveRecall(store, 'storehouse', NOW)).map((r) => r.id)).toEqual([id])
+    expect(await retrieveAmbient(store, PLACE_CUE, NOW)).toEqual([])
+  })
+
+  it('the vector pool carries the predicate', async () => {
+    const { db, store } = await makeStore()
+    const text = 'storehouse'
+    const id = await store.insertMemory({
+      tick: NOW - 60,
+      kind: 'perception',
+      text,
+      importance: 5,
+      tags: EMPTY_TAGS,
+    })
+    dropFromFts(db, id, text)
+    expect((await retrieveRecall(store, 'storehouse', NOW)).map((r) => r.id)).toEqual([id])
+    expect(await retrieveAmbient(store, PLACE_CUE, NOW)).toEqual([])
+  })
+
+  it('the tag pool carries the predicate', async () => {
+    const { db, store } = await makeStore()
+    const id = await store.insertMemory({
+      tick: NOW - 60,
+      kind: 'perception',
+      text: 'the door swung in the wind',
+      importance: 5,
+      tags: AT_STOREHOUSE,
+    })
+    dropFromVec(db, id)
+    expect((await retrieveRecall(store, 'storehouse', NOW)).map((r) => r.id)).toEqual([id])
+    expect(await retrieveAmbient(store, PLACE_CUE, NOW)).toEqual([])
+  })
+
+  it('only today’s perception is out: yesterday’s and today’s other kinds stay', async () => {
+    const { store } = await makeStore()
+    const text = 'the storehouse door swung in the wind'
+    const insert = (tick: number, kind: MemoryKind): Promise<number> =>
+      store.insertMemory({ tick, kind, text, importance: 5, tags: AT_STOREHOUSE })
+    const yesterday = await insert(NOW - TICKS_PER_DAY, 'perception')
+    const todaysPerception = await insert(NOW - 60, 'perception')
+    const stay = [
+      yesterday,
+      await insert(NOW - 50, 'thought'),
+      await insert(NOW - 40, 'journal'),
+      await insert(NOW - 30, 'reflection'),
+    ]
+
+    const ids = (await retrieveAmbient(store, PLACE_CUE, NOW)).map((r) => r.id)
+    expect(ids).not.toContain(todaysPerception)
+    expect([...ids].sort((a, b) => a - b)).toEqual(stay.sort((a, b) => a - b))
   })
 })

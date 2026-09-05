@@ -1,15 +1,6 @@
 import { type WorldState } from '../state.js'
 import { dayPhaseFromTick, litSourceWithin, type SimConfig } from '@sj/shared'
 
-// Everything else costs the same in the dark as at noon: the night is a price change, not a curfew.
-export const NIGHT_WORK_VERBS: ReadonlySet<string> = new Set([
-  'build',
-  'craft',
-  'till',
-  'pave',
-  'dig_channel',
-])
-
 export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: string): boolean {
   if (!config.light.enabled) return false
   if (dayPhaseFromTick(state.tick) !== 'night') return false
@@ -19,14 +10,13 @@ export function fumblesInTheDark(state: WorldState, config: SimConfig, agentId: 
 }
 
 // The one derivation of what the dark costs. Never a refusal: burning fuel or burning time is
-// the body's own choice.
+// the body's own choice, and the night is a price change rather than a curfew. Which acts pay it
+// is each verb's own `needsLight`, never a list of names kept where the verbs cannot see it.
 export function workPenalty(
   state: WorldState,
   config: SimConfig,
   agentId: string,
-  verb: string,
+  needsLight: boolean,
 ): number {
-  return NIGHT_WORK_VERBS.has(verb) && fumblesInTheDark(state, config, agentId)
-    ? config.light.nightWorkPenalty
-    : 1
+  return needsLight && fumblesInTheDark(state, config, agentId) ? config.light.nightWorkPenalty : 1
 }

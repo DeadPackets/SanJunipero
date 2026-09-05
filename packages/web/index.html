@@ -78,6 +78,13 @@
         <p id="first-frame-note" role="status">Looking for the town…</p>
       </div>
     </div>
+    <!-- The first two lines a visitor reads, over the town rather than over the title card, so
+         they are shown the thing they name. Outside `#root`, which React clears on mount; the
+         sheet styles them, and `ui/firstFrame.ts` fills the count in and takes them away. -->
+    <div class="first-lines" id="first-frame-lines" hidden>
+      <p class="first-lines-head"></p>
+      <p class="first-lines-note">The camera finds the moments; drag to take it.</p>
+    </div>
     <noscript>
       <div class="no-script">
         <h1>San Junipero</h1>

@@ -15,10 +15,11 @@ import {
 import { assemblePrompt } from './assemble.js'
 import { makeablesLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES } from './rulesOfBeing.js'
+import { SCENE_ANSWER } from '../scene/sceneLlm.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
 // The constants themselves, not copies of them: a test that retypes the string it guards stops
 // guarding the day somebody edits the source and not the test.
-import { CRAFT_HINT, OPAQUE_REFUSAL, REPEATED_REFUSAL } from '../runtime/agentRuntime.js'
+import { CANNOT_BEGIN, CRAFT_HINT, OPAQUE_REFUSAL } from '../runtime/agentRuntime.js'
 
 describe('the prompt surfaces are clean', () => {
   it('block 1 — rules of being, capabilities and speech rules', () => {
@@ -75,8 +76,8 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
   // A mind's own day log carries ordinary English back into the prompt, so an ordinary word in
   // the enforced set crashes every remaining turn of its day.
   const ordinaryPhrases: Record<string, string> = {
-    milestone: 'Your mind wanders back over the day: finishing the roof felt like a milestone.',
-    milestones: 'Your mind wanders back over the day: the milestones of a long summer.',
+    milestone: 'Looking back over the day: finishing the roof felt like a milestone.',
+    milestones: 'Looking back over the day: the milestones of a long summer.',
     tier: 'Nadia stacked the baskets, the small ones on the upper tier.',
     tiers: 'The riverbank falls away in tiers down to the water.',
     construct: 'Omar means to construct a rail along the deck.',
@@ -86,6 +87,15 @@ describe("★ an ordinary English word must never kill a mind's day", () => {
     council: 'The neighbours held a council by the well.',
     market: 'I carried the hides down to the market.',
     custom: 'It is the custom here to eat after dark.',
+    arbiter: 'Halim stood between the two of them as arbiter, and both accepted it.',
+    arbiters: 'The old ones were the arbiters of every quarrel over a boundary stone.',
+    codex: 'A codex of remedies lay open on the shelf, its pages soft with use.',
+    ruling: 'The ruling passion of his life was the river and what it carried.',
+    rulings: 'Her rulings on who sat where at supper were never questioned.',
+    verdict: 'The verdict of the whole table was that the stew wanted salt.',
+    verdicts: 'Leyla hands down verdicts on every loaf that leaves her oven.',
+    schema: 'He drew a schema of the channel in the dust with a stick.',
+    schemas: 'Two schemas for the bridge lay side by side on the bench.',
   }
 
   it('the compacted day log may say milestone, tier or construct, byte for byte', () => {
@@ -170,7 +180,7 @@ describe('★ a ruling is our machinery writing into a mind, not a person speaki
       'the river runs too fast here to stand in',
       // ★ THE WIDER FALLBACK, and the loop-breaker. Both are mind-facing and both are ours.
       'you turn it over and it will not come together as it stands',
-      REPEATED_REFUSAL,
+      CANNOT_BEGIN,
       CRAFT_HINT,
       OPAQUE_REFUSAL,
     ]) {
@@ -319,7 +329,7 @@ describe('the naming law', () => {
       { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] },
       { x: 67, y: 94 },
     )
-    expect(line).toContain('The town keeps ground for a new roof at (67, 94)')
+    expect(line).toContain('The town keeps ground for a new building at (67, 94)')
     expect(scanForLayoutLeak(line)).toEqual([])
     expect(scanPromptForGlassLeak(line)).toEqual([])
     // And it says nothing at all when there is nowhere left, rather than an empty phrase.
@@ -344,5 +354,16 @@ describe('the naming law', () => {
   it('has one copy for the unnamed case, and it is not a label', () => {
     expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering not yet named')
     expect(scanPromptForGlassLeak(UNNAMED_CONSTRUCT_COPY)).toEqual([])
+  })
+})
+
+describe('★ the words a relationship is asked for in', () => {
+  it('leaves the four verbs and the scene answer clean of any ops word', () => {
+    expect(scanPromptForGlassLeak(CAPABILITIES)).toEqual([])
+    for (const verb of ['court', 'propose', 'lie_with', 'leave_partner']) {
+      expect(CAPABILITIES, verb).toContain(`${verb}: name it ${verb}`)
+      expect(scanPromptForGlassLeak(`name it ${verb}; give targetId`), verb).toEqual([])
+    }
+    expect(scanPromptForGlassLeak(SCENE_ANSWER)).toEqual([])
   })
 })

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import {
@@ -70,7 +70,7 @@ describe('asset http routes', () => {
       onTick: ({ tick, emit }) => {
         if (tick !== 1) return
         CAST.forEach((id, i) => {
-          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: 7300 })
+          emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: ADULT_AGE_DAYS })
         })
       },
     })
@@ -96,6 +96,15 @@ describe('asset http routes', () => {
 
   it('404s an unknown placeholder class', async () => {
     expect((await fetch(`${base}/assets/placeholder/spaceship.png`)).status).toBe(404)
+  })
+
+  // ★ A name every plain object answers to is not a class the town draws.
+  it('★ 404s a name the table inherits rather than holds', async () => {
+    for (const klass of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      const res = await fetch(`${base}/assets/placeholder/${klass}.png`)
+      expect(res.status, klass).toBe(404)
+      await res.text()
+    }
   })
 
   /** A sharp encode can fail — an exhausted libuv pool, an OOM on a big raw buffer. Unanswered,

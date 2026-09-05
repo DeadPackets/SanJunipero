@@ -119,11 +119,11 @@ describe('the town, seen from the world', () => {
 })
 
 describe('★ a build takes a plot, and the plot is never the asker s', () => {
-  it('ring 1 holds eleven more, and the twelfth crosses into ring 2', () => {
+  it('ring 1 holds nine more, and the tenth crosses into ring 2', () => {
     const { built } = raise(12)
     expect(built).toHaveLength(12)
-    expect(built.slice(0, 11).map((b) => b.rings)).toEqual(Array(11).fill(1))
-    expect(built[11]!.rings).toBe(2)
+    expect(built.slice(0, 9).map((b) => b.rings)).toEqual(Array(9).fill(1))
+    expect(built[9]!.rings).toBe(2)
   })
 
   it('every building any sequence of claims can raise keeps the grammar s floor', () => {
@@ -212,10 +212,10 @@ describe('how many rings are standing', () => {
   })
 
   it('rises to two the moment a building stands on a ring-2 plot, and not before', () => {
-    const { built, standing } = raise(11)
+    const { built, standing } = raise(9)
     expect(ringsStanding(TOWN_SQUARE, standing)).toBe(1)
-    expect(built[10]!.rings).toBe(1)
-    const two = raise(12).standing
+    expect(built[8]!.rings).toBe(1)
+    const two = raise(10).standing
     expect(ringsStanding(TOWN_SQUARE, two)).toBe(2)
   })
 
@@ -416,8 +416,8 @@ describe('★ a plot you cannot walk to is not ground the town keeps for you', (
   it('★ a deck across the channel opens the far bank, and it is the FIRST plot ring 2 offers', () => {
     const crossing = deck(dry, span(-3))
     const blocks = offered(crossing, 80)
-    expect(blocks.slice(0, 11).every((k) => Number(k.split(',')[0]) > -2)).toBe(true)
-    expect(blocks[11]).toBe('-2,0')
+    expect(blocks.slice(0, 9).every((k) => Number(k.split(',')[0]) > -2)).toBe(true)
+    expect(blocks[9]).toBe('-2,0')
     // Every one of the five west blocks joins the town, not just the one the deck touches —
     // and the deck stands beside block (-1,-1), none of them.
     for (const k of ['-2,0', '-2,-1', '-2,1', '-2,-2', '-2,2']) expect(blocks, k).toContain(k)

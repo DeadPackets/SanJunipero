@@ -9,6 +9,7 @@ import {
   thirstDecayPerTick,
 } from './config.js'
 import { CITY_BED_KIND, CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
+import { DURATION_TICKS } from './duration.js'
 import { MINUTES_PER_DAY } from './time.js'
 
 // Every section flag, in the order they will be unpinned.
@@ -32,8 +33,8 @@ const C11_FLAGS = [
 describe('SimConfigSchema', () => {
   it('defaults carry the binding values', () => {
     const c = SimConfigSchema.parse({})
-    expect(c.needs.hungerDecayPerTick).toBe(0.021)
-    expect(c.needs.deathAfterZeroHungerTicks).toBe(2880)
+    expect(c.needs.hungerDecayPerTick).toBe(0.01)
+    expect(c.needs.deathAfterZeroHungerTicks).toBe(5760)
     expect(c.movement.sightRadius).toBe(12)
     expect(c.health.injuryDamage.grave).toBe(60)
     expect(c.skills.tracks).toHaveLength(12)
@@ -138,11 +139,9 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(inTheRoom).toContain(CITY_BED_KIND)
   })
 
-  it('reproduction: partnership, conception, gestation, fertility', () => {
-    expect(c.reproduction.coSleepNightsToPartner).toBe(3)
-    expect(c.reproduction.partnerWindowDays).toBe(7)
-    expect(c.reproduction.conceptionChancePerNight).toBe(0.2)
-    expect(c.reproduction.gestationDays).toBe(72)
+  it('reproduction: gestation and fertility — the chance of a child is not a dial', () => {
+    expect(c.reproduction).not.toHaveProperty('conceptionChancePerNight')
+    expect(c.reproduction.gestationDays).toBe(20)
     expect(c.reproduction.fertileYears).toEqual({ from: 16, to: 45 })
   })
 
@@ -186,7 +185,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(() => SimConfigSchema.parse({ seasons: { winter: { bogus: 1 } } })).toThrow()
     const o = SimConfigSchema.parse({ reproduction: { gestationDays: 1 } })
     expect(o.reproduction.gestationDays).toBe(1)
-    expect(o.reproduction.coSleepNightsToPartner).toBe(3)
+    expect(o.reproduction.enabled).toBe(true)
     expect(o.spoilage.enabled).toBe(true)
   })
 
@@ -201,8 +200,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     const c = SimConfigSchema.parse({})
     expect(c.mortality.drainPerTick).toEqual({
       injury: 0.025,
-      poison: 0.12,
-      illness: 0.08,
+      poison: 0.08,
+      illness: 0.04,
       fatigue: 0.04,
     })
     expect(c.mortality.hungerHpDrainPerTick).toBe(0.04)
@@ -218,7 +217,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.illness.contagionEnabled).toBe(true)
     expect(c.illness.contagionChance).toBe(0.06)
     expect(c.illness.contagionRadius).toBe(3)
-    expect(c.thirst.decayFactorOfHunger).toBe(0.6)
+    expect(c.thirst.decayFactorOfHunger).toBe(0.4)
     expect(c.thirst.drinkRestore).toBe(60)
     expect(c.thirst.waterskinCharges).toBe(4)
   })
@@ -233,7 +232,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
 
   // The spec writes thirst decay as a derivation, so it is exported once.
   it('thirstDecayPerTick is the one derivation of the slower clock', () => {
-    expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.0126, 10)
+    expect(thirstDecayPerTick(DEFAULT_CONFIG)).toBeCloseTo(0.004, 10)
     const fast = SimConfigSchema.parse({
       needs: { hungerDecayPerTick: 0.1 },
       thirst: { decayFactorOfHunger: 0.5 },
@@ -244,7 +243,11 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   it('ground, water and road dials carry their exact values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.fertility).toEqual({ enabled: true, radius: 3, waterBonus: 0.5, maxMultiplier: 1.5 })
-    expect(c.roads).toEqual({ enabled: true, stonePerTile: 1, paveDurationTicks: 6 })
+    expect(c.roads).toEqual({
+      enabled: true,
+      stonePerTile: 1,
+      paveDurationTicks: DURATION_TICKS.minutes,
+    })
     expect(c.desirePaths).toEqual({
       enabled: true,
       wearThreshold: 120,
@@ -280,7 +283,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   it('warmth and light carry the ratified values', () => {
     const c = SimConfigSchema.parse({})
     expect(c.warmth.comfortBand).toBe(8)
-    expect(c.warmth.exposureDecayPerTick).toBe(0.15)
+    expect(c.warmth.exposureDecayPerTick).toBe(0.08)
     expect(c.warmth.coldEnergyDrainShare).toBe(0.5)
     expect(c.warmth.heatRadius).toBe(2)
     expect(c.warmth.insulation).toEqual({ garment: 12 })

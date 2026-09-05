@@ -161,7 +161,7 @@ async function runArm(
     if (v.kind === 'attempt') {
       // The only honest measure of "would codify": run the same call the runtime runs.
       try {
-        arbiter.codify(v.recipe, { agentId: AGENT.agentId, intent })
+        arbiter.codify(v, { agentId: AGENT.agentId, intent })
         codified = true
       } catch {
         codified = false

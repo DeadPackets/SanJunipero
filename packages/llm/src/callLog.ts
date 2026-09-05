@@ -25,6 +25,14 @@ export type LlmCallInsert = {
   finishReason: string | null
   ok: boolean
   error: string | null
+  // Which `WakeReason` bought this call. Null for every caller that has no wake.
+  wakeReason?: string | null
+  // Every reason that was true at that tick, deciding one first, as a JSON array. The winner
+  // alone hides the overlap: the reason below it would have bought the call anyway.
+  wakeReasons?: readonly string[] | null
+  // One JSON object, not a column per block: the blocks change as the prompt does, and a
+  // schema migration for each is not worth it.
+  blockTokens?: Record<string, number> | null
 }
 
 export function migrateLlmTables(db: Database.Database): void {
@@ -47,7 +55,10 @@ export function migrateLlmTables(db: Database.Database): void {
       error TEXT,
       provider TEXT,
       finish_reason TEXT,
-      generation_id TEXT
+      generation_id TEXT,
+      wake_reason TEXT,
+      wake_reasons TEXT,
+      block_tokens TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_llm_calls_caller ON llm_calls(caller);
     CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts);
@@ -76,6 +87,9 @@ export function migrateLlmTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
   `)
+  // A reservation is released in a JS `finally`, which a kill never reaches. One process owns
+  // this ledger, so anything still reserved when it opens belongs to a run that is gone.
+  db.exec('DELETE FROM llm_reservations')
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
@@ -90,6 +104,15 @@ export function migrateLlmTables(db: Database.Database): void {
   }
   if (!cols.some((c) => c.name === 'generation_id')) {
     db.exec('ALTER TABLE llm_calls ADD COLUMN generation_id TEXT')
+  }
+  if (!cols.some((c) => c.name === 'wake_reason')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN wake_reason TEXT')
+  }
+  if (!cols.some((c) => c.name === 'wake_reasons')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN wake_reasons TEXT')
+  }
+  if (!cols.some((c) => c.name === 'block_tokens')) {
+    db.exec('ALTER TABLE llm_calls ADD COLUMN block_tokens TEXT')
   }
   const outcomeCols = db.prepare('PRAGMA table_info(turn_outcomes)').all() as { name: string }[]
   if (!outcomeCols.some((c) => c.name === 'plan_continued')) {
@@ -129,8 +152,15 @@ export function sumReserved(db: Database.Database, caller: string): number {
   return row.total
 }
 
+/** This caller's own ceiling for a rolling day, and where that day starts. */
+type CallerRail = { usd: number; sinceMs: number }
+
+/** A reservation, or the reason it was refused — the lifetime budget or this caller's own rail.
+ *  Two shapes and not one null, because a rail holds ONE caller and the budget stops the run. */
+export type Reserved = { id: number } | { held: 'budget' | 'rail'; spentUsd: number }
+
 export type BudgetGuard = {
-  reserve(expectedUsd: number, budgetUsd: number | null): number | null
+  reserve(expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved
   release(reservationId: number): void
   sumReserved(): number
 }
@@ -142,15 +172,22 @@ export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGu
     'INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)',
   )
   const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')
-  const reserve = db.transaction((expectedUsd: number, budgetUsd: number | null): number | null => {
-    if (
-      budgetUsd !== null &&
-      sumCostUsd(db, caller) + sumReserved(db, caller) + expectedUsd > budgetUsd
-    ) {
-      return null
-    }
-    return Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid)
-  })
+  const reserve = db.transaction(
+    (expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved => {
+      const held = sumReserved(db, caller)
+      const lifetime = sumCostUsd(db, caller)
+      if (budgetUsd !== null && lifetime + held + expectedUsd > budgetUsd) {
+        return { held: 'budget', spentUsd: lifetime }
+      }
+      // The rail joins the same transaction the budget is read in: a runaway caller must not be
+      // able to spend between one read of the ledger and the next.
+      if (rail !== null) {
+        const today = sumCostUsdSince(db, caller, rail.sinceMs)
+        if (today + held + expectedUsd > rail.usd) return { held: 'rail', spentUsd: today }
+      }
+      return { id: Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid) }
+    },
+  )
   return {
     reserve,
     release: (reservationId) => {
@@ -160,31 +197,56 @@ export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGu
   }
 }
 
-export function insertLlmCall(db: Database.Database, call: LlmCallInsert): void {
-  db.prepare(
-    `INSERT INTO llm_calls
+/** Returns the row it wrote, so a fact the caller only learns after the answer parses can be
+ *  merged into the same row rather than guessed at from the outside. */
+export function insertLlmCall(db: Database.Database, call: LlmCallInsert): number {
+  const info = db
+    .prepare(
+      `INSERT INTO llm_calls
        (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
         reasoning_tokens, cost_usd, estimated_cost_usd, reported_cost_usd, latency_ms, ok,
-        error, provider, finish_reason, generation_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    Date.now(),
-    call.agentId,
-    call.caller,
-    call.model,
-    call.inputTokens,
-    call.outputTokens,
-    call.cacheReadTokens,
-    call.reasoningTokens,
-    call.costUsd,
-    call.estimatedCostUsd,
-    call.reportedCostUsd,
-    Math.round(call.latencyMs),
-    call.ok ? 1 : 0,
-    call.error,
-    call.provider,
-    call.finishReason,
-    call.generationId ?? null,
+        error, provider, finish_reason, generation_id, wake_reason, wake_reasons, block_tokens)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      Date.now(),
+      call.agentId,
+      call.caller,
+      call.model,
+      call.inputTokens,
+      call.outputTokens,
+      call.cacheReadTokens,
+      call.reasoningTokens,
+      call.costUsd,
+      call.estimatedCostUsd,
+      call.reportedCostUsd,
+      Math.round(call.latencyMs),
+      call.ok ? 1 : 0,
+      call.error,
+      call.provider,
+      call.finishReason,
+      call.generationId ?? null,
+      call.wakeReason ?? null,
+      call.wakeReasons == null ? null : JSON.stringify(call.wakeReasons),
+      call.blockTokens == null ? null : JSON.stringify(call.blockTokens),
+    )
+  return Number(info.lastInsertRowid)
+}
+
+/** What the answer committed to, which the caller only learns once the plan has parsed. */
+export function mergeBlockTokens(
+  db: Database.Database,
+  id: number,
+  patch: Record<string, number>,
+): void {
+  const row = db.prepare('SELECT block_tokens AS json FROM llm_calls WHERE id = ?').get(id) as
+    | { json: string | null }
+    | undefined
+  if (row === undefined) return
+  const base = row.json === null ? {} : (JSON.parse(row.json) as Record<string, number>)
+  db.prepare('UPDATE llm_calls SET block_tokens = ? WHERE id = ?').run(
+    JSON.stringify({ ...base, ...patch }),
+    id,
   )
 }
 
@@ -216,8 +278,13 @@ export type UnattributedCall = {
  *  still has one. A row outside the band is never asked about again. */
 export function unattributedCalls(
   db: Database.Database,
-  window: { from: number; until: number; limit: number },
+  window: { from: number; until: number; limit: number; skip?: readonly string[] },
 ): UnattributedCall[] {
+  const skip = window.skip ?? []
+  // Excluded in SQL, not after: filtered afterwards they would still fill the limit and hold
+  // every newer row out of the window.
+  const notThese =
+    skip.length === 0 ? '' : `AND generation_id NOT IN (${skip.map(() => '?').join(',')})`
   return db
     .prepare(
       `SELECT id, generation_id AS generationId, agent_id AS agentId, model,
@@ -225,10 +292,10 @@ export function unattributedCalls(
               cache_read_tokens AS cacheReadTokens
          FROM llm_calls
         WHERE provider IS NULL AND generation_id IS NOT NULL AND ok = 1
-          AND ts >= ? AND ts <= ?
+          AND ts >= ? AND ts <= ? ${notThese}
         ORDER BY id LIMIT ?`,
     )
-    .all(window.from, window.until, window.limit) as UnattributedCall[]
+    .all(window.from, window.until, ...skip, window.limit) as UnattributedCall[]
 }
 
 export type CallPricing = {
@@ -251,4 +318,38 @@ export function sumCostUsd(db: Database.Database, caller: string): number {
     .prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ?')
     .get(caller) as { total: number }
   return row.total
+}
+
+/** What this caller has spent inside a rolling window. `idx_llm_calls_caller` serves it. */
+function sumCostUsdSince(db: Database.Database, caller: string, sinceMs: number): number {
+  const row = db
+    .prepare(
+      'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ? AND ts >= ?',
+    )
+    .get(caller, sinceMs) as { total: number }
+  return row.total
+}
+
+/** When the oldest call still inside the window was billed — the moment the window rolls off it
+ *  and the caller has room again. Null when it has spent nothing in the window at all. */
+export function oldestCallTsSince(
+  db: Database.Database,
+  caller: string,
+  sinceMs: number,
+): number | null {
+  const row = db
+    .prepare('SELECT MIN(ts) AS ts FROM llm_calls WHERE caller = ? AND ts >= ?')
+    .get(caller, sinceMs) as { ts: number | null }
+  return row.ts
+}
+
+/** The operator's own line, newest first is not wanted here: the stream logs them in order. */
+export function alertsSince(
+  db: Database.Database,
+  afterId: number,
+  kind: string,
+): { id: number; detail: string }[] {
+  return db
+    .prepare('SELECT id, detail FROM alerts WHERE id > ? AND kind = ? ORDER BY id')
+    .all(afterId, kind) as { id: number; detail: string }[]
 }

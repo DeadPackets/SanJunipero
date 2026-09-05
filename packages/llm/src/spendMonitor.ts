@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { MINUTES_PER_DAY, TICK_REAL_MS } from '@sj/shared'
 import { insertAlert } from './callLog.js'
+import { MIND_MODEL, PINNED_CALLERS, modelFor } from './pins.js'
 
 // Derived, never typed: a window of W real minutes covers W/48 of a sim-day at the shipped
 // tick, and its spend scales by 48/W to reach $/sim-day. Moving the tick moves this with it.
@@ -13,8 +14,13 @@ export const DEFAULT_SPEND_THRESHOLD_USD_PER_SIM_DAY = 0.4
 export const REAL_MINUTES_PER_SIM_HOUR = REAL_MINUTES_PER_SIM_DAY / 24
 
 /** The callers a mind's own thinking goes through, and the only ones the per-mind rate counts.
- *  The narrator, the arbiter, the tier-2.5 pass and the forge are town work at any cast size. */
-export const MIND_CALLERS: string[] = ['turn', 'reflection', 'reflection.edit', 'dream', 'recall']
+ *  The narrator, the arbiter, the tier-2.5 pass and the forge are town work at any cast size.
+ *  Read off the pins, or a caller put on the mind's route is invisible to the ceiling it drives:
+ *  `preflight` is a fixed few calls before any mind exists, and `recall` has no pin of its own. */
+export const MIND_CALLERS: string[] = [
+  ...PINNED_CALLERS.filter((c) => c !== 'preflight' && modelFor(c) === MIND_MODEL),
+  'recall',
+]
 
 const MIND_CALLER_SLOTS = MIND_CALLERS.map(() => '?').join(',')
 
@@ -182,12 +188,14 @@ export function projectDailySpend(
 
 // A call that came back with nothing was still paid for, and the provider says so one of two
 // ways; the retry path swallows both.
-export type FailureClass = 'empty_output' | 'unparseable' | 'other'
+export type FailureClass = 'empty_output' | 'unparseable' | 'aborted' | 'other'
 
 export function classifyFailure(error: string | null): FailureClass {
   if (error === null) return 'other'
   if (/no output generated/i.test(error)) return 'empty_output'
   if (/no object generated|could not parse/i.test(error)) return 'unparseable'
+  // No tokens, no generation id, $0: the one failure the caps and the backfill are both blind to.
+  if (/\baborted\b|\btimed? ?out\b/i.test(error)) return 'aborted'
   return 'other'
 }
 
@@ -195,11 +203,18 @@ export type DeadCalls = {
   calls: number
   emptyOutput: number
   unparseable: number
+  aborted: number
   otherFailures: number
 }
 export type DeadCallRow = DeadCalls & { agentId: string | null; day: string }
 
-const NO_DEAD_CALLS: DeadCalls = { calls: 0, emptyOutput: 0, unparseable: 0, otherFailures: 0 }
+const NO_DEAD_CALLS: DeadCalls = {
+  calls: 0,
+  emptyOutput: 0,
+  unparseable: 0,
+  aborted: 0,
+  otherFailures: 0,
+}
 
 // The wall-clock day, which is the only day `llm_calls` knows: it carries no tick.
 const dayOf = (ts: number): string => new Date(ts).toISOString().slice(0, 10)
@@ -223,6 +238,7 @@ export function deadCallCounts(
     const cls = classifyFailure(row.error)
     if (cls === 'empty_output') acc.emptyOutput += 1
     else if (cls === 'unparseable') acc.unparseable += 1
+    else if (cls === 'aborted') acc.aborted += 1
     else acc.otherFailures += 1
     byKey.set(key, acc)
   }
@@ -237,6 +253,7 @@ export const sumDeadCalls = (rows: DeadCallRow[]): DeadCalls =>
       calls: acc.calls + r.calls,
       emptyOutput: acc.emptyOutput + r.emptyOutput,
       unparseable: acc.unparseable + r.unparseable,
+      aborted: acc.aborted + r.aborted,
       otherFailures: acc.otherFailures + r.otherFailures,
     }),
     NO_DEAD_CALLS,
@@ -251,7 +268,8 @@ export function reportDeadCalls(
   for (const row of rows) {
     const detail =
       `${row.agentId ?? 'the run'} on ${row.day}: ${row.calls} paid calls came back with nothing — ` +
-      `${row.emptyOutput} empty, ${row.unparseable} unparseable, ${row.otherFailures} otherwise failed`
+      `${row.emptyOutput} empty, ${row.unparseable} unparseable, ${row.aborted} cut off by the` +
+      ` bound and billed to nobody, ${row.otherFailures} otherwise failed`
     insertAlert(db, { agentId: row.agentId, kind: 'llm_dead_calls', detail })
     console.warn(`dead calls: ${detail}`)
   }

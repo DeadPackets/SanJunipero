@@ -37,6 +37,16 @@ export function doorTile(state: WorldState, s: Structure): Point | null {
 const onCorner = (s: { x: number; y: number; w: number; h: number }, p: Point): boolean =>
   (p.x < s.x || p.x >= s.x + s.w) && (p.y < s.y || p.y >= s.y + s.h)
 
+/** A roof of yours: one you own, or one your own things already live in — a couple's house
+ *  carries one partner's name, and genesis seats a founder by putting their kit in their roof. */
+export function isYourRoof(state: WorldState, agentId: string, s: Structure): boolean {
+  if (s.stage !== 'complete') return false
+  if (s.owner === agentId) return true
+  return Object.values(state.items).some(
+    (i) => i.owner === agentId && i.loc.t === 'structure' && i.loc.id === s.id,
+  )
+}
+
 export function insideOf(state: WorldState, agentId: string): string | null {
   return state.agents[agentId]?.insideId ?? null
 }

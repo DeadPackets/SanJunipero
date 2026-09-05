@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, SimConfigSchema, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  SimConfigSchema,
+  type SimConfig,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
@@ -22,7 +28,11 @@ function world(config = DEFAULT_CONFIG): WorldState {
     config,
     ROWS.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
 }
 
 function withStorehouse(s: WorldState, config = DEFAULT_CONFIG): WorldState {
@@ -199,10 +209,13 @@ describe('perception smells it coming', () => {
   const perceive = (s: WorldState, config = DEFAULT_CONFIG) =>
     composePerception(s, config, 'a1', [])
 
-  it('flags a fish only on its final day', () => {
-    const s = withFood(world(), 'fish', { t: 'tile', x: 1, y: 1 })
-    expect(perceive(s).visible.items[0]).not.toHaveProperty('spoiling')
-    expect(perceive({ ...s, tick: MINUTES_PER_DAY }).visible.items[0]!.spoiling).toBe(true)
+  // Six days of bread on the open ground is three, so the last of them is day two.
+  it('flags a loaf on the ground only on its final day, which the ground brings forward', () => {
+    const s = withFood(world(), 'bread', { t: 'tile', x: 1, y: 1 })
+    expect(perceive({ ...s, tick: MINUTES_PER_DAY }).visible.items[0]).not.toHaveProperty(
+      'spoiling',
+    )
+    expect(perceive({ ...s, tick: 2 * MINUTES_PER_DAY }).visible.items[0]!.spoiling).toBe(true)
   })
 
   it('flags the fish in your own hands too', () => {

@@ -17,6 +17,10 @@ export const FEET_Y = 88
 const WALK_FPS = 8
 export const WALK_LOOP = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // v2, 8fps
 export const BOB_PX = 1 // passing frames render 1px lower — render-time only, never baked
+/** ★ A STANDING BODY BREATHES. `idle` was one frame at `bobY: 0`, so anybody not walking was a
+ *  statue. Two steps a whole pixel apart on a 450 ms hold is the pixel-art practice, and the
+ *  phase is the body's own gait, so a group standing together does not breathe in unison. */
+export const IDLE_BREATH_MS = 450
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
 export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
@@ -109,7 +113,9 @@ export function charPose(
     const bobbing = opts.bob !== false && (row === 'passing-a' || row === 'passing-b')
     return { row, facing: a.facing, bobY: bobbing ? BOB_PX : 0 }
   }
-  return { row: 'idle', facing: a.facing, bobY: 0 }
+  if (opts.bob === false) return { row: 'idle', facing: a.facing, bobY: 0 }
+  const step = Math.floor(a.nowMs / IDLE_BREATH_MS + (opts.phase ?? 0) * 2)
+  return { row: 'idle', facing: a.facing, bobY: (((step % 2) + 2) % 2) * BOB_PX }
 }
 
 // ── THE STRIDE FOLLOWS THE GROUND ─────────────────────────────────────────────────────────

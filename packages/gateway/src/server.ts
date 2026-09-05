@@ -6,6 +6,9 @@ import {
   CLOSE_BAD_HELLO,
   DEFAULT_CONFIG,
   PROTOCOL_VERSION,
+  TICK_REAL_MS,
+  agentName,
+  personAt,
   type AssetRecord,
   type SimConfig,
 } from '@sj/shared'
@@ -14,9 +17,12 @@ import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { thoughtsSince } from './observer.js'
+import { makeSceneRelay } from './scenes.js'
+import { makeDirector } from './stakes.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
+import { makeMomentsReader } from './moments.js'
 import { mountConstructsApi } from './constructs.js'
 import { mountBondsApi } from './bonds.js'
 import { mountLineageApi } from './lineage.js'
@@ -46,6 +52,7 @@ export type GatewayOpts = {
   paused?: () => boolean // the world clock's own state; absent → the town is always running
   onViewers?: (count: number) => void // live viewer count, as one greets and as one leaves
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
+  replayMsPerTick?: number // default TICK_REAL_MS — the cadence a replay plays the past back at
 }
 export type Gateway = { port: number; close(): Promise<void>; pump(): void } // pump exposed for tests
 
@@ -114,15 +121,16 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
 
   mountAssetRoutes(router, {
     getCodex,
-    knowsAgent: (id) => mirror.state().agents[id] !== undefined,
+    knowsAgent: (id) => personAt(mirror.state().agents, id) !== undefined,
   })
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
+  const moments = makeMomentsReader({ db, mirror, narratorDb })
   const closeConstructsApi = mountConstructsApi(router, { agentDbDir: opts.agentDbDir })
   mountBondsApi(router, { db, mirror, config })
   mountLineageApi(router, { db, mirror })
   mountDiscoveryApi(router, { db, mirror })
-  const shareDeps = { mirror, narratorDb, getCodex }
+  const shareDeps = { mirror, narratorDb, getCodex, moments }
   mountShareCard(router, shareDeps)
   mountCrawlerRoutes(router, { mirror, narratorDb })
 
@@ -257,6 +265,19 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     return scrubTokens > 0
   }
 
+  // ── replay cursors ──
+  // A replay pays for ONE fold, at its first minute; every minute after it is a read of the log
+  // forwarded in the frame shape a live delta already has. Its own scene relay, because the live
+  // one holds the open scenes of the town's present.
+  type Replay = { tick: number; nextAtMs: number; scenes: ReturnType<typeof makeSceneRelay> }
+  const replays = new Map<WebSocket, Replay>()
+  const replayMsPerTick = opts.replayMsPerTick ?? TICK_REAL_MS
+  const endReplay = (sock: WebSocket): boolean => {
+    if (!replays.delete(sock)) return false
+    hub.setMuted(sock, false)
+    return true
+  }
+
   const removers = new Map<WebSocket, () => void>()
   const maxViewers = opts.maxViewers ?? DEFAULT_MAX_VIEWERS
   wss.on('connection', (sock: WebSocket) => {
@@ -277,6 +298,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }, HELLO_DEADLINE_MS)
     let scrubAt = 0 // last answered scrub, for coalescing
     let liveAt = 0 // last answered `live`, on its own clock: a drag ends with one of them
+    let replayAt = 0 // last opened replay: the same floor, because it pays the same fold
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -299,6 +321,39 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       }
       sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
       scrubTokens -= performance.now() - startedAt
+    }
+
+    const answerReplay = (req: { from: number; reqId: number }): void => {
+      // First, whatever this socket was already playing: every path below leaves it somewhere
+      // else, and a cursor left running would send minutes into a view that has moved on.
+      endReplay(sock)
+      // Nothing recorded to play: the town has not lived that minute yet, so it hands back now.
+      if (req.from >= mirror.state().tick) {
+        sock.send(snapshotJson())
+        return
+      }
+      if (!takeScrubBudget()) {
+        sock.send(busyScrubJson(req.reqId))
+        return
+      }
+      const startedAt = performance.now()
+      const at = mirror.snapshotAt(req.from)
+      sock.send(
+        JSON.stringify({
+          t: 'replaying',
+          reqId: req.reqId,
+          tick: req.from,
+          seq: at.seq,
+          state: at.state,
+        }),
+      )
+      scrubTokens -= performance.now() - startedAt
+      hub.setMuted(sock, true)
+      replays.set(sock, {
+        tick: req.from,
+        nextAtMs: Date.now() + replayMsPerTick,
+        scenes: makeSceneRelay(),
+      })
     }
 
     sock.on('message', (data) => {
@@ -333,6 +388,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             sock.send(catchUpJson)
           }
         }
+        // The shot the town is already on. A replaying socket never gets one: a moment's own
+        // cast owns that camera.
+        if (directorJson !== null) sock.send(directorJson)
         return
       }
       if (msg.t === 'scrub') {
@@ -349,11 +407,19 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           pendingScrub = null
           if (next !== null && sock.readyState === OPEN) answerScrub(next)
         }, SCRUB_MIN_MS - since)
+      } else if (msg.t === 'replay') {
+        const now = Date.now()
+        if (now - replayAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
+        replayAt = now
+        answerReplay(msg)
       } else if (msg.t === 'live') {
         // A full snapshot per 40-byte frame, otherwise: the same floor a scrub gets, on its own
         // clock so ending a drag is never the ask that gets dropped.
         const now = Date.now()
-        if (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
+        // A replay ends on this frame and nothing follows it — the floor may drop a spare `live`,
+        // never the one that hands a viewer back the live town.
+        const ending = endReplay(sock)
+        if (!ending && (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED)) return
         liveAt = now
         sock.send(snapshotJson())
       }
@@ -361,6 +427,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     sock.on('close', () => {
       clearTimeout(helloTimer)
       if (scrubTimer !== null) clearTimeout(scrubTimer)
+      replays.delete(sock)
       removers.get(sock)?.()
       removers.delete(sock)
       opts.onViewers?.(hub.size())
@@ -368,9 +435,51 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   })
 
   // ── poll pump ──
+  const sceneFrames = makeSceneRelay()
+  // What the camera is on, folded off the same groups the deltas ride. Read-only on the world:
+  // the names and the partnerships come out of the mirror's own state.
+  const director = makeDirector(
+    (id) => agentName(mirror.state().agents, id),
+    (id) => personAt(mirror.state().agents, id)?.partnerId ?? null,
+  )
+  director.prime(db, mirror.state().tick)
+  let directorJson: string | null = null
+  /** The cut, the beat and the act without the tick, which moves every minute on its own. */
+  let directorMark = ''
   let lastThoughtId = 0
   let lastAssetSeq = 0
   let observerSeen = false
+  /** One recorded minute per replaying socket per beat, at the live cadence. No fold and no
+   *  stringify of state: the log's own rows, in the frame shape the viewer already folds. */
+  const driveReplays = (now: number): void => {
+    for (const [sock, cur] of replays) {
+      if (sock.readyState !== OPEN) {
+        replays.delete(sock)
+        continue
+      }
+      // Held rather than dropped: a replayed minute a viewer misses is a hole in its own fold.
+      if (now < cur.nextAtMs || sock.bufferedAmount > MAX_BUFFERED) continue
+      if (cur.tick >= mirror.state().tick) {
+        endReplay(sock)
+        sock.send(snapshotJson())
+        continue
+      }
+      // The bucket a scrub drains, and it is the whole town's: with it empty every replay holds
+      // its minute rather than spending the thread that ticks. They catch up on the next beat.
+      if (!takeScrubBudget()) break
+      const startedAt = performance.now()
+      const next = cur.tick + 1
+      for (const g of mirror.eventsBetween(cur.tick, next)) {
+        const seq = g.events[g.events.length - 1]!.seq
+        sock.send(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
+        for (const frame of cur.scenes(g.events)) sock.send(JSON.stringify(frame))
+      }
+      cur.tick = next
+      cur.nextAtMs = Math.max(now, cur.nextAtMs + replayMsPerTick)
+      scrubTokens -= performance.now() - startedAt
+    }
+  }
+
   const pump = (): void => {
     // A stopped clock sends no deltas. Its own frame, because re-broadcasting the snapshot would
     // yank a scrubbing viewer back to the live edge.
@@ -388,13 +497,28 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     for (const g of groups) {
       const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
+      for (const frame of sceneFrames(g.events)) hub.broadcast(JSON.stringify(frame))
+      director.fold(g.events)
+    }
+    const cut = director.frame(mirror.state().tick)
+    const mark = JSON.stringify([cut.cut, cut.quiet, cut.act])
+    if (mark !== directorMark) {
+      directorMark = mark
+      directorJson = JSON.stringify(cut)
+      hub.broadcast(directorJson)
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {
       for (const t of thoughtsSince(db, lastThoughtId)) {
         lastThoughtId = t.id
         hub.broadcast(
-          JSON.stringify({ t: 'thought', agentId: t.agentId, tick: t.tick, text: t.text }),
+          JSON.stringify({
+            t: 'thought',
+            agentId: t.agentId,
+            tick: t.tick,
+            text: t.text,
+            importance: t.importance,
+          }),
         )
       }
     }
@@ -406,6 +530,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         hub.broadcast(JSON.stringify({ t: 'assets', records: fresh }))
       }
     }
+    driveReplays(Date.now())
   }
   const timer = setInterval(pump, opts.pollMs ?? DEFAULT_POLL_MS)
 

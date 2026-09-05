@@ -29,6 +29,13 @@ describe('mechanicalGate', () => {
     const r = mechanicalGate(img(2, 2, [1, 2, 3, 255]), { w: 2, h: 2, requireAlpha: true })
     expect(r.failures.join()).toMatch(/alpha/)
   })
+  it('fails a near-empty cell — a corner smudge clears every other check', () => {
+    const i = img(64, 64, [0, 0, 0, 0])
+    for (let p = 0; p < 12; p++) i.data.set([1, 2, 3, 255], p * 4)
+    const r = mechanicalGate(i, { w: 64, h: 64, requireAlpha: true })
+    expect(r.ok).toBe(false)
+    expect(r.failures.join()).toMatch(/empty/)
+  })
   it('fails when the cut left nothing opaque', () => {
     const r = mechanicalGate(img(2, 2, [0, 0, 0, 0]), { w: 2, h: 2, requireAlpha: true })
     expect(r.failures.join()).toMatch(/empty/)
@@ -84,29 +91,35 @@ describe('refusalMessage — choosing is not deciding', () => {
   })
 })
 
-// `gen-cast-v5.ts` is live-spend and no test can run it, so its source is the only check available.
-describe('gen-cast-v5 ships nothing that failed a gate', () => {
-  const src = readFileSync(new URL('../scripts/gen-cast-v5.ts', import.meta.url), 'utf8')
+// The character pipeline is live-spend against a real provider, and `characterCommission.test.ts`
+// drives it on committed art; these are the source checks that art cannot make.
+describe('the character pipeline ships nothing that failed a gate', () => {
+  const src = readFileSync(new URL('./characterCommission.ts', import.meta.url), 'utf8')
 
   it('refuses at every point where a candidate is chosen', () => {
-    for (const what of ['/${p}`', 'stride-trio', '${m.id} sleep'])
+    for (const what of ['/${p}`', 'stride-trio', '${look.id} sleep'])
       expect(src, `no refusal beside ${what}`).toContain(what)
     // walk frames, the stride trio, the sleep cell — three decision points, three refusals
-    expect(src.match(/refuseFailing\(/g) ?? []).toHaveLength(4) // 1 definition + 3 call sites
+    expect(src.match(/refusalFor\(/g) ?? []).toHaveLength(4) // 1 definition + 3 call sites
   })
 
   it('★ the stride trio and the atlas pixel bar are no longer advisory', () => {
     expect(src, 'the stride trio still just logs FLAGGED').not.toContain("'FLAGGED'")
     expect(src, 'the packed atlas is still written whatever the bar says').toMatch(
-      /if \(bar\.length > 0\)\s+throw new Error/,
+      /if \(bar\.length > 0\)\s+return refuse\(/,
     )
   })
 
-  it('reads the attempt knob its own header has documented since v4', () => {
-    expect(src).toMatch(/process\.env(\.CAST_ATTEMPTS|\['CAST_ATTEMPTS'\])/)
+  it('the attempt knob is a number the caller may raise, not a constant', () => {
+    expect(src).toMatch(/deps\.attempts \?\? CHARACTER_ATTEMPTS/)
     expect(src, 'a hard-coded attempt count is left somewhere').not.toMatch(
       /for \(let i = 0; i < 3; i\+\+\)/,
     )
+  })
+
+  it('and the CLI shell still reads the operator’s own knob', () => {
+    const cli = readFileSync(new URL('../scripts/gen-cast-v5.ts', import.meta.url), 'utf8')
+    expect(cli).toMatch(/process\.env(\.CAST_ATTEMPTS|\['CAST_ATTEMPTS'\])/)
   })
 })
 
@@ -141,7 +154,6 @@ describe('★ no generator in the package ships a candidate that failed a gate',
   // The two structure generators are their SUBJECTS plus a call, so the shared loop is where
   // their refusal lives and where this test has to look for it.
   const GENERATORS = [
-    'gen-cast-v5.ts',
     'lib/cells.ts',
     'gen-library-v2.ts',
     'gen-cast-v4.ts',
@@ -203,6 +215,14 @@ describe('★ no generator in the package ships a candidate that failed a gate',
       if (s.includes('failures.length < a.failures.length') && !s.includes('refuseFailing('))
         offenders.push(`${f}: picks the least-bad candidate and never refuses one`)
     }
+    // The character pipeline moved out of `scripts` and the sweep follows it there: the
+    // least-bad reduce is legal only beside a refusal, wherever the code lives.
+    const pipeline = readFileSync(new URL('./characterCommission.ts', import.meta.url), 'utf8')
+    if (
+      pipeline.includes('failures.length < a.failures.length') &&
+      !pipeline.includes('refusalFor(')
+    )
+      offenders.push('characterCommission.ts: picks the least-bad candidate and never refuses one')
     expect(offenders, 'a generator ships a candidate its own gate failed').toEqual([])
   })
 

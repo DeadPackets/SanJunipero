@@ -17,11 +17,11 @@ const run = runFoundersWorld(
 )
 
 describe('a founder knows the village they founded', () => {
-  it('hands all five the whole town on tick 1, storehouse included', () => {
+  it('hands all twelve the whole town on tick 1, storehouse included', () => {
     const ids = Object.keys(run.state.structures).sort()
     expect(ids).toContain(STOREHOUSE)
     const founders = Object.keys(run.state.agents)
-    expect(founders).toHaveLength(5)
+    expect(founders).toHaveLength(12)
     for (const id of founders) expect(run.state.agents[id]?.knownPlaces, id).toEqual(ids)
   })
 

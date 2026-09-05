@@ -1,11 +1,56 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, thirstDecayPerTick } from '@sj/shared'
+import { FOOD_NUTRITION } from './food.js'
 
-// Three tuning facts, pinned. All three are reachable only through packages/shared/src/config.ts,
+// Four tuning facts, pinned. All four are reachable only through packages/shared/src/config.ts,
 // which is frozen: the forge pin stateHash(DEFAULT_CONFIG) moves the moment any is touched.
 
 const C = DEFAULT_CONFIG
 const perDay = (perTick: number): number => perTick * MINUTES_PER_DAY
+
+// D1 — survival is a backdrop. Starving is still the way a neglected body dies; it is no longer
+// the clock every turn is set by. The table is the whole of that claim, in sim-days.
+describe('D1 — the death-time table', () => {
+  const days = (ticks: number): number => ticks / MINUTES_PER_DAY
+
+  it('a full stomach takes 6.9 sim-days to empty, and an empty one 4 more to kill', () => {
+    expect(C.needs.hungerDecayPerTick).toBe(0.01)
+    expect(days(100 / C.needs.hungerDecayPerTick)).toBeCloseTo(6.94, 2)
+    expect(C.needs.deathAfterZeroHungerTicks).toBe(5760)
+    expect(days(C.needs.deathAfterZeroHungerTicks)).toBe(4)
+    // Eleven days from the last meal to the grave: long enough that a hungry body is a story
+    // somebody can notice, walk over to, and feed.
+    expect(days(100 / C.needs.hungerDecayPerTick + C.needs.deathAfterZeroHungerTicks)).toBeCloseTo(
+      10.94,
+      2,
+    )
+  })
+
+  it('one loaf is four days of it, so the storehouse holds a season of meals', () => {
+    const loaf = C.needs.eatRestoreHunger * FOOD_NUTRITION.bread!
+    expect(loaf).toBe(60)
+    expect(days(loaf / C.needs.hungerDecayPerTick)).toBeCloseTo(4.17, 2)
+  })
+
+  it('thirst still tracks hunger and still outruns it', () => {
+    expect(C.thirst.decayFactorOfHunger).toBe(0.4)
+    expect(days(100 / thirstDecayPerTick(C))).toBeCloseTo(17.36, 2)
+  })
+
+  it('an untended illness takes days, and poison half as many', () => {
+    expect(C.mortality.drainPerTick.illness).toBe(0.04)
+    expect(C.mortality.drainPerTick.poison).toBe(0.08)
+    expect(days(C.health.maxHp / C.mortality.drainPerTick.illness)).toBeCloseTo(1.74, 2)
+    expect(days(C.health.maxHp / C.mortality.drainPerTick.poison)).toBeCloseTo(0.87, 2)
+  })
+
+  it('a cold night is uncomfortable, not lethal, and the sky waits three weeks', () => {
+    expect(C.warmth.exposureDecayPerTick).toBe(0.08)
+    // A whole night out of doors at the mildest winter hour spends 58 of the 100 a body has.
+    expect(C.warmth.exposureDecayPerTick * 12 * 60).toBeCloseTo(57.6, 2)
+    expect(C.weather.harshFromDay).toBe(21)
+  })
+})
 
 describe('C11 finding 1 — the energy budget spends more than a day holds', () => {
   it('a body awake all day spends 134 of the 100 it has', () => {

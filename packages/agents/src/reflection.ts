@@ -1,9 +1,11 @@
 import { z } from 'zod'
-import type { LlmClient, LlmMessage } from '@sj/llm'
+import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
-import { GIST_SYSTEM, gistMemories, type GistLlm } from './memory/gist.js'
+import { GIST_SYSTEM, gistMemories, type GistBatch, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
 import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
+import { TIE_KINDS, type TieDelta } from './scene/scene.js'
+import type { TieStore } from './memory/ties.js'
 
 export type ReflectionLlm = GistLlm & {
   extractFacts(
@@ -16,6 +18,10 @@ export type ReflectionLlm = GistLlm & {
     scenes: { title: string; text: string }[],
   ): Promise<{ title: string; text: string; standing: string[] }>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
+  listTies(
+    dayMemories: MemoryRow[],
+    people: readonly string[],
+  ): Promise<{ about: string; kind: TieDelta['kind']; text: string; settled: boolean }[]>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
   proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown>
 }
@@ -31,13 +37,50 @@ export type ReflectionResult = {
   gistsWritten: number
   /** Long rows that wanted a gist tonight; the rest stay eligible tomorrow. */
   gistsEligible: number
+  /** Ties the night opened or settled. A scene is not the only place a mind incurs something. */
+  tiesWritten: number
   fallback: boolean
 }
 
+/** Whose book the night writes into, and the roll it may name. Absent, a mind reflects the way
+ *  it did before there were ties. */
+export type ReflectionTies = {
+  store: TieStore
+  cast: readonly { id: string; name: string }[]
+  tick: number
+}
+
+/** Names back to ids off the closed roll, dropping the mind itself and anyone it invented. */
+function tiesFrom(
+  answer: readonly { about: string; kind: TieDelta['kind']; text: string; settled: boolean }[],
+  ties: ReflectionTies,
+): TieDelta[] {
+  const agentId = ties.store.agentId
+  const idOf = new Map<string, string>()
+  for (const p of ties.cast) {
+    idOf.set(p.name.toLowerCase(), p.id)
+    idOf.set(p.id.toLowerCase(), p.id)
+  }
+  const out: TieDelta[] = []
+  for (const t of answer) {
+    const personId = idOf.get(t.about.trim().toLowerCase())
+    if (personId === undefined || personId === agentId) continue
+    if (t.text.trim().length === 0) continue
+    out.push({
+      agentId,
+      personId,
+      kind: t.kind,
+      text: t.text.trim(),
+      ...(t.settled ? { settled: true as const } : {}),
+    })
+  }
+  return out
+}
+
 export const FALLBACK_DAY_TITLE = 'A long day'
-export const FALLBACK_AUTOBIOGRAPHY = 'A long day; too weary to make sense of it.'
+export const FALLBACK_AUTOBIOGRAPHY = 'A long day. Too tired to make sense of it.'
 export const FALLBACK_DIGEST_CHARS = 2000
-const FALLBACK_EMPTY_DIGEST = 'Nothing of the day comes back.'
+const FALLBACK_EMPTY_DIGEST = 'Nothing from today comes back.'
 
 // A night with no headroom left must still leave the day written down, or the
 // mind wakes with a hole where yesterday was and never gets it back.
@@ -52,16 +95,20 @@ export async function runSleepReflection(deps: {
   personality: PersonalityStore
   llm: ReflectionLlm
   day: number
+  ties?: ReflectionTies
   alert?: (kind: string, detail: string) => void
 }): Promise<ReflectionResult> {
-  const { mem, personality, llm, day, alert } = deps
+  const { mem, personality, llm, day, ties, alert } = deps
 
   // 1. Load the day's memories.
   const dayMemories = mem.memoriesOfDay(day)
 
   // The first refused step ends the thinking; every later step reads this latch
   // rather than spending another call the guard will refuse anyway.
-  const degraded: { reason: string | null } = { reason: null }
+  const degraded: { reason: string | null; outOfBudget: boolean } = {
+    reason: null,
+    outOfBudget: false,
+  }
   async function step<T>(run: () => Promise<T>): Promise<T | null> {
     if (degraded.reason !== null) return null
     try {
@@ -70,6 +117,7 @@ export async function runSleepReflection(deps: {
       // Every step here is one provider call, and no failure of one may cost the mind its day:
       // throwing skips the day node below, and the caller has already marked the night done.
       degraded.reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      degraded.outOfBudget = err instanceof BudgetExceededError
       return null
     }
   }
@@ -138,6 +186,21 @@ export async function runSleepReflection(deps: {
     ledgersUpdated.push(person)
   }
 
+  // 5b. What the day left standing between this mind and the people in it. The note above is
+  //     prose the mind reads; these are rows the scene block and the quarrel upgrade read.
+  let tiesWritten = 0
+  if (ties !== undefined) {
+    const listed = await step(() =>
+      llm.listTies(
+        dayMemories,
+        ties.cast.map((p) => p.name),
+      ),
+    )
+    const deltas = listed === null ? [] : tiesFrom(listed, ties)
+    ties.store.apply(deltas, ties.tick, 'reflection')
+    tiesWritten = deltas.length
+  }
+
   // 6. Autobiography paragraph.
   const personalityDoc = personality.current().doc
   const paragraph = await step(() => llm.autobiographyParagraph(daySummaryText, personalityDoc))
@@ -146,9 +209,16 @@ export async function runSleepReflection(deps: {
   // 7. Personality edit — ≤1 by construction, drift-limiter validates.
   const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
 
-  // 8. Gists — the day's long rows plus what a refused night left behind. Last, because it is
-  //    the one step the night can lose without losing what it learned.
-  const gists = await step(() => gistMemories(mem, llm, dayMemories))
+  // 8. Gists — the day's long rows plus what a refused night left behind. Outside the latch on
+  //    purpose: a degraded night is the one that grows that backlog, and the batch self-limits.
+  let gists: GistBatch | null = null
+  if (!degraded.outOfBudget) {
+    try {
+      gists = await gistMemories(mem, llm, dayMemories)
+    } catch (err) {
+      degraded.reason ??= err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+    }
+  }
   if (gists !== null && gists.written === 0 && gists.failed > 0) {
     alert?.('gist_batch_refused', `${gists.failed} of ${gists.eligible} long rows went ungisted`)
   }
@@ -159,6 +229,7 @@ export async function runSleepReflection(deps: {
     ledgersUpdated,
     gistsWritten: gists?.written ?? 0,
     gistsEligible: gists?.eligible ?? 0,
+    tiesWritten,
   }
   if (degraded.reason !== null) {
     alert?.('reflection_fallback', degraded.reason)
@@ -224,19 +295,19 @@ function nightPrompt(dayMemories: MemoryRow[], instruction: string[]): LlmPrompt
 
 export function extractFactsPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return nightPrompt(dayMemories, [
-    'Before sleep, you sort the day into what is solidly true.',
+    'Before sleep, you sort out what you are sure actually happened today.',
     // "From each moment" is a pass per memory against an unbounded array; asking for the few
     // surest ones asks for the same work once.
     'Keep only the few facts you are surest of, at most eight: who did what, who owes whom, what is where.',
     'For each fact, name the subject, the relation, and the object, and note the memory it came from.',
-    'Write down only what the memories actually show, never what you merely suspect.',
+    'Write down only what the memories actually show, not what you suspect.',
   ])
 }
 
 export function summarizeScenesPrompt(dayMemories: MemoryRow[]): LlmPrompt {
   return nightPrompt(dayMemories, [
-    'Before sleep, you gather the day into scenes.',
-    'Group the moments into a few natural scenes, each with a short title and a short telling of what happened.',
+    'Before sleep, you break the day up into scenes.',
+    'Group the moments into a few scenes, each with a short title and a short account of what happened.',
     'For each scene, list the memories it draws from.',
   ])
 }
@@ -249,11 +320,11 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
   return {
     system: [
       'Before sleep, you look back over the whole day.',
-      'Give the day a single title and a short telling that holds its scenes together.',
+      'Give the day one title and a short account that ties its scenes together.',
       'Then name what you carry into tomorrow, as `standing`: at most three short lines, one each',
       'for what you want, what you promised or owe, and what you are in the middle of making.',
-      'Leave `standing` empty rather than invent one; write each line as a thing you are about,',
-      'not as a report of the day.',
+      'Leave `standing` empty rather than make one up. Write each line as something you are set',
+      'on, not as a report of the day.',
     ].join('\n'),
     messages: [{ role: 'user', content: `The day held these scenes:\n${JSON.stringify(scenes)}` }],
   }
@@ -266,7 +337,7 @@ export function updateLedgerPrompt(
 ): LlmPrompt {
   return {
     system: [
-      'Before sleep, you revisit your private note about one person.',
+      'Before sleep, you go back to your private note about one person.',
       'Rewrite that note from the day, keeping what still holds and adding what changed.',
       'The note is yours alone: your opinion, your trust, what they owe you and what you owe them.',
     ].join('\n'),
@@ -283,6 +354,19 @@ export function updateLedgerPrompt(
   }
 }
 
+export function listTiesPrompt(dayMemories: MemoryRow[], people: readonly string[]): LlmPrompt {
+  return nightPrompt(dayMemories, [
+    'Before sleep, you go over what the day left between you and other people.',
+    'A tie is one thing YOU now hold about one of them: a promise you made or they made you, a',
+    'debt, a slight, a grudge, an attraction, a secret, an alliance.',
+    'Write one only where today actually made it or paid it off, and mark it settled when the day',
+    'cleared something that was already owed. Most days leave one or two, and many leave none.',
+    people.length === 0
+      ? 'Name nobody: you were alone today.'
+      : `Name only these people: ${people.join(', ')}.`,
+  ])
+}
+
 export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): LlmPrompt {
   return {
     system: [
@@ -294,7 +378,7 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
         role: 'user',
         content: [
           `Your day:\n${daySummary}`,
-          `You hold dear: ${doc.values.join(', ')}.`,
+          `What matters to you: ${doc.values.join(', ')}.`,
           `Your mood: ${doc.current.mood}.`,
         ].join('\n'),
       },
@@ -365,6 +449,24 @@ const DAY_SUMMARY_SCHEMA = z
   })
   .strict()
 const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
+// Six is what a whole scene may name; a day is longer, and eight is the runaway stop rather
+// than the ask, which the prose above puts at one or two.
+const TIES_SCHEMA = z
+  .object({
+    ties: z
+      .array(
+        z
+          .object({
+            about: z.string().min(1),
+            kind: z.enum(TIE_KINDS),
+            text: z.string().min(1),
+            settled: z.boolean(),
+          })
+          .strict(),
+      )
+      .max(8),
+  })
+  .strict()
 const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
 export const ProposeEditSchema = z.discriminatedUnion('verdict', [
   z.object({ verdict: z.literal('no_proposal') }).strict(),
@@ -417,6 +519,15 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
         schema: LEDGER_SCHEMA,
       })
       return value.doc
+    },
+    async listTies(dayMemories, people) {
+      const p = listTiesPrompt(dayMemories, people)
+      const { value } = await client.object({
+        system: p.system,
+        messages: p.messages,
+        schema: TIES_SCHEMA,
+      })
+      return value.ties
     },
     async autobiographyParagraph(daySummary, doc) {
       const p = autobiographyPrompt(daySummary, doc)

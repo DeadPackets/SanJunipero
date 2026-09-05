@@ -29,6 +29,8 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'fauna_killed':
     case 'agent_expressed':
     case 'discovery_made':
+    case 'scene_closed':
+    case 'agent_spawned':
       return chronicleLine(ev, {
         agentName: (id) => name(id),
         structureKind: (id) => structureKind(id),
@@ -43,7 +45,7 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'crop_harvested': {
       const kind =
         typeof p.cropId === 'string' ? (state?.crops[p.cropId]?.kind ?? 'harvest') : 'harvest'
-      return `The ${kind} came in.`
+      return `The ${kindWords(kind)} came in.`
     }
     case 'fire_ignited':
       return `Fire! The ${structureKind(p.structureId)} is burning.`

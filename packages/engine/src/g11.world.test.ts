@@ -2,7 +2,9 @@
 // Scripted actors only, no LLM, $0. Every row is an addendum §18 criterion.
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   DAYS_PER_SEASON,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   dayPhaseFromTick,
@@ -23,8 +25,12 @@ import {
   mealRestore,
   nutritionOf,
   workPenalty,
+  VERBS,
   type PendingEvent,
 } from './verbs/index.js'
+
+/** What the dark charges for is the verb's own business now, so a test reads it off the verb. */
+const lit = (verb: string): boolean => VERBS[verb]?.needsLight === true
 import { createWorldTick } from './worldTick.js'
 import { ev, grid } from './testutil/world.js'
 
@@ -38,7 +44,7 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 const MAP = (n = 24): TileId[][] => grid(n)
 
 const spawn = (s: WorldState, config: SimConfig, id: string, x: number, y: number): WorldState =>
-  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
+  fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), config)
 
 const give = (
   s: WorldState,
@@ -147,7 +153,16 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
       throw new Error('no seed')
     }
 
-    const kill = doVerb(meadow(), CFG, 401, 'hunter', 'hunt', { faunaId: DEER }, 10, seedFor(true))
+    const kill = doVerb(
+      meadow(),
+      CFG,
+      401,
+      'hunter',
+      'hunt',
+      { faunaId: DEER },
+      DURATION_TICKS.moment + 2,
+      seedFor(true),
+    )
     expect(kill.refusal).toBeNull()
     expect(kill.events.some((e) => e.type === 'fauna_killed')).toBe(true)
     expect(kill.state.fauna?.[DEER]).toBeUndefined() // a taken body leaves the world outright
@@ -157,7 +172,16 @@ describe('G11a-F1: bodies with no minds — they run, they are hunted, and the c
       .map((p) => ({ kind: p.kind, qty: p.qty }))
     expect(taken).toEqual(FAUNA_YIELD.deer.map((y) => ({ kind: y.kind, qty: y.qty })))
 
-    const miss = doVerb(meadow(), CFG, 401, 'hunter', 'hunt', { faunaId: DEER }, 10, seedFor(false))
+    const miss = doVerb(
+      meadow(),
+      CFG,
+      401,
+      'hunter',
+      'hunt',
+      { faunaId: DEER },
+      DURATION_TICKS.moment + 2,
+      seedFor(false),
+    )
     expect(miss.events.some((e) => e.type === 'fauna_killed')).toBe(false)
     expect(miss.state.fauna![DEER]!.alive).toBe(true)
     // A missed approach is not a nothing: the animal bolts.
@@ -507,13 +531,13 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     expect(carried.refusal).toBeNull()
     expect(blind.duration).toBe(Math.ceil(CFG.roads.paveDurationTicks * CFG.light.nightWorkPenalty))
     expect(carried.duration).toBe(CFG.roads.paveDurationTicks)
-    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(
+    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', lit('pave'))).toBe(
       CFG.light.nightWorkPenalty,
     )
-    expect(workPenalty({ ...nightWork(true), tick: NIGHT }, CFG, 'wright', 'pave')).toBe(1)
+    expect(workPenalty({ ...nightWork(true), tick: NIGHT }, CFG, 'wright', lit('pave'))).toBe(1)
     // Speech and walking cost the same at midnight as at noon: the night is a price change,
     // not a curfew.
-    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', 'speak')).toBe(1)
+    expect(workPenalty({ ...nightWork(false), tick: NIGHT }, CFG, 'wright', lit('speak'))).toBe(1)
   })
 
   it('a torch burns for exactly its fuel and then it is ash', () => {
@@ -523,7 +547,7 @@ describe('G11a-C2: the dark charges for work, a flame answers it, and the flame 
     const lit = struck.events.find((e) => e.type === 'item_lit')!.payload as {
       burnsUntilTick: number
     }
-    const litAt = NIGHT + 1
+    const litAt = NIGHT + DURATION_TICKS.moment
     expect(lit.burnsUntilTick).toBe(litAt + CFG.light.torchBurnTicks)
     expect(glowRadiusFor(CFG, 'torch')).toBe(CFG.light.glowRadius.torch)
 
@@ -616,7 +640,15 @@ describe('G11a-V1: three kinds at the table beat the same thing twice', () => {
     let s = spawn(genesisState(CFG, MAP()), CFG, 'diner', 4, 4)
     s = give(s, CFG, 'diner', 'item_loaf', 'bread', 2)
     s = { ...s, tick: 400 }
-    const out = doVerb(s, CFG, 401, 'diner', 'eat', { itemId: 'item_loaf' }, 4)
+    const out = doVerb(
+      s,
+      CFG,
+      401,
+      'diner',
+      'eat',
+      { itemId: 'item_loaf' },
+      DURATION_TICKS.half_hour + 2,
+    )
     expect(out.refusal).toBeNull()
     expect(out.state.agents.diner!.recentFoods).toEqual([{ kind: 'bread', day: 0 }])
     expect(CFG.foodVariety.windowDays).toBe(3)

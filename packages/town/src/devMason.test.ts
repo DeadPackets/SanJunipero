@@ -2,6 +2,7 @@
 // The engine locates the town by reading the authored `TOWN_SQUARE` less `state.origin`.
 import { describe, expect, it } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CITY_GROUND,
   TOWN_SQUARE,
   T_ROAD,
@@ -21,12 +22,12 @@ import {
 } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { devTownSquare, devWorldOrigin } from './devTown.js'
-import { FOUNDERS, GO_HOME_BELOW, masonIntent } from './founders.js'
+import { FOUNDER_ROSTER, GO_HOME_BELOW, masonIntent } from './founders.js'
 import { type Run, runFoundersWorld } from './testutil.js'
 
 const TICKS = 4320
 const RINGS = 3
-const GENESIS_STRUCTURES = 11
+const GENESIS_STRUCTURES = 13
 
 function runDevWorld(builders: boolean, rings = RINGS, ticks = TICKS, jointBuild = false): Run {
   return runFoundersWorld({ interiors: true, builders, holdings: true, jointBuild }, ticks, rings)
@@ -107,7 +108,8 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
       ).toEqual(['kind'])
     }
     // and it is a founder's hand on every one of them, not the tick-1 script's
-    for (const e of raised) expect(FOUNDERS.map((f) => f.id)).toContain(String(e.payload.builderId))
+    for (const e of raised)
+      expect(FOUNDER_ROSTER.map((f) => f.id)).toContain(String(e.payload.builderId))
   })
 
   // "Not on water, not on a street tile" PASSES with the square ten rows out — a plot shifted by
@@ -151,10 +153,10 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
 
   it('★ and the town survives building — nobody worked themselves onto the ground', () => {
     expect(run.events.filter((e) => e.type === 'agent_collapsed')).toEqual([])
-    for (const f of FOUNDERS) expect(run.state.agents[f.id]!.alive, f.id).toBe(true)
+    for (const f of FOUNDER_ROSTER) expect(run.state.agents[f.id]!.alive, f.id).toBe(true)
   })
 
-  it('builders OFF is the landed world exactly — eleven buildings and no more', () => {
+  it('builders OFF is the landed world exactly — thirteen buildings and no more', () => {
     const off = runDevWorld(false, RINGS, 1440)
     expect(off.events.filter((e) => e.type === 'structure_planned' && e.tick > 1)).toEqual([])
     expect(standingRects(off.state).length).toBe(GENESIS_STRUCTURES)
@@ -211,7 +213,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       peak.who.size,
       'no site had two different bodies on it in one tick',
     ).toBeGreaterThanOrEqual(2)
-    for (const id of peak.who) expect(FOUNDERS.map((f) => f.id)).toContain(id)
+    for (const id of peak.who) expect(FOUNDER_ROSTER.map((f) => f.id)).toContain(id)
     const [peakTick, peakId] = peak.key.split(':')
     expect(
       planted(on).some((e) => String(e.payload.id) === peakId),
@@ -249,7 +251,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
       expect(plannedAt.get(String(e.payload.id)), 'finished without being planned').toBeDefined()
     }
     expect(on.events.filter((e) => e.type === 'agent_collapsed')).toEqual([])
-    for (const f of FOUNDERS) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
+    for (const f of FOUNDER_ROSTER) expect(on.state.agents[f.id]!.alive, f.id).toBe(true)
   })
 
   // Asked of the pure function instead: in a run a founder only decides with its hands free and
@@ -262,7 +264,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
         fold(s, { seq: ++n, tick: 1, type, payload }, cfg)
       const body = (s: WorldState, id: string, at: { x: number; y: number }): WorldState =>
         put(
-          put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: 7300 }),
+          put(s, 'agent_spawned', { id, name: id, x: at.x, y: at.y, ageDays: ADULT_AGE_DAYS }),
           'item_spawned',
           { id: `item_wood_${id}`, kind: 'wood', qty: 99, loc: { t: 'agent', id } },
         )

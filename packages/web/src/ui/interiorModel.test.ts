@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type AssetRecord, DEFAULT_CONFIG, INTERIOR_KINDS } from '@sj/shared'
+import { ADULT_AGE_DAYS, type AssetRecord, DEFAULT_CONFIG, INTERIOR_KINDS } from '@sj/shared'
 import { genesisState, type Item, type WorldState } from '@sj/engine/state'
 import { GAMIFICATION_BAN } from './townStats.js'
 import {
@@ -28,7 +28,7 @@ function agent(id: string, name: string, over: Partial<WorldState['agents'][stri
     hp: 10,
     injuries: [],
     ill: false,
-    ageDays: 7300,
+    ageDays: ADULT_AGE_DAYS,
     skills: {},
     activity: null,
     collapsedSinceTick: null,
@@ -181,6 +181,13 @@ describe('roomCard — who lives here and who is in', () => {
     expect(roomStateOf({ asleep: false, activity: null })).toBe(ROOM_STATE_IDLE)
     expect(ROOM_STATE_IDLE).not.toMatch(SYNONYM_BAN)
     expect(roomStateOf({ asleep: true, activity: { verb: 'sleep' } })).toBe(ROOM_STATE_ASLEEP)
+  })
+
+  it('a slug is spent before the room card says it', () => {
+    expect(roomStateOf({ asleep: false, activity: { verb: 'dig_channel' } })).toBe(
+      'Digging channel',
+    )
+    expect(roomStateOf({ asleep: false, activity: { verb: 'recipe:plank' } })).toBe('Making plank')
   })
 
   it('a public building has nobody living in it, and that is not an error', () => {

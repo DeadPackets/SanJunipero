@@ -3,13 +3,23 @@ import Database from 'better-sqlite3'
 import {
   DEATH_CAUSES,
   fold,
+  Invited,
+  InvitationRefused,
+  PartnershipDissolved,
+  PartnershipFormed,
   genesisState,
   RngStreams,
   VERBS,
   type TileId,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DAYS_PER_YEAR,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  type SimEvent,
+} from '@sj/shared'
 import { detectFirsts } from '../firsts.js'
 import { CONSTRUCT_VOCABULARY, scanPromptForGlassLeak } from '@sj/shared'
 import { migrateNarratorTables } from '../schema.js'
@@ -201,7 +211,13 @@ describe('tier 1 — the engine firsts', () => {
 
   it('counts the town up to each round number, once', () => {
     const born = Array.from({ length: 12 }, (_, i) =>
-      ev(i + 1, 'agent_spawned', { id: `a${i}`, name: `A${i}`, x: 0, y: 0, ageDays: 7300 }),
+      ev(i + 1, 'agent_spawned', {
+        id: `a${i}`,
+        name: `A${i}`,
+        x: 0,
+        y: 0,
+        ageDays: ADULT_AGE_DAYS,
+      }),
     )
     const fired = detectFirsts([...born, ...born], ctx()).filter((m) => m.kind.endsWith('_souls'))
     expect(fired.map((m) => m.kind)).toEqual(['first_ten_souls'])
@@ -209,7 +225,7 @@ describe('tier 1 — the engine firsts', () => {
 
   it('marks the turn of the year and the winter come through, once each', () => {
     const spring = [
-      ev(day(364) + 60, 'agent_spoke', { agentId: 'a', text: 'warm again', x: 0, y: 0 }),
+      ev(day(DAYS_PER_YEAR) + 60, 'agent_spoke', { agentId: 'a', text: 'warm again', x: 0, y: 0 }),
     ]
     const kinds = detectFirsts(spring, ctx()).map((m) => m.kind)
     expect(kinds).toContain('first_winter_survived')
@@ -318,18 +334,65 @@ describe('tier 1 — the engine firsts', () => {
   })
 })
 
-// A world with two bodies and the pair rows the engine keeps for them.
-function pairWorld(
-  rows: Record<
-    string,
-    {
-      nights: number
-      lastNightDay: number
-      formedTick: number | null
-      dissolvedTick: number | null
+describe('tier 1 — the four relationship firsts', () => {
+  // Every payload below is the engine's own schema, parsed, so a fixture cannot drift from it.
+  const courted = Invited.parse({ agentId: 'bex', byId: 'ada', verb: 'court' })
+  const refused = InvitationRefused.parse({
+    agentId: 'bex',
+    byId: 'ada',
+    verb: 'propose',
+    witnesses: ['cass'],
+  })
+  const formed = PartnershipFormed.parse({ aId: 'ada', bId: 'bex' })
+  const dissolved = PartnershipDissolved.parse({ aId: 'ada', bId: 'bex', byId: 'bex' })
+
+  it('fires each of the four once, as a social first, naming both bodies', () => {
+    const streams: Record<string, SimEvent> = {
+      first_courtship: ev(day(1), 'invited', courted),
+      first_proposal_refused: ev(day(2), 'invitation_refused', refused),
+      first_wedding: ev(day(3), 'partnership_formed', formed),
+      first_breakup: ev(day(4), 'partnership_dissolved', dissolved),
     }
-  >,
-): WorldState {
+    for (const [kind, e] of Object.entries(streams)) {
+      const fired = detectFirsts([e, e, e], ctx()).filter((m) => m.kind === kind)
+      expect(fired, kind).toHaveLength(1)
+      expect(fired[0]!.tier, kind).toBe(1)
+      expect(fired[0]!.domain, kind).toBe('social')
+      expect(fired[0]!.agentIds, kind).toEqual(['ada', 'bex'])
+    }
+  })
+
+  it('tells the invitation verbs apart: a refused courtship is not a refused proposal', () => {
+    const courtRefusal = ev(
+      day(1),
+      'invitation_refused',
+      InvitationRefused.parse({ agentId: 'bex', byId: 'ada', verb: 'court', witnesses: [] }),
+    )
+    const lieAsk = ev(
+      day(1),
+      'invited',
+      Invited.parse({ agentId: 'bex', byId: 'ada', verb: 'lie_with' }),
+    )
+    const kinds = detectFirsts([courtRefusal, lieAsk], ctx()).map((m) => m.kind)
+    expect(kinds).not.toContain('first_proposal_refused')
+    expect(kinds).not.toContain('first_courtship')
+  })
+
+  it('no longer knows the bed statistics it used to count', () => {
+    const kinds = TIER1_DEFS.map((d) => d.kind)
+    expect(kinds).not.toContain('first_partnership')
+    expect(kinds).not.toContain('first_affair')
+    const nights = Array.from({ length: 12 }, (_, i) =>
+      ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i }),
+    )
+    expect(
+      detectTier2(nights, { seenKinds: new Set(), config: DEFAULT_CONFIG }).map((m) => m.kind),
+    ).toEqual([])
+  })
+})
+
+// Two bodies standing in a world, for the detectors that need one.
+function twoBodies(): WorldState {
   const flat = Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0))
   let s = genesisState(DEFAULT_CONFIG, flat)
   for (const [id, name] of [
@@ -338,16 +401,21 @@ function pairWorld(
   ]) {
     s = fold(
       s,
-      { seq: 0, tick: 0, type: 'agent_spawned', payload: { id, name, x: 4, y: 4, ageDays: 7300 } },
+      {
+        seq: 0,
+        tick: 0,
+        type: 'agent_spawned',
+        payload: { id, name, x: 4, y: 4, ageDays: ADULT_AGE_DAYS },
+      },
       DEFAULT_CONFIG,
     )
   }
-  return { ...s, pairNights: rows }
+  return s
 }
 
 describe('tier 2 — the patterns, and the parting that needs more than a gap', () => {
-  const t2 = (events: SimEvent[], state?: WorldState) =>
-    detectTier2(events, { seenKinds: new Set(), config: DEFAULT_CONFIG, state })
+  const t2 = (events: SimEvent[]) =>
+    detectTier2(events, { seenKinds: new Set(), config: DEFAULT_CONFIG })
 
   it('hears the first conversation, and does not mistake two shouts across the valley for one', () => {
     const close = [
@@ -360,45 +428,6 @@ describe('tier 2 — the patterns, and the parting that needs more than a gap', 
       ev(105, 'agent_spoke', { agentId: 'bex', text: 'i did', x: 40, y: 4 }),
     ]
     expect(t2(apart).map((m) => m.kind)).not.toContain('first_conversation')
-  })
-
-  it('a long partnership does not break on a gap they talked across', () => {
-    const dissolved = day(9)
-    const state = pairWorld({
-      'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: dissolved },
-    })
-    const spokeOnDayFive = [
-      ...Array.from({ length: 5 }, (_, i) =>
-        ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i }),
-      ),
-      ev(day(5) + 60, 'agent_spoke', { agentId: 'ada', text: 'still here', x: 4, y: 4 }),
-      ev(day(9) + 60, 'agent_spoke', { agentId: 'ada', text: 'and again', x: 4, y: 4 }),
-    ]
-    expect(t2(spokeOnDayFive, state).map((m) => m.kind)).not.toContain('first_breakup')
-  })
-
-  it('a pair who separate and never speak again do part', () => {
-    const state = pairWorld({
-      'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: day(12) },
-    })
-    const silence = [
-      ...Array.from({ length: 5 }, (_, i) =>
-        ev(day(i) + 1, 'co_slept', { aId: 'ada', bId: 'bex', day: i }),
-      ),
-      ev(day(12) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 }),
-    ]
-    const found = t2(silence, state).find((m) => m.kind === 'first_breakup')
-    expect(found?.agentIds).toEqual(['ada', 'bex'])
-    expect(found?.tier).toBe(2)
-    expect(found?.domain).toBe('social')
-  })
-
-  it('a pair still partnered part from nobody', () => {
-    const state = pairWorld({
-      'ada|bex': { nights: 5, lastNightDay: 4, formedTick: day(3), dissolvedTick: null },
-    })
-    const sixDayGap = [ev(day(6) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 })]
-    expect(t2(sixDayGap, state).map((m) => m.kind)).not.toContain('first_breakup')
   })
 
   it('finds a grandparent by reading three generations of births', () => {
@@ -446,15 +475,10 @@ describe('tier 2 — the patterns, and the parting that needs more than a gap', 
     ).not.toContain('first_conversation')
   })
 
-  it('a pass with no world in reach simply does not run the three that need one', () => {
-    const lapse = [ev(day(12) + 60, 'agent_moved', { id: 'ada', x: 9, y: 9 })]
-    expect(t2(lapse).map((m) => m.kind)).not.toContain('first_breakup')
-  })
-
   // Both of these match on `agent_harmed{source:'attack'}`, so they are driven with the log
   // the verb actually produces rather than a hand-written one.
   it('a blow and a word after it: the quarrel and the peace, off the log attack really writes', () => {
-    const s = pairWorld({})
+    const s = twoBodies()
     const blow = VERBS.attack!.onComplete(
       s,
       DEFAULT_CONFIG,
@@ -472,7 +496,7 @@ describe('tier 2 — the patterns, and the parting that needs more than a gap', 
       // Far enough after the blow that it is a peace and not the same argument continuing.
       ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'enough of that', x: 4, y: 4 }),
     ]
-    const found = t2(log, s)
+    const found = t2(log)
     const quarrel = found.find((m) => m.kind === 'first_quarrel')
     const peace = found.find((m) => m.kind === 'first_reconciliation')
     expect(quarrel).toBeDefined()
@@ -482,11 +506,10 @@ describe('tier 2 — the patterns, and the parting that needs more than a gap', 
   })
 
   it('a hurt with no hand behind it is not a quarrel', () => {
-    const s = pairWorld({})
     const log = [
       ev(day(1) + 10, 'agent_harmed', { agentId: 'bex', amount: 5, source: 'fire' }),
       ev(day(1) + 400, 'agent_spoke', { agentId: 'bex', text: 'that was close', x: 4, y: 4 }),
     ]
-    expect(t2(log, s).map((m) => m.kind)).not.toContain('first_quarrel')
+    expect(t2(log).map((m) => m.kind)).not.toContain('first_quarrel')
   })
 })

@@ -23,6 +23,7 @@ const {
   SORTED_LAYER,
   Z_AUTHORISED,
   applyDepthOrder,
+  createDepthGate,
   createLayers,
   createScreenLayers,
   literalZIndexOffenders,
@@ -162,6 +163,53 @@ describe('applyDepthOrder culls to the viewport', () => {
     const only = all.filter((e) => e.node.visible).map((e) => ({ box: e.box, node: nodeFor() }))
     applyDepthOrder(only as never, { x: -1e6, y: -1e6, w: 2e6, h: 2e6 })
     expect(only.map((e) => [e.box.id, e.node.zIndex] as const)).toEqual(withCull)
+  })
+})
+
+// ★ The sort is the frame's most expensive pass and its inputs move only when a body steps, a
+// thing appears or the camera moves. A town asleep paid for it sixty times a second.
+describe('★ the depth gate keeps the sort off a still frame', () => {
+  const VIEW = { x: -1e6, y: -1e6, w: 2e6, h: 2e6 }
+  const entry = (
+    id: string,
+    x: number,
+    y: number,
+  ): { box: ReturnType<typeof structureDepthBox>; node: FakeNode } => ({
+    box: structureDepthBox(id, { x, y, w: 2, h: 2 }),
+    node: nodeFor(),
+  })
+
+  it('opens on the first frame and closes while nothing moves', () => {
+    const gate = createDepthGate()
+    const town = [entry('a', 4, 4), entry('b', 9, 9)]
+    expect(gate(town as never, VIEW)).toBe(true)
+    expect(gate(town as never, VIEW)).toBe(false)
+    expect(gate(town as never, VIEW)).toBe(false)
+  })
+
+  it('opens when a body steps, when the camera moves, and when a thing arrives or leaves', () => {
+    const gate = createDepthGate()
+    const a = entry('a', 4, 4)
+    const town = [a, entry('b', 9, 9)]
+    gate(town as never, VIEW)
+
+    a.box.x0 += 0.02 // a walker between two tiles
+    expect(gate(town as never, VIEW)).toBe(true)
+    expect(gate(town as never, VIEW)).toBe(false)
+
+    expect(gate(town as never, { ...VIEW, x: VIEW.x + 1 })).toBe(true)
+
+    town.push(entry('c', 12, 12))
+    expect(gate(town as never, { ...VIEW, x: VIEW.x + 1 })).toBe(true)
+    town.pop()
+    expect(gate(town as never, { ...VIEW, x: VIEW.x + 1 })).toBe(true)
+  })
+
+  it('★ opens when a sprite is replaced under an id that did not change', () => {
+    const gate = createDepthGate()
+    const a = entry('a', 4, 4)
+    gate([a] as never, VIEW)
+    expect(gate([{ box: a.box, node: nodeFor() }] as never, VIEW)).toBe(true)
   })
 })
 

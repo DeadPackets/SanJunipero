@@ -1,16 +1,25 @@
 import type Database from 'better-sqlite3'
 import type { LlmClient } from '@sj/llm'
-import { IntentParamsSchema, registerVerb, VERBS } from '@sj/engine'
+import { registerVerb, unregisterVerb, VERBS } from '@sj/engine'
 import {
+  CLOSED_KEYS,
+  cosine,
   FORBIDDEN_FRAMING,
+  MINUTES_PER_DAY,
+  NO_PARAMS,
   type DiscoveryCredit,
   type DiscoveryKind,
+  type RosterEntry,
   scanRulingForGlassLeak,
   type RulingVocabulary,
 } from '@sj/shared'
 import { CANON } from './canon.js'
+import { makeCouncil, type LawCompileAnswer, type LawCompileAsk } from './council.js'
+import { isCharterRow, type AttemptVerdict, type VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
-import { codify as codifyRecipe, verbFromRecipe } from './codify.js'
+import { habitLines, namedCustoms } from './constructs.js'
+import { ConstructStore } from './constructStore.js'
+import { codify as codifyAttempt, verbFromCharter } from './codify.js'
 import {
   assembleExpressivePrompt,
   ExpressiveRulingSchema,
@@ -18,6 +27,7 @@ import {
   expressiveVerbFromRuling,
   isExpressive,
   isExpressiveRow,
+  readExpressiveRuling,
   type ExpressiveRuling,
 } from './expressive.js'
 import { assembleAdjudicationPrompt } from './prompt.js'
@@ -25,18 +35,29 @@ import { recipeSanityRefusal, type RecipeVocabulary } from './sanity.js'
 import { ReviewStore } from './review.js'
 import { RulebookStore } from './rulebook.js'
 import { RulingsStore } from './rulings.js'
-import { VerdictSchema, type Recipe, type Verdict } from './verdict.js'
+import {
+  StrictVerdictSchema,
+  readRuling,
+  withDefaultTakes,
+  type Recipe,
+  type Verdict,
+} from './verdict.js'
 
 // At or above this cosine the stored ruling is returned verbatim, so a rephrasing of an
-// already-ruled intent resolves to identical physics with zero LLM calls.
+// already-ruled intent resolves to identical physics with zero LLM calls. The same bar decides
+// that a fresh ruling is a second name for a charter the town already has.
 export const SIMILARITY_SHORT_CIRCUIT = 0.92
 
-// Impossible classes that depend on who asked (skills, inventory) must never
-// become global precedent; only context-independent classes short-circuit.
-const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set([
-  'physically_impossible',
-  'beyond_adjacency',
-])
+// A minted verb nobody has begun in this long is retired: the row stays, the word goes, and
+// the roster every mind reads stays the size of what the town actually does.
+export const RETIREMENT_DAYS = 14
+export const RETIRED_REASON = 'unused for fourteen days'
+
+// Impossible classes that depend on who asked (skills, inventory) or on how far the town has
+// climbed must never become global precedent; only context-independent classes short-circuit.
+// `beyond_adjacency` is not one: the codex grows, and the court also reaches for it to say
+// somebody was not standing near enough.
+const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible'])
 
 // Invalid LLM verdicts (e.g. a map naming a verb that does not exist) get this
 // many total tries before the diegetic fallback below.
@@ -59,7 +80,7 @@ export const FALLBACK_IMPOSSIBLE = {
 // The words a turn is made of, spilled into the act slot: the name of an act, the keys it takes,
 // the parts of an answer. An intent made of nothing else is a decode slip, not an attempt.
 const DEBRIS_WORDS: ReadonlySet<string> = new Set([
-  ...Object.keys(IntentParamsSchema.shape).map((k) => k.toLowerCase()),
+  ...CLOSED_KEYS.map((k) => k.toLowerCase()),
   'thought',
   'speech',
   'action',
@@ -138,6 +159,10 @@ function impossibleSelfContradicts(v: Verdict): boolean {
   )
 }
 
+// A refusal reporting on the ask rather than on the world. Live ruling 11 of the last rehearsal
+// told a mind a destination could not be resolved to a walk action; these are its words.
+const MACHINE_PROSE = /\bcoordinates?\b|\bparameters?\b|\bresolved to\b|\b\w+ action\b/i
+
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
 // Self-contradiction is not on this list — that one is retried, above.
@@ -145,6 +170,7 @@ function reasonTainted(reason: string, vocabulary?: RulingVocabulary): boolean {
   return (
     FORBIDDEN_FRAMING.test(reason) ||
     MACHINE_TOKEN.test(reason.trim()) ||
+    MACHINE_PROSE.test(reason) ||
     scanRulingForGlassLeak(reason, vocabulary).length > 0
   )
 }
@@ -190,7 +216,23 @@ export type ArbiterDeps = {
 
 export type Arbiter = {
   adjudicate(intent: string, agentCtx: AgentCtx): Promise<Verdict>
-  codify(recipe: Recipe, credit: DiscoveryCredit): { ruleId: number; verb: string }
+  codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
+  // Every active minted verb as a prompt lists it, in rulebook order.
+  roster(): RosterEntry[]
+  // The names the town gave its own recurrences. Names only — see `namedCustoms`.
+  customs(): string[]
+  // What keeps happening, named or not: gatherings that came back on enough separate days.
+  habits(): string[]
+  // The rungs one step out, in the codex's own words. What the court has always been shown and
+  // no mind ever was, which is why no mind ever reached for one.
+  frontier(): string[]
+  // A body began this minted act at this tick, so it is not for retiring yet.
+  noteUsed(verb: string, tick: number): void
+  // Retires every minted verb unused for RETIREMENT_DAYS; returns the words that went.
+  retireUnused(tick: number): string[]
+  // What of a rule the town just agreed the world can hold them to. One call, at the close of
+  // the talk that passed it, and the answer rides in the event the fold reads.
+  compileLaw(ask: LawCompileAsk): Promise<LawCompileAnswer>
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -201,19 +243,40 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const rulebook = new RulebookStore(deps.db)
   const review = new ReviewStore(deps.db)
   const codex = new CodexStore(deps.db)
+  const constructs = new ConstructStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
+  const council = makeCouncil({
+    llm: deps.llm,
+    ...(deps.vocabulary === undefined ? {} : { vocabulary: deps.vocabulary }),
+  })
   const tick = deps.tick ?? (() => 0)
+
+  // The roster is read on every turn of every mind, so a row is read out of its JSON once and
+  // once only; the JSON itself is the key, so a row that changes is read again.
+  const readRows = new Map<string, unknown>()
+  function rowContents(json: string): unknown {
+    const held = readRows.get(json)
+    if (held !== undefined) return held
+    const parsed: unknown = JSON.parse(json)
+    readRows.set(json, parsed)
+    return parsed
+  }
 
   // Restart resilience: the rulebook is durable but the verb registry is
   // in-memory — re-register every active codified verb in deterministic order.
   for (const row of rulebook.allActive()) {
     if (VERBS[row.verb]) continue
-    const parsed: unknown = JSON.parse(row.recipeJson)
-    registerVerb(
-      isExpressiveRow(parsed)
-        ? expressiveVerbFromRuling(parsed.name, parsed)
-        : verbFromRecipe(parsed as Recipe),
-    )
+    const parsed = rowContents(row.recipeJson)
+    if (isExpressiveRow(parsed)) {
+      registerVerb(expressiveVerbFromRuling(parsed.name, parsed))
+      continue
+    }
+    // A row of an older shape registers a verb that throws at act time, not at boot.
+    if (!isCharterRow(parsed)) {
+      deps.llm.alert('rulebook_row_unreadable', `${row.recipeId} is not a charter this town reads`)
+      continue
+    }
+    registerVerb(verbFromCharter(parsed))
   }
 
   // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
@@ -241,6 +304,44 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     return row.id
   }
 
+  // A fresh attempt that says what an active charter already says is that charter, not a
+  // second name for it. Charter vectors are cached per gloss; a town has few.
+  const charterVectors = new Map<string, Float32Array>()
+  async function charterTwin(v: { recipe: Recipe; summary: string }): Promise<string | null> {
+    const charters = rulebook
+      .allActive()
+      .map((row) => rowContents(row.recipeJson))
+      .filter((p) => !isExpressiveRow(p)) as VerbCharter[]
+    if (charters.length === 0) return null
+    const asked = await deps.embedder.embed(`${v.recipe.name}. ${v.summary}`)
+    for (const c of charters) {
+      const key = `${c.id}|${c.gloss}`
+      let vec = charterVectors.get(key)
+      if (vec === undefined) {
+        vec = await deps.embedder.embed(`${c.name}. ${c.gloss}`)
+        charterVectors.set(key, vec)
+      }
+      if (cosine(asked, vec) >= SIMILARITY_SHORT_CIRCUIT) return c.id
+    }
+    return null
+  }
+
+  function roster(): RosterEntry[] {
+    return rulebook.allActive().map((row) => {
+      const parsed = rowContents(row.recipeJson)
+      if (isExpressiveRow(parsed)) {
+        return {
+          id: parsed.id,
+          name: parsed.name,
+          gloss: parsed.emote,
+          reads: parsed.targeted ? ['targetId'] : [],
+        }
+      }
+      const c = parsed as VerbCharter
+      return { id: c.id, name: c.name, gloss: c.gloss, reads: c.reads }
+    })
+  }
+
   // What the rulebook already makes, read fresh each time: a second waterskin is only a
   // second one against the first, and the first may have been codified a minute ago.
   function codifiedVocabulary(agentCtx: AgentCtx): RecipeVocabulary {
@@ -248,9 +349,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     const knownRecipeIds = new Set<string>()
     for (const row of rulebook.allActive()) {
       knownRecipeIds.add(row.recipeId)
-      const parsed: unknown = JSON.parse(row.recipeJson)
+      const parsed = rowContents(row.recipeJson)
       if (isExpressiveRow(parsed)) continue
-      for (const r of (parsed as Recipe).outcomeTable) {
+      for (const r of (parsed as VerbCharter).outcomes) {
         for (const e of r.effects) if (e.op === 'spawn_item') knownProducts.add(e.kind)
       }
     }
@@ -286,7 +387,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
       // Stage 1 — deterministic rulebook lookup (exact normalized-name match).
       const hit = rulebook.lookup(intent)
-      if (hit) return { kind: 'map', verb: hit.verb, params: {} }
+      if (hit) return { kind: 'map', verb: hit.verb, params: NO_PARAMS }
 
       // Stages 2 and 3 share one retrieval: similar[0] serves the short-circuit,
       // the full list becomes the LLM's precedent block.
@@ -300,7 +401,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           const row = rulebook.byId(stored.recipe.id)
           if (row === null) return stored
           if (row.revertedAtTick === null)
-            return { kind: 'map', verb: stored.recipe.id, params: {} }
+            return { kind: 'map', verb: stored.recipe.id, params: NO_PARAMS }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
         } else if (stored.kind === 'map') {
           if (stored.verb.startsWith('recipe:')) {
@@ -322,13 +423,14 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       // one small call names it, and a ruling nobody can parse falls through to the full path.
       if (isExpressive(intent)) {
         const cheap = assembleExpressivePrompt({ canon: CANON, agent: agentCtx, intent })
-        const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
-        const ruling = ExpressiveRulingSchema.safeParse(r.value)
-        if (ruling.success && !wordTainted(ruling.data.word)) {
+        for (let i = 0; i < MAX_LLM_ATTEMPTS; i++) {
+          const r = await deps.llm.object({ schema: ExpressiveRulingSchema, ...cheap })
+          const ruling = readExpressiveRuling(r.value, i === MAX_LLM_ATTEMPTS - 1)
+          if (ruling === null || wordTainted(ruling.word)) continue
           const verdict: Verdict = {
             kind: 'map',
-            verb: codifyExpressive(ruling.data, tick(), { agentId: agentCtx.agentId, intent }),
-            params: {},
+            verb: codifyExpressive(ruling, tick(), { agentId: agentCtx.agentId, intent }),
+            params: NO_PARAMS,
           }
           await rulings.record(intent, verdict, tick())
           return verdict
@@ -363,27 +465,48 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         precedent,
         intent,
         ...(deps.vocabulary === undefined ? {} : { materials: deps.vocabulary }),
+        learned: roster(),
       })
       let value: Verdict | null = null
       let contradicted = false
       for (let i = 0; i < MAX_LLM_ATTEMPTS && value === null; i++) {
-        const r = await deps.llm.object({ schema: VerdictSchema, system, messages })
+        const answer = await deps.llm.object({ schema: StrictVerdictSchema, system, messages })
         contradicted = false
+        // The court answers in the strict dialect; anything off it is not a ruling — retry. Once
+        // the retry is spent, a duration off the closed set is the one slip a sound recipe is
+        // not thrown away for: the word defaults and everything else must still read.
+        const spent = i === MAX_LLM_ATTEMPTS - 1
+        const ruling =
+          readRuling(answer.value) ?? (spent ? readRuling(withDefaultTakes(answer.value)) : null)
+        if (ruling === null) continue
         // A map naming an unregistered verb is a hallucination — retry, never
         // return or record it (finding 8).
-        if (r.value.kind === 'map' && !VERBS[r.value.verb]) continue
+        if (ruling.kind === 'map' && !VERBS[ruling.verb]) continue
+        if (ruling.kind === 'attempt') {
+          const twin = await charterTwin(ruling)
+          if (twin !== null) {
+            value = { kind: 'map', verb: twin, params: NO_PARAMS }
+            break
+          }
+        }
         // An attempt that leaks the machinery is invalid — retry (finding 12).
-        if (framingTainted(r.value)) continue
+        if (framingTainted(ruling)) continue
         // A recipe that cannot stand as a permanent verb is invalid — retry. Codification is
         // forever, and the mini-rehearsal proved a bad one is minted in silence otherwise.
-        if (r.value.kind === 'attempt' && recipeSanityRefusal(r.value.recipe, vocab) !== null)
+        if (ruling.kind === 'attempt' && recipeSanityRefusal(ruling.recipe, vocab) !== null)
+          continue
+        // A canon carrying an id that was on neither line is the format error the prompt already
+        // calls it — so it retries, the way every other answer off the dialect does. Run 5 lost
+        // five attempts here and the wording was hardened twice; the retry is what was missing,
+        // and every attempt rehearsals 6 to 8 ruled died on this check without one.
+        if (ruling.kind === 'attempt' && !spent && !codex.withinAdjacency(ruling.recipe.canon))
           continue
         // An impossible whose own reason argues the other way — retry, never launder.
-        if (impossibleSelfContradicts(r.value)) {
+        if (impossibleSelfContradicts(ruling)) {
           contradicted = true
           continue
         }
-        value = r.value
+        value = ruling
       }
       if (value === null) {
         if (contradicted) {
@@ -398,31 +521,70 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
-      // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
-      // corrected verdict is what gets recorded, so an exploit never becomes precedent.
-      const verdict: Verdict =
-        value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)
-          ? {
-              kind: 'impossible',
-              reason: 'this would need a craft the town has not yet reached',
-              class: 'beyond_adjacency',
-            }
-          : value
+      // An attempt whose recipe canon the codex has not earned is beyond adjacency.
+      let verdict: Verdict = value
+      if (value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)) {
+        // Every attempt rehearsals 6, 7 and 8 ruled died right here — all of them — and the
+        // canon went unrecorded, so nobody could say whether the court invented an id or the
+        // ladder simply has no rung for what was asked. The corrected verdict hides both.
+        deps.llm.alert(
+          'attempt_beyond_adjacency',
+          `canon [${value.recipe.canon.join(', ')}] for "${intent.slice(0, 90)}"`,
+        )
+        verdict = {
+          kind: 'impossible',
+          reason: 'this would need a craft the town has not yet reached',
+          class: 'beyond_adjacency',
+        }
+      }
 
-      // Stage 4 — record the ruling as shared precedent.
+      // Stage 4 — record the ruling as shared precedent. A refusal that says the ladder is too
+      // short is returned, never recorded: the rung it wanted may be earned tomorrow.
+      if (verdict.kind === 'impossible' && verdict.class === 'beyond_adjacency') return verdict
       await rulings.record(intent, verdict, tick())
 
       return verdict
     },
 
-    codify(recipe, credit) {
-      return codifyRecipe(recipe, credit, {
+    codify(attempt, credit) {
+      return codifyAttempt(attempt, credit, {
         rulebook,
         review,
         codex,
         tick: tick(),
         ...(deps.onCodified === undefined ? {} : { onCodified: deps.onCodified }),
       })
+    },
+
+    roster,
+
+    customs() {
+      return namedCustoms(constructs.all())
+    },
+
+    habits() {
+      return habitLines(constructs.all())
+    },
+
+    frontier() {
+      return codex.frontierNames()
+    },
+
+    noteUsed(verb, tick) {
+      rulebook.touch(verb, tick)
+    },
+
+    retireUnused(tick) {
+      const stale = rulebook.unusedSince(tick - RETIREMENT_DAYS * MINUTES_PER_DAY)
+      for (const row of stale) {
+        rulebook.revert(row.recipeId, RETIRED_REASON, tick)
+        unregisterVerb(row.verb)
+      }
+      return stale.map((row) => row.verb)
+    },
+
+    compileLaw(ask) {
+      return council(ask)
     },
 
     sanity(recipe, agentCtx) {

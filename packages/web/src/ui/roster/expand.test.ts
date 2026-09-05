@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
+  DAYS_PER_YEAR,
   bondFrom,
   type Bond,
   type BondAct,
@@ -108,7 +109,7 @@ describe('expanding never removes the way back, because the list never goes away
           hp: 100,
           injuries: [],
           ill: false,
-          ageDays: 30 * 364,
+          ageDays: 30 * DAYS_PER_YEAR,
           skills: {},
           activity: null,
           collapsedSinceTick: null,

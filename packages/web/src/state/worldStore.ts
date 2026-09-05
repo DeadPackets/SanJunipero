@@ -1,7 +1,9 @@
 import {
   SimConfigSchema,
   type AssetRecord,
+  type ServerDirector,
   type ServerMsg,
+  type ServerScene,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -13,8 +15,13 @@ const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
 const RECENT_EVENTS_CAP = 400
 
-type ViewMode = { live: true } | { live: false; tick: number }
-type Thought = { agentId: string; tick: number; text: string }
+/** Three states, not two: LIVE, a STILL scrub pinned to one minute, and a REPLAY walking the
+ *  past forward. A replay is not live — it never moves the live watermark — but its time moves. */
+type ViewMode = { live: true } | { live: false; replaying: boolean; tick: number }
+type Thought = { agentId: string; tick: number; text: string; importance: number }
+/** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
+ *  which is the Pixi handle and has nothing to do with this. */
+export type TownScene = ServerScene['scene']
 // Law flips are kept whole, outside the capped delta ring: a town's legal history
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
@@ -28,6 +35,9 @@ type Trouble = 'reload' | 'resnapshot'
 export type WorldStore = {
   getState: () => WorldState | null
   getMode: () => ViewMode
+  /** Is the clock on screen advancing? The question every reader that folds a delta or walks a
+   *  body is really asking — live and replaying both answer yes, a still scrub answers no. */
+  timeMoving: () => boolean
   /** The operator has stopped the world clock. The town is still served; it is not moving. */
   getPaused: () => boolean
   getTick: () => number
@@ -39,6 +49,12 @@ export type WorldStore = {
    *  into the log is reused the moment it is trimmed, so a reader counts from here. */
   thoughtsSeq: () => number
   recentEvents: () => SimEvent[]
+  /** The scene the town is holding, open or just closed. The closing frame carries the summary,
+   *  so it is KEPT rather than cleared — whoever shows it decides how long it stands. */
+  getScene: () => TownScene | null
+  /** What the gateway says is worth watching, and the act the day has reached. One frame, kept
+   *  until the next one changes it — the camera, the cue and the stamp all read this one. */
+  getDirector: () => ServerDirector | null
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** The world log's head as the server last reported it — the signal a read model refetches on,
@@ -65,10 +81,13 @@ export function createWorldStore(): WorldStore {
   const thoughts: Thought[] = []
   const latest = new Map<string, { tick: number; text: string }>()
   const events: SimEvent[] = []
+  let scene: TownScene | null = null
+  let director: ServerDirector | null = null
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
+  const timeMoving = (): boolean => mode.live || mode.replaying
 
   // Every subscriber pass is a full entity sync, so a burst is coalesced onto the next frame.
   // Off a browser there is no frame to wait for and the pass stays synchronous.
@@ -90,6 +109,7 @@ export function createWorldStore(): WorldStore {
   return {
     getState: () => state,
     getMode: () => mode,
+    timeMoving,
     getPaused: () => paused,
     getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
     liveEdge: () => liveEdge,
@@ -97,6 +117,8 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
+    getScene: () => scene,
+    getDirector: () => director,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -127,8 +149,8 @@ export function createWorldStore(): WorldStore {
           // sends: refolding an event this state already has throws, and the town stops.
           if (msg.seq <= logSeq) return null
           logSeq = msg.seq
-          // deltas only advance the live view; while scrubbed the past moment stays still
-          if (mode.live && state !== null && config !== null) {
+          // deltas advance whatever clock is moving; while scrubbed the past moment stays still
+          if (timeMoving() && state !== null && config !== null) {
             // Folded aside first: a throw halfway through must not leave half a town on screen.
             let next = state
             try {
@@ -137,6 +159,8 @@ export function createWorldStore(): WorldStore {
               return 'resnapshot'
             }
             state = next
+            // The replay's own playhead, so every reader of `mode.tick` follows the past forward.
+            if (!mode.live) mode = { live: false, replaying: true, tick: next.tick }
             for (const ev of msg.events) {
               if (ev.type !== 'config_changed') continue
               const p = ev.payload as { path?: unknown; value?: unknown }
@@ -154,11 +178,23 @@ export function createWorldStore(): WorldStore {
           break
         case 'scrubbed':
           state = msg.state as WorldState
-          mode = { live: false, tick: msg.tick }
+          mode = { live: false, replaying: false, tick: msg.tick }
+          break
+        case 'replaying':
+          // The log head goes BACK to where this state was taken: the recorded deltas that follow
+          // carry their own old seqs, and the guard above must read them as the rise they are.
+          logSeq = msg.seq
+          state = msg.state as WorldState
+          mode = { live: false, replaying: true, tick: msg.tick }
           break
         case 'thought':
           thoughtsSeq++
-          thoughts.push({ agentId: msg.agentId, tick: msg.tick, text: msg.text })
+          thoughts.push({
+            agentId: msg.agentId,
+            tick: msg.tick,
+            text: msg.text,
+            importance: msg.importance,
+          })
           if (thoughts.length > THOUGHT_LOG_CAP)
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
           latest.set(msg.agentId, { tick: msg.tick, text: msg.text })
@@ -166,6 +202,12 @@ export function createWorldStore(): WorldStore {
         case 'assets':
           records.push(...msg.records)
           assetsSeq += msg.records.length
+          break
+        case 'scene':
+          scene = msg.scene
+          break
+        case 'director':
+          director = msg
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

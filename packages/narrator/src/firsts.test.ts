@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import type { SimEvent } from '@sj/shared'
-import { detectFirsts } from './firsts.js'
+import { detectFirsts, populationDelta } from './firsts.js'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 
@@ -11,6 +11,16 @@ const ev = (seq: number, tick: number, type: string, payload: unknown = {}): Sim
   type,
   payload,
 })
+
+const ratified = (seq: number, tick: number): SimEvent =>
+  ev(seq, tick, 'law_ratified', {
+    lawId: 'law_slate',
+    agentId: 'nadia',
+    text: 'Nobody takes another\u2019s planks.',
+    why: '',
+    predicate: { kind: 'forbid', verb: 'take' },
+    votes: { for: ['nadia'], against: [] },
+  })
 
 const speechAndTrade = [
   ev(1, 10, 'agent_spoke', { agentId: 'a', text: 'first', x: 0, y: 0 }),
@@ -52,24 +62,42 @@ describe('detectFirsts', () => {
     expect(ms.map((m) => m.kind)).toEqual(['first_trade'])
   })
 
-  it('first_law fires from rulebookCount, citing the first event of the day', () => {
-    const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 1 })
-    const law = ms.find((m) => m.kind === 'first_law')
-    expect(law).toEqual({
+  // The town writes its own rules now, so the first one is the council that passed it and the
+  // person who put it to the room — not a count of rows in the court's book.
+  it('first_law fires on the ratification, naming whoever proposed it', () => {
+    const ms = detectFirsts([...speechAndTrade, ratified(4, 20)], {
+      seenKinds: new Set(),
+      rulebookCount: 0,
+    })
+    expect(ms.find((m) => m.kind === 'first_law')).toEqual({
       kind: 'first_law',
       tier: 1,
       domain: 'engine',
       label: 'the first law',
-      eventSeq: 1,
+      eventSeq: 4,
       day: 0,
-      tick: 10,
-      agentIds: [],
+      tick: 20,
+      agentIds: ['nadia'],
     })
   })
 
-  it('first_law already seen emits nothing', () => {
-    const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(['first_law']), rulebookCount: 1 })
-    expect(ms.find((m) => m.kind === 'first_law')).toBeUndefined()
+  it('fires once, and never from a rulebook the town never voted on', () => {
+    expect(
+      detectFirsts([ratified(1, 20), ratified(2, 30)], {
+        seenKinds: new Set(),
+        rulebookCount: 0,
+      }).filter((m) => m.kind === 'first_law'),
+    ).toHaveLength(1)
+    expect(
+      detectFirsts([ratified(1, 20)], { seenKinds: new Set(['first_law']), rulebookCount: 1 }).find(
+        (m) => m.kind === 'first_law',
+      ),
+    ).toBeUndefined()
+    expect(
+      detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 9 }).find(
+        (m) => m.kind === 'first_law',
+      ),
+    ).toBeUndefined()
   })
 
   it('non-give action_completed is not a trade — it is whatever it actually was', () => {
@@ -94,5 +122,44 @@ describe('detectFirsts', () => {
     expect(
       detectFirsts(speechAndTrade, { seenKinds: store.milestoneKinds(), rulebookCount: 0 }),
     ).toEqual([])
+  })
+})
+
+// Payload shapes from the arrivals design §2; the engine's own lane lands the zod schemas.
+describe('the valley road counts both ways', () => {
+  const arrived = ev(1, 600, 'agent_arrived', {
+    id: 'mira',
+    name: 'Mira',
+    sex: 'f',
+    ageDays: 11_315,
+    x: 65,
+    y: 127,
+  })
+  const departed = ev(2, 700, 'agent_departed', { agentId: 'reza' })
+
+  it('adds the person the road brought and takes away the one it took', () => {
+    expect(populationDelta(arrived)).toBe(1)
+    expect(populationDelta(departed)).toBe(-1)
+  })
+
+  it('fires the first coming and the first going once each, naming the body', () => {
+    const firsts = detectFirsts([arrived, arrived, departed, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })
+    expect(firsts.filter((m) => m.kind === 'first_arrival')).toHaveLength(1)
+    expect(firsts.filter((m) => m.kind === 'first_leaving')).toHaveLength(1)
+    expect(firsts.find((m) => m.kind === 'first_arrival')?.agentIds).toEqual(['mira'])
+    expect(firsts.find((m) => m.kind === 'first_leaving')?.agentIds).toEqual(['reza'])
+  })
+
+  it('and neither label names a number or a machine', () => {
+    for (const m of detectFirsts([arrived, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })) {
+      expect(m.label).not.toMatch(/\d/)
+      expect(m.label).not.toMatch(/\b(agent|id|event|model)\b/i)
+    }
   })
 })

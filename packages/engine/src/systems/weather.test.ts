@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { SEASONS, SimConfigSchema, simTimeFromTick, type SimConfig } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  SEASONS,
+  SimConfigSchema,
+  simTimeFromTick,
+  type SimConfig,
+} from '@sj/shared'
 import { genesisState, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { RngStream, RngStreams } from '../rng.js'
@@ -47,7 +53,7 @@ describe('rollWeatherKind: a seeded year of hourly rolls', () => {
     const rng = RngStream.seed('wy0', 'weather')
     let kind = 'sunny'
     let snowHours = 0
-    for (let h = 0; h < 364 * 24; h++) {
+    for (let h = 0; h < DAYS_PER_YEAR * 24; h++) {
       const { season } = simTimeFromTick(h * 60)
       kind = rollWeatherKind(CFG, rng, season, kind, Math.floor(h / 24))
       expect(CFG.weather.kinds).toContain(kind)

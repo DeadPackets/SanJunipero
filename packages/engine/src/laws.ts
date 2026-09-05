@@ -8,11 +8,10 @@ import type { SimConfig } from '@sj/shared'
 // not on this list cannot be changed at runtime by anyone, through any surface.
 export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'reproduction.enabled': z.boolean(),
-  'reproduction.coSleepNightsToPartner': z.number().int().positive(),
-  'reproduction.partnerWindowDays': z.number().int().positive(),
-  'reproduction.conceptionChancePerNight': z.number().min(0).max(1),
   'reproduction.gestationDays': z.number().int().positive(),
   'aging.deathOfOldAgeEnabled': z.boolean(),
+  // The ceiling on the town, set by the runtime at attach so a replay carries it.
+  'population.maxMinds': z.number().int().positive(),
   'spoilage.enabled': z.boolean(),
   'spoilage.days': z.record(z.string(), z.number().positive()),
   'spoilage.storehouseMultiplier': z.number().positive(),
@@ -41,6 +40,8 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'constructs.enabled': z.boolean(),
   'constructs.minParticipants': z.number().int().positive(),
   // The dials tuning is expected to reach for.
+  'needs.hungerDecayPerTick': z.number().positive(),
+  'light.fuelBurnTicks': z.number().int().positive(),
   'mortality.poisonChanceSpoiled': z.number().min(0).max(1),
   'illness.dailyWorsenChance': z.number().min(0).max(1),
   'illness.contagionEnabled': z.boolean(),

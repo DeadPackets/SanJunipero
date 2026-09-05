@@ -10,16 +10,23 @@ import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
+import { createMomentEmotes, type MomentEmoteLayer } from './momentEmotes.js'
 import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
+import { createFireflies, type FireflyLayer } from './fireflies.js'
 import { createSmoke, type SmokeLayer } from './smoke.js'
+import { createClouds, type CloudLayer } from './clouds.js'
 import { createVignette, type Vignette } from './vignette.js'
 import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
+import { bubbleSubject, shouldBubble } from '../ui/thoughts.js'
 import { createToponymLayer, type ToponymLayer } from './toponyms.js'
+
+/** Nobody is in a room the town is not holding open. */
+const NOBODY: readonly string[] = []
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({
@@ -75,11 +82,14 @@ export function StageMount({
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
     let acts: ActLayer | null = null
+    let moments: MomentEmoteLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let lightPools: LightPools | null = null
+    let fireflies: FireflyLayer | null = null
     let smoke: SmokeLayer | null = null
+    let clouds: CloudLayer | null = null
     let vignette: Vignette | null = null
     let interior: InteriorScene | null = null
     let landmarks: LandmarkLayer | null = null
@@ -88,6 +98,39 @@ export function StageMount({
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
+    let torn = false
+    // Every layer the effect got as far as building, whether it finished or threw. Once: a
+    // failed build tears down here and React's cleanup then runs over the same locals.
+    const teardown = (): void => {
+      if (torn) return
+      torn = true
+      offSync?.()
+      offEvents?.()
+      offCamera?.()
+      offInterior?.()
+      if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
+      // onKeyDown reads this ref and only guards on null, so a destroyed scene left in it is
+      // one the keyboard can still drive.
+      sceneRef.current = null
+      interiorRef.current = null
+      landmarks?.destroy()
+      toponyms?.destroy()
+      interior?.destroy()
+      chars?.destroy()
+      bubbles?.destroy()
+      acts?.destroy()
+      moments?.destroy()
+      ambient?.destroy()
+      lightPools?.destroy()
+      fireflies?.destroy()
+      smoke?.destroy()
+      clouds?.destroy()
+      vignette?.destroy()
+      weather?.destroy()
+      atmosphere?.destroy()
+      scene?.destroy()
+      scene = null
+    }
     // Faces install before the scene exists so the first label drawn is already a bitmap
     // glyph; installFaces resolves even when the webfonts never do.
     void installFaces(document)
@@ -139,11 +182,14 @@ export function StageMount({
         bubbles = createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
+        moments = createMomentEmotes(s, store, book)
         atmosphere = createAtmosphere(s)
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
+        fireflies = createFireflies(s, store)
         smoke = createSmoke(s, store)
+        clouds = createClouds(s, store)
         vignette = createVignette(s.app) // last onto app.stage: over the weather
         sceneRef.current = s
         const charLayer = chars
@@ -151,10 +197,6 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
-        // The track over a head is the act layer's number, drawn by the character layer that
-        // owns the slot it wraps. Same shape as `anchorOf`, and for the same reason.
-        const actLayer = acts
-        s.actFraction = (agentId) => actLayer.fractionOf(agentId)
         interior = createInteriorScene(s, store, book, selectAgent)
         s.interior = interior
         interiorRef.current = interior
@@ -186,10 +228,13 @@ export function StageMount({
           s.sortDepth() // one painter's order for the whole frame, after every box is published
           bubbles?.tick(now)
           acts?.tick()
+          moments?.tick(now)
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
+          fireflies?.tick(dt)
           smoke?.tick(dt)
+          clouds?.tick(dt)
           vignette?.tick()
           const state = store.getState()
           if (state !== null) {
@@ -199,8 +244,11 @@ export function StageMount({
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
           if (said > seenThoughts) {
+            const held = store.getScene()
+            const inTheRoom = held?.open ? held.participants : NOBODY
             for (const t of store.thoughtsLog().slice(seenThoughts - said))
-              bubbles?.spawnThought(t.agentId, t.text)
+              if (shouldBubble(t, bubbleSubject(s), inTheRoom))
+                bubbles?.spawnThought(t.agentId, t.text)
             seenThoughts = said
           }
         }
@@ -212,33 +260,14 @@ export function StageMount({
         // No WebGL, no WebGPU, or a context lost mid-build.
         if (disposed) return
         firstFrameStuck(FIRST_FRAME_COPY.blind)
-        scene?.destroy()
-        scene = null
+        teardown()
       })
     return () => {
       disposed = true
       // Fast Refresh remounts this component and the effect below destroys the scene; without
       // this line the chrome upstream keeps the dead one and throws on its next ticker call.
       if (published) onScene?.(null)
-      offSync?.()
-      offEvents?.()
-      offCamera?.()
-      offInterior?.()
-      if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
-      interiorRef.current = null
-      landmarks?.destroy()
-      toponyms?.destroy()
-      interior?.destroy()
-      chars?.destroy()
-      bubbles?.destroy()
-      acts?.destroy()
-      ambient?.destroy()
-      lightPools?.destroy()
-      smoke?.destroy()
-      vignette?.destroy()
-      weather?.destroy()
-      atmosphere?.destroy()
-      scene?.destroy()
+      teardown()
     }
   }, [])
 

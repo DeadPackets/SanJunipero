@@ -13,7 +13,7 @@ OUT=$ROOT/rehearsals
 MINUTES=${1:-65}
 SPEED=${SPEED:-1}
 DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 48}")
-export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=8 PORT=${PORT:-8099}
+export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=2 SJ_MAX_MINDS=${SJ_MAX_MINDS:-20} PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$
 export SJ_ADMIN_PORT=${SJ_ADMIN_PORT:-8799}
 # Nobody watches a rehearsal, and unwatched is exactly when pacing drops the clock to 0.25x
@@ -37,6 +37,14 @@ for i in $(seq 1 $((MINUTES * 6))); do
   sleep 10
   kill -0 $PID 2>/dev/null || { echo "stream exited early at $((i * 10)) s"; break; }
 done
-kill -INT $PID 2>/dev/null; sleep 5; kill -0 $PID 2>/dev/null && kill $PID
-grep -v -i "key" "$OUT/stream.log" | tail -40 > "$OUT/stream-tail.txt"
+# The same 20 s compose allows the container: a live teardown drains the turns still in flight,
+# and a second signal inside that window re-enters the close on handles the first is using.
+kill -INT $PID 2>/dev/null
+for i in $(seq 1 20); do sleep 1; kill -0 $PID 2>/dev/null || break; done
+kill -0 $PID 2>/dev/null && kill $PID
+# By the SHAPE of a secret, not by the word "key": a bare sk-… on its own line carries no word
+# to grep for, and dropping whole lines loses the run's own story with them.
+sed -E -e 's/sk-[A-Za-z0-9._-]{6,}/[redacted]/g' \
+  -e 's/([A-Za-z0-9_]*(KEY|TOKEN|SECRET)[A-Za-z0-9_]*[=:][[:space:]]*)[^[:space:]"'"'"']+/\1[redacted]/gI' \
+  "$OUT/stream.log" | tail -40 > "$OUT/stream-tail.txt"
 echo "done; log lines: $(wc -l < "$OUT/stream.log")"

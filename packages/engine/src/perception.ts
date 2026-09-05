@@ -1,9 +1,11 @@
 import {
   isBeddedKind,
   isHearthKind,
+  MINUTES_PER_DAY,
   isRoofedKind,
   isTravelled,
   lightBandAt,
+  sanitizeSpokenText,
   simTimeFromTick,
   visionRadiusAt,
   type SimConfig,
@@ -13,7 +15,7 @@ import {
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { hears } from './earshot.js'
-import { doorTile, insideOf, roomIsFull } from './interiors.js'
+import { doorTile, insideOf, isYourRoof, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
 import {
@@ -26,12 +28,15 @@ import {
   type WorldState,
 } from './state.js'
 import { ageBand, type AgeBand } from './systems/aging.js'
+import { sexOf } from './systems/reproduction.js'
 import { isSpoiling } from './systems/spoilage.js'
 import {
   buildTicks,
   isAdjacentToRect,
   itemWithinReach,
   isMapRim,
+  VERBS,
+  WALK_LOST_THEM,
   walkIsCapped,
   workPenalty,
 } from './verbs/index.js'
@@ -64,7 +69,16 @@ export type PerceivedAgent = {
   // Absent on a well body, so a healthy town reads exactly as it always did — and never a number.
   // The packet carries the phrase, because the phrase is what a pair of eyes actually gets.
   condition?: string
-}
+  // A face the valley has only just seen for the first time. Absent once the town has had
+  // STRANGER_DAYS to get used to it, and absent on everyone born here.
+  stranger?: true
+} & Markings
+
+/** How long a body off the road still reads as one to everyone who looks at it. */
+export const STRANGER_DAYS = 3
+
+// Tags a minted verb left, readable by anyone who can see the thing. Absent when unmarked.
+export type Markings = { marks?: Record<string, string> }
 
 // How a worn thing reads to whoever is looking. The forageable-prose precedent: the packet
 // carries the phrase, because the phrase is what a pair of eyes actually gets.
@@ -135,7 +149,7 @@ export type PerceivedStructure = {
   // A body has to tell a room it will sleep WELL in from a room with a floor BEFORE it walks
   // there; being told at the door is a turn already spent. Absent on a kind with no bed.
   bed?: true
-}
+} & Markings
 
 // Whose it is, and whose hands made it — the two things prose needs to say
 // "Rahel's basket" or "a chair bearing Yusuf's mark". Absent when unclaimed.
@@ -151,7 +165,8 @@ export type PerceivedItem = {
   x: number
   y: number
 } & OwnerNames &
-  Turning
+  Turning &
+  Markings
 
 export type InventoryItem = Item & OwnerNames & Turning
 
@@ -177,15 +192,37 @@ export type HeardSpeech = { speakerId: string; name: string; text: string; dista
 export type SeenEvent =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
   | { kind: 'mystery'; mystery: string; prose: string }
-  | { kind: 'expression'; actorName: string; verb: string; sense: 'sight' | 'sound' }
+  | {
+      kind: 'expression'
+      actorName: string
+      verb: string
+      sense: 'sight' | 'sound'
+      // What a minted act looks or sounds like, in the words its charter gave it.
+      label?: string
+    }
+  // Somebody within earshot worked something out, and said why. `saying` is absent when the
+  // mind had no thought behind the ask.
+  | {
+      kind: 'discovery'
+      inventorName: string
+      pronoun: 'he' | 'she'
+      name: string
+      saying?: string
+    }
+  // Something the town agreed against, done where somebody could see it. `self` is the breaker's
+  // own copy: being seen is the whole of what a forbid costs.
+  | { kind: 'law_broken'; breakerName: string; lawText: string; self: boolean }
+  // Somebody came up the valley road where this pair of eyes could see the edge of the map.
+  | { kind: 'stranger_arrived'; name: string }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
 export type PerceivedGround = { wellTravelled: true }
 
 // The roof the body is standing under. Absent under open sky, so a packet from a town that
-// never went in reads exactly as it always did.
-export type PerceivedInterior = { id: string; kind: string }
+// never went in reads exactly as it always did. Whose it is rides with it: courting is gated on
+// standing under a private roof of your own or theirs, and nothing else said whose this was.
+export type PerceivedInterior = { id: string; kind: string; yours?: true; ownerName?: string }
 
 // What the hands and the feet can act on from where the body stands, read off the verbs' own
 // tests so the prose and a refusal can never disagree about the same body.
@@ -195,6 +232,19 @@ export type PerceivedReach = {
   // Spots this packet names that are not ground: `findPath` refuses them all, so `walk` can
   // never end on one. Composed here because only the packet knows which spots it named.
   noFooting: { x: number; y: number }[]
+}
+
+// A shelf this mind may use and what stands on it, grouped by kind. Carried whether or not the
+// body is near the walls: where your own things are is a thing you know, not a thing you see.
+export type PerceivedStore = {
+  structureId: string
+  kind: string
+  name?: string
+  // Absent on a roof of this mind's own and on the town's store, which belongs to nobody.
+  ownerName?: string
+  // Absent on the town's store: everybody's things are in it and it is nobody's roof.
+  yours?: true
+  items: { kind: string; qty: number }[]
 }
 
 export type PerceptionPacket = {
@@ -209,6 +259,9 @@ export type PerceptionPacket = {
     activityToward?: { x: number; y: number }
     inside?: PerceivedInterior
     inventory: InventoryItem[]
+    // Your own things heaped on the ground by your own wall, grouped by kind. Absent below the
+    // few it takes to be a heap, so a tidy doorstep reads exactly as it always did.
+    doorstep?: { kind: string; qty: number }[]
   }
   weather: { kind: string; temperatureC: number }
   visible: {
@@ -220,6 +273,7 @@ export type PerceptionPacket = {
     forageables: PerceivedForageable[]
   }
   reach: PerceivedReach
+  stores: PerceivedStore[]
   ground?: PerceivedGround
   light: 'bright' | 'dim' | 'dark'
   // Present only while this body is doing work the dark is charging it for. Absent otherwise,
@@ -277,11 +331,16 @@ const SELF_EVENT_TAG: Record<string, string> = {
   agent_tended: 'you_were_tended',
 }
 
+// The one interruption a mind is told about in words. Every other act cut short is read off the
+// body next turn — standing still, holding nothing — and needs no sentence of its own.
+const INTERRUPT_TAG: Record<string, string> = { [WALK_LOST_THEM]: 'you_lost_them' }
+
 // Every tag `feltTagFor` can produce, so the prose map can be proven complete
 // rather than sampled. Mystery tags come from MYSTERIES.
 export const FELT_TAGS: readonly string[] = [
   ...Object.keys(PRECIPITATION).map((kind) => `${kind}_started`),
   ...Object.values(SELF_EVENT_TAG),
+  ...Object.values(INTERRUPT_TAG),
 ]
 
 // A felt event is something that happens *to* this agent (or ambient weather). Anything about
@@ -294,6 +353,10 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
+  if (ev.type === 'action_interrupted') {
+    const reason = (ev.payload as { reason?: unknown }).reason
+    return typeof reason === 'string' ? (INTERRUPT_TAG[reason] ?? null) : null
+  }
   return SELF_EVENT_TAG[ev.type] ?? null
 }
 
@@ -317,15 +380,19 @@ type Lens = {
   nameOf(id: string): string
 }
 
-function itemMarks(lens: Lens, i: Item): OwnerNames & Turning {
-  const out: OwnerNames & Turning = {}
+function itemMarks(lens: Lens, i: Item): OwnerNames & Turning & Markings {
+  const out: OwnerNames & Turning & Markings = {}
   if (lens.config.ownership.enabled) {
     if (i.owner !== undefined) out.ownerName = lens.nameOf(i.owner)
     if (i.crafterMark !== undefined) out.crafterMarkName = lens.nameOf(i.crafterMark)
   }
   if (isSpoiling(lens.state, i, lens.config)) out.spoiling = true
+  if (i.marks !== undefined) out.marks = i.marks
   return out
 }
+
+const marked = (thing: { marks?: Record<string, string> }): Markings =>
+  thing.marks === undefined ? {} : { marks: thing.marks }
 
 function perceiveAgents(lens: Lens): PerceivedAgent[] {
   const { state, config, self } = lens
@@ -335,6 +402,8 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
     .map((a) => {
       const worn = wornProse(state, a.id)
       const condition = conditionProse(state, config, a.id)
+      const day = Math.floor(state.tick / MINUTES_PER_DAY)
+      const stranger = a.arrived !== undefined && day - a.arrived.day <= STRANGER_DAYS
       return {
         id: a.id,
         name: a.name,
@@ -346,6 +415,8 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
         ageBand: ageBand(config, a.ageDays),
         ...(worn === undefined ? {} : { worn }),
         ...(condition === undefined ? {} : { condition }),
+        ...(stranger ? { stranger: true as const } : {}),
+        ...marked(a),
       }
     })
 }
@@ -425,6 +496,7 @@ function perceiveStructures(lens: Lens): PerceivedStructure[] {
     ...howFarUp(lens, s),
     ...theHearth(lens, s),
     ...theBed(lens, s),
+    ...marked(s),
   }))
 }
 
@@ -541,6 +613,95 @@ function perceiveInventory(lens: Lens): InventoryItem[] {
     .map((i) => ({ ...i, ...itemMarks(lens, i) }))
 }
 
+// The town's own store belongs to nobody and holds everybody's things, so it is never one of
+// the roofs that are yours, however much of yours stands on its shelves.
+const isTownStore = (config: SimConfig, s: Structure): boolean =>
+  s.owner === undefined && config.spoilage.preservingKinds.includes(s.kind)
+
+// Two tiles out from the wall is the ground a thing is set down on rather than carried in, and
+// three of them is a heap rather than a thing you put down for a moment.
+const DOORSTEP_REACH = 2
+const DOORSTEP_HEAP = 3
+
+const withinOfRect = (
+  x: number,
+  y: number,
+  r: { x: number; y: number; w: number; h: number },
+  reach: number,
+): boolean =>
+  x >= r.x - reach && x <= r.x + r.w - 1 + reach && y >= r.y - reach && y <= r.y + r.h - 1 + reach
+
+/** What this mind has left lying on the ground by its own walls. Owner, 2026-09-02: "agents
+ *  just end up leaving things in front of their houses". Absent until it is a heap. */
+function perceiveDoorstep(
+  lens: Lens,
+  yours: Structure[],
+): { kind: string; qty: number }[] | undefined {
+  const { state, self } = lens
+  if (yours.length === 0) return undefined
+  const kinds = new Map<string, number>()
+  let heaped = 0
+  for (const id of Object.keys(state.items).sort()) {
+    const i = state.items[id]!
+    if (!isTileItem(i) || i.owner !== self.id) continue
+    if (!yours.some((s) => withinOfRect(i.loc.x, i.loc.y, s, DOORSTEP_REACH))) continue
+    kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
+    heaped += i.qty
+  }
+  if (heaped < DOORSTEP_HEAP) return undefined
+  return [...kinds]
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+    .map(([kind, qty]) => ({ kind, qty }))
+}
+
+/** The shelves this mind may use — the roofs that are its own, and the town's own store, which
+ *  is the one public building that keeps what is left in it — most of a kind first. */
+function perceiveStores(lens: Lens, yours: Structure[]): PerceivedStore[] {
+  const { state, config } = lens
+  const inside = new Map<string, Map<string, number>>()
+  for (const id of Object.keys(state.items).sort()) {
+    const i = state.items[id]!
+    if (!isStructureItem(i)) continue
+    const kinds = inside.get(i.loc.id) ?? new Map<string, number>()
+    kinds.set(i.kind, (kinds.get(i.kind) ?? 0) + i.qty)
+    inside.set(i.loc.id, kinds)
+  }
+  const mine = new Set(yours.map((s) => s.id))
+  const stores: PerceivedStore[] = []
+  for (const s of Object.values(state.structures).sort(byId)) {
+    const isYours = mine.has(s.id)
+    const townsOwn = isTownStore(config, s)
+    if (s.stage !== 'complete' || (!isYours && !townsOwn)) continue
+    // Whose walls they are, when they are not this mind's own: a body sleeping under a
+    // partner's roof has to be able to call the shelf theirs.
+    const owner = s.owner === undefined || s.owner === lens.self.id ? undefined : s.owner
+    stores.push({
+      structureId: s.id,
+      kind: s.kind,
+      ...named(s),
+      ...(isYours ? { yours: true as const } : {}),
+      ...(owner === undefined ? {} : { ownerName: lens.nameOf(owner) }),
+      items: [...(inside.get(s.id) ?? new Map<string, number>())]
+        .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
+        .map(([kind, qty]) => ({ kind, qty })),
+    })
+  }
+  // The roofs that are yours first: the shelf a mind reaches for is the one it lives under.
+  return stores.sort((a, b) => Number(b.yours ?? false) - Number(a.yours ?? false))
+}
+
+/** The roof underfoot and whose it is, read off the owner the `lie_with` gate reads. Unowned
+ *  walls are nobody's and say nothing, which is what they are. */
+function whoseRoof(lens: Lens, roof: Structure): PerceivedInterior {
+  const owner = roof.owner
+  return {
+    id: roof.id,
+    kind: roof.kind,
+    ...(owner === lens.self.id ? { yours: true as const } : {}),
+    ...(owner === undefined || owner === lens.self.id ? {} : { ownerName: lens.nameOf(owner) }),
+  }
+}
+
 function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
   const { state, config, self } = lens
   const heard: HeardSpeech[] = []
@@ -596,6 +757,24 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
     }
   }
 
+  // Who saw it was settled the moment it happened, by the same lens a taking is seen through;
+  // the packet only asks whether this body is on that list, or is the one who did it.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'law_broken') continue
+    const p = ev.payload as { lawId?: unknown; agentId?: unknown; witnesses?: unknown }
+    if (typeof p.lawId !== 'string' || typeof p.agentId !== 'string') continue
+    const law = state.socialLaws?.[p.lawId]
+    if (law === undefined) continue
+    const mine = p.agentId === self.id
+    if (!mine && !(Array.isArray(p.witnesses) && p.witnesses.includes(self.id))) continue
+    seen.push({
+      kind: 'law_broken',
+      breakerName: lens.nameOf(p.agentId),
+      lawText: law.text,
+      self: mine,
+    })
+  }
+
   // A dance is a thing at a place and obeys the light like everything else seen; a song is
   // carried by the voice, so it goes as far as speech goes and the dark does not touch it.
   for (const ev of recentEvents) {
@@ -606,17 +785,58 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
       x?: unknown
       y?: unknown
       sense?: unknown
+      label?: unknown
+      radius?: unknown
     }
     if (typeof p.agentId !== 'string' || typeof p.verb !== 'string') continue
     if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
     if (p.agentId === self.id) continue
     const sense = p.sense === 'sound' ? 'sound' : 'sight'
+    // A minted act may name its own reach; the room still walls it in.
     const reaches =
-      sense === 'sound'
-        ? hears(state, config, ev.payload, self.id)
-        : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
+      typeof p.radius === 'number'
+        ? lens.sameRoom(p.agentId) && dist(self.x, self.y, p.x, p.y) <= p.radius
+        : sense === 'sound'
+          ? hears(state, config, ev.payload, self.id)
+          : lens.sameRoom(p.agentId) && lens.withinSight(p.x, p.y)
     if (!reaches) continue
-    seen.push({ kind: 'expression', actorName: lens.nameOf(p.agentId), verb: p.verb, sense })
+    seen.push({
+      kind: 'expression',
+      actorName: lens.nameOf(p.agentId),
+      verb: p.verb,
+      sense,
+      ...(typeof p.label === 'string' ? { label: sanitizeSpokenText(p.label) } : {}),
+    })
+  }
+
+  // A discovery is told, not seen: it carries as far as the inventor's voice does, from where
+  // the inventor stands now.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'discovery_made') continue
+    const p = ev.payload as { byId?: unknown; name?: unknown; saying?: unknown }
+    if (typeof p.byId !== 'string' || typeof p.name !== 'string' || p.byId === self.id) continue
+    const inventor = state.agents[p.byId]
+    if (inventor === undefined) continue
+    const mouth = { x: inventor.x, y: inventor.y, insideId: inventor.insideId }
+    if (!hears(state, config, mouth, self.id)) continue
+    seen.push({
+      kind: 'discovery',
+      inventorName: inventor.name,
+      pronoun: sexOf(inventor) === 'm' ? 'he' : 'she',
+      name: p.name,
+      ...(typeof p.saying === 'string' ? { saying: sanitizeSpokenText(p.saying) } : {}),
+    })
+  }
+
+  // An arrival is a thing at a place: whoever had that stretch of the valley's edge in sight
+  // watched somebody walk in out of it, and nobody else did.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'agent_arrived') continue
+    const p = ev.payload as { id?: unknown; name?: unknown; x?: unknown; y?: unknown }
+    if (typeof p.id !== 'string' || typeof p.name !== 'string' || p.id === self.id) continue
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (indoors !== null || !lens.withinSight(p.x, p.y)) continue
+    seen.push({ kind: 'stranger_arrived', name: p.name })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a
@@ -678,7 +898,8 @@ export function composePerception(
 
   const ground = groundUnderfoot(state, config, self.x, self.y)
   const fumbling =
-    self.activity !== null && workPenalty(state, config, agentId, self.activity.verb) !== 1
+    self.activity !== null &&
+    workPenalty(state, config, agentId, VERBS[self.activity.verb]?.needsLight === true) !== 1
 
   const roof = indoors === null ? undefined : state.structures[indoors]
   const walkTo = self.activity?.verb === 'walk' ? self.activity.params : undefined
@@ -686,6 +907,13 @@ export function composePerception(
     typeof walkTo?.x === 'number' && typeof walkTo.y === 'number'
       ? { x: walkTo.x, y: walkTo.y }
       : undefined
+
+  // One reading of "the roofs that are yours" for the whole packet, so the shelf a mind is
+  // shown and the doorstep it is told about cannot come from two different rules.
+  const yourRoofs = Object.values(state.structures).filter(
+    (s) => isYourRoof(state, agentId, s) && !isTownStore(config, s),
+  )
+  const doorstep = perceiveDoorstep(lens, yourRoofs)
 
   const visible = {
     agents: perceiveAgents(lens),
@@ -711,8 +939,9 @@ export function composePerception(
       y: self.y,
       activity: self.activity?.verb ?? null,
       ...(toward === undefined ? {} : { activityToward: toward }),
-      ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
+      ...(roof === undefined ? {} : { inside: whoseRoof(lens, roof) }),
       inventory: perceiveInventory(lens),
+      ...(doorstep === undefined ? {} : { doorstep }),
     },
     weather: { ...state.weather },
     ...(ground === undefined ? {} : { ground }),
@@ -722,6 +951,7 @@ export function composePerception(
     ...(isMapRim(state, self.x, self.y) ? { atRim: true as const } : {}),
     visible,
     reach: perceiveReach(lens, visible),
+    stores: perceiveStores(lens, yourRoofs),
     heard: perceiveHeard(lens, recentEvents),
     seen: perceiveSeen(lens, recentEvents),
     feltEvents,

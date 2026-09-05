@@ -12,7 +12,7 @@ const DAY_12 = 12 * MINUTES_PER_DAY + 9 * 60 + 40
 
 describe('the stamp says the day, the season, the time and where the picture came from', () => {
   it('reads DAY n · SEASON · HH:MM · LIVE', () => {
-    expect(stampText(DAY_12, 'LIVE')).toBe('DAY 12 · SPRING · 09:40 · LIVE')
+    expect(stampText(DAY_12, 'LIVE')).toBe('DAY 12 · SUMMER · 09:40 · LIVE')
   })
 
   it('pads the clock, so the corner never jitters between 9:40 and 10:40', () => {
@@ -23,6 +23,26 @@ describe('the stamp says the day, the season, the time and where the picture cam
   it('turns the season over with the year', () => {
     expect(stampText(DAYS_PER_SEASON * MINUTES_PER_DAY, 'LIVE')).toContain('SUMMER')
     expect(stampText((DAYS_PER_SEASON - 1) * MINUTES_PER_DAY, 'LIVE')).toContain('SPRING')
+  })
+})
+
+// ★ THE DAY HAS A SHAPE. The gateway marks the day I / II / III; the stamp is where a viewer
+// reads it, because the mark applies between cuts too and the cue slot does not stand between them.
+describe('★ the act the day has reached, beside the clock', () => {
+  it('★ reads DAY n · SEASON · HH:MM · LIVE · ACT II', () => {
+    expect(stampText(DAY_12, 'LIVE', 'II')).toBe('DAY 12 · SUMMER · 09:40 · LIVE · ACT II')
+    expect(stampText(DAY_12, 'REPLAY', 'III')).toBe('DAY 12 · SUMMER · 09:40 · REPLAY · ACT III')
+  })
+
+  it('★ says nothing before the day has anything to be an act of', () => {
+    expect(stampText(DAY_12, 'LIVE', null)).toBe('DAY 12 · SUMMER · 09:40 · LIVE')
+    expect(stampText(DAY_12, 'LIVE')).toBe(stampText(DAY_12, 'LIVE', null))
+  })
+
+  it('★ reads the mark off the gateway’s own frame, not off the clock', () => {
+    const src = readFileSync(new URL('./QuietStamp.tsx', import.meta.url), 'utf8')
+    expect(src).toContain('store.getDirector()?.act ?? null')
+    expect(src).toContain('stampText(tick, stampWord(live, awake, link, paused), act)')
   })
 })
 

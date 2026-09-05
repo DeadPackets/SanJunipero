@@ -1,35 +1,107 @@
-import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   BUBBLE_FADE_MS,
   bubbleAlpha,
   onLeash,
   BUBBLE_FONT_PX,
+  BUBBLE_MAX_LINES,
   BUBBLE_MAX_PX,
+  capLines,
   GLYPH_ZOOM,
+  READ_MS_PER_CHAR,
   SPEAKER_TINT,
   SPEECH_MAX_CHARS,
   SPEECH_MS_BASE,
-  SPEECH_MS_PER_CHAR,
   WRAP_CHARS,
+  bubbleInked,
   bubbleLife,
   bubbleShown,
+  BUBBLE_CAP,
+  clampBubble,
   dominantColor,
   inViewSpeakers,
   placeBubbles,
   speakerWash,
+  createBubbleLayer,
   wrapBubble,
 } from './bubbles.js'
 import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
+import { fateOfPriorLine, typedChars, typingMs } from './converse.js'
 import type { Rect } from './tooltip.js'
+import { Container } from 'pixi.js'
+import type { Scene } from './scene.js'
+import type { WorldStore } from '../state/worldStore.js'
 
-describe('bubbleLife', () => {
-  it('is base plus per-char for short text', () => {
-    expect(bubbleLife('hi')).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * 2)
+// ★ D3 — 240 characters took 8.6s to type and died 13.1s in, leaving 4.5 seconds to read them:
+// 53 characters a second, where a person reads about 18. The window is bought, not left over.
+describe('★ bubbleLife buys a read window out of what is SHOWN', () => {
+  it('is the typing, then the base, then a read window per shown character', () => {
+    expect(READ_MS_PER_CHAR).toBe(55)
+    expect(bubbleLife('hi')).toBe(typingMs(2) + SPEECH_MS_BASE + READ_MS_PER_CHAR * 2)
   })
-  it('clamps at SPEECH_MAX_CHARS', () => {
-    expect(bubbleLife('x'.repeat(500))).toBe(SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS)
+
+  it('★ a thought is not typed, so it pays for reading only', () => {
+    const thought = 'cold stays outside where it belongs'
+    expect(bubbleLife(thought, true)).toBe(SPEECH_MS_BASE + READ_MS_PER_CHAR * thought.length)
+    expect(bubbleLife(thought, true)).toBeLessThan(bubbleLife(thought))
+  })
+
+  it('★ the read window is never squeezed by the typing, at the longest box there is', () => {
+    // the most a three-line box can hold: three full lines and the two breaks between them
+    const shown = capLines(wrapBubble('x '.repeat(400), WRAP_CHARS), WRAP_CHARS).join('\n')
+    expect(shown.split('\n')).toHaveLength(BUBBLE_MAX_LINES)
+    expect(shown.length).toBeGreaterThan(3 * WRAP_CHARS - 4)
+    expect(bubbleLife(shown) - typingMs(shown.length)).toBeGreaterThanOrEqual(
+      READ_MS_PER_CHAR * shown.length,
+    )
+  })
+
+  it('★ always outlasts its own typing, so no line dies half-said', () => {
+    for (const len of [1, 13, 40, 120, SPEECH_MAX_CHARS]) {
+      expect(bubbleLife('x'.repeat(len)), `${len} chars`).toBeGreaterThan(typingMs(len))
+    }
+  })
+})
+
+// ★ Holding the partner's line so the pair reads as one exchange also held the SPEAKER's own
+// previous line, and two full-alpha slabs from one mouth stacked until the first timed out.
+describe('★ what a new line does to the lines already in the air', () => {
+  const line = (agentId: string, dimmed = false) => ({ agentId, isThought: false, dimmed })
+
+  it('★ ends the speaker’s OWN last line — they have said something new', () => {
+    expect(fateOfPriorLine(line('amara'), 'amara')).toBe('end')
+    expect(fateOfPriorLine(line('amara', true), 'amara')).toBe('end')
+  })
+
+  it('★ dims and holds the other speaker’s, so the pair is on screen together', () => {
+    expect(fateOfPriorLine(line('amara'), 'yusuf')).toBe('dim')
+  })
+
+  it('lets a dimmed line go the moment a third one lands', () => {
+    expect(fateOfPriorLine(line('amara', true), 'omar')).toBe('end')
+  })
+
+  it('leaves a thought alone: it is not part of anybody’s exchange', () => {
+    for (const speaker of ['amara', 'yusuf']) {
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: false }, speaker)).toBe(
+        'keep',
+      )
+      expect(fateOfPriorLine({ agentId: 'amara', isThought: true, dimmed: true }, speaker)).toBe(
+        'keep',
+      )
+    }
+  })
+
+  it('★ the layer applies it to every live bubble on every spoken line', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain(
+      'const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)',
+    )
+    expect(SRC).toContain("if (fate === 'end') b.dieMs = now")
   })
 })
 
@@ -94,11 +166,8 @@ describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
     expect(wrapBubble(long).join(' ')).toBe(long)
   })
 
-  it("holds a longer line longer, up to the sanitizer's own ceiling", () => {
+  it('holds a longer line longer', () => {
     expect(bubbleLife('x'.repeat(200))).toBeGreaterThan(bubbleLife('x'.repeat(40)))
-    expect(bubbleLife('x'.repeat(SPEECH_MAX_CHARS + 100))).toBe(
-      SPEECH_MS_BASE + SPEECH_MS_PER_CHAR * SPEECH_MAX_CHARS,
-    )
   })
 
   it('is about twice the width the box used to wrap at', () => {
@@ -116,6 +185,52 @@ describe('★ 2A — the box grows to the sentence, and nothing is cut', () => {
 
   it('leaves a short line alone', () => {
     expect(wrapBubble('the iron sings today', 24)).toEqual(['the iron sings today'])
+  })
+})
+
+// ★ D2 — 240 characters wrapped to eleven lines and stood a slab over a third of a 1440px frame.
+// The utterance still reaches the Chronicle whole; the DRAWING stops at three lines.
+describe('★ the bubble draws four lines, and says so', () => {
+  const SPEECH =
+    'the fish are biting well this morning by the river and the light is good on the water and nobody has come down to see any of it with me'
+
+  it('★ keeps a box of four lines or fewer exactly as it was wrapped', () => {
+    // Four holds the median spoken line of the gate rehearsal whole; three cut 68% of them.
+    expect(BUBBLE_MAX_LINES).toBe(4)
+    for (const said of ['the iron sings today', 'the fish are biting well this morning']) {
+      const lines = wrapBubble(said, 24)
+      expect(capLines(lines, 24)).toEqual(lines)
+    }
+  })
+
+  it('★ keeps the first four and ends the last in one ellipsis', () => {
+    const lines = wrapBubble(SPEECH, 24)
+    expect(lines.length).toBeGreaterThan(BUBBLE_MAX_LINES)
+    const shown = capLines(lines, 24)
+    expect(shown).toHaveLength(BUBBLE_MAX_LINES)
+    expect(shown.slice(0, -1)).toEqual(lines.slice(0, BUBBLE_MAX_LINES - 1))
+    expect(shown.at(-1)!.endsWith('…')).toBe(true)
+    expect(shown.filter((l) => l.includes('…'))).toHaveLength(1)
+  })
+
+  it('★ the ellipsis replaces trailing characters rather than overflowing the box', () => {
+    for (const width of [10, 16, 24, WRAP_CHARS]) {
+      for (const l of capLines(wrapBubble(SPEECH, width), width))
+        expect(l.length, `${width}`).toBeLessThanOrEqual(width)
+    }
+  })
+
+  it('★ a thought is quieter, not longer: the same three lines', () => {
+    const face = faceFor('thought')
+    const at = wrapCharsFor(face.family, face.size, BUBBLE_MAX_PX)
+    expect(capLines(wrapBubble(SPEECH, at), at)).toHaveLength(BUBBLE_MAX_LINES)
+  })
+
+  it('★ the layer cuts the DRAWING, never the line it was handed', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('capLines(wrapBubble(text.slice(0, SPEECH_MAX_CHARS), wrapAt), wrapAt)')
+    // and the event that carries it away is untouched: `spawn` is handed the whole `text`
+    expect(SRC).toContain('spawnSpeech: (agentId, text) => {')
   })
 })
 
@@ -234,6 +349,42 @@ describe('★ everybody the camera can see speaks out loud', () => {
       expect(bubbleShown(zoom, false), `${zoom}x off screen`).toBe(false)
     }
   })
+
+  /** ★ THE "…" ON A SPEAKER STANDING IN THE PICTURE. The cull was asked about the BUBBLE's own
+   *  anchor — 70 world px over the speaker's feet — as a bare point with no margin, so anybody
+   *  whose feet were inside the top 70 px of the view was ruled off screen and collapsed to a
+   *  glyph. At the director's 3x stop the view is 300 world px tall: the whole top quarter. */
+  describe('★ the cull is asked about the SPEAKER, not about where their words float', () => {
+    const VIEW = { x: 0, y: 0, w: 1440, h: 900 }
+    const feet = (id: string, sx: number, sy: number) => ({ id, sx, sy })
+
+    it('★ keeps a speaker whose whole body is in the picture, however near the top edge', () => {
+      for (const feetY of [0, 1, 20, 51, 52, 70, 450, 899]) {
+        expect(inViewSpeakers([feet('a', 700, feetY)], VIEW).has('a'), `feet at ${feetY}`).toBe(
+          true,
+        )
+      }
+    })
+
+    it('★ still drops a speaker the camera genuinely cannot see', () => {
+      // feet one pixel above the top edge, so even the heels are out of frame
+      expect(inViewSpeakers([feet('above', 700, -1)], VIEW).has('above')).toBe(false)
+      // ...and one whose head has just cleared the bottom edge
+      expect(
+        inViewSpeakers([feet('below', 700, 900 + CHAR_TARGET_PX + 1)], VIEW).has('below'),
+      ).toBe(false)
+      expect(inViewSpeakers([feet('crown', 700, 900 + CHAR_TARGET_PX)], VIEW).has('crown')).toBe(
+        true,
+      )
+      expect(inViewSpeakers([feet('far', 5000, 400)], VIEW).has('far')).toBe(false)
+    })
+
+    it('★ the layer hands it the feet, and lifts the box off the head only to place it', () => {
+      const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+      expect(SRC).toContain('const seen = inViewSpeakers(at, view)')
+      expect(SRC).toContain('sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift')
+    })
+  })
 })
 
 describe('two speakers standing together do not composite into one pile', () => {
@@ -282,6 +433,78 @@ describe('two speakers standing together do not composite into one pile', () => 
     ]
     expect(placeBubbles(want, view)).toEqual(placeBubbles(want, view))
   })
+
+  // ★ D5 — the burst frame caught a box pinned at the very top of the viewport with a line of
+  // the box under it composited away. `placeTag` steps AWAY from the anchor and clamps as it
+  // goes, so once the view pinned the box the step had nowhere left to move it.
+  describe('★ the whole box stays inside the picture, clear of the boxes already there', () => {
+    // the director's own frame at 1440x900 and the 2x stop, in world coordinates; a box is the
+    // widest a bubble goes and three lines tall
+    const VIEW = { x: 0, y: 0, w: 720, h: 450 }
+    const BOX = { w: 213, h: 35 }
+    // the place name over the same head, tall enough that stepping up runs out of viewport
+    const NAME = { x: 0, y: 0, w: 720, h: 260 }
+    const inside = (r: Rect): boolean =>
+      r.x >= VIEW.x && r.y >= VIEW.y && r.x + r.w <= VIEW.x + VIEW.w && r.y + r.h <= VIEW.y + VIEW.h
+
+    it('★ steps a box the view pinned at its top edge clear of what is already there', () => {
+      const want = [0, 1].map((i) => ({ id: `b${i}`, sx: 360, sy: 320, size: BOX }))
+      const placed = placeBubbles(want, VIEW, [NAME])
+      for (const p of placed) {
+        expect(overlaps(p.rect, NAME), p.id).toBe(false)
+        expect(inside(p.rect), p.id).toBe(true)
+      }
+    })
+
+    it('★ keeps four boxes asking for one head inside the frame and off each other', () => {
+      const placed = placeBubbles(
+        [0, 1, 2, 3].map((i) => ({ id: `b${i}`, sx: 360, sy: 320, size: BOX })),
+        VIEW,
+        [NAME],
+      )
+      for (const p of placed) expect(inside(p.rect), p.id).toBe(true)
+      for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length; j++)
+          expect(overlaps(placed[i]!.rect, placed[j]!.rect), `${i} vs ${j}`).toBe(false)
+      }
+    })
+
+    it('★ the node is hung off the CLAMPED box, not off where the box wanted to be', () => {
+      const [p] = placeBubbles([{ id: 'a', sx: 360, sy: 40, size: BOX }], VIEW)
+      expect(p!.sy).toBe(p!.rect.y)
+      expect(p!.sx).toBe(p!.rect.x + p!.rect.w / 2)
+    })
+
+    it('leaves a box that already fits exactly where the placer put it', () => {
+      expect(clampBubble({ x: 200, y: 200, ...BOX }, VIEW, [])).toEqual({ x: 200, y: 200, ...BOX })
+    })
+  })
+})
+
+// ★ D1 — `build` draws the paper at its final w × h and then empties the label, so a speech
+// bubble opened as a blank rectangle for the 36ms its first character took to type.
+describe('★ the paper is not there until the first character is', () => {
+  const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+
+  it('★ is blank at the instant of speaking, and inked one character later', () => {
+    expect(bubbleInked(typedChars(40, 0))).toBe(false)
+    expect(bubbleInked(typedChars(40, -100))).toBe(false)
+    expect(bubbleInked(typedChars(40, typingMs(1)))).toBe(true)
+    expect(bubbleInked(typedChars(40, typingMs(40)))).toBe(true)
+  })
+
+  it('★ a thought is not typed, so its paper is there from the first frame', () => {
+    expect(bubbleInked('cold stays outside'.length)).toBe(true)
+  })
+
+  it('★ the layer holds the node back rather than showing an empty box', () => {
+    expect(SRC).toContain('node.visible = bubbleInked(typed)')
+    expect(SRC).toContain(
+      'b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)',
+    )
+    // and the box is still cut to the whole line: reflow would move paper under a reader
+    expect(SRC).toContain('const w = Math.ceil(label.width) + 2 * BUBBLE_PAD')
+  })
 })
 
 describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
@@ -305,5 +528,93 @@ describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
     expect(bubbleAlpha(BUBBLE_FADE_MS / 2)).toBeLessThan(1)
     expect(bubbleAlpha(0)).toBe(0)
     expect(bubbleAlpha(-40)).toBe(0)
+  })
+})
+
+// The layer, driven the way the ticker drives it. Pixi measures labels through
+// `document.createElement('canvas')` and these tests run with no DOM, so a label needs the
+// smallest stub that lets one build.
+describe('★ a mind under a roof is not on the map, and neither is what it says', () => {
+  beforeAll(() => {
+    if (typeof globalThis.document !== 'undefined') return
+    const ctx = {
+      font: '',
+      measureText: (t: string) => ({
+        width: t.length * 8,
+        actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: t.length * 8,
+        actualBoundingBoxAscent: 8,
+        actualBoundingBoxDescent: 2,
+      }),
+      fillText: () => {},
+      clearRect: () => {},
+      getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+      scale: () => {},
+      translate: () => {},
+      save: () => {},
+      restore: () => {},
+      setTransform: () => {},
+    }
+    const canvas = { width: 1, height: 1, getContext: () => ctx, style: {} }
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => canvas, body: { appendChild: () => {} } },
+    })
+    Object.defineProperty(globalThis, 'CanvasRenderingContext2D', {
+      configurable: true,
+      value: class {
+        letterSpacing = ''
+      },
+    })
+  })
+
+  type Body = { x: number; y: number; alive: boolean; insideId?: string }
+
+  function harness(): {
+    layer: ReturnType<typeof createBubbleLayer>
+    amara: Body
+    said: () => Container[]
+  } {
+    const bubbleLayer = new Container()
+    const amara: Body = { x: 4, y: 4, alive: true }
+    const scene = {
+      layers: { bubbles: bubbleLayer },
+      textScale: 1,
+      getZoom: () => 1,
+      wantsMotion: () => false,
+      viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
+      anchorOf: () => null,
+      tags: { occupied: () => [], setOccupied: () => {} },
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ agents: { amara } }),
+      assetRecords: () => [],
+    } as unknown as WorldStore
+    return { layer: createBubbleLayer(scene, store), amara, said: () => bubbleLayer.children }
+  }
+
+  it('★ a line spoken indoors is not drawn over the roof', () => {
+    const h = harness()
+    h.amara.insideId = 'smithy'
+    h.layer.spawnSpeech('amara', 'the iron is hot')
+    expect(h.said()).toHaveLength(0)
+  })
+
+  it('★ a line spoken outside leaves with the speaker when they step inside', () => {
+    const h = harness()
+    h.layer.spawnSpeech('amara', 'the iron is hot')
+    expect(h.said()).toHaveLength(1)
+
+    h.amara.insideId = 'smithy'
+    h.layer.tick(performance.now())
+    expect(h.said()).toHaveLength(0)
+  })
+
+  // ★ `tick` is the ONLY reaper and it runs on the ticker, which stops with `requestAnimationFrame`
+  // in a hidden tab. The socket keeps delivering, and `onEvents` spawns inline.
+  it('★ a tab nobody is looking at does not stack speech without limit', () => {
+    const h = harness()
+    for (let i = 0; i < BUBBLE_CAP * 3; i++) h.layer.spawnSpeech('amara', `line ${String(i)}`)
+    expect(h.said()).toHaveLength(BUBBLE_CAP)
   })
 })

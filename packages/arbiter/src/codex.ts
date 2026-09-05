@@ -55,6 +55,37 @@ export class CodexStore {
     return rows.map((r) => r.id)
   }
 
+  /** The same rungs the court is shown, said the way the codex authored them — "a store held in
+   *  common", never `common_store`. The court needs the ids to copy into a canon; a mind needs
+   *  only to know the thing is there to be reached for. */
+  frontierNames(): string[] {
+    const rows = this.db
+      .prepare(
+        'SELECT c.name FROM codex c JOIN codex p ON p.id = c.prerequisite_id' +
+          ' WHERE c.known = 0 AND p.known = 1 ORDER BY c.id',
+      )
+      .all() as { name: string }[]
+    return rows.map((r) => r.name)
+  }
+
+  // A rung is earned the moment a craft resting on it is codified.
+  learn(ids: string[]): void {
+    const mark = this.db.prepare('UPDATE codex SET known = 1 WHERE id = ?')
+    for (const id of ids) mark.run(id)
+  }
+
+  // The court's proposed next rung: unearned, hung off a rung the codex already has. A
+  // prerequisite the codex has never heard of is a made-up id, and the proposal is dropped.
+  propose(rung: { id: string; name: string; prerequisiteId: string }): boolean {
+    const parent = this.db.prepare('SELECT era FROM codex WHERE id = ?').get(rung.prerequisiteId) as
+      | { era: Era }
+      | undefined
+    if (parent === undefined) return false
+    if (this.db.prepare('SELECT 1 FROM codex WHERE id = ?').get(rung.id) !== undefined) return false
+    this.insert({ ...rung, era: parent.era, known: false })
+    return true
+  }
+
   withinAdjacency(recipeCanon: string[]): boolean {
     if (recipeCanon.length === 0) return false
     const known = new Set(this.known())

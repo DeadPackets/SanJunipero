@@ -1,7 +1,15 @@
 // An intent adjudicates once, codifies, and the byte-identical intent then resolves Tier-1
 // with zero further arbiter calls. Fully deterministic: no live API.
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG, stateHash, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  NO_PARAMS,
+  stateHash,
+  ticksFor,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import {
   RngStream,
   RngStreams,
@@ -28,7 +36,7 @@ const boilSaltRecipe: Recipe = {
   id: 'recipe:boil_salt',
   name: 'Boil River Water for Salt',
   skillCheck: { track: 'cooking', difficulty: 2 },
-  durationTicks: 5,
+  takes: 'minutes',
   costs: [],
   requires: [{ type: 'adjacent_fire' }],
   outcomeTable: [
@@ -36,7 +44,7 @@ const boilSaltRecipe: Recipe = {
       weight: 1,
       success: true,
       label: 'A crust of salt forms as the water boils away.',
-      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1, to: 'agent' }],
+      effects: [{ op: 'spawn_item', kind: 'salt', qty: 1 }],
     },
     {
       weight: 1,
@@ -65,6 +73,10 @@ function isSpawnPayload(p: unknown): p is { kind: string } {
   return typeof p === 'object' && p !== null && 'kind' in p && typeof p.kind === 'string'
 }
 
+function isDurationPayload(p: unknown): p is { duration: number } {
+  return typeof p === 'object' && p !== null && 'duration' in p && typeof p.duration === 'number'
+}
+
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
   seq: seq++,
@@ -77,7 +89,7 @@ const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
 function makeWorld(): WorldState {
   let s = fold(
     genesisState(CFG),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 2, y: 2, ageDays: ADULT_AGE_DAYS }),
     CFG,
   )
   s = fold(
@@ -127,12 +139,16 @@ function runTier1(state: WorldState): {
 
   const res = submitIntent(state, CFG, 'a1', 'recipe:boil_salt', {})
   if (!res.ok) throw new Error(res.reason)
+  // Driven for as long as the world says the act takes: this fixture works by an unfuelled
+  // fire, and a craft in the dark is slower.
+  let duration = ticksFor(boilSaltRecipe.takes)
   for (const e of res.events) {
+    if (e.type === 'action_started' && isDurationPayload(e.payload)) duration = e.payload.duration
     state = fold(state, ev(e.type, e.payload), CFG)
     events.push(e)
   }
 
-  for (let i = 0; i < boilSaltRecipe.durationTicks; i++) {
+  for (let i = 0; i < duration; i++) {
     const tick = state.tick + 1
     state = fold(state, ev('tick_advanced', {}, tick), CFG)
     const wt = createWorldTick(CFG, rng)(state)
@@ -156,14 +172,14 @@ describe('GATE G4: "boil river water for salt" adjudicates once, then runs Tier-
 
     // 4. Codify lands the recipe in the rulebook and hot-registers the verb.
     expect(VERBS['recipe:boil_salt']).toBeUndefined()
-    const { verb } = arbiter.codify(r1.recipe, CODIFY_CREDIT)
+    const { verb } = arbiter.codify(r1, CODIFY_CREDIT)
     expect(verb).toBe('recipe:boil_salt')
     expect(new RulebookStore(db).byId('recipe:boil_salt')).not.toBeNull()
     expect(VERBS['recipe:boil_salt']).toBeDefined()
 
     // 5. Byte-identical intent resolves Tier-1 map with zero further LLM calls.
     const r2 = await arbiter.adjudicate(INTENT, TAMAR_CTX)
-    expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: {} })
+    expect(r2).toEqual({ kind: 'map', verb: 'recipe:boil_salt', params: NO_PARAMS })
     expect(llm.objectCalls).toBe(1)
 
     // 6. Tier-1 execution: submitIntent accepts, the 5-tick pipeline completes the

@@ -14,7 +14,7 @@ import {
   type TickHandler,
   type WorldState,
 } from '@sj/engine'
-import { DEFAULT_CONFIG, isRoofedKind, type SimConfig } from '@sj/shared'
+import { DAYS_PER_YEAR, DEFAULT_CONFIG, isRoofedKind, type SimConfig } from '@sj/shared'
 import { EngineBridge } from '../src/runtime/bridge.js'
 import { makeablesLine, perceptionToProse } from '../src/prompt/prose.js'
 
@@ -51,7 +51,7 @@ IDS.forEach((id, i) => {
       x: at.x,
       y: at.y,
       sex: 'f',
-      ageDays: 30 * 364,
+      ageDays: 30 * DAYS_PER_YEAR,
     }),
     config,
   )

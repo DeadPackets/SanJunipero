@@ -2,7 +2,7 @@ import type { LibraryCategory } from '@sj/shared'
 import { EST_COST_PER_IMAGE } from '../imageClient.js'
 import { EST_COST_PER_VISION_CALL } from '../visionQa/visionJudge.js'
 import { STYLE_PROMPT } from '../styleBible.js'
-import { MASTER_PALETTE } from '../palette.js'
+import { PALETTE_WORDS, SWATCH_CLAUSE } from '../palette.js'
 import { LIBRARY, type LibraryEntry } from './catalog.js'
 
 // One batch per eyeball: the runner refuses to make all 54 in a single unwatched go.
@@ -46,19 +46,9 @@ export type PlannedItem = {
   candidates: number
 }
 
-// A style anchor teaches architecture; a swatch teaches colour. With the anchor cottage attached
-// the model returned THE ANCHOR RECOLOURED against a prompt that banned the arch by name.
-export const SWATCH_CLAUSE =
-  'The reference image is a COLOUR CHART, not an object. It carries the palette and nothing ' +
-  'else. There is NO object to copy anywhere in this request — invent the subject from the ' +
-  'description alone.'
-
-/** The palette, in words, for calls whose only reference is the colour chart. */
-export const PALETTE_WORDS = [
-  'Colour it from this warm cozy pastel palette ONLY:',
-  MASTER_PALETTE.join(' '),
-  '— flat blocks of these colours with hard pixel edges, no gradients, no anti-aliasing.',
-].join(' ')
+// The two clauses live beside the palette itself, so the character pipeline can reach them
+// without loading the LLM SDK this module's own imports pull in.
+export { PALETTE_WORDS, SWATCH_CLAUSE } from '../palette.js'
 
 // At 24 px the instruction was survival advice for a cell that could not hold detail. At the
 // C-level 128 px cell an UNDER-detailed sprite is the failure mode instead.

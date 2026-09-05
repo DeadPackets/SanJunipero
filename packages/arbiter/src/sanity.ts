@@ -137,6 +137,9 @@ export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}
   }
 
   for (const product of productsOf(recipe)) {
+    // A building is raised, not made in the hand: the live run put a footbridge in a fist.
+    if (vocab.structureKinds?.has(product) === true)
+      return `${recipe.id} makes ${product}, which is raised, not carried`
     for (const known of vocab.knownProducts ?? []) {
       if (nearDuplicate(product, known))
         return `${recipe.id} makes ${product}, and the town already makes ${known}`

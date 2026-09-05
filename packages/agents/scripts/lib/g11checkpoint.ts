@@ -37,14 +37,18 @@ const MindClockZ = z
   .object({
     lastTurnTick: z.number().nullable(),
     reconsiderAtTick: z.number().nullable(),
-    conversationUntilTick: z.number(),
     dozeUntilTick: z.number(),
     // Not a wire schema — nothing sends this to a provider — so `z.record` is safe here.
     // Optional values, because an unspent rung is absent rather than false.
     alarmArmed: z.record(z.string(), z.boolean().optional()),
     morningWokeDay: z.number().nullable(),
+    // Defaulted, not optional: a checkpoint written before the dusk rung existed still resumes,
+    // and the field the runtime reads back is still the clock's own `number | null`.
+    gatheringDay: z.number().nullable().default(null),
     wakeRetryAtTick: z.number(),
     prevVisibleIds: z.array(z.string()),
+    // Optional the way the clock's own field is: a checkpoint from before the felt latch resumes.
+    feltSeen: z.array(z.string()).optional(),
   })
   .strict()
 const MindSnapshot = z

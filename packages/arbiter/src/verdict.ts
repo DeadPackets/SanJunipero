@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IntentParamsSchema } from '@sj/engine/verbs'
+import { ClosedIntentParams, DEFAULT_DURATION_WORD, DurationWordSchema } from '@sj/shared'
 
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
@@ -9,7 +9,6 @@ export const OutcomeEffectSchema = z.discriminatedUnion('op', [
       op: z.literal('spawn_item'),
       kind: z.string().min(1),
       qty: z.number().int().positive().max(20),
-      to: z.literal('agent'),
       durability: z.number().int().positive().max(200).optional(),
     })
     .strict(),
@@ -21,6 +20,33 @@ export const OutcomeEffectSchema = z.discriminatedUnion('op', [
     })
     .strict(),
   z.object({ op: z.literal('hp_delta'), delta: z.number().int().min(-50).max(50) }).strict(), // negative = damage, positive = heal
+  // A tag the town can read off a person, a building or a thing: "marked: debt two planks".
+  z
+    .object({
+      op: z.literal('mark'),
+      on: z.enum(['self', 'target', 'structure', 'item']),
+      key: z.string().min(1).max(24),
+      value: z.string().min(1).max(60),
+    })
+    .strict(),
+  // What the others see or hear, in the third person, as far as a dance or a song carries.
+  z
+    .object({
+      op: z.literal('witness'),
+      label: z.string().min(1).max(120),
+      sense: z.enum(['sight', 'sound']),
+      radius: z.number().int().positive().max(30).optional(),
+    })
+    .strict(),
+  z.object({ op: z.literal('name_place'), text: z.string().min(1).max(40) }).strict(),
+  z.object({ op: z.literal('transfer'), to: z.literal('target') }).strict(),
+  z
+    .object({
+      op: z.literal('need_delta'),
+      need: z.enum(['energy', 'social', 'warmth']),
+      delta: z.number().int().min(-50).max(50),
+    })
+    .strict(),
   z.object({ op: z.literal('none') }).strict(),
 ])
 export type OutcomeEffect = z.infer<typeof OutcomeEffectSchema>
@@ -64,7 +90,7 @@ export const RecipeSchema = z
       .object({ track: z.string().min(1), difficulty: z.number().int().min(1).max(10) })
       .strict()
       .optional(),
-    durationTicks: z.number().int().positive().max(1440),
+    takes: DurationWordSchema,
     costs: z.array(
       z.object({ kind: z.string().min(1), qty: z.number().int().positive() }).strict(),
     ),
@@ -83,14 +109,27 @@ export const ImpossibleClassSchema = z.enum([
   'insufficient_materials',
 ])
 
-// `params` names its keys rather than using `z.record`, whose `propertyNames` a grammar-
-// constrained decoder refuses. Loose, so a verb minted at runtime can still take a new key.
+// The verb the court maps to is a free word, so a minted one can be named here; its params are
+// the closed grammar every act shares, which is what a strict decoder can be handed.
 export const VerdictSchema = z.discriminatedUnion('kind', [
   z
-    .object({ kind: z.literal('map'), verb: z.string().min(1), params: IntentParamsSchema })
+    .object({ kind: z.literal('map'), verb: z.string().min(1), params: ClosedIntentParams })
     .strict(),
   z
-    .object({ kind: z.literal('attempt'), recipe: RecipeSchema, summary: z.string().min(1) })
+    .object({
+      kind: z.literal('attempt'),
+      recipe: RecipeSchema,
+      summary: z.string().min(1),
+      // The next rung this step opens, proposed by the court so the ladder grows as it is climbed.
+      unlocks: z
+        .object({
+          id: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/),
+          name: z.string().min(1).max(60),
+          prerequisiteId: z.string().min(1),
+        })
+        .strict()
+        .optional(),
+    })
     .strict(),
   z
     .object({
@@ -101,6 +140,83 @@ export const VerdictSchema = z.discriminatedUnion('kind', [
     .strict(),
 ])
 export type Verdict = z.infer<typeof VerdictSchema>
+
+type AnyZod = z.ZodType
+type AnyShape = z.ZodObject<Record<string, AnyZod>>
+
+// The ruling model's decoder takes only an object at the root, refuses `oneOf`, and refuses an
+// optional key. Derived, so an op or a field added to the verdict is in the dialect that day.
+export function strictly(schema: AnyZod): AnyZod {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return strictly((schema as z.ZodOptional<AnyZod>).unwrap()).nullable()
+  if (type === 'array') {
+    const array = schema as z.ZodArray<AnyZod>
+    // Carried over rather than dropped, so `minItems` still reaches the decoder.
+    const checks = (array.def.checks ?? []) as z.core.$ZodCheck<unknown[]>[]
+    return z.array(strictly(array.element)).check(...checks)
+  }
+  // Both union kinds report `union`; rebuilding either as a plain one is what turns oneOf to anyOf.
+  if (type === 'union') return z.union((schema as z.ZodUnion<[AnyZod]>).options.map(strictly))
+  if (type !== 'object') return schema
+  const shape = (schema as AnyShape).shape
+  return z
+    .object(Object.fromEntries(Object.entries(shape).map(([k, v]) => [k, strictly(v)])))
+    .strict()
+}
+
+export const StrictVerdictSchema = z.object({ verdict: strictly(VerdictSchema) }).strict()
+
+/** Null stood in for absence and comes off here — but only where the town's own schema says the
+ *  key may be absent, so a params key answered null stays null. Walks value and schema together. */
+export function withoutNulls(value: unknown, schema: AnyZod): unknown {
+  const { type } = schema.def
+  if (type === 'optional' || type === 'nullable')
+    return withoutNulls(value, (schema as z.ZodOptional<AnyZod>).unwrap())
+  if (type === 'array')
+    return Array.isArray(value)
+      ? value.map((v) => withoutNulls(v, (schema as z.ZodArray<AnyZod>).element))
+      : value
+  if (type === 'union') {
+    for (const option of (schema as z.ZodUnion<[AnyZod]>).options) {
+      const stripped = withoutNulls(value, option)
+      if (option.safeParse(stripped).success) return stripped
+    }
+    return value
+  }
+  if (type !== 'object' || value === null || typeof value !== 'object') return value
+  const shape = (schema as AnyShape).shape
+  const out: Record<string, unknown> = {}
+  for (const [key, v] of Object.entries(value)) {
+    const field = shape[key]
+    if (field === undefined) {
+      out[key] = v
+      continue
+    }
+    if (v === null && field.def.type === 'optional') continue
+    out[key] = withoutNulls(v, field)
+  }
+  return out
+}
+
+/** The same answer with the one word it may get wrong replaced. A duration off the closed set is
+ *  a schema failure like any other; this is what the last attempt falls back to rather than
+ *  throwing away a sound recipe over its clock. */
+export function withDefaultTakes(raw: unknown): unknown {
+  const verdict = (raw as { verdict?: Record<string, unknown> } | null)?.verdict
+  const recipe = verdict?.recipe
+  if (verdict === undefined || recipe === null || typeof recipe !== 'object') return raw
+  return { verdict: { ...verdict, recipe: { ...recipe, takes: DEFAULT_DURATION_WORD } } }
+}
+
+/** The court's answer in the dialect it was asked for, read as the verdict the town keeps, or
+ *  null off the union. */
+export function readRuling(raw: unknown): Verdict | null {
+  const wrapped = StrictVerdictSchema.safeParse(raw)
+  if (!wrapped.success) return null
+  const read = VerdictSchema.safeParse(withoutNulls(wrapped.data.verdict, VerdictSchema))
+  return read.success ? read.data : null
+}
 
 export function skillFactor(level: number, difficulty: number): number {
   return Math.min(0.95, Math.max(0.05, 0.5 + 0.05 * (level - difficulty)))

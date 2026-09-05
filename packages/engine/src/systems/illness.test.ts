@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { fold } from '../fold.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type TileId, type WorldState } from '../state.js'
@@ -26,7 +26,7 @@ const map = (): TileId[][] => grid(16)
 function town(config: SimConfig, at: [string, number, number][]): WorldState {
   let s = genesisState(config, map())
   for (const [id, x, y] of at) {
-    s = fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: 7300 }), config)
+    s = fold(s, ev('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }), config)
   }
   return s
 }

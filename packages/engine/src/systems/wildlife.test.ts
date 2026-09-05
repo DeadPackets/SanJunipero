@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { FOOD_KINDS, VERBS } from '../verbs/index.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev } from '../testutil/world.js'
+import { ev, runAct } from '../testutil/world.js'
 
 const CFG: SimConfig = SimConfigSchema.parse({})
 const DAWN = 360 // hour 6, minute 0
@@ -18,7 +18,11 @@ function makeWorld(rows: string[] = ['.~', '..'], config = CFG): WorldState {
     config,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
 }
 function atTick(s: WorldState, tick: number): WorldState {
   return { ...s, tick }
@@ -43,7 +47,7 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
 function castLine(s: WorldState, seed: string, config = CFG): WorldTickResult {
   const r = submitIntent(s, config, 'a1', 'fish', { x: 1, y: 0 })
   if (!r.ok) throw new Error(r.reason)
-  return tickOnce(applyAll(s, r.events, config), config, new RngStreams(seed))
+  return runAct(applyAll(s, r.events, config), config, 'a1', new RngStreams(seed))
 }
 
 describe('fold: wildlife_changed', () => {
@@ -150,7 +154,7 @@ describe('verb: forage', () => {
     const s = makeWorld(['.f', '..'])
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events).toContainEqual({
       type: 'item_spawned',
       payload: {
@@ -172,7 +176,7 @@ describe('verb: forage', () => {
     const s = atTick(makeWorld(['.f', '..']), WINTER + 5)
     const r = submitIntent(s, CFG, 'a1', 'forage', {})
     if (!r.ok) throw new Error(r.reason)
-    const t = tickOnce(applyAll(s, r.events))
+    const t = runAct(applyAll(s, r.events), CFG)
     expect(t.events.map((e) => e.type)).not.toContain('item_spawned')
     expect(Object.keys(t.state.items)).toHaveLength(0)
   })

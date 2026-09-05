@@ -1,10 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
-import { DEFAULT_CONFIG, TICK_REAL_MS, type SimEvent } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  TICK_REAL_MS,
+  type SimEvent,
+} from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
-import { stepWalk, VERBS, WALK_NO_ROAD } from './verbs/index.js'
+import type { LawPredicate } from './socialLaws.js'
+import { runAct } from './testutil/world.js'
+import { ACT_SET_DOWN, stepWalk, VERBS, WALK_NO_ROAD } from './verbs/index.js'
 
 const CHAR_TILE: Record<string, TileId> = { '.': 0, '~': 2 }
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
@@ -20,7 +28,10 @@ function makeWorld(rows: string[] = ['........', '........', '........', '......
     DEFAULT_CONFIG,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }))
+  return fold(
+    s,
+    ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+  )
 }
 function patchAgent(
   s: WorldState,
@@ -49,6 +60,26 @@ describe('submitIntent', () => {
     })
   })
 
+  // One tick of a 12-mind rehearsal died here: the seam spread the mind's whole answer into
+  // strict WalkParams, and `duration` threw before anything was recorded.
+  it('takes only the keys the legs read, however many the mind filled in', () => {
+    const s = makeWorld()
+    const r = submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', {
+      x: 3,
+      y: 0,
+      kind: 'north',
+      description: 'off to the mill',
+      recipe: 'bread',
+    })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.events[0]?.payload).toEqual({
+      agentId: 'a1',
+      verb: 'walk',
+      params: { x: 3, y: 0 },
+      duration: 1,
+    })
+  })
+
   it('debuffed duration is longer when hunger is 20', () => {
     let s = makeWorld()
     s = fold(s, ev(2, 'needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -80 }] }))
@@ -73,6 +104,16 @@ describe('submitIntent', () => {
     expect(submitIntent(down, DEFAULT_CONFIG, 'a1', 'build', {}).ok).toBe(false)
     s = patchAgent(s, 'a1', { activity: { verb: 'walk', ticksRemaining: 2, params: {} } })
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
+  })
+
+  it('a body on the ground may still drink at the water and step out of a room', () => {
+    const river = patchAgent(makeWorld(['~.......']), 'a1', { collapsedSinceTick: 5, x: 1, y: 0 })
+    expect(submitIntent(river, DEFAULT_CONFIG, 'a1', 'drink', {}).ok).toBe(true)
+    const indoors = patchAgent(makeWorld(), 'a1', {
+      collapsedSinceTick: 5,
+      insideId: 'structure_1',
+    })
+    expect(submitIntent(indoors, DEFAULT_CONFIG, 'a1', 'exit', {}).ok).toBe(true)
   })
 
   it('rejects unknown verbs and unreachable destinations with in-world reasons', () => {
@@ -292,8 +333,8 @@ describe('verb registry', () => {
   })
 })
 
-// One policy over the whole registry: interruption is something the world does to a body, never
-// something a mind can ask for. VerbDef used to declare it and nothing read it.
+// One policy over the whole registry: no act elbows another out of a pair of busy hands. What
+// changed in task 30 is that a body may take its OWN hands off the work, by the one verb for it.
 describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () => {
   const CFG = DEFAULT_CONFIG
   const busyWith = (verb: string): WorldState =>
@@ -302,12 +343,13 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     ])
 
   // The policy is about the HANDS. `speak` declares `atOnce`, because a body with an axe in its
-  // hands can still answer when it is spoken to. Widening this set is a visible edit.
-  it('★ the mouth is the only thing that does not wait for the hands', () => {
+  // hands can still answer when it is spoken to; `stop` is what puts the axe down; an ask and a
+  // parting are words too. Widening this set is a visible edit.
+  it('★ the mouth, the setting-down and the asking are the only things that do not wait for the hands', () => {
     const exempt = Object.keys(VERBS)
       .filter((k) => VERBS[k]!.atOnce !== undefined)
       .sort()
-    expect(exempt).toEqual(['speak'])
+    expect(exempt).toEqual(['court', 'leave_partner', 'lie_with', 'propose', 'speak', 'stop'])
     const r = submitIntent(busyWith('build'), CFG, 'a1', 'speak', { text: 'over here' })
     expect(r.ok).toBe(true)
     expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(
@@ -330,23 +372,293 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     ])
   })
 
-  it('★ and the only thing that ends an activity early is the world, not another intent', () => {
-    // Every `action_interrupted` the engine emits, and who emits it. A mind is on none of
-    // these lists: `submitIntent` has no path that produces one.
+  it('★ and an act ends early only through the event the fold reads, never a mutation beside it', () => {
     const s = busyWith('sleep')
     expect(s.agents.a1!.activity).not.toBeNull()
-    const byIntent = submitIntent(s, CFG, 'a1', 'eat', {})
-    expect(byIntent.ok).toBe(false)
+    // Still true of every act but the one: eat does not get to shove sleep aside.
+    expect(submitIntent(s, CFG, 'a1', 'eat', {}).ok).toBe(false)
+    // `intent.ts` names no interruption of its own: the verb emits it, and every one of them —
+    // the world's four reasons and the mind's — is a payload the fold applies.
     const src = readFileSync(new URL('./intent.ts', import.meta.url), 'utf8')
-    expect(src, 'submitIntent learned to interrupt without a ruling').not.toContain(
+    expect(src, 'submitIntent learned to interrupt behind the registry').not.toContain(
       'action_interrupted',
     )
-    // and the world's own four reasons still clear it
-    for (const reason of ['blocked', 'gone', 'collapsed', 'rest']) {
+    for (const reason of ['blocked', 'gone', 'collapsed', 'rest', ACT_SET_DOWN]) {
       const cleared = applyAll(s, [
         { type: 'action_interrupted', payload: { agentId: 'a1', reason } },
       ])
       expect(cleared.agents.a1!.activity, reason).toBeNull()
     }
+  })
+})
+
+// ── the town's own rules, judged where the world's are ─────────────────────────────────────
+const NIGHT = 22 * 60
+const NOON = 12 * 60
+
+const ratified = (lawId: string, text: string, predicate: LawPredicate): unknown => ({
+  lawId,
+  agentId: 'a1',
+  text,
+  why: 'they said so',
+  predicate,
+  votes: { for: ['a1'], against: [] },
+})
+
+const at = (s: WorldState, tick: number): WorldState => ({ ...s, tick })
+
+const lawEv = (type: string, payload: unknown, tick = 0): SimEvent => ({
+  seq: seq++,
+  tick,
+  type,
+  payload,
+})
+
+/** A storehouse at (4,4) with a1 on its doorstep, and room around it for a crowd. */
+function lawWorld(): WorldState {
+  let s = genesisState(
+    DEFAULT_CONFIG,
+    Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0)),
+  )
+  s = fold(
+    s,
+    lawEv('structure_planned', {
+      id: 'structure_1',
+      kind: 'storehouse',
+      x: 4,
+      y: 4,
+      w: 2,
+      h: 2,
+      maxHp: 20,
+      flammable: true,
+      builderId: 'a1',
+    }),
+  )
+  s = fold(s, lawEv('structure_completed', { id: 'structure_1' }))
+  return fold(
+    s,
+    lawEv('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 6, ageDays: ADULT_AGE_DAYS }),
+  )
+}
+
+const spawn = (s: WorldState, id: string, x: number, y: number): WorldState =>
+  fold(s, lawEv('agent_spawned', { id, name: id, x, y, ageDays: ADULT_AGE_DAYS }))
+
+const shelve = (s: WorldState, id: string, kind: string, where: unknown): WorldState =>
+  fold(s, lawEv('item_spawned', { id, kind, qty: 1, loc: where }))
+
+const finished = (s: WorldState, verb: string, params: object, tick: number): WorldState =>
+  fold(
+    fold(s, lawEv('action_started', { agentId: 'a1', verb, params, duration: 1 }, tick)),
+    lawEv('action_completed', { agentId: 'a1', verb }, tick),
+  )
+
+const forbidAtNight: LawPredicate = { kind: 'forbid', verb: 'take', when: 'night' }
+
+describe('a law the town wrote', () => {
+  it('forbid is witnessed and never blocked: the act goes through, the neighbours see it', () => {
+    let s = lawWorld()
+    s = spawn(s, 'near', 6, 6)
+    s = spawn(s, 'also', 4, 9)
+    s = spawn(s, 'faraway', 4, 18)
+    s = spawn(s, 'indoors', 5, 4)
+    s = fold(s, lawEv('agent_entered', { agentId: 'indoors', structureId: 'structure_1' }))
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    s = fold(
+      s,
+      lawEv('law_ratified', ratified('law_1', 'No taking after dark.', forbidAtNight), 10),
+    )
+
+    const r = submitIntent(at(s, NIGHT), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started', 'law_broken'])
+    expect(r.ok && r.events[1]?.payload).toEqual({
+      lawId: 'law_1',
+      agentId: 'a1',
+      verb: 'take',
+      witnesses: ['also', 'near'],
+    })
+  })
+
+  it('the same law at noon is no law at all, and a law let go of is none either', () => {
+    let s = lawWorld()
+    s = spawn(s, 'near', 6, 6)
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    s = fold(
+      s,
+      lawEv('law_ratified', ratified('law_1', 'No taking after dark.', forbidAtNight), 10),
+    )
+
+    const day = submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(day.ok && day.events.map((e) => e.type)).toEqual(['action_started'])
+
+    const gone = fold(s, lawEv('law_repealed', { lawId: 'law_1', agentId: 'a1', text: 'x' }, 20))
+    const after = submitIntent(at(gone, NIGHT), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(after.ok && after.events.map((e) => e.type)).toEqual(['action_started'])
+  })
+
+  it('a law for the weekend bites on Saturday and Sunday and on no other day', () => {
+    let s = lawWorld()
+    s = spawn(s, 'near', 6, 6)
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    s = fold(
+      s,
+      lawEv(
+        'law_ratified',
+        ratified('law_1', 'No taking on the weekend.', {
+          kind: 'forbid',
+          verb: 'take',
+          when: 'weekend',
+        }),
+        10,
+      ),
+    )
+    const types = (day: number) => {
+      const r = submitIntent(at(s, day * MINUTES_PER_DAY + NOON), DEFAULT_CONFIG, 'a1', 'take', {
+        itemId: 'item_1',
+      })
+      return r.ok && r.events.map((e) => e.type)
+    }
+    expect(types(4)).toEqual(['action_started'])
+    expect(types(5)).toEqual(['action_started', 'law_broken'])
+    expect(types(6)).toEqual(['action_started', 'law_broken'])
+    expect(types(7)).toEqual(['action_started'])
+  })
+
+  it('a rule the world holds nobody to never fires', () => {
+    let s = lawWorld()
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    s = fold(s, lawEv('law_ratified', ratified('law_1', 'Be kind.', { kind: 'none' }), 10))
+    const r = submitIntent(at(s, NIGHT), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
+  })
+
+  it('require_before refuses in the town’s own words until the thing asked for is done today', () => {
+    let s = lawWorld()
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
+    const text = 'Sleep before you lift a thing.'
+    s = fold(
+      s,
+      lawEv(
+        'law_ratified',
+        ratified('law_1', text, {
+          kind: 'require_before',
+          verb: 'take',
+          before: 'sleep',
+        }),
+        10,
+      ),
+    )
+
+    expect(submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })).toEqual({
+      ok: false,
+      reason: `the town agreed: ${text}`,
+    })
+
+    const slept = finished(at(s, NOON), 'sleep', {}, NOON)
+    expect(slept.agents.a1!.lawMarks).toEqual({ sleep: NOON })
+    expect(
+      submitIntent(at(slept, NOON + 60), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }).ok,
+    ).toBe(true)
+    // A night's sleep does not carry: the rule asks again the next morning.
+    expect(
+      submitIntent(at(slept, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
+        itemId: 'item_1',
+      }).ok,
+    ).toBe(false)
+  })
+
+  it('common lets you take your first from the store and refuses the second', () => {
+    let s = lawWorld()
+    s = shelve(s, 'item_1', 'bread', { t: 'structure', id: 'structure_1' })
+    const text = 'One loaf each from the store.'
+    s = fold(
+      s,
+      lawEv(
+        'law_ratified',
+        ratified('law_1', text, {
+          kind: 'common',
+          itemKind: 'bread',
+          structureId: 'structure_1',
+        }),
+        10,
+      ),
+    )
+
+    expect(submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }).ok).toBe(
+      true,
+    )
+
+    const holding = shelve(s, 'item_2', 'bread', { t: 'agent', id: 'a1' })
+    expect(
+      submitIntent(at(holding, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }),
+    ).toEqual({ ok: false, reason: `the town agreed: ${text}` })
+  })
+
+  it('tithe refuses the take until the shelving is paid for, and asks again next period', () => {
+    let s = lawWorld()
+    s = shelve(s, 'item_1', 'wood', { t: 'structure', id: 'structure_1' })
+    s = shelve(s, 'item_2', 'wood', { t: 'agent', id: 'a1' })
+    const text = 'A log in before a log out.'
+    s = fold(
+      s,
+      lawEv(
+        'law_ratified',
+        ratified('law_1', text, {
+          kind: 'tithe',
+          itemKind: 'wood',
+          qty: 1,
+          to: 'structure_1',
+          every: 'day',
+        }),
+        10,
+      ),
+    )
+
+    expect(submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })).toEqual({
+      ok: false,
+      reason: `the town agreed: ${text}`,
+    })
+
+    const paid = finished(
+      at(s, NOON),
+      'stow',
+      { itemId: 'item_2', structureId: 'structure_1' },
+      NOON,
+    )
+    expect(paid.agents.a1!.lawMarks).toEqual({ law_1: 0 })
+    expect(
+      submitIntent(at(paid, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }).ok,
+    ).toBe(true)
+    expect(
+      submitIntent(at(paid, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
+        itemId: 'item_1',
+      }).ok,
+    ).toBe(false)
+  })
+
+  it('a walk composed to reach the thing breaks nothing; the act at the end of it does, once', () => {
+    let s = lawWorld()
+    s = spawn(s, 'near', 4, 12)
+    s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 11 })
+    s = fold(
+      s,
+      lawEv('law_ratified', ratified('law_1', 'No taking after dark.', forbidAtNight), 10),
+    )
+
+    const night = at(s, NIGHT)
+    const composed = submitIntent(night, DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(composed.ok && composed.events.map((e) => e.type)).toEqual(['action_started'])
+    expect(composed.ok && (composed.events[0]!.payload as { verb: string }).verb).toBe('walk')
+
+    const started = composed.ok
+      ? composed.events.reduce(
+          (w, e) => fold(w, lawEv(e.type, e.payload, NIGHT), DEFAULT_CONFIG),
+          night,
+        )
+      : night
+    const broken = runAct(started, DEFAULT_CONFIG).events.filter((e) => e.type === 'law_broken')
+    expect(broken).toHaveLength(1)
+    expect(broken[0]!.payload).toMatchObject({ lawId: 'law_1', agentId: 'a1', verb: 'take' })
   })
 })

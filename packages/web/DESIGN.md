@@ -70,7 +70,7 @@ draws with it on the canvas).
 Self-hosted through `@fontsource`, never a CDN link. **Nothing renders below 12 CSS px** —
 `ui/chromeType.test.ts` is the law, and it outranks any smaller number a sketch asks for.
 
-## The six marks on the stage
+## The marks on the stage
 
 `packages/web/src/stage/`. Each is DOM, absolutely positioned inside `.app`, placed against the
 camera every frame by **one** rAF loop (`stage/anchor.ts`, `joinStageLoop`) that writes
@@ -84,10 +84,22 @@ overlay sixty times a second.
 | `ThoughtsButton` | one 44px pixel wisp, shown or hidden; a switch, so `aria-pressed`, and off empties the silhouette the way `.legend-chip.off` strikes a chip — never a darker ground, which is what a pressed arm means | bottom-left, stacked over the help button |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
-| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
-| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced | bottom-centre, `--mark-inset`, never reaching the arms |
+| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` and, once the day has one, `· ACT I\|II\|III` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
+| `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case; or, while the gateway's own cut owns the shot, **why the camera is here** in the same sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
+| `SceneCard` | a struck stamp for what the town calls the scene, and `At the fire pit · Nadia & Yusuf` under it; written at the cut and gone 6s later | top-left, level with `.stage-live` across the picture |
+| `LowerThird` | the speaker's 28px bust (96 on the stream), their name on an ink slab, and their line typing in at 28 characters a second over a hidden ghost that holds the width | bottom-centre, directly over the cue; only while its speaker is in the shot |
+| `SleepCard` | `The town sleeps until 06:00.` on a slab, and one quieter line under it | dead centre; only when EVERY living body is asleep |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
 | `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
+
+**The three story marks all read one answer.** The gateway scores the town and pushes one
+`{ t: 'director' }` frame — a cut, a quiet beat and the day's act — and `ui/DirectorMode.tsx` is
+its only reader. It holds the cut for `CUT_MIN_MS` (8s) so a gateway that changes its mind is not
+a cut, then hands the same shot to the card, the caption and the camera. Nothing on the stage
+gets a second opinion about who is in frame, so nothing on the stage can name somebody the camera
+is not on. The two lines a visitor arrives to (`ui/firstFrame.ts`, `#first-frame-lines` in
+`index.html`) are the fourth: they stand over the town until the first cut, the first hand on the
+camera, or twenty seconds.
 
 **The sun arc is the one permanent mark.** `ui/skyModel.ts` puts one traveller on one curve —
 the sun from 05:00 to 21:00, then the moon over the same road — and the boundary is
@@ -123,21 +135,38 @@ character). Everybody the camera can see gets a box; at zoom 0.25 everything col
 pill. Wider boxes collide far more often, so `MAX_STACK_STEPS` is 6 rather than 3 — past that
 `onLeash` hides a bubble rather than let two composite.
 
-**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary. At rest it is
-7A: one 20px plate eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY`
-picks first-match-wins — a condition outranks a state, because a person who is hurt is the news;
-the plate turns ember for the three that are. "Between things" wears nothing, and neither does a
-walker. The moment an act starts, **the track wraps that same slot**: seven blocks on a 120°
-arch at r=26, solid for done and hollow for what is left, so progress is a count and a position
-before it is ever a hue. It goes when the act does. The arch spans OVER the glyph — every block
-clears the plate by 3.7px and the arc runs 20.3px each side, twice the plate's own width — and
-because the slot is world art the ratio holds at every zoom stop the indicators show at. Whoever
-the chip is willing to name is whoever the track may wrap: `fractionOf` reads the act layer's own
-`atWork` set, so the word and the arc cannot disagree about what is running.
-`working` has no glyph: while the job runs the track IS the mark, which is how "hurt while
-chopping" says both at once. The act chip keeps its word at the feet and has lost its fill and
-the Graphics **mask** that drew it — a mask per chip is a render target per working person, and
-the viewport rule puts a chip on every one of them.
+**The cull is asked about the SPEAKER, head to heel** — not about the anchor the box floats from,
+seventy world pixels higher, which is what made a person standing in the top of the frame wear a
+"…" over their own words; at the director's 3× stop that band is a whole quarter of the picture.
+**A conversation looks like one** (`render/converse.ts`): the box is cut to the whole sentence
+and the words arrive inside it at 28 characters a second, so the paper never moves under the
+reader; a body that is `talking` turns toward the last other voice within earshot in the twelve
+seconds behind it; and once a line stops being the newest it dims to `PRIOR_ALPHA` (0.6) and is
+held `PRIOR_HOLD_MS` (6s), letting go the moment a third line lands. That single write is the one
+alpha allowed on a bubble node, and `textFaces.test.ts` fails on a second.
+
+**One address over a head.** `render/overhead.ts` is the whole overhead vocabulary: one 20px plate
+eight pixels over the head, holding **one** glyph that `OVERHEAD_PRIORITY` picks
+first-match-wins — a condition outranks a state, because a person who is hurt is the news; the
+plate turns ember for the three that are. "Between things" wears nothing, and neither does a
+walker. A cell the atlas has no glyph for draws **nothing**: `indexOf` answering −1 cut a frame
+off the left of the sheet, and the forge's checkerboard stood over the head of somebody who was
+only speaking.
+
+**The seven progress blocks are gone.** An arch over the head told the truth and read as broken
+on any job past a minute, and it crowded the one address the slot was built to be. Progress is a
+1px honey bar under the act chip, beneath the word it is about (`render/acts.ts`), still gated by
+`ACT_TRACK_MAX_TICKS` so a 2880-tick house keeps its word and shows no bar. `working` has no
+glyph: the chip IS the mark, which is how "hurt while chopping" says both at once. The chip has
+lost its fill and the Graphics **mask** that drew it — a mask per chip is a render target per
+working person, and the viewport rule puts a chip on every one of them.
+
+**A pixel rises off a head when something happens to the person under it**
+(`render/momentEmotes.ts`): a heart for a bond gained, the crack for one lost, the lit bulb for a
+discovery or a law, the ember mark for a ruling undone. Ten world pixels on an ease-out over
+1.2s, a fade over the last 0.6s, gone at 1.8s, drawn clear of the slot's own top edge so the two
+marks can never composite. The same moment prints in the cue slot for six seconds and bounces
+both bodies on the finished-structure curve.
 
 **One occupancy.** `render/tooltip.ts` is the label layer and owns the only table of taken screen
 space, keyed by who owns the boxes (`bubbles`, `plate`). Everybody writes theirs and reads
@@ -220,6 +249,81 @@ out of**. Several now, and the sheet's own lists read the sheet rather than the 
 
 **With the sheet open the signpost stays whole at every width** — 0 px² of overlap measured at
 320, 375, 390, 768, 844×390, 1024, 1440 and 2560, against 36,352 px² (100% hidden) at ≤390 before.
+
+## The night
+
+The night was the same picture at 0.45 of its own light, which is a hole rather than an hour.
+It is now a place to watch, and every part of it reads the light model that was already there —
+`render/tints.ts`'s one day clock and `ui/skyModel.ts`'s one traveller. There is no second one.
+
+| Mark | What it is | Where |
+|---|---|---|
+| the night floor | `NIGHT_FLOOR` = `[0.5, 0.58, 0.95]`, the multiply quad's darkest tint | `render/tints.ts` |
+| the window | a `--f4e289` glow on every LIT hearth house, at the art's window or the front face | `render/lightPools.ts` |
+| the fireflies | 90 pooled 2px lights over grass, on a clear night only | `render/fireflies.ts` |
+| the moon | a second screened ramp over the same masked ground, `#CDD8FF` at 0.14 | `render/atmosphere.ts` |
+| the long shadow | the contact blob stretched and laid away from a low sun | `ui/skyModel.ts` → `render/characters.ts` |
+
+**The floor is a measured number, not a mood.** `[0.45, 0.52, 0.95]` left a roof at 0.536 of its
+own luma; `[0.5, 0.58, 0.95]` puts it at 0.590 and holds the blue cast exactly (the hue ladder
+`r < g < b` is unchanged). Everything downstream reads it: `skyLevel` derives from the floor's
+own luminance, so the lamps, the sky ramp and the glow all moved with it and none of them was
+retuned by hand. One consequence is recorded rather than hidden — under the brighter night the
+pale paving (`#e8d5bc`) now carries the landmark ink at 4.60:1 where every other tile still
+fails, so the plate is still load-bearing but for ten grounds rather than eleven.
+
+**A hearth the art does not PAINT is a fire indoors**, and a fire indoors reaches the town
+through a wall. Only the cabin's manifest ever named a window; cottage, farmhouse and house
+burned all night behind a dark facade. `windowSpot` falls back to the front face at the cabin's
+own height (`370/512` of the painted cell) for any lit source with no painted flame — which is
+exactly the four hearth kinds, and never a fire pit or a lamp post, whose flame is already lit
+on screen. The gate is `flamesAt` itself: an unfed hearth is not in the list at all.
+
+**Clear is not a second list of weather words** — it is exactly the weather `WEATHER_DIAG` does
+not grade, so a kind added to the grade cannot forget to put the swarm away. The fireflies come
+out at `FIREFLY_DUSK` (0.5 of the fall to night), so the golden hour stays a golden hour.
+Ninety sprites are built once and only written to; the blinks are 0.43 Hz and 0.61 Hz, under the
+3 Hz floor every light in the renderer is held to.
+
+**A low sun draws the shadow out and then lets it go.** `shadowCast` is a hump, not a ramp: the
+blob stretches to `SHADOW_MAX_STRETCH` (2.6×) through the golden band and is back under the feet
+as the sun touches the horizon, so nothing snaps at the minute the light goes. It falls away
+from the sun — east at dawn, west at dusk — and softens as it lengthens. Read once a frame for
+the whole cast, because the sun's height is a function of the minute and not of who is standing
+in it.
+
+## Sound
+
+**Opt-in, diegetic, synthesized, and muted until a viewer says otherwise.** `ui/sound.ts` is the
+whole of it: no audio file, no CDN, no `Audio` element. An `AudioContext` is opened inside the
+click that unmutes — the gesture the autoplay policy wants — and never before.
+
+`soundCues(scene)` is **the one list**. The synth is handed it and the chips are stamped from
+it, so a sound the chips cannot name cannot be played, and a chip with nothing behind it cannot
+be printed. Every voice in it has a source the viewer can point at:
+
+| Voice | Its source on screen | Gain |
+|---|---|---|
+| wind | every canopy and every column of smoke drifting on `windNow()` | 0.12, +0.16 in a storm |
+| rain | the drops `weatherFx` is drawing | 0.24 rain, 0.34 storm |
+| crickets | the fireflies, on the same clear night, in the same frame | 0.20 × the night |
+| fire | a lit flame inside the view rect | 0.09 + 0.045 each, capped 0.20 |
+| murmur | the people in the open scene the camera can see | 0.06 + 0.03 each, capped 0.14 |
+| a bell | `law_ratified` — what the town just decided | a struck one-shot, 2.4 s |
+
+The loudest world the town can build — a storm, at night, over fires, in a scene — sums to 0.96
+before `SOUND_MASTER` (0.55), so the mix cannot clip. Every continuous voice is one filtered tap
+off a single two-second noise loop, built once on the first unmute and only ramped afterwards;
+the bell is the one exception and strikes two partials on the bell ratio (784 Hz × 2.76).
+
+**A chip stands for a START, never for a running voice.** The sun arc is the one permanent mark
+over the town, so "♪ WIND" may not sit in the corner all day: `trackStarts` stamps a voice the
+instant it enters the mix and `standingChips` holds it `CUE_CHIP_MS` (4.2 s). The chip is the
+cue mark's own material — cream, `--font-body` 600 at `--f-1`, 0.18em, on the four-way
+`--halo-deep` — stacked `column-reverse` above the corner cluster, so a bell arriving on top
+leaves every chip under it where the eye left it. The "♪" toggle is the cluster's third 44px
+slab, its mark drawn on the 8×8 grid for the same reason the wisp is: `--font-sign` has no ♪ and
+no legal size under 16px. Off empties the note rather than darkening the paper.
 
 ## Motion
 
@@ -315,7 +419,12 @@ once.
 - **Rendering law untouched**: 2:1 dimetric `sx=(dx-dy)*16`, `sy=(dx+dy)*8`; the fixed zoom stops
   `0.25 0.5 1 2 3 4`; NEAREST everywhere.
 - **Determinism untouched.** Nothing in the chrome moves the world.
-- The first viewport is the town at zoom 1, centred, with the director cutting from there.
+- The first viewport is the town at zoom 1, centred, with the director cutting from there. **The
+  director is armed for every viewer**, desk and stream alike; any input hands the camera back for
+  20s. It opens to 2× at 1280px and wider, where two speakers two tiles apart fit in one shot.
+- **A carved name is not permanent chrome.** Toponyms come in at the 2× stop and answer on hover
+  below it, and the one the viewer has picked stands down for its own nameplate — a picked
+  building used to wear three labels at once.
 - **Two `<img alt="">` are deliberate.** A person's portrait sits beside their name, and the
   discovery art is ornament on a card whose `aria-label` already carries the whole record.
 - **The town-dim is a pointer-only dismissal**, `aria-hidden` with no role. Escape is the keyboard

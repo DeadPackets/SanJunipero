@@ -142,6 +142,7 @@ describe('a verdict nobody can read', () => {
     const llm = new LlmClient({
       db,
       caller: 'semantic',
+      audience: 'ops',
       model: mockModel([{ json: noProvenance }, { json: GOOD_VERDICT }]),
     })
     const milestones = await detectSemanticFirsts({
@@ -164,6 +165,7 @@ describe('a verdict nobody can read', () => {
     const llm = new LlmClient({
       db,
       caller: 'semantic',
+      audience: 'ops',
       model: mockModel([{ json: { hits: 'not an array' } }, { json: { wrong: true } }]),
     })
     const milestones = await detectSemanticFirsts({
@@ -196,6 +198,14 @@ describe('the nightly pass', () => {
     expect(rows[1]!.quote).toBe(LIE_SPOKEN)
     expect(rows[1]!.quote2).toBe(LIE_THOUGHT)
     expect(rows[1]!.provenance2).toBe('mem_7')
+  })
+
+  // ★ The concept was marked found in one table and the mark written in another by the caller;
+  // a kill between the two lost the mark and never looked for it again.
+  it('★ writes the mark with the row that says the concept is found', async () => {
+    const { store, milestones } = await run(new ScriptedLlm())
+    expect(store.milestoneKinds()).toEqual(new Set(milestones.map((m) => m.kind)))
+    expect(store.milestones().map((m) => m.kind)).toEqual(['first_god_afterlife', 'first_lie'])
   })
 
   it('a thought that comes after the words is a change of mind, not a lie', async () => {

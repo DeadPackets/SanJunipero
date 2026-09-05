@@ -2,11 +2,18 @@ import { CLOSE_BAD_HELLO, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 
 const LAST_SEEN_KEY = 'sj:lastSeenTick'
+const STALE_BUNDLE_KEY = 'sj:reloadedForStale'
 const GAP_TICKS = 1440 // more than a missed day → offer the digest
 const BACKOFF_MIN_MS = 1_000
 const BACKOFF_MAX_MS = 30_000
 
-export type ObservatoryHandle = { scrub(tick: number): void; goLive(): void; close(): void }
+export type ObservatoryHandle = {
+  scrub(tick: number): void
+  /** Play the town forward from `from` at the live cadence, until it catches up or `goLive`. */
+  replay(from: number): void
+  goLive(): void
+  close(): void
+}
 export type LinkStatus = 'connecting' | 'online' | 'reconnecting'
 
 export function connectObservatory(opts: {
@@ -46,6 +53,26 @@ export function connectObservatory(opts: {
     }
   }
 
+  /** One reload per page load. A bundle a cache still serves is refused again after the reload,
+   *  and without this every open tab re-fetches it about once a second for as long as it lasts. */
+  const reloadOnce = (): boolean => {
+    try {
+      if (sessionStorage.getItem(STALE_BUNDLE_KEY) !== null) return false
+      sessionStorage.setItem(STALE_BUNDLE_KEY, '1')
+    } catch {
+      /* site data blocked: the guard is best effort, the reload is not */
+    }
+    location.reload()
+    return true
+  }
+  const clearStaleMark = (): void => {
+    try {
+      sessionStorage.removeItem(STALE_BUNDLE_KEY)
+    } catch {
+      /* site data blocked */
+    }
+  }
+
   const open = (): void => {
     if (closed) return
     sock = new WebSocket(opts.url)
@@ -68,30 +95,33 @@ export function connectObservatory(opts: {
       }
       // A scrub inside the server's coalescing window is answered late — after the `live` the
       // viewer asked for next — and would put the view back on a minute they have left.
-      if (msg.t === 'scrubbed' && msg.reqId !== reqId) return
+      if ((msg.t === 'scrubbed' || msg.t === 'replaying') && msg.reqId !== reqId) return
       if (msg.t === 'snapshot') {
         const last = readLastSeen()
         if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
       }
       const trouble = opts.store.applyServer(msg)
       if (trouble === 'reload') {
-        location.reload()
+        reloadOnce()
         return
       }
       if (trouble === 'resnapshot') {
         send({ t: 'live' })
         return
       }
-      if (msg.t === 'snapshot' || msg.t === 'tick') writeLastSeen(msg.tick)
+      // The town read: whatever this tab reloaded for is behind it, so the next real refusal
+      // is allowed its own reload.
+      if (msg.t === 'snapshot') clearStaleMark()
+      // A replayed minute is a minute this viewer has already seen: stored, it would make the
+      // next visit offer a digest of the days between then and now.
+      if (msg.t === 'snapshot' || (msg.t === 'tick' && opts.store.getMode().live))
+        writeLastSeen(msg.tick)
     }
     sock.onclose = (e: CloseEvent) => {
       if (closed) return
       // The server refuses a hello it does not recognise: reconnecting with the same one loops
       // forever, and only a reload fetches a viewer this town speaks to.
-      if (e.code === CLOSE_BAD_HELLO) {
-        location.reload()
-        return
-      }
+      if (e.code === CLOSE_BAD_HELLO && reloadOnce()) return
       setStatus('reconnecting')
       setTimeout(open, backoffMs)
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS)
@@ -106,6 +136,9 @@ export function connectObservatory(opts: {
   return {
     scrub(tick) {
       send({ t: 'scrub', tick, reqId: ++reqId })
+    },
+    replay(from) {
+      send({ t: 'replay', from, reqId: ++reqId })
     },
     goLive() {
       reqId++ // no scrub still in flight can answer for the live edge

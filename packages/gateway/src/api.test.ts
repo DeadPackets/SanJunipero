@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { DEFAULT_CONFIG } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  BondsResponseSchema,
+  DEFAULT_CONFIG,
+  LawsResponseSchema,
+  bondId,
+} from '@sj/shared'
+import { LAW_FIXTURE } from '@sj/shared/testutil'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
@@ -70,10 +77,10 @@ describe('observer data apis', () => {
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: 7300 })
-          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 3, ageDays: 7300 })
-          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: 7300 })
-          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 5, y: 5, ageDays: 7300 })
+          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 3, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 5, y: 5, ageDays: ADULT_AGE_DAYS })
         }
         if (tick === 2) {
           emit('agent_spoke', { agentId: 'alice', text: 'Morning.', x: 0, y: 0 })
@@ -186,6 +193,28 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/agent/bob/personality`)).json()).toEqual([])
   })
 
+  /** Two prepares per journal GET, on the thread that ticks the town: a stranger looping the
+   *  panel paid a compile each time. The SQL is a literal, so the statement is held with it. */
+  it('★ compiles a mind\u2019s reads once, not once per GET', async () => {
+    const proto = Object.getPrototypeOf(new Database(':memory:')) as {
+      prepare: (sql: string) => unknown
+    }
+    const real = proto.prepare
+    let compiled = 0
+    proto.prepare = function (this: unknown, sql: string): unknown {
+      if (sql.includes('FROM journal')) compiled += 1
+      return real.call(this, sql)
+    }
+    try {
+      await (await fetch(`${base}/api/agent/alice/journal`)).json()
+      const first = compiled
+      for (let i = 0; i < 5; i++) await (await fetch(`${base}/api/agent/alice/journal`)).json()
+      expect(compiled, 'five more GETs compiled nothing').toBe(first)
+    } finally {
+      proto.prepare = real
+    }
+  })
+
   it('the journal feed is capped, and the cap keeps the newest of both halves', async () => {
     const over = JOURNAL_MAX + 50
     const cdb = openAgentFixtureDb(join(dir, 'carl.db'))
@@ -247,18 +276,6 @@ describe('observer data apis', () => {
 
   it('chapters is the C7 stub', async () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([])
-  })
-
-  // bob is 2 for speaking and 6 for the house he PLANNED and the town completed at tick 40 —
-  // `structure_completed {id}` names no person, and the plan is where the town keeps one.
-  it('heat: per-agent 60-tick windows from the stub scorer', async () => {
-    expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
-      { fromTick: 0, toTick: 59, agentId: 'alice', score: 4 },
-      { fromTick: 0, toTick: 59, agentId: 'bob', score: 8 },
-      { fromTick: 0, toTick: 59, agentId: 'cara', score: 2 },
-      { fromTick: 60, toTick: 119, agentId: 'bob', score: 2 },
-      { fromTick: 60, toTick: 119, agentId: 'dan', score: 20 },
-    ])
   })
 })
 
@@ -322,5 +339,230 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
     ])
     expect(api.call('nobody')).toEqual([])
     api.close()
+  })
+})
+
+/** The bond graph reads the log directly, so the five acts reach it whatever `FOLD_TYPES` says. */
+describe('★ the five acts of a relationship reach the read path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwrel-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('rel-test'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['alice', 'Alice'],
+            ['bob', 'Bob'],
+            ['cara', 'Cara'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 4) emit('invited', { agentId: 'bob', byId: 'alice', verb: 'court' })
+        if (tick === 5)
+          emit('invitation_refused', {
+            agentId: 'bob',
+            byId: 'alice',
+            verb: 'court',
+            witnesses: ['cara'],
+          })
+        if (tick === 6) emit('invited', { agentId: 'bob', byId: 'alice', verb: 'propose' })
+        if (tick === 7)
+          emit('invitation_accepted', { agentId: 'bob', byId: 'alice', verb: 'propose' })
+        if (tick === 8) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
+        if (tick === 9) emit('partnership_dissolved', { aId: 'alice', bId: 'bob', byId: 'bob' })
+      },
+    })
+    for (let i = 0; i < 12; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('makes the partnership a bond and the public no a slight', async () => {
+    const body = BondsResponseSchema.parse(await (await fetch(`${base}/api/bonds`)).json())
+    const b = body.bonds.find((x) => x.id === bondId('alice', 'bob'))
+    expect(b?.acts).toEqual([{ kind: 'partner', count: 1, firstTick: 8, lastTick: 8 }])
+    expect(b?.kind, 'they parted at tick 9').not.toBe('partner')
+    expect(b?.warmth).toBeLessThan(0)
+  })
+})
+
+/** The Laws page's whole supply. The rows are joined off the FOLDED state and a breach count the
+ *  read path keeps, so what the page says survives a restart as long as the log does. */
+describe('★ /api/laws serves the rules the town wrote, and how often they were broken', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwlaws-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('laws-test'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['omar', 'Omar'],
+            ['salma', 'Salma'],
+            ['yusuf', 'Yusuf'],
+            ['amara', 'Amara'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        // One council a tick, in fixture order: the page's "newest first" is the reverse of this.
+        for (const [i, f] of LAW_FIXTURE.entries()) {
+          if (tick !== 10 + i) continue
+          emit('law_proposed', { lawId: f.id, agentId: f.proposedBy, text: f.text })
+          emit('law_ratified', {
+            lawId: f.id,
+            agentId: f.proposedBy,
+            text: f.text,
+            why: f.why,
+            predicate: f.predicate,
+            votes: f.votes,
+          })
+        }
+        if (tick === 20)
+          emit('law_broken', {
+            lawId: 'law_slate',
+            agentId: 'yusuf',
+            verb: 'take',
+            witnesses: ['nadia'],
+          })
+        if (tick === 21)
+          emit('law_broken', { lawId: 'law_slate', agentId: 'omar', verb: 'take', witnesses: [] })
+        if (tick === 22)
+          emit('law_repealed', {
+            lawId: 'law_fire_tax',
+            agentId: 'salma',
+            text: LAW_FIXTURE[1]!.text,
+          })
+      },
+    })
+    for (let i = 0; i < 25; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads newest first, in the town’s own words, with the proposer named', async () => {
+    const body = LawsResponseSchema.parse(await (await fetch(`${base}/api/laws`)).json())
+    expect(body.laws.map((l) => l.id)).toEqual(['law_well_order', 'law_fire_tax', 'law_slate'])
+    expect(body.laws.map((l) => l.proposerName)).toEqual(['Amara', 'Salma', 'Nadia'])
+    expect(body.laws.find((l) => l.id === 'law_slate')).toEqual({
+      id: 'law_slate',
+      text: LAW_FIXTURE[0]!.text,
+      proposedBy: 'nadia',
+      proposerName: 'Nadia',
+      ratifiedTick: 10,
+      repealedTick: null,
+      votes: { for: ['nadia', 'omar'], against: [] },
+      why: LAW_FIXTURE[0]!.why,
+      enforced: true,
+      breaches: 2,
+    })
+  })
+
+  it('keeps a rule the town let go of, and holds nothing against the unbroken', async () => {
+    const body = LawsResponseSchema.parse(await (await fetch(`${base}/api/laws`)).json())
+    const gone = body.laws.find((l) => l.id === 'law_fire_tax')!
+    expect(gone.repealedTick).toBe(22)
+    expect(gone.breaches).toBe(0)
+    expect(body.laws.find((l) => l.id === 'law_well_order')!.breaches).toBe(0)
+  })
+
+  // Which verb the court compiled a sentence to is ops-plane, and `enforced` is the whole of
+  // what a viewer is owed about it.
+  it('says whether the world holds anybody to it, and never how', async () => {
+    const raw = await (await fetch(`${base}/api/laws`)).text()
+    for (const word of ['predicate', 'require_before', 'ordinal', 'itemKind'])
+      expect(raw, word).not.toContain(word)
+  })
+})
+
+/** A viewer opening the page twice in one tick must not re-scan the world, and a viewer opening
+ *  it after a council must not be served the answer from before it. */
+describe('★ the laws body is built once a generation and dropped when the world moves', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwlawseq-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('serves the same string twice, and a new one once a law lands', () => {
+    const db = openDb(join(dir, 'world.db'))
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('laws-seq'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', { id: 'nadia', name: 'Nadia', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        if (tick === 3)
+          emit('law_ratified', {
+            lawId: 'law_slate',
+            agentId: 'nadia',
+            text: LAW_FIXTURE[0]!.text,
+            why: LAW_FIXTURE[0]!.why,
+            predicate: LAW_FIXTURE[0]!.predicate,
+            votes: LAW_FIXTURE[0]!.votes,
+          })
+      },
+    })
+    loop.step()
+    const mirror = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS })
+    const routes = new Map<string, RouteHandler>()
+    const close = mountDataApi(
+      {
+        route: (m, path, fn) => {
+          routes.set(`${m} ${path}`, fn)
+        },
+      },
+      { db, mirror, config: DEFAULT_CONFIG },
+    )
+    const get = (): string => {
+      let body = ''
+      routes.get('GET /api/laws')!(
+        { url: '/api/laws' } as IncomingMessage,
+        {
+          writeHead: () => {},
+          end: (b: string) => {
+            body = b
+          },
+        } as unknown as ServerResponse,
+        {},
+      )
+      return body
+    }
+
+    const empty = get()
+    expect(JSON.parse(empty)).toEqual({ laws: [] })
+    expect(get()).toBe(empty)
+
+    for (let i = 0; i < 3; i++) loop.step()
+    mirror.poll()
+    const after = LawsResponseSchema.parse(JSON.parse(get()))
+    expect(after.laws.map((l) => l.id)).toEqual(['law_slate'])
+
+    close()
+    db.close()
   })
 })

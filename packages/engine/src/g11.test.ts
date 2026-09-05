@@ -2,9 +2,12 @@
 // move, the night that hides a taking, and whether a competent body would have lived.
 import { describe, it, expect } from 'vitest'
 import {
+  ADULT_AGE_DAYS,
   CHUNK_TILES,
   chunkOf,
   chunksTouched,
+  DAYS_PER_YEAR,
+  DURATION_TICKS,
   MINUTES_PER_DAY,
   SimConfigSchema,
   stateHash,
@@ -77,23 +80,36 @@ function genesisTown(config: SimConfig = CFG): {
 // ------------------------------------------------------------------ the 128x128 town
 
 describe('G11a-M1: the genesis town folds, and it is the size the world says it is', () => {
-  it('a hundred and twenty-eight tiles on a side, eleven roofs, a herd and the standing bushes', () => {
+  it('a hundred and twenty-eight tiles on a side, thirteen roofs, a herd and the standing bushes', () => {
     const { state } = genesisTown()
     expect(state.terrain.length).toBe(CFG.world.size.h)
     expect(state.terrain[0]!.length).toBe(CFG.world.size.w)
     expect(state.terrain.every((row) => row.length === CFG.world.size.w)).toBe(true)
 
     const structures = Object.values(state.structures)
-    expect(structures).toHaveLength(11)
-    // Eleven buildings, four of them still roofed: the village was abandoned and the other seven
-    // stand as walls a pair of hands can finish. Sound, this valley held 21 bodies against five.
+    expect(structures).toHaveLength(13)
+    // Thirteen buildings, twelve of them roofed: every founder wakes indoors (D1), the cottage
+    // row included, and the farmhouse nobody sleeps in is left as walls to finish together.
     expect(
       structures
         .filter((s) => s.stage === 'complete')
         .map((s) => s.kind)
         .sort(),
-    ).toEqual(['cabin', 'fire_pit', 'storehouse', 'well'])
-    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(5)
+    ).toEqual([
+      'cabin',
+      'cottage',
+      'fire_pit',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'house',
+      'storehouse',
+      'well',
+    ])
+    expect(structures.filter((s) => s.kind === 'house')).toHaveLength(7)
     expect(structures.some((s) => s.kind === 'well')).toBe(true)
     expect(structures.some((s) => s.kind === 'storehouse')).toBe(true)
 
@@ -161,7 +177,11 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     const { state: town } = genesisTown(GROWS)
     let s = fold(
       town,
-      ev('agent_spawned', { id: 'walker', name: 'walker', x: 30, y: 70, ageDays: 7300 }, 0),
+      ev(
+        'agent_spawned',
+        { id: 'walker', name: 'walker', x: 30, y: 70, ageDays: ADULT_AGE_DAYS },
+        0,
+      ),
       GROWS,
     )
     // A real walk, so the traffic map has keys in it before the ground shifts under them.
@@ -192,7 +212,10 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
       600,
     )
     const before = { ...s }
-    expect(Object.keys(before.traffic ?? {}).length).toBeGreaterThan(0)
+    // Which cells of the flat grid carry a footfall, in the order the grid holds them.
+    const wornCells = (t: number[] | undefined): number[] =>
+      (t ?? []).flatMap((v, i) => (v > 0 ? [i] : []))
+    expect(wornCells(before.traffic).length).toBeGreaterThan(0)
 
     const grown = pass(before, GROWS, MINUTES_PER_DAY)
     const growth = grown.events.find((e) => e.type === 'world_grown')!
@@ -207,16 +230,10 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     for (const id of Object.keys(before.structures)) {
       expect(grown.state.structures[id]!.y).toBe(before.structures[id]!.y + dy)
     }
-    const shifted = Object.keys(before.traffic!)
-      .map((k) => {
-        const [x, y] = k.split(',').map(Number)
-        return `${x},${y! + dy}`
-      })
-      .sort()
+    const width = before.terrain[0]!.length
+    const shifted = wornCells(before.traffic).map((i) => i + dy * width)
     // Asked of the growth alone: the same midnight decays these one-footfall tiles off the map.
-    expect(Object.keys(apply(before, GROWS, [growth], MINUTES_PER_DAY).traffic!).sort()).toEqual(
-      shifted,
-    )
+    expect(wornCells(apply(before, GROWS, [growth], MINUTES_PER_DAY).traffic)).toEqual(shifted)
   })
 
   // ★ THE GROUND THAT ARRIVES IS THE WORLD CONTINUED. The river is a reason for the town's
@@ -249,7 +266,7 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
       [
         {
           type: 'agent_spawned',
-          payload: { id: 'walker', name: 'walker', x: 30, y: 70, ageDays: 7300 },
+          payload: { id: 'walker', name: 'walker', x: 30, y: 70, ageDays: ADULT_AGE_DAYS },
         },
       ],
       0,
@@ -290,7 +307,11 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
 describe('G11a-M3: an operator may move a law, and only the laws the whitelist names', () => {
   it('two flags flipped mid-run change the next tick, and the log replays the flips', () => {
     let s = genesisState(CFG, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'body', name: 'body', x: 5, y: 5, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'body', name: 'body', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = fold(s, ev('fauna_spawned', { id: 'fauna_1', kind: 'deer', x: 15, y: 15 }), CFG)
     s = { ...s, tick: 399 }
 
@@ -344,7 +365,7 @@ describe('G11a-P1: the perf gate on a full 128x128 town', () => {
           name: `body_${i}`,
           x: 30 + (i % 6),
           y: 68 + Math.floor(i / 6),
-          ageDays: 7300,
+          ageDays: ADULT_AGE_DAYS,
         }),
         CFG,
       )
@@ -447,7 +468,15 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     const door = doorTile(s, s.structures[HOUSE.id]!)!
     s = fold(
       s,
-      ev('agent_spawned', { id: 'ada', name: 'ada', x: door.x, y: door.y, ageDays: 7300 }),
+      // Thirty, not the fixture's old 7 300 days: on a 28-day year that number is an elder, and
+      // an elder pays the 1.2x energy toll this row exists to show a competent body clearing.
+      ev('agent_spawned', {
+        id: 'ada',
+        name: 'ada',
+        x: door.x,
+        y: door.y,
+        ageDays: 30 * DAYS_PER_YEAR,
+      }),
       CFG,
     )
     s = fold(s, ev('agent_entered', { agentId: 'ada', structureId: HOUSE.id }), CFG)
@@ -539,7 +568,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
   // affliction standing, and the only thing in the world that lifts one is a herb.
   it('one collapse leaves a fatigue clock that a full night of sleep does not lift', () => {
     let s = genesisState(CFG, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = fold(
       s,
       ev('needs_changed', { id: 'ada', changes: [{ need: 'energy', delta: -96 }] }, 0),
@@ -586,7 +619,10 @@ describe('G11a-D1: a competent body comes through three days on the default worl
       (eaten as { events: PendingEvent[] }).events,
       awake.tick + 1,
     )
-    cured = pass(cured, CFG, awake.tick + 2, 'ratchet').state
+    // The herb is a meal, and a meal is half a sim-hour of chewing.
+    for (let i = 2; i <= DURATION_TICKS.half_hour + 1; i++) {
+      cured = pass(cured, CFG, awake.tick + i, 'ratchet').state
+    }
     expect(cured.agents.ada!.afflictions).toBeUndefined()
   })
 
@@ -597,7 +633,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
       s.agents.ada!.afflictions?.find((x) => x.kind === 'fatigue')?.severity ?? 0
 
     let s = genesisState(CFG, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }, 0), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }, 0),
+      CFG,
+    )
     s = { ...s, tick: 0 }
 
     // HALF 3 — a body with a full bar is told where a bed is, and the refusal names the door
@@ -666,7 +706,11 @@ describe('G11a-D1: a competent body comes through three days on the default worl
   it('and the same body given nothing to eat, drink or lie on does not — which is the difference', () => {
     // The control: the script is what changed, not the physics.
     let s = genesisState(CFG, MAP())
-    s = fold(s, ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: 7300 }), CFG)
+    s = fold(
+      s,
+      ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
+      CFG,
+    )
     s = { ...s, tick: 0 }
     let collapses = 0
     for (let tick = 1; tick <= DAYS * MINUTES_PER_DAY; tick++) {

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, DURATION_TICKS, SimConfigSchema, type SimConfig } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from '../state.js'
 import { fold } from '../fold.js'
 import { submitIntent } from '../intent.js'
 import { VERBS } from '../verbs/index.js'
 import { RngStreams } from '../rng.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev } from '../testutil/world.js'
+import { ev, runAct } from '../testutil/world.js'
 
 const FAST: SimConfig = SimConfigSchema.parse({
   crops: {
@@ -23,7 +23,11 @@ function makeWorld(rows: string[] = ['.#', '..'], config = FAST): WorldState {
     config,
     rows.map((row) => Array.from(row).map((c) => CHAR_TILE[c]!)),
   )
-  return fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: 7300 }), config)
+  return fold(
+    s,
+    ev('agent_spawned', { id: 'a1', name: 'a1', x: 0, y: 0, ageDays: ADULT_AGE_DAYS }),
+    config,
+  )
 }
 function atTick(s: WorldState, tick: number): WorldState {
   return { ...s, tick }
@@ -141,7 +145,7 @@ describe('verb: till', () => {
     const r = submitIntent(s, FAST, 'a1', 'till', { x: 0, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const t = tickOnce(s)
+    const t = runAct(s, FAST)
     expect(t.events).toContainEqual({
       type: 'tile_changed',
       payload: { x: 0, y: 0, from: 1, to: 6, reason: 'tilled', byId: 'a1' },
@@ -170,7 +174,7 @@ describe('verb: plant', () => {
     const r = submitIntent(s, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    const t = tickOnce(s)
+    const t = runAct(s, FAST)
     expect(t.events).toContainEqual({
       type: 'crop_planted',
       payload: { id: 'crop_1', kind: 'wheat', x: 1, y: 0, plantedDay: 0 },
@@ -181,6 +185,31 @@ describe('verb: plant', () => {
     })
     expect(t.state.crops.crop_1!.stage).toBe(0)
     expect(submitIntent(t.state, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' }).ok).toBe(false)
+  })
+
+  it('two sowers over one plot leave one crop, and a plot that stopped being farmland gets none', () => {
+    let s = fold(
+      makeWorld(),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      FAST,
+    )
+    for (const id of ['a1', 'a2']) {
+      const r = submitIntent(s, FAST, id, 'plant', { x: 1, y: 0, kind: 'wheat' })
+      if (!r.ok) throw new Error(r.reason)
+      s = applyAll(s, r.events)
+    }
+    const out = runAct(s, FAST)
+    expect(out.events.filter((e) => e.type === 'crop_planted')).toHaveLength(1)
+    expect(Object.values(out.state.crops).filter((c) => c.x === 1 && c.y === 0)).toHaveLength(1)
+
+    let paved = makeWorld()
+    const r = submitIntent(paved, FAST, 'a1', 'plant', { x: 1, y: 0, kind: 'wheat' })
+    if (!r.ok) throw new Error(r.reason)
+    paved = applyAll(paved, r.events)
+    paved = applyAll(paved, [
+      { type: 'tile_changed', payload: { x: 1, y: 0, from: 6, to: 8, reason: 'paved' } },
+    ])
+    expect(runAct(paved, FAST).events.filter((e) => e.type === 'crop_planted')).toHaveLength(0)
   })
 })
 
@@ -250,6 +279,15 @@ describe('verb: harvest', () => {
     return fold(s, ev('crop_grew', { cropId: 'crop_1', stage: 3 }), FAST)
   }
 
+  function twoAtOnePlot(): WorldState {
+    const s = fold(
+      mature(),
+      ev('agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      FAST,
+    )
+    return s
+  }
+
   it('is registered with the farming skill', () => {
     expect(VERBS.harvest!.kind).toBe('harvest')
     expect(VERBS.harvest!.skill).toEqual({ track: 'farming', xp: 1 })
@@ -276,8 +314,7 @@ describe('verb: harvest', () => {
     const r = submitIntent(s, FAST, 'a1', 'harvest', { cropId: 'crop_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    s = fold(s, ev('tick_advanced', {}, s.tick + 1), FAST)
-    const out = createWorldTick(FAST, new RngStreams('t'))(s)
+    const out = runAct(s, FAST)
     expect(out.events).toContainEqual({ type: 'crop_harvested', payload: { cropId: 'crop_1' } })
     expect(out.events).toContainEqual({
       type: 'item_spawned',
@@ -296,7 +333,8 @@ describe('verb: harvest', () => {
     })
     expect(out.state.crops.crop_1).toBeUndefined()
     expect(out.state.items.item_2!.qty).toBe(3)
-    expect(applyAll(s, out.events, FAST, s.tick)).toEqual(out.state)
+    // Every change came through an event: the clock is the one thing the ticks moved on their own.
+    expect(applyAll(s, out.events, FAST, s.tick)).toEqual({ ...out.state, tick: s.tick })
   })
 
   it('a plot beside water yields more, and the same crop out in the dry yields the plain number', () => {
@@ -311,8 +349,7 @@ describe('verb: harvest', () => {
       const r = submitIntent(s, FAST, 'a1', 'harvest', { cropId: 'crop_1' })
       if (!r.ok) throw new Error(r.reason)
       s = applyAll(s, r.events)
-      s = fold(s, ev('tick_advanced', {}, s.tick + 1), FAST)
-      const out = createWorldTick(FAST, new RngStreams('t'))(s)
+      const out = runAct(s, FAST)
       const spawned = out.events.find((e) => e.type === 'item_spawned')!
       return (spawned.payload as { qty: number }).qty
     }
@@ -320,28 +357,42 @@ describe('verb: harvest', () => {
     expect(harvestQty(['.#~', '...'])).toBe(4)
     expect(harvestQty(['.#.', '...'])).toBe(3)
   })
+
+  it('the second of two reapers over one plot completes as nothing, and the tick still folds', () => {
+    let s = twoAtOnePlot()
+    for (const id of ['a1', 'a2']) {
+      const r = submitIntent(s, FAST, id, 'harvest', { cropId: 'crop_1' })
+      if (!r.ok) throw new Error(r.reason)
+      s = applyAll(s, r.events)
+    }
+    const out = runAct(s, FAST)
+    expect(out.events.filter((e) => e.type === 'crop_harvested')).toHaveLength(1)
+    expect(out.events.filter((e) => e.type === 'item_spawned')).toHaveLength(1)
+    expect(out.events).toContainEqual({
+      type: 'action_completed',
+      payload: { agentId: 'a2', verb: 'harvest' },
+    })
+    expect(out.state.crops).toEqual({})
+    expect(out.state.agents.a2!.activity).toBeNull()
+  })
 })
 
 describe('verb: dig_channel', () => {
-  it('cuts a channel beside water in four ticks', () => {
+  it('cuts a channel beside water in an hour of digging', () => {
     let s = atTick(makeWorld(['.~.', '...']), NOON)
     const r = submitIntent(s, FAST, 'a1', 'dig_channel', { x: 1, y: 1 })
     if (!r.ok) throw new Error(r.reason)
     expect(r.events[0]).toEqual({
       type: 'action_started',
-      payload: { agentId: 'a1', verb: 'dig_channel', params: { x: 1, y: 1 }, duration: 4 },
+      payload: {
+        agentId: 'a1',
+        verb: 'dig_channel',
+        params: { x: 1, y: 1 },
+        duration: DURATION_TICKS.hour,
+      },
     })
     s = applyAll(s, r.events)
-    let out = createWorldTick(
-      FAST,
-      new RngStreams('t'),
-    )(fold(s, ev('tick_advanced', {}, s.tick + 1), FAST))
-    for (let i = 0; i < 3; i++) {
-      out = createWorldTick(
-        FAST,
-        new RngStreams('t'),
-      )(fold(out.state, ev('tick_advanced', {}, out.state.tick + 1), FAST))
-    }
+    const out = runAct(s, FAST)
     expect(out.events).toContainEqual({
       type: 'tile_changed',
       payload: { x: 1, y: 1, from: 0, to: 10, reason: 'channel', byId: 'a1' },

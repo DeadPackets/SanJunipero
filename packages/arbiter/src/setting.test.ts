@@ -36,10 +36,10 @@ describe('CANON — contemporary rural', () => {
     expect(CANON).toMatch(/nothing arrives from outside/i)
   })
 
-  it('keeps the adjacency rule verbatim — the engine of the arbiter and the codifier', () => {
-    expect(CANON).toContain(
-      'each new craft must be reached from one the town already practices, one careful step at a time',
-    )
+  // The codex grows as it is climbed now, so the one hard line is the valley's rim, not the ladder.
+  it('keeps exactly one hard line: nothing arrives from outside', () => {
+    expect(CANON).not.toContain('one careful step at a time')
+    expect(CANON).toMatch(/nothing arrives from outside/i)
   })
 
   it('carries not one word of the wrong century', () => {

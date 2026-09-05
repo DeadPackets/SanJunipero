@@ -11,3 +11,17 @@ section of a spec addendum under [superpowers/specs](superpowers/specs). The pla
 those codes were written against are under [superpowers/](superpowers); the rulings themselves
 are not in the tree. A comment is written to stand without its code — if one does not, the code
 is not the fix.
+
+# The town's own words
+
+These four are what a relationship is made of, in the words the paper and the stage use for it.
+None of them is an ops word, and none of them names a table.
+
+- **ask** — one person naming `court`, `propose` or `lie_with` at another. It is an offer and
+  not a fact: the other answers it in their own time, or never.
+- **invitation** — an ask that is standing. It reaches the viewer as a scene of its own, and it
+  lapses if nobody answers it.
+- **partner** — the two people a `partnership_formed` names. It is the nearest claim two people
+  can have on each other short of blood, and either of them may end it.
+- **part** — the end of a partnership, by one of the two. The record keeps the partnership; the
+  pair fall back to whatever else they are to each other, and may take each other up again.

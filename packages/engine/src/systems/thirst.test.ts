@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { SimConfigSchema, stateHash, thirstDecayPerTick, type SimConfig } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DURATION_TICKS,
+  SimConfigSchema,
+  stateHash,
+  thirstDecayPerTick,
+  type SimConfig,
+} from '@sj/shared'
 import { fold } from '../fold.js'
 import { composePerception } from '../perception.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, thirstOf, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
-import { ev, needChanges, roundTrips } from '../testutil/world.js'
+import { ev, needChanges, roundTrips, runAct } from '../testutil/world.js'
 
 const quiet = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const CFG: SimConfig = SimConfigSchema.parse(quiet)
@@ -24,7 +31,7 @@ function map(): TileId[][] {
 function body(config = CFG, x = 3, y = 4): WorldState {
   return fold(
     genesisState(config, map()),
-    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: 7300 }),
+    ev('agent_spawned', { id: 'a1', name: 'a1', x, y, ageDays: ADULT_AGE_DAYS }),
     config,
   )
 }
@@ -52,8 +59,8 @@ describe('thirst: absent means full', () => {
     expect(composePerception(clean, CFG, 'a1', []).self.body.thirst).toBe(100)
   })
 
-  it('decays at 0.6x the hunger rate, per tick, and not at all when the world says so', () => {
-    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * 0.6)
+  it('decays at 0.4x the hunger rate, per tick, and not at all when the world says so', () => {
+    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * 0.4)
     expect(thirsts(tickOnce(body()))).toEqual([-DECAY])
     expect(tickOnce(body()).state.agents.a1!.thirst).toBe(100 - DECAY)
     expect(thirsts(tickOnce(body(OFF), OFF))).toEqual([])
@@ -95,7 +102,7 @@ describe('drink: four ways to answer it', () => {
     if (!r.ok) throw new Error(r.reason)
     let out = s
     for (const e of r.events) out = fold(out, ev(e.type, e.payload, s.tick), CFG)
-    return tickOnce(out)
+    return runAct(out, CFG)
   }
   const skin = (s: WorldState, charges: number) =>
     fold(
@@ -110,13 +117,13 @@ describe('drink: four ways to answer it', () => {
       CFG,
     )
 
-  it('is a Tier-1 verb that takes one tick', () => {
+  it('is a Tier-1 verb, and a sip of water is a moment', () => {
     const r = submitIntent(parch(body(), 10), CFG, 'a1', 'drink', {})
     expect(r.ok).toBe(true)
     if (r.ok)
       expect(r.events[0]).toEqual({
         type: 'action_started',
-        payload: { agentId: 'a1', verb: 'drink', params: {}, duration: 1 },
+        payload: { agentId: 'a1', verb: 'drink', params: {}, duration: DURATION_TICKS.moment },
       })
   })
 
@@ -126,7 +133,9 @@ describe('drink: four ways to answer it', () => {
       type: 'agent_drank',
       payload: { agentId: 'a1', source: 'water_tile' },
     })
-    expect(pond.state.agents.a1!.thirst).toBe(10 + CFG.thirst.drinkRestore - DECAY)
+    expect(pond.state.agents.a1!.thirst).toBe(
+      10 + CFG.thirst.drinkRestore - DURATION_TICKS.moment * DECAY,
+    )
 
     const channel = drank(parch(body(CFG, 5, 6), 10))
     expect(channel.events).toContainEqual({
@@ -164,7 +173,9 @@ describe('drink: four ways to answer it', () => {
       payload: { agentId: 'a1', source: 'item', itemId: 'item_1' },
     })
     expect(r.state.items.item_1!.charges).toBe(1)
-    expect(r.state.agents.a1!.thirst).toBe(10 + CFG.thirst.drinkRestore - DECAY)
+    expect(r.state.agents.a1!.thirst).toBe(
+      10 + CFG.thirst.drinkRestore - DURATION_TICKS.moment * DECAY,
+    )
 
     const empty = submitIntent(skin(parch(body(CFG, 1, 1), 10), 0), CFG, 'a1', 'drink', {
       itemId: 'item_1',

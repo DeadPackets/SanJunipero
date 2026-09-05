@@ -1,4 +1,4 @@
-import { simTimeFromTick, tickToMoment } from '@sj/shared'
+import { simTimeFromTick, tickToMoment, weekdayFromTick } from '@sj/shared'
 
 export const momentStamp = (tick: number): string => {
   const m = tickToMoment(tick)
@@ -10,7 +10,7 @@ export const momentStamp = (tick: number): string => {
 export function dateline(tick: number): { day: string; time: string } {
   const m = tickToMoment(tick)
   return {
-    day: `DAY ${m.day} · ${simTimeFromTick(tick).season.toUpperCase()}`,
+    day: `${weekdayFromTick(tick).toUpperCase()} · DAY ${m.day} · ${simTimeFromTick(tick).season.toUpperCase()}`,
     time: m.time,
   }
 }

@@ -104,6 +104,12 @@ export const CHANGE_EMPTY = 'Nothing about them has changed yet — they have on
 // ── the Character tab, re-framed as WHAT MOVED ─────────────────────────────────────────────
 
 export type PersonalityRow = { version: number; day: number; doc: string; edit: string }
+
+/** One parser for `/api/agent/<id>/personality`: the reader cache is keyed on the URL, so two
+ *  parsers for one document means whichever page mounted first decides what a bad body means. */
+export const personalityRows = (body: unknown): PersonalityRow[] | null =>
+  Array.isArray(body) ? (body as PersonalityRow[]) : null
+
 export type ChangeEntry = { version: number; day: number; edit: string; diff: DiffLine[] }
 
 /**

@@ -1,32 +1,8 @@
 import type { SimConfig } from '@sj/shared'
 import type { Item, WorldState } from '../state.js'
 import { words } from './build.js'
-import { bodyAt, nearestWater, VERBS } from './index.js'
-
-type CandidateSource = (state: WorldState, agentId: string) => string[]
-
-function heldItemIds(state: WorldState, agentId: string): string[] {
-  return Object.keys(state.items).filter((id) => {
-    const loc = state.items[id]!.loc
-    return loc.t === 'agent' && loc.id === agentId
-  })
-}
-
-// A mind that names the verb and leaves its object blank has still chosen the act (K20). Where
-// the world offers exactly one thing that verb would accept, reading it in beats refusing it.
-const OBJECT_PARAM: Record<string, { key: string; candidates: CandidateSource }> = {
-  eat: { key: 'itemId', candidates: heldItemIds },
-  drink: { key: 'itemId', candidates: heldItemIds },
-  drop: { key: 'itemId', candidates: heldItemIds },
-  wear: { key: 'itemId', candidates: heldItemIds },
-  kindle: { key: 'itemId', candidates: heldItemIds },
-  snuff: { key: 'itemId', candidates: heldItemIds },
-  fill: { key: 'itemId', candidates: heldItemIds },
-  read: { key: 'itemId', candidates: heldItemIds },
-  stow: { key: 'itemId', candidates: heldItemIds },
-  take: { key: 'itemId', candidates: (state) => Object.keys(state.items).sort() },
-  enter: { key: 'structureId', candidates: (state) => Object.keys(state.structures) },
-}
+import { asRead, bodyAt, nearestWater, VERBS } from './index.js'
+import { objectBindingFor } from './objectParam.js'
 
 function isBlank(raw: unknown): boolean {
   return raw === null || raw === undefined || (typeof raw === 'string' && raw.trim().length === 0)
@@ -54,7 +30,7 @@ export function markUnderAnotherKey(
   const { [from]: mark, ...rest } = params
   const fits = MARK_KEYS.filter((k) => k !== from)
     .map((k) => ({ ...rest, [k]: mark }))
-    .filter((p) => def.validate(state, config, agentId, p) === null)
+    .filter((p) => def.validate(state, config, agentId, asRead(def, p)) === null)
   return fits.length === 1 ? fits[0]! : null
 }
 
@@ -68,7 +44,7 @@ export function loneCandidateFor(
   verb: string,
   params: Record<string, unknown>,
 ): Record<string, unknown> | null {
-  const spec = OBJECT_PARAM[verb]
+  const spec = objectBindingFor(verb)
   const fits = readingsOf(state, config, agentId, verb, params)
   if (spec === undefined || fits.length !== 1) return null
   return { ...params, [spec.key]: fits[0] }
@@ -82,7 +58,7 @@ function readingsOf(
   verb: string,
   params: Record<string, unknown>,
 ): string[] {
-  const spec = OBJECT_PARAM[verb]
+  const spec = objectBindingFor(verb)
   const def = VERBS[verb]
   if (spec === undefined || def === undefined) return []
   if (state.agents[agentId] === undefined || !isBlank(params[spec.key])) return []
@@ -90,6 +66,42 @@ function readingsOf(
     .candidates(state, agentId)
     .sort()
     .filter((id) => def.validate(state, config, agentId, { ...params, [spec.key]: id }) === null)
+}
+
+// A name the world does not hold. Whatever a verb answers to it is that verb's words for "that
+// is not the sort of thing I take", and a real mark answered the same way is no reading either.
+const NO_SUCH_MARK = 'no_such_mark'
+
+/** What is actually in the way, when the act left its object blank and nothing fit: every
+ *  candidate is put to the verb, and one shared reason for the refusals is the answer to send. */
+export function soleObstacle(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  verb: string,
+  params: Record<string, unknown>,
+): string | null {
+  const spec = objectBindingFor(verb)
+  const def = VERBS[verb]
+  if (spec === undefined || def === undefined) return null
+  if (state.agents[agentId] === undefined || !isBlank(params[spec.key])) return null
+  const unnamed = def.validate(state, config, agentId, params)
+  const unknown = def.validate(state, config, agentId, { ...params, [spec.key]: NO_SUCH_MARK })
+  // Naming anything at all left the same answer: this refusal was never about the missing name.
+  if (unnamed === null || unnamed === unknown) return null
+  const marks = spec.candidates(state, agentId)
+  // Nothing the act could have named: what is absent is the answer, not a word to write. An act
+  // that parses as it stands was refused by the world — `drink` at a dry bank says so already.
+  const askedForTheName = def.params?.safeParse(params).success !== true
+  if (marks.length === 0) return askedForTheName ? unknown : null
+  const standing = new Set<string>()
+  for (const id of marks) {
+    const why = def.validate(state, config, agentId, { ...params, [spec.key]: id })
+    // Something fits: this act has a reading, and the readings above answer it, not this.
+    if (why === null) return null
+    if (why !== unnamed && why !== unknown) standing.add(why)
+  }
+  return standing.size === 1 ? [...standing][0]! : null
 }
 
 const nameOf = (state: WorldState, id: string): string => {
@@ -178,16 +190,20 @@ export function readAsPerson(
   verb: string,
   params: Record<string, unknown>,
 ): { params: Record<string, unknown> } | { refusal: string } | null {
+  const def = VERBS[verb]
   const p = withoutBlanks(params)
+  // A mark filed under a word this verb does not read is still a mark the mind named, so that
+  // one reading gets the whole answer; the rest are asked of the act as the verb reads it.
+  const only = def === undefined ? p : asRead(def, p)
   // What the mind named outranks what the world would have guessed: the id it gave is right
   // 152 times in 154, and only a mark that fits nowhere falls through to the readings below.
   const read =
     markUnderAnotherKey(state, config, agentId, verb, p) ??
-    kindNamedAsMark(state, config, agentId, verb, p) ??
-    waterNamedWrong(state, config, agentId, verb, p) ??
-    loneCandidateFor(state, config, agentId, verb, p)
+    kindNamedAsMark(state, config, agentId, verb, only) ??
+    waterNamedWrong(state, config, agentId, verb, only) ??
+    loneCandidateFor(state, config, agentId, verb, only)
   if (read !== null) return { params: read }
-  const asked = ambiguity(state, config, agentId, verb, p)
+  const asked = ambiguity(state, config, agentId, verb, only)
   if (asked !== null) return { refusal: asked }
   return Object.keys(p).length === Object.keys(params).length ? null : { params: p }
 }

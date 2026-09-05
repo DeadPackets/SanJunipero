@@ -199,7 +199,9 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
   router.route('GET', '/assets/placeholder/:file', (_req, res, params) => {
     const klass = stripPng(params.file ?? '')
     const size =
-      klass !== null && klass in PLACEHOLDER_PX ? PLACEHOLDER_PX[klass as AssetClass] : undefined
+      klass !== null && Object.hasOwn(PLACEHOLDER_PX, klass)
+        ? PLACEHOLDER_PX[klass as AssetClass]
+        : undefined
     if (!size) {
       notFound(res)
       return

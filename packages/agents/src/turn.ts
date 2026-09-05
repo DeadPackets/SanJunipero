@@ -1,6 +1,12 @@
 import { z } from 'zod'
-import { MINUTES_PER_DAY, type DayPhase } from '@sj/shared'
-import { IntentParamsSchema } from '@sj/engine/verbs'
+import {
+  ClosedIntentParams,
+  Intent as ClosedIntentSchema,
+  MINUTES_PER_DAY,
+  namedParams,
+  PLAN_MAX_STEPS,
+  type DayPhase,
+} from '@sj/shared'
 
 // An hour of the day is a plan for today; a day and a phase is an appointment. Without the
 // second shape nothing can be arranged in advance, only remembered or improvised.
@@ -10,14 +16,23 @@ const ReconsiderAtSchema = z.union([
 ])
 export type ReconsiderAt = z.infer<typeof ReconsiderAtSchema>
 
+// The act as the runtime holds it: the same closed grammar with the keys it never asked for
+// already taken off, which is the shape each verb's own `validate` reads.
 export const IntentSchema = z
   .object({
-    verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
-    params: IntentParamsSchema.default({}).describe(
-      'Exactly what the act asks for, named by its keys.',
-    ),
+    verb: ClosedIntentSchema.shape.verb,
+    params: ClosedIntentParams.partial()
+      .default({})
+      .describe('Exactly what the act asks for, named by its keys.'),
   })
   .strict()
+const FreeformSchema = z
+  .object({ freeform: z.string().min(1).describe('What you are trying to do, in your own words.') })
+  .strict()
+const ACT_NOW =
+  'One act you start now: its exact word as verb with what it asks as params, or freeform for a try at something new.'
+const A_PLAN =
+  'Up to twelve acts your body does one after another while you stop thinking about it.'
 // Every optional field takes null as well as absence, and not via `.transform()`, which
 // `z.toJSONSchema(..., { io: 'output' })` refuses to represent. Readers treat both alike.
 export const TurnSchema = z
@@ -26,49 +41,35 @@ export const TurnSchema = z
       .string()
       .min(1)
       .describe(
-        'What passes through your mind this moment. Yours alone; no one else ever hears it.',
+        'What is going through your head this moment, in one or two sentences. Yours alone; nobody else ever hears it.',
       ),
     speech: z
       .string()
       .min(1)
       .nullish()
-      .describe('Words you say aloud. Anyone within earshot hears them.'),
-    action: z
-      .union([
-        IntentSchema,
-        z
-          .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
-          .strict(),
-      ])
-      .nullish()
-      .describe(
-        'One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new.',
-      ),
-    plan: z
-      .array(IntentSchema)
-      .max(12)
-      .nullish()
-      .describe('Up to twelve acts your body carries out one after another while your mind rests.'),
+      .describe('Words you say out loud. Anyone close enough hears them.'),
+    action: z.union([IntentSchema, FreeformSchema]).nullish().describe(ACT_NOW),
+    plan: z.array(IntentSchema).max(PLAN_MAX_STEPS).nullish().describe(A_PLAN),
     journal: z
       .string()
       .min(1)
       .nullish()
-      .describe('Words you set down in your own book. Writing takes part of the hour.'),
+      .describe('Words you write in your own book. Writing takes part of the hour.'),
     recall: z
       .string()
       .min(1)
       .nullish()
       .describe(
-        'Something out of your own past to cast your mind back to. Casting back fills the whole moment: you do nothing else with it, and what comes back reaches you a moment later.',
+        'Something from your own past to think back to. Thinking back takes the whole moment: you do nothing else with it, and what comes back reaches you a moment later.',
       ),
     importance: z
       .number()
       .int()
       .min(1)
       .max(10)
-      .describe('How deeply this moment matters to you, one through ten.'),
+      .describe('How much this moment matters to you, one to ten.'),
     reconsider_at: ReconsiderAtSchema.nullish().describe(
-      'When you mean to return to your thoughts: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.',
+      'When you mean to think again: a clock time today such as 08:30, or a day and a part of that day such as {"day": 12, "phase": "dusk"}. The parts of a day are day, dusk and night.',
     ),
   })
   .strict()
@@ -76,16 +77,120 @@ export const TurnSchema = z
 // { verb: 'wait' } out loud. Measures whether banning the shrug creates real acts or renames it.
 export const TurnSchemaActionRequired = TurnSchema.extend({
   action: z
-    .union([
-      IntentSchema,
-      z
-        .object({ freeform: z.string().min(1).describe('What you attempt, in your own words.') })
-        .strict(),
-    ])
-    .describe(
-      "One act you begin now: its exact word as verb with what it asks as params, or freeform for a try at something new. If you truly do nothing this turn, answer { verb: 'wait', params: {} }.",
-    ),
+    .union([IntentSchema, FreeformSchema])
+    .describe(`${ACT_NOW} If you truly do nothing this turn, answer { verb: 'wait', params: {} }.`),
 })
+
+// ★ ONE OBJECT, NOT A CHOICE OF TWO. A grammar-constrained back end handles a union of object
+// shapes worst of everything a schema can hold, and this was one of the two the turn had. The
+// keys are the same keys; `fromClosed` puts the answer back into the shape the world reads.
+const StrictActionSchema = z
+  .object({
+    verb: ClosedIntentSchema.shape.verb
+      .nullable()
+      .describe(
+        'The exact word of the act, such as walk or eat. Null only when no word on the list fits and you are saying it in your own words instead.',
+      ),
+    params: ClosedIntentParams.describe(
+      'Exactly what the act asks for, named by its keys; every other key is null.',
+    ),
+    freeform: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe(
+        'What you are trying to do, in your own words, when no word on the list fits. Null whenever you named a verb.',
+      ),
+  })
+  .strict()
+
+// ★ The other one, and the turn's only regex with it: a clock time and an appointment are now
+// three keys of one object rather than a string held to a shape or an object.
+const StrictReconsiderAt = z
+  .object({
+    time: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe('A clock time today, written as 08:30. Null when you mean another day.'),
+    day: z
+      .number()
+      .int()
+      .positive()
+      .nullable()
+      .describe('The day you mean, when it is not today. Null when you named a time.'),
+    phase: z
+      .enum(['day', 'dusk', 'night'])
+      .nullable()
+      .describe('Which part of that day: day, dusk or night. Null when you named a time.'),
+  })
+  .strict()
+
+// The turn every mind is asked for: no key left out, no key it has never heard of. Absence is
+// written as null, and `fromClosed` below takes it back out for the world.
+export const StrictTurnSchema = TurnSchemaActionRequired.required().extend({
+  action: StrictActionSchema.describe(
+    `${ACT_NOW} If you truly do nothing this turn, answer verb 'wait' and no params.`,
+  ),
+  plan: z.array(ClosedIntentSchema).max(PLAN_MAX_STEPS).nullable().describe(A_PLAN),
+  reconsider_at: StrictReconsiderAt.nullable().describe(
+    'When you mean to think again: a clock time today such as 08:30, or a day and a part of that day. The parts of a day are day, dusk and night.',
+  ),
+})
+
+/** The turn's own field names. A mind reaches for these as verbs — four of the phase 1 gate's
+ *  seven paid rulings were `plan` named as an act — and the runtime turns them away as the
+ *  no-op they are. Read off the schema, so a field added there cannot leave this stale. */
+export const TURN_FIELDS: ReadonlySet<string> = new Set(Object.keys(StrictTurnSchema.shape))
+
+const askedFor = (step: unknown): unknown => {
+  if (step === null || typeof step !== 'object') return step
+  const { params, ...rest } = step as { params?: unknown }
+  if (params === null || typeof params !== 'object') return step
+  return { ...rest, params: namedParams(params as Record<string, unknown>) }
+}
+
+const said = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0
+
+/** The flat act read back as the one the world takes: a named verb wins over words in the
+ *  margin, and an act that named neither is the null the runtime has always understood. An
+ *  answer in the older two-shape dialect has no `freeform` key and comes through untouched. */
+const oneAct = (raw: unknown): unknown => {
+  if (raw === null || typeof raw !== 'object' || !('freeform' in raw)) return askedFor(raw)
+  const { freeform, ...named } = raw as { freeform?: unknown; verb?: unknown }
+  if (said(named.verb)) return askedFor(named)
+  return said(freeform) ? { freeform } : null
+}
+
+// A decoder no longer holds the clock to a shape, so the one loose form a mind writes is read
+// here rather than costing a whole second turn.
+const CLOCK = /^(\d{1,2}):(\d{2})$/
+
+/** The flat "when" read back as the one shape or the other. */
+const whenAgain = (raw: unknown): unknown => {
+  if (raw === null || typeof raw !== 'object' || !('time' in raw)) return raw
+  const { time, day, phase } = raw as { time?: unknown; day?: unknown; phase?: unknown }
+  if (said(time)) {
+    const hhmm = CLOCK.exec(time.trim())
+    return hhmm === null ? time : `${hhmm[1]!.padStart(2, '0')}:${hhmm[2]!}`
+  }
+  return typeof day === 'number' && said(phase) ? { day, phase } : null
+}
+
+// With `namedParams` on a map verdict, the only place a closed answer's nulls come off: each
+// verb's `validate` parses a `.strict()` schema of its own keys, which a null-filled one fails.
+export function fromClosed(raw: unknown): unknown {
+  if (raw === null || typeof raw !== 'object') return raw
+  const turn = { ...raw } as { action?: unknown; plan?: unknown; reconsider_at?: unknown }
+  if ('action' in turn) turn.action = oneAct(turn.action)
+  if (Array.isArray(turn.plan)) turn.plan = turn.plan.map(askedFor)
+  if ('reconsider_at' in turn) turn.reconsider_at = whenAgain(turn.reconsider_at)
+  return turn
+}
+
+/** A mind's answer, in the closed dialect it was asked for, read as the turn the runtime knows. */
+export const readMindTurn = (raw: unknown): z.ZodSafeParseResult<Turn> =>
+  TurnSchemaActionRequired.safeParse(fromClosed(raw))
 
 export type Turn = z.infer<typeof TurnSchema>
 
@@ -96,7 +201,22 @@ export const FALLBACK_TURN: Turn = {
 
 // The acts that ask for nothing of their own. A verb minted at runtime is one too: the arbiter
 // only ever hands those over with nothing in them.
-const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'exit', 'doff', 'drink', 'forage'])
+const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'stop', 'exit', 'doff', 'drink', 'forage'])
+
+/** Words for standing still. The registry has none of them and the runtime reads every one as a
+ *  quiet beat, so asking a mind again to fill one in buys a call for an act with nowhere to go. */
+export const BODY_NOOPS: ReadonlySet<string> = new Set([
+  'stand',
+  'sit',
+  'wait',
+  'rest',
+  'look',
+  'think',
+  'none',
+  'nothing',
+  'pause',
+  'stay',
+])
 
 // A try at something new carries no verb of its own, so neither reader below can speak for it.
 const namedAct = (turn: Turn): z.infer<typeof IntentSchema> | null => {
@@ -118,11 +238,15 @@ export const waitIsRest = (turn: Turn): Turn => {
   return { ...rested, plan: kept.length > 0 ? kept : null }
 }
 
-/** The verb this turn began with nothing named, or null when the act carries its detail. */
+/** The verb this turn began with nothing named, or null when the act carries its detail. A
+ *  field of the turn named as a verb is dropped as the no-op it is, so asking again for a
+ *  detail it never had would buy a call for an act that cannot reach the world. */
 export function actWithoutItsDetail(turn: Turn): string | null {
   const action = namedAct(turn)
   if (action === null) return null
-  if (ACTS_ASKING_NOTHING.has(action.verb) || action.verb.includes(':')) return null
+  if (ACTS_ASKING_NOTHING.has(action.verb) || TURN_FIELDS.has(action.verb)) return null
+  if (BODY_NOOPS.has(action.verb)) return null
+  if (action.verb.includes(':')) return null
   return Object.values(action.params).every(isBlankAnswer) ? action.verb : null
 }
 
@@ -152,9 +276,9 @@ export async function parseTurnWithRepair(
   alert: (kind: string, detail: string) => void,
   hasOneReading?: ActHasOneReading,
 ): Promise<Turn> {
-  const first = TurnSchemaActionRequired.safeParse(raw)
+  const first = readMindTurn(raw)
   if (!first.success) {
-    const second = TurnSchemaActionRequired.safeParse(await repair(z.prettifyError(first.error)))
+    const second = readMindTurn(await repair(z.prettifyError(first.error)))
     if (second.success) return waitIsRest(second.data)
     alert('turn_fallback', z.prettifyError(second.error))
     return FALLBACK_TURN
@@ -170,7 +294,7 @@ export async function parseTurnWithRepair(
     alert('act_detail_filled_in', `${empty} has one candidate and was read as that`)
     return rested
   }
-  const again = TurnSchemaActionRequired.safeParse(
+  const again = readMindTurn(
     await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
   )
   if (again.success) {

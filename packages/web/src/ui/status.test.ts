@@ -8,6 +8,7 @@ import { GAMIFICATION_BAN } from './townStats.js'
 import { RosterListView } from '../paper/pages/RosterList.js'
 import { rosterRows2 } from './roster/rosterRow.js'
 import type { WorldState } from '@sj/engine/state'
+import { DAYS_PER_YEAR } from '@sj/shared'
 import {
   BANNED_STATUS_LITERALS,
   CONDITIONS,
@@ -20,6 +21,7 @@ import {
   TALK_RECENT_TICKS,
   conditionsOf,
   drivesOf,
+  stateLine,
   stateWord,
   statusLiteralOffenders,
   statusOf,
@@ -83,7 +85,7 @@ describe('the duplicate, as a test', () => {
           y: 3,
           alive: true,
           asleep: true,
-          ageDays: 35 * 364,
+          ageDays: 35 * DAYS_PER_YEAR,
           needs: { hunger: 80, energy: 40, warmth: 80, social: 80 },
           hp: 100,
           injuries: [],
@@ -157,12 +159,33 @@ describe('STATES — one state per person, and the array IS the priority', () =>
     expect(statusOf(body({ alive: false, lastSpokeTick: 500 }), 501)).toBe('gone')
   })
 
+  // A body is still for half an hour at a stretch now. The word alone reads as a stuck body,
+  // so anywhere with room for a sentence says how long there is left of it.
+  it('the line says the act and how far there is to go, and drops the number when there is none', () => {
+    expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 40 } }))).toBe(
+      'Fishing — 40 min to go',
+    )
+    expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 0 } }))).toBe('Fishing')
+    expect(stateLine(body({ activity: { verb: 'fish' } }))).toBe('Fishing')
+    expect(stateLine(body())).toBe('Between things')
+    // The state still rules the word: a sleeper is asleep however long the clock says.
+    expect(stateLine(body({ asleep: true, activity: { verb: 'fish', ticksRemaining: 9 } }))).toBe(
+      'Asleep — 9 min to go',
+    )
+  })
+
   it('the working word is the verb’s own gerund, and the others keep theirs', () => {
     expect(stateWord(body({ activity: { verb: 'build' } }))).toBe('Building')
     expect(stateWord(body({ activity: { verb: 'tend' } }))).toBe('Tending')
     expect(stateWord(body({ activity: { verb: 'make' } }))).toBe('Making') // the t7 gerund rule
     expect(stateWord(body({ activity: { verb: 'walk' } }))).toBe('Walking')
     expect(stateWord(body())).toBe('Between things')
+  })
+
+  it('a slug is spent before it is said, so no separator reaches the word', () => {
+    expect(stateWord(body({ activity: { verb: 'dig_channel' } }))).toBe('Digging channel')
+    expect(stateWord(body({ activity: { verb: 'recipe:plank' } }))).toBe('Making plank')
+    expect(stateWord(body({ activity: { verb: 'express:mourn' } }))).toBe('Mourning')
   })
 })
 
@@ -286,5 +309,27 @@ describe('statusLiteralOffenders — the synonym bug cannot come back', () => {
     expect(statusLiteralOffenders([{ path: 'y.ts', source: "'resting' + 'awake'" }])).toEqual([
       'y.ts',
     ])
+  })
+})
+
+describe('the roster’s two closing lines', () => {
+  const html = (gone: number, left: number): string =>
+    renderToStaticMarkup(
+      createElement(RosterListView, {
+        rows: [],
+        gone,
+        left,
+        sort: 'name' as const,
+        openId: null,
+        onSort: () => {},
+        onToggle: () => {},
+      }),
+    )
+
+  it('counts the dead and the departed apart, and prints neither line for nobody', () => {
+    expect(html(2, 1)).toContain('2 rest in the town’s memory.')
+    expect(html(2, 1)).toContain('One went down the valley road.')
+    expect(html(0, 3)).toContain('3 went down the valley road.')
+    expect(html(0, 0)).not.toMatch(/memory|valley road/)
   })
 })

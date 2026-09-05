@@ -26,6 +26,8 @@ export type RulebookRow = {
   tick: number
   revertedAtTick: number | null
   revertedReason: string | null
+  // The last tick a body began this act; the minting tick until then.
+  lastUsedTick: number
 }
 
 type RawRulebookRow = {
@@ -38,6 +40,7 @@ type RawRulebookRow = {
   tick: number
   reverted_at_tick: number | null
   reverted_reason: string | null
+  last_used_tick: number | null
 }
 
 function toRulebookRow(r: RawRulebookRow): RulebookRow {
@@ -51,6 +54,7 @@ function toRulebookRow(r: RawRulebookRow): RulebookRow {
     tick: r.tick,
     revertedAtTick: r.reverted_at_tick,
     revertedReason: r.reverted_reason,
+    lastUsedTick: r.last_used_tick ?? r.tick,
   }
 }
 
@@ -64,8 +68,8 @@ export class RulebookStore {
   insert(recipe: RulebookEntry, tick: number): number {
     const res = this.db
       .prepare(
-        `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick, last_used_tick)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         recipe.id,
@@ -73,6 +77,7 @@ export class RulebookStore {
         normalizeIntent(recipe.name),
         JSON.stringify(recipe),
         recipe.id,
+        tick,
         tick,
       )
     return Number(res.lastInsertRowid)
@@ -96,7 +101,7 @@ export class RulebookStore {
     this.db
       .prepare(
         `UPDATE rulebook SET reverted_at_tick = NULL, reverted_reason = NULL,
-           name = ?, normalized_name = ?, recipe_json = ?, verb = ?, tick = ?
+           name = ?, normalized_name = ?, recipe_json = ?, verb = ?, tick = ?, last_used_tick = ?
          WHERE recipe_id = ?`,
       )
       .run(
@@ -105,8 +110,24 @@ export class RulebookStore {
         JSON.stringify(recipe),
         recipe.id,
         tick,
+        tick,
         recipe.id,
       )
+  }
+
+  touch(verb: string, tick: number): void {
+    this.db.prepare('UPDATE rulebook SET last_used_tick = ? WHERE verb = ?').run(tick, verb)
+  }
+
+  // Active rows nobody has used since `beforeTick`, minting counted as a use.
+  unusedSince(beforeTick: number): RulebookRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM rulebook WHERE reverted_at_tick IS NULL
+           AND COALESCE(last_used_tick, tick) < ? ORDER BY id`,
+      )
+      .all(beforeTick) as RawRulebookRow[]
+    return rows.map(toRulebookRow)
   }
 
   allActive(): RulebookRow[] {

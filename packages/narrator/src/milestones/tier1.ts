@@ -12,6 +12,10 @@ const one =
     const v = p(ev)[key]
     return typeof v === 'string' ? [v] : []
   }
+const pair =
+  (first: string, second: string) =>
+  (ev: SimEvent): string[] =>
+    [p(ev)[first], p(ev)[second]].filter((v): v is string => typeof v === 'string').sort()
 
 // The closed vocabulary of ways to die, and the sentence the town would use for each. Mirrors
 // the engine's DEATH_CAUSES; the guard test holds the two together.
@@ -126,7 +130,14 @@ export const TIER1_DEFS: MilestoneDef[] = [
     match: (ev) => ev.type === 'agent_recovered',
     agentIds: one('agentId'),
   },
-  { kind: 'first_law', label: 'the first law', tier: 1, domain: 'engine', match: () => false }, // emitted from rulebookCount
+  {
+    kind: 'first_law',
+    label: 'the first law',
+    tier: 1,
+    domain: 'engine',
+    match: (ev) => ev.type === 'law_ratified',
+    agentIds: one('agentId'),
+  },
 
   // C11's deep world, in the same shape.
   {
@@ -260,6 +271,22 @@ export const TIER1_DEFS: MilestoneDef[] = [
     agentIds: one('id'),
   },
   {
+    kind: 'first_arrival',
+    label: 'the first stranger to come up the valley road',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'agent_arrived',
+    agentIds: one('id'),
+  },
+  {
+    kind: 'first_leaving',
+    label: 'the first to go down the valley road for good',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'agent_departed',
+    agentIds: one('agentId'),
+  },
+  {
     kind: 'first_grave',
     label: 'the first stone set for the dead',
     tier: 1,
@@ -287,6 +314,40 @@ export const TIER1_DEFS: MilestoneDef[] = [
     tier: 1,
     domain: 'engine',
     match: (ev) => simTimeFromTick(ev.tick).year >= 1,
+  },
+  // The four relationship firsts. Social, not engine: each is a thing two people chose, and
+  // the log carries both of them by name.
+  {
+    kind: 'first_courtship',
+    label: 'the first asking to walk out together',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'invited' && verbOf(ev) === 'court',
+    agentIds: pair('agentId', 'byId'),
+  },
+  {
+    kind: 'first_proposal_refused',
+    label: 'the first offer of a life together turned down',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'invitation_refused' && verbOf(ev) === 'propose',
+    agentIds: pair('agentId', 'byId'),
+  },
+  {
+    kind: 'first_wedding',
+    label: 'the first two who chose each other',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'partnership_formed',
+    agentIds: pair('aId', 'bId'),
+  },
+  {
+    kind: 'first_breakup',
+    label: 'the first parting',
+    tier: 1,
+    domain: 'social',
+    match: (ev) => ev.type === 'partnership_dissolved',
+    agentIds: pair('aId', 'bId'),
   },
   ...deathDefs,
   ...populationDefs,

@@ -44,7 +44,8 @@ const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
       onClose: () => {},
       onSubject: () => {},
       onInside: () => {},
-      onJump: () => {},
+      onScrub: () => {},
+      onPlay: () => {},
       onLive: () => {},
       onMoment: () => {},
       ...over,
@@ -108,7 +109,8 @@ describe('the signpost', () => {
     const css = src('../ui/chrome.css')
     // The corner cluster is one block now: the thoughts switch stands on the same slab.
     // Anchored: the same pair heads the `forced-colors` list, indented, further up the sheet.
-    const body = /^\.help-button, \.thoughts-button \{([^}]*)\}/m.exec(css)?.[1] ?? ''
+    const body =
+      /^\.help-button, \.thoughts-button(?:, \.sound-button)? \{([^}]*)\}/m.exec(css)?.[1] ?? ''
     expect(body).toContain('width: 44px')
     expect(body).toContain('height: 44px')
     expect(body).toMatch(/left: max\(var\(--mark-inset\), env\(safe-area-inset-/)
@@ -125,6 +127,14 @@ describe('the signpost', () => {
     // ...and the id it names is the one the sheet actually carries
     expect(keyMap).toContain(`id={KEY_MAP_ID}`)
     expect(KEY_MAP_ID).toBe('key-map-sheet')
+  })
+
+  // React may re-invoke a pending updater, and Safari allows 100 history writes per 30 s: an
+  // address written from inside one is written more times than the viewer navigated.
+  it('★ writes the address bar outside the state updater, never inside it', () => {
+    const app = src('../App.tsx')
+    expect(app).not.toMatch(/setRoute\(\([\s\S]{0,200}?writeAddress/)
+    expect(app.match(/writeAddress\(/g)).toHaveLength(3) // the definition and its two callers
   })
 
   it('★ is what the app mounts, with the arm’s wiring kept', () => {
@@ -376,6 +386,8 @@ describe('★ every page that can be quiet can also be out of reach', () => {
     './pages/Chronicle.tsx',
     './pages/Moments.tsx',
     './pages/BondsGraph.tsx',
+    './pages/Person.tsx',
+    './pages/Building.tsx',
   ]
 
   it.each(PAGES)('%s branches on the read failing, and offers it again', (page) => {
@@ -390,6 +402,24 @@ describe('★ every page that can be quiet can also be out of reach', () => {
   it('never swaps the copy while there is still an answer to show', () => {
     expect(src('./pages/Moments.tsx')).toContain('read.failed && moments === null')
     expect(src('./pages/Chronicle.tsx')).toContain('entries.length === 0 && record.failed')
+  })
+})
+
+// An operator can press Set and shut the sheet in the same breath, and the paper unmounts its
+// body on close: an answer held in the body is an answer nobody ever reads.
+describe('★ the operator’s answer outlives the page it was asked from', () => {
+  it('is the paper’s state, and the page only hands it over', () => {
+    const paper = src('./Paper.tsx')
+    expect(paper).toContain('useState<PaperNotice | null>(null)')
+    expect(paper).toContain('className="laws-notice"')
+    expect(paper).toContain('onNotice={setNotice}')
+  })
+
+  it('is written by both operator write paths and held by neither', () => {
+    const laws = src('./pages/Laws.tsx')
+    expect(laws, 'the page keeps no answer of its own').not.toContain('setNotice')
+    expect(laws).toContain('onNotice({')
+    expect(laws).toContain('<ExportLink token={operatorToken} onNotice={refused} />')
   })
 })
 

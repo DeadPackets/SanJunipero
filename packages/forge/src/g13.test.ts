@@ -149,7 +149,7 @@ describe('G13a.3 — the city template', () => {
       expect(t.anchor.x + x.dx).toBeLessThan(WORLD_SIZE_GENESIS)
       expect(t.anchor.y + x.dy).toBeLessThan(WORLD_SIZE_GENESIS)
     }
-    expect(t.structures).toHaveLength(11)
+    expect(t.structures).toHaveLength(13)
   })
 
   // The town has to WORK: every door must be walkable-to from the square.

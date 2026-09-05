@@ -7,7 +7,7 @@ export type HubSocket = {
 }
 export const OPEN = 1
 
-type Member = { sock: HubSocket; onResync: () => string; lagging: boolean }
+type Member = { sock: HubSocket; onResync: () => string; lagging: boolean; muted: boolean }
 
 /** What the hub says out loud. Injectable so a test can read the sentence instead of stderr. */
 export type HubReport = (line: string) => void
@@ -27,11 +27,17 @@ export class SocketHub {
   }
 
   add(sock: HubSocket, onResync: () => string): () => void {
-    const m: Member = { sock, onResync, lagging: false }
+    const m: Member = { sock, onResync, lagging: false, muted: false }
     this.#members.add(m)
     return () => {
       this.#members.delete(m)
     }
+  }
+
+  /** A viewer watching the past is somewhere else in time: a live delta folded onto it throws and
+   *  freezes the town. Muted it is still counted, still resyncable — it is just not sent to. */
+  setMuted(sock: HubSocket, muted: boolean): void {
+    for (const m of this.#members) if (m.sock === sock) m.muted = muted
   }
 
   broadcast(json: string): void {
@@ -40,6 +46,7 @@ export class SocketHub {
         this.#members.delete(m)
         continue
       }
+      if (m.muted) continue
       if (!m.lagging) {
         if (m.sock.bufferedAmount > MAX_BUFFERED) {
           m.lagging = true // deltas are droppable: resync replaces them
@@ -56,7 +63,7 @@ export class SocketHub {
    *  cannot already contain the deltas that follow it — refolding those freezes the client. */
   resyncDrained(): void {
     for (const m of this.#members) {
-      if (!m.lagging || m.sock.readyState !== OPEN) continue
+      if (m.muted || !m.lagging || m.sock.readyState !== OPEN) continue
       if (m.sock.bufferedAmount >= RESUME_BELOW) continue
       m.sock.send(m.onResync())
       m.lagging = false

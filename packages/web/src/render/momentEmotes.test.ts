@@ -1,0 +1,246 @@
+import { readFileSync } from 'node:fs'
+import { describe, expect, it, vi } from 'vitest'
+import { Container, Texture } from 'pixi.js'
+import type { SimEvent } from '@sj/shared'
+import { InvitationAccepted, InvitationRefused, Invited, PartnershipFormed } from '@sj/engine'
+import type { WorldStore } from '../state/worldStore.js'
+import type { Scene } from './scene.js'
+import type { TextureBook } from './textures.js'
+import { CUE_TYPES, bodiesOf } from '../ui/stageCue.js'
+import { CHAR_TARGET_PX, EMOTE_KINDS } from './charAnim.js'
+import { SLOT_ABOVE_HEAD_PX, SLOT_PX } from './overhead.js'
+import {
+  MOMENT_EMOTE,
+  MOMENT_EMOTE_ABOVE_PX,
+  MOMENT_EMOTE_FADE_MS,
+  BODILESS_MOMENTS,
+  MOMENT_EMOTE_MS,
+  MOMENT_EMOTE_RISE_MS,
+  MOMENT_EMOTE_RISE_PX,
+  createMomentEmotes,
+  emoteRise,
+  momentEmote,
+  type MomentEmoteLayer,
+} from './momentEmotes.js'
+
+const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
+
+const ev = (type: string, payload: Record<string, unknown>): SimEvent => ({
+  seq: 1,
+  tick: 1,
+  type,
+  payload,
+})
+
+// ★ Nothing on the stage marked an achievement. A house finishing bounced; a person working out
+// how to smoke a fish, or two people becoming a pair, passed in silence.
+describe('★ a pixel rises off the head of whoever it happened to', () => {
+  it('★ wears the right glyph for what happened', () => {
+    expect(momentEmote('partnership_formed')).toBe('heart')
+    expect(momentEmote('partnership_dissolved')).toBe('anger') // the crack
+    expect(momentEmote('co_slept'), 'a shared roof is not a moment').toBe(null)
+    expect(momentEmote('discovery_made')).toBe('idea') // the lit bulb
+    expect(momentEmote('law_ratified')).toBe('idea')
+    expect(momentEmote('law_repealed')).toBe('exclaim') // the ember mark
+    expect(momentEmote('agent_moved')).toBe(null)
+  })
+
+  it('★ asks the atlas only for cells it actually has', () => {
+    for (const [type, kind] of Object.entries(MOMENT_EMOTE)) {
+      expect(EMOTE_KINDS, type).toContain(kind)
+    }
+  })
+
+  it('★ spawns one per involved body', () => {
+    expect(bodiesOf(ev('partnership_formed', { aId: 'amara', bId: 'yusuf' }))).toEqual([
+      'amara',
+      'yusuf',
+    ])
+    expect(bodiesOf(ev('discovery_made', { byId: 'omar' }))).toEqual(['omar'])
+  })
+
+  it('says something for every moment the cue slot prints ABOUT A PERSON', () => {
+    for (const type of CUE_TYPES) {
+      if (BODILESS_MOMENTS.has(type)) continue
+      expect(momentEmote(type), type).not.toBe(null)
+    }
+  })
+
+  it('★ and the exception is named, not silent: a finished building has nobody to rise off', () => {
+    expect([...BODILESS_MOMENTS]).toEqual(['structure_completed'])
+    for (const type of BODILESS_MOMENTS) expect(momentEmote(type), type).toBe(null)
+  })
+})
+
+describe('★ it rises, then fades, and is gone at 1.8 s', () => {
+  it('★ is gone after MOMENT_EMOTE_MS', () => {
+    expect(MOMENT_EMOTE_MS).toBe(1800)
+    expect(emoteRise(MOMENT_EMOTE_MS - 1)).not.toBe(null)
+    expect(emoteRise(MOMENT_EMOTE_MS)).toBe(null)
+    expect(emoteRise(MOMENT_EMOTE_MS + 500)).toBe(null)
+    expect(emoteRise(-1)).toBe(null)
+  })
+
+  it('★ climbs on an ease-out — most of the way in the first half of the rise', () => {
+    expect(emoteRise(0)?.dy).toBe(-0)
+    const half = emoteRise(MOMENT_EMOTE_RISE_MS / 2)!.dy
+    expect(half).toBeLessThan(-MOMENT_EMOTE_RISE_PX / 2) // past halfway at half the time
+    expect(emoteRise(MOMENT_EMOTE_RISE_MS)?.dy).toBeCloseTo(-MOMENT_EMOTE_RISE_PX)
+    // ...and it has settled by the time the fade starts, so nothing fades while still moving
+    expect(emoteRise(MOMENT_EMOTE_MS - MOMENT_EMOTE_FADE_MS)?.dy).toBeCloseTo(-MOMENT_EMOTE_RISE_PX)
+    let last = 1
+    for (let t = 0; t < MOMENT_EMOTE_MS; t += 13) {
+      const dy = emoteRise(t)!.dy
+      expect(dy).toBeLessThanOrEqual(last)
+      last = dy
+    }
+  })
+
+  it('★ fades over the last 600ms and is whole before that', () => {
+    expect(MOMENT_EMOTE_FADE_MS).toBe(600)
+    expect(emoteRise(0)?.alpha).toBe(1)
+    expect(emoteRise(MOMENT_EMOTE_MS - MOMENT_EMOTE_FADE_MS)?.alpha).toBe(1)
+    expect(emoteRise(MOMENT_EMOTE_MS - MOMENT_EMOTE_FADE_MS / 2)?.alpha).toBeCloseTo(0.5)
+    expect(emoteRise(MOMENT_EMOTE_MS - 1)?.alpha).toBeCloseTo(0, 2)
+  })
+
+  it('★ starts clear of the overhead slot, so the two marks can never composite', () => {
+    // the slot's own top edge, measured off the slot rather than transcribed
+    expect(MOMENT_EMOTE_ABOVE_PX).toBeGreaterThan(CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX)
+  })
+})
+
+// The layer, driven the way the ticker drives it. No canvas stub: this draws sprites, never text.
+describe('★ the layer puts one sprite over each body, and takes them away again', () => {
+  const amara: { x: number; y: number; alive: boolean; insideId?: string } = {
+    x: 0,
+    y: 0,
+    alive: true,
+  }
+
+  function harness(): {
+    emit: (ev: SimEvent) => void
+    layer: MomentEmoteLayer
+    sprites: () => Container[]
+    goIndoors: () => void
+  } {
+    amara.x = 0
+    amara.y = 0
+    amara.alive = true
+    delete amara.insideId
+    const overlay = new Container()
+    let handler: (evts: SimEvent[]) => void = () => {}
+    const scene = {
+      layers: { overlay },
+      textScale: 1,
+      getZoom: () => 1,
+      anchorOf: () => ({ x: 0, y: 0 }),
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ agents: { amara: { ...amara }, yusuf: { x: 1, y: 0, alive: true } } }),
+      onEvents: (fn: (evts: SimEvent[]) => void) => {
+        handler = fn
+        return () => {}
+      },
+    } as unknown as WorldStore
+    const book = { get: () => Promise.resolve(Texture.EMPTY) } as unknown as TextureBook
+    const layer = createMomentEmotes(scene, store, book)
+    // the layer parents its marks under one node of its own
+    return {
+      emit: (e) => {
+        handler([e])
+      },
+      layer,
+      sprites: () => overlay.children[0]!.children,
+      goIndoors: () => {
+        amara.insideId = 'smithy'
+      },
+    }
+  }
+
+  it('★ spawns one per involved body, and both are gone after MOMENT_EMOTE_MS', async () => {
+    const h = harness()
+    await Promise.resolve() // the atlas lands on a microtask
+    const at = performance.now()
+    // The mark is born on the clock inside `emit`; under load that is not `at` any more.
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(at)
+    h.emit(ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })))
+    clock.mockRestore()
+    expect(h.sprites()).toHaveLength(2)
+
+    h.layer.tick(at + MOMENT_EMOTE_MS - 1)
+    expect(h.sprites(), 'still standing a millisecond short').toHaveLength(2)
+    h.layer.tick(at + MOMENT_EMOTE_MS + 1)
+    expect(h.sprites()).toHaveLength(0)
+  })
+
+  it('★ takes a mark off a body that has gone indoors — it is not on the map to mark', async () => {
+    const h = harness()
+    await Promise.resolve()
+    const at = performance.now()
+    h.emit(ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })))
+    expect(h.sprites()).toHaveLength(2)
+
+    h.goIndoors()
+    h.layer.tick(at + 1)
+    expect(h.sprites(), "amara's mark floated over the smithy's roof").toHaveLength(1)
+  })
+
+  it('spawns nothing for a moment that wears no glyph', async () => {
+    const h = harness()
+    await Promise.resolve()
+    h.emit(ev('agent_moved', { id: 'amara', x: 1, y: 1 }))
+    expect(h.sprites()).toHaveLength(0)
+  })
+
+  // Every payload is the engine's own schema, parsed: a fixture that drifts fails here.
+  it('★ marks the one who was asked, and the one who was turned down, and nobody else', async () => {
+    const h = harness()
+    await Promise.resolve()
+    h.emit(ev('invited', Invited.parse({ agentId: 'amara', byId: 'yusuf', verb: 'court' })))
+    expect(h.sprites(), 'the question rises off the one who must answer').toHaveLength(1)
+
+    const h2 = harness()
+    await Promise.resolve()
+    h2.emit(
+      ev(
+        'invitation_refused',
+        InvitationRefused.parse({
+          agentId: 'amara',
+          byId: 'yusuf',
+          verb: 'propose',
+          witnesses: ['omar'],
+        }),
+      ),
+    )
+    expect(h2.sprites(), 'the rain falls on the one who asked').toHaveLength(1)
+
+    const h3 = harness()
+    await Promise.resolve()
+    h3.emit(
+      ev(
+        'invitation_accepted',
+        InvitationAccepted.parse({ agentId: 'amara', byId: 'yusuf', verb: 'court' }),
+      ),
+    )
+    expect(h3.sprites(), 'a yes belongs to both of them').toHaveLength(2)
+  })
+})
+
+// ★ Progress belongs under the word it is about, not on an arch over the head.
+describe('★ the act chip carries the progress, and the head carries none', () => {
+  const OVERHEAD = src('./overhead.ts')
+
+  it('★ no progress blocks remain in the overhead layer', () => {
+    for (const gone of ['TRACK_BLOCKS', 'blockCentres', 'trackFilled', 'setTrack', 'BLOCK_PX']) {
+      expect(OVERHEAD, gone).not.toContain(gone)
+    }
+    expect(src('./characters.ts')).not.toContain('setTrack')
+  })
+
+  it('★ the chip gains a one-pixel honey bar under its word', () => {
+    const ACTS = src('./acts.ts')
+    expect(ACTS).toContain('ACT_BAR_PX')
+    expect(ACTS).toContain('barWidth(')
+  })
+})

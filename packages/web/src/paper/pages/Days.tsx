@@ -5,6 +5,7 @@ import {
   MARK_GLYPH_PX,
   MARK_GLYPH_SCALE,
   coalesceMarks,
+  gridDays,
   markLeft,
   markWindow,
   marksFrom,
@@ -13,6 +14,7 @@ import {
   type MarkSources,
 } from '../../ui/timelineMarks.js'
 import { milestonesFeed } from '../../ui/feeds.js'
+import { pointPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { useFrameCoalesced } from '../../ui/onFrame.js'
 import type { PageProps } from './types.js'
@@ -72,6 +74,7 @@ function DayStripView({
   marks,
   marksDown,
   onScrub,
+  onMark,
   onLive,
 }: {
   edge: number
@@ -80,6 +83,7 @@ function DayStripView({
   marks: readonly Mark[]
   marksDown: boolean
   onScrub: (tick: number) => void
+  onMark: (mark: Mark) => void
   onLive: () => void
 }) {
   const span = Math.max(1, edge)
@@ -120,12 +124,11 @@ function DayStripView({
     }
   }
 
-  const gridDays = Array.from({ length: Math.floor(span / MINUTES_PER_DAY) + 1 }, (_, d) => d)
-
   return (
     <div className="day-strip" role="group" aria-label="The days the town has lived">
       <p className="sheet-note">
-        Drag the strip to replay a day. The stamp reads REPLAY until you come back to now.
+        Drag the strip to hold a minute still, or pick a mark to watch it. The stamp reads REPLAY
+        until you come back to now.
       </p>
       {/* The strip scrubs without its marks, so this is a note beside a working control rather
           than a page-wide refusal — but a bare strip must not read as a town with no days. */}
@@ -144,9 +147,9 @@ function DayStripView({
               className="mark"
               data-kind={mk.kind}
               style={{ left: markLeft(mk.tick, span) }}
-              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
+              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Watch this moment.`}
               onClick={() => {
-                onScrub(mk.tick)
+                onMark(mk)
               }}
             >
               <MarkGlyph mark={mk} />
@@ -176,7 +179,7 @@ function DayStripView({
           if (e.buttons === 1) drag(e.clientX)
         }}
       >
-        {gridDays.map((d) => (
+        {gridDays(span).map((d) => (
           <span
             key={d}
             className="day-tick"
@@ -200,7 +203,7 @@ function DayStripView({
   )
 }
 
-export function Days({ store, onJump, onLive }: PageProps) {
+export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
@@ -226,7 +229,10 @@ export function Days({ store, onJump, onLive }: PageProps) {
       marks={marks}
       marksDown={marksRead.failed && marksRead.data === null}
       onScrub={(tick) => {
-        onJump(Math.max(0, Math.min(edge, Math.round(tick))))
+        onScrub(Math.max(0, Math.min(edge, Math.round(tick))))
+      }}
+      onMark={(mk) => {
+        onPlay(pointPlay(mk.tick, edge, mk.words))
       }}
       onLive={onLive}
     />

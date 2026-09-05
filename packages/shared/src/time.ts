@@ -1,15 +1,41 @@
 export const TICK_REAL_MS = 2000
 export const MINUTES_PER_DAY = 1440
-export const DAYS_PER_SEASON = 91
-export const DAYS_PER_YEAR = 364
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]
+// A year is four weeks: a life a viewer can watch to its end, and a winter every fourth week.
+export const DAYS_PER_YEAR = 28
+// Derived, never typed: `simTimeFromTick` indexes SEASONS by it, so a year that is not four
+// seasons long is a season the calendar cannot name.
+export const DAYS_PER_SEASON = DAYS_PER_YEAR / SEASONS.length
+export const WEEKDAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+] as const satisfies readonly string[] & { length: typeof DAYS_PER_SEASON }
+export type Weekday = (typeof WEEKDAYS)[number]
+export const WEEKEND: readonly Weekday[] = ['Saturday', 'Sunday']
+
+/** A season is one week long, so every season opens on a Monday and day 1 was a Monday. */
+export function weekdayFromTick(tick: number): Weekday {
+  return WEEKDAYS[Math.floor(tick / MINUTES_PER_DAY) % WEEKDAYS.length]!
+}
+export const isWeekendTick = (tick: number): boolean => WEEKEND.includes(weekdayFromTick(tick))
+
+/** A grown body of no particular age — what a fixture means when it spawns "an adult". Counted,
+ *  never typed: the literal 7 300 that used to say this is an elder on a four-week year. */
+export const ADULT_AGE_DAYS = 30 * DAYS_PER_YEAR
 
 export type DayPhase = 'dawn' | 'day' | 'dusk' | 'night'
 
 export const DAWN_HOUR = 5
 // The hour `SimTime.isNight` turns over on, which is the hour every sleeping mind's night begins.
 const NIGHT_HOUR = 20
+/** The other end of that night: the hour the town gets up, and the hour the sleep card counts to. */
+export const WAKE_HOUR = 6
 
 // The only phase derivation in the codebase. `SimTime.isNight` is the older two-way
 // clock and every landed caller keeps it — the two disagree at dusk on purpose.
@@ -60,6 +86,6 @@ export function simTimeFromTick(tick: number): SimTime {
   const dayOfSeason = (dayOfYear % DAYS_PER_SEASON) + 1
   const hour = Math.floor(minuteOfDay / 60)
   const minute = minuteOfDay % 60
-  const isNight = hour >= NIGHT_HOUR || hour < 6
+  const isNight = hour >= NIGHT_HOUR || hour < WAKE_HOUR
   return { tick, year, season, dayOfSeason, dayOfYear, hour, minute, isNight }
 }

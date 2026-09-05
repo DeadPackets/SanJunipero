@@ -70,7 +70,7 @@ export const BOND_NOTES: Readonly<Record<string, string>> = {
   give: 'gave something away',
   teach: 'taught something',
   attack: 'came to blows',
-  co_slept: 'kept house together',
+  partnership_formed: 'took each other as partners',
   born: 'parent and child',
 }
 
@@ -80,7 +80,7 @@ export const BOND_ACT_OF_KIND: Readonly<Record<BondKind, string>> = {
   friend: 'spoke',
   work: 'teach',
   owe: 'give',
-  partner: 'co_slept',
+  partner: 'partnership_formed',
   kin: 'born',
   rival: 'attack',
 }
@@ -119,6 +119,44 @@ export const BOND_VALENCE: Readonly<Record<BondKind, number>> = {
   partner: 4,
   kin: 0,
   rival: -8,
+}
+
+/** What a tie the minds themselves wrote is worth to a pair. Apart from `BOND_VALENCE` because a
+ *  tie is not one of the six acts the panel names: it moves warmth and joins no act window. */
+export const TIE_ACTS = [
+  'slight',
+  'promise_kept',
+  'promise_broken',
+  'attraction',
+  'kin',
+  'parted',
+] as const
+export type TieAct = (typeof TIE_ACTS)[number]
+
+export const TIE_VALENCE: Readonly<Record<TieAct, number>> = {
+  slight: -3,
+  promise_kept: 3,
+  promise_broken: -6,
+  attraction: 2,
+  kin: 0,
+  parted: -6,
+}
+
+/** Which of those a scene's tie delta is, or null where it says nothing about warmth: a promise
+ *  newly made is neither kept nor broken, and a grudge is a slight that stayed. */
+export function tieActOf(kind: string, settled: boolean): TieAct | null {
+  if (kind === 'promise') return settled ? 'promise_kept' : null
+  if (settled) return null
+  if (kind === 'slight' || kind === 'grudge') return 'slight'
+  if (kind === 'attraction' || kind === 'kin') return kind
+  return null
+}
+
+/** What a tie that nobody ever settled is worth when its clock runs out. A promise left to lapse
+ *  IS a promise broken — the only producer of the strongest negative in the table. Anything else
+ *  weighs nothing: a grudge nobody fed is a grudge forgiven, which is the point of the clock. */
+export function tieActOfLetGo(kind: string): TieAct | null {
+  return kind === 'promise' ? 'promise_broken' : null
 }
 
 /** Silence costs warmth, which is what lets a level fall without anybody doing anything wrong.
@@ -186,6 +224,15 @@ export function bondRollup(bond: Bond, kind: BondKind): BondRollup | null {
 export type BondFold = {
   /** Ticks must not go backwards — the caller reads the log in `seq` order, which is tick order. */
   add(kind: BondKind, tick: number): void
+  /** A tie the minds wrote, weighed into warmth alone. It counts toward no act and names no
+   *  bond kind, so the served window and its ceiling are what they were. */
+  addTie(act: TieAct, tick: number): void
+  /** The partnership ended. Weighs the parting and drops the served kind back to whatever else
+   *  the pair are to each other; a later `add('partner')` takes it up again. */
+  part(tick: number): void
+  /** Move the "as of" the prior half of the reading is measured against. Only forward, and only
+   *  so a fold kept alive across rebuilds answers what a fresh one would. */
+  advanceTo(asOfTick: number): void
   acts(): number
   bond(): Bond
 }
@@ -195,9 +242,12 @@ export type BondFold = {
 export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   const [lo, hi] = [aId, bId].sort() as [string, string]
   const id = bondId(aId, bId)
-  const priorAt = Math.max(0, asOfTick - WARMTH_HALF_LIFE_TICKS)
+  let priorAt = Math.max(0, asOfTick - WARMTH_HALF_LIFE_TICKS)
 
-  let kind: BondKind = 'friend'
+  // Partnership is held apart from the rest because it is the one kind that can be undone:
+  // folding it into `strongerBondKind` made it permanent the first time it landed.
+  let partnered = false
+  let otherKind: BondKind | null = null
   let first = true
   const rolls = new Map<BondKind, { count: number; firstTick: number; lastTick: number }>()
   const recent: BondAct[] = []
@@ -208,6 +258,9 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   let warmth = 0 // running, evaluated at `lastTick`
   let prior = 0 // the same, over acts at or before `priorAt`
   let priorFrom = 0
+  // Acts still newer than `priorAt`, in tick order. They fall into `prior` as it moves forward,
+  // so this holds one half-life of a pair's acts and never the town's whole history.
+  const pending: { w: number; tick: number }[] = []
   // the level as at the end of the last CLOSED tick, and when it last differed
   let closedLevel: BondLevel | null = null
   let levelChangedTick = 0
@@ -221,25 +274,29 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     openTick = -1
   }
 
+  const weigh = (w: number, tick: number): void => {
+    if (first) {
+      formedTick = tick
+      levelChangedTick = tick
+      first = false
+    }
+    if (tick !== openTick) closeTick()
+
+    warmth = decayWarmth(warmth, lastTick, tick) + w
+    lastTick = tick
+    openTick = tick
+
+    if (tick <= priorAt) {
+      prior = decayWarmth(prior, priorFrom, tick) + w
+      priorFrom = tick
+    } else pending.push({ w, tick })
+  }
+
   return {
     add(k, tick) {
-      if (first) {
-        kind = k
-        formedTick = tick
-        levelChangedTick = tick
-        first = false
-      } else kind = strongerBondKind(kind, k)
-
-      if (tick !== openTick) closeTick()
-
-      warmth = decayWarmth(warmth, lastTick, tick) + BOND_VALENCE[k]
-      lastTick = tick
-      openTick = tick
-
-      if (tick <= priorAt) {
-        prior = decayWarmth(prior, priorFrom, tick) + BOND_VALENCE[k]
-        priorFrom = tick
-      }
+      if (k === 'partner') partnered = true
+      else otherKind = otherKind === null ? k : strongerBondKind(otherKind, k)
+      weigh(BOND_VALENCE[k], tick)
 
       const roll = rolls.get(k)
       if (roll === undefined) rolls.set(k, { count: 1, firstTick: tick, lastTick: tick })
@@ -252,6 +309,23 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
       if (recent.length > BOND_RECENT_ACTS) recent.shift()
       count += 1
     },
+    addTie(act, tick) {
+      weigh(TIE_VALENCE[act], tick)
+    },
+    part(tick) {
+      partnered = false
+      weigh(TIE_VALENCE.parted, tick)
+    },
+    advanceTo(at) {
+      const moved = Math.max(0, at - WARMTH_HALF_LIFE_TICKS)
+      if (moved <= priorAt) return
+      priorAt = moved
+      while (pending.length > 0 && pending[0]!.tick <= priorAt) {
+        const a = pending.shift()!
+        prior = decayWarmth(prior, priorFrom, a.tick) + a.w
+        priorFrom = a.tick
+      }
+    },
     acts: () => count,
     bond() {
       closeTick()
@@ -259,7 +333,7 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
         id,
         aId: lo,
         bId: hi,
-        kind,
+        kind: partnered ? 'partner' : (otherKind ?? 'friend'),
         strength: count,
         formedTick,
         lastUpdatedTick: lastTick,

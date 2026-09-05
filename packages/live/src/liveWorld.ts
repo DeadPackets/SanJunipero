@@ -6,8 +6,10 @@ import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
 import {
   ARBITER_DB_FILE,
+  DAYS_PER_YEAR,
   DISCOVERY_EVENT,
   MINUTES_PER_DAY,
+  POPULATION_MAX_DEFAULT,
   REFLECTION_SETTLE_MS,
   type SimEvent,
 } from '@sj/shared'
@@ -22,6 +24,9 @@ import {
   preflightRefusal,
   runPreflight,
   wireBirths,
+  wireArrivals,
+  ensureArrivals,
+  needsArrival,
   resolveCast,
   FOUNDER_MINDS,
   type BootedMinds,
@@ -36,6 +41,7 @@ import {
   MIND_MODEL,
   modelFor,
   PROVIDER_ORDER,
+  alertsSince,
   backfillUnattributed,
   checkActRate,
   checkProviderMix,
@@ -54,9 +60,11 @@ import {
   ReviewStore,
   makeArbiter,
   openArbiterDb,
+  RETIRED_REASON,
   runConstructPass,
+  type Arbiter,
+  type AttemptVerdict,
   type Codified,
-  type Recipe,
 } from '@sj/arbiter'
 import { AssetCodex } from '@sj/forge'
 import {
@@ -68,13 +76,13 @@ import {
   type TranscriptRecord,
 } from '@sj/narrator'
 import { publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
-import { createDiscoveryArt } from './discoveryCommission.js'
+import { createCastArt, createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
  *  48 sim-days pass inside one, so this is the flow, not a lifetime. `SJ_SPEND_DAILY_USD`. */
 const LIVE_SPEND_DAILY_USD = 3
-/** Dollars over the town's whole life; 0 is none. Reaching it KILLS THE PROCESS: a stream that
- *  quietly stops thinking and keeps serving a town of statues is the costliest thing to discover. */
+/** Dollars over the town's whole life; 0 is none. Reaching it stops every mind and leaves the
+ *  town serving: the operator hears it on the ops surface, and the viewer is never dark for it. */
 const LIVE_SPEND_STOP_USD = 50
 const SPEND_DAY_MS = 24 * 60 * 60 * 1000
 /** How often the ledger is read, in world ticks. At the dev world's tick this is every 20 s
@@ -91,6 +99,35 @@ const SEMANTIC_RECORD_CAP = 300
 /** `dozeTicks` is the one `MIND_CONFIG` dial denominated in real seconds — it is an HTTP retry
  *  backoff — so it is the only one this world's 2 500 ms tick may rescale. */
 const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
+
+/** Sim-minutes a mind waits between turns when nothing is happening to it: the one dial that
+ *  trades money for a town worth watching. At the old 30 a mind acted twice an hour, which
+ *  measured as 15.9 idle hours of a 17.3-hour waking day. Every call the town makes scales
+ *  roughly inversely with it. */
+export const DEFAULT_IDLE_GAP_TICKS = 15
+/** The physics a LIVE town runs on, laid down at Day 0 as laws so a replay carries them. The
+ *  defaults suit a scripted world; at 0.01 a meal lasts four days and a log burns eight hours, and
+ *  r13 measured the result: 25 meals and 5 chops in 37 mind-days. Here a meal lasts about eight
+ *  waking hours and a hearth wants feeding twice a night, so food and wood are work again. */
+export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
+  'needs.hungerDecayPerTick': 0.12,
+  'light.fuelBurnTicks': 240,
+}
+
+export function idleGapTicks(env: Record<string, string | undefined> = process.env): number {
+  const raw = Number(env.SJ_IDLE_GAP)
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_IDLE_GAP_TICKS
+}
+/** The detector never joins a gathering to one more than `windowDays` older, so an event past
+ *  that window can no longer make a candidate — held, it is the whole log in memory. One day of
+ *  margin, because the pass runs on the boundary of the day it is closing. */
+export function trimRecognizerWindow(events: SimEvent[], tick: number, windowDays: number): void {
+  const oldest = tick - (windowDays + 1) * MINUTES_PER_DAY
+  let drop = 0
+  while (drop < events.length && events[drop]!.tick < oldest) drop += 1
+  if (drop > 0) events.splice(0, drop)
+}
+
 /** The call ledger and the alerts. A `.db` beside the minds, so `SJ_FRESH=1` takes it too. */
 export const LIVE_OPS_DB = '_ops.db'
 /** Rendered into the adjudication prompt AND enforced against the answer, so a ruling can never
@@ -151,7 +188,12 @@ export type LiveCastOpts = {
   maxMinds?: number
   /** Injected in tests, and handed the SAME ops db the cap is read off — a test whose fake
    *  client bills a different ledger proves nothing about the stop. */
-  makeClient?: (opsDb: Database.Database, caller: string, agentId?: string) => LlmClient
+  makeClient?: (
+    opsDb: Database.Database,
+    caller: string,
+    agentId?: string,
+    audience?: 'mind' | 'ops',
+  ) => LlmClient
   embedder?: { embed(t: string): Promise<Float32Array> }
   /** For a harness that cannot wait out the boredom floor. Absent in every real run. */
   mindConfig?: Partial<MindConfig>
@@ -193,8 +235,9 @@ export async function settle(
 
 /** A per-call cap cannot see a slow leak; this bounds CALLS per unit time, PER MIND. Calls, not
  *  dollars: a failover to a dearer back end is the routing moving, not the town running away.
- *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours); 14 is 3x, per ruling 25. */
-const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 14
+ *  Rehearsal-4 run C measured 4.7 (203 mind calls, 5 minds, 8.6 sim-hours) over the callers the
+ *  monitor then counted; the scene lines it did not are 735 of 1,307 more, so 7.3, and 22 is 3x. */
+const LIVE_CALL_CEILING_PER_MIND_SIM_HOUR = 22
 // A rate needs a span to be a rate: two sim-hours is four real minutes at 1x and a burst of
 // night reflections spread thin enough not to read as a runaway.
 const LIVE_RATE_MIN_SPAN_SIM_HOURS = 2
@@ -204,6 +247,9 @@ const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 /** How often the operator hears a projected burn. Well under every hard stop, so a leak is on
  *  the ops surface with an hour left to look at it. */
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
+/** How long the close may spend asking who served the rows nobody claimed. The container allows
+ *  20 s for the whole shutdown, and the three reports after this one need the rest of it. */
+const STOP_SWEEP_MS = 3_000
 /** How often unattributed rows are asked about. One sweep drains far more than any town
  *  produces in a minute, and the endpoint is never asked twice inside one. */
 const LIVE_BACKFILL_REAL_SECONDS = 60
@@ -211,10 +257,6 @@ const LIVE_BACKFILL_REAL_SECONDS = 60
 /** The pinned provider is an ALLOW-LIST for every mind-facing call, not a preference: a routing
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
-
-/** The population ceiling, as a multiple of the founding cast: nothing else in the world stops
- *  the town growing, and every mind is another live bill. `SJ_MAX_MINDS`. */
-const LIVE_MAX_MINDS_PER_FOUNDER = 3
 
 function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
@@ -244,6 +286,12 @@ function dailyStopMessage(spent: number, budget: number): string {
   ].join('\n')
 }
 
+/** A refusal the ledger raised, not a fault: the minds must not run, and the town must keep
+ *  serving anyway. `serve.ts` boots the scripted cast on this one and refuses on every other. */
+export class MindsHeldError extends Error {
+  override readonly name = 'MindsHeldError'
+}
+
 /** The daily budget refuses a boot too, and BEFORE the pre-flight: a container that restarts on
  *  its own would otherwise pay for a pre-flight on every loop to be told the same thing. */
 export function dailyReachedRefusal(spent: number, budget: number): string {
@@ -269,7 +317,7 @@ export function capReachedRefusal(spent: number, cap: number, agentDbDir: string
 
 export const RATE_STOP_ALERT_KIND = 'rate_stop'
 
-export function rateStopRefusal(detail: string, agentDbDir: string): string {
+function rateStopRefusal(detail: string, agentDbDir: string): string {
   return [
     'stream: could not start — this town was stopped for calling far too often.',
     ...detail.split('\n'),
@@ -345,10 +393,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = Math.max(
-    opts.maxMinds ?? founders.length * LIVE_MAX_MINDS_PER_FOUNDER,
-    founders.length,
-  )
+  // The world's own ceiling is announced from here at attach; this is the runtime's last line.
+  const maxMinds = Math.max(opts.maxMinds ?? POPULATION_MAX_DEFAULT, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -364,36 +410,38 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const priorRateStop = rateStopOnRecord(opsDb)
   if (priorRateStop !== null) {
     opsDb.close()
-    throw new Error(rateStopRefusal(priorRateStop, opts.agentDbDir))
+    throw new MindsHeldError(rateStopRefusal(priorRateStop, opts.agentDbDir))
   }
   const alreadySpent = ledgerTotalUsd(opsDb)
   if (cap > 0 && alreadySpent >= cap) {
     opsDb.close()
-    throw new Error(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
+    throw new MindsHeldError(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
   }
   const today = spentToday()
   if (today >= dailyBudget) {
     opsDb.close()
-    throw new Error(dailyReachedRefusal(today, dailyBudget))
+    throw new MindsHeldError(dailyReachedRefusal(today, dailyBudget))
   }
 
   const openRouterKey = process.env.OPENROUTER_API_KEY ?? ''
 
   /** A row whose answer named no back end books at the ceiling for ever otherwise; asking
    *  OpenRouter who served it is the only way back to a real price. */
+  const unclaimable = new Set<string>()
   const sweepUnattributed = async (): Promise<void> => {
     if (openRouterKey === '') return
-    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey })
+    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey, unclaimable })
     if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
   }
 
-  const makeClient = (caller: string, agentId?: string): LlmClient =>
+  const makeClient = (caller: string, agentId?: string, audience?: 'mind' | 'ops'): LlmClient =>
     opts.makeClient !== undefined
-      ? opts.makeClient(opsDb, caller, agentId)
+      ? opts.makeClient(opsDb, caller, agentId, audience)
       : new LlmClient({
           db: opsDb,
           caller,
           ...(agentId === undefined ? {} : { agentId }),
+          ...(audience === undefined ? {} : { audience }),
           allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
           // The per-caller backstop: it stops one caller running away between two reads of the
           // ledger, which the tick watchdog below cannot see.
@@ -461,11 +509,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
   let stopBirths: (() => void) | null = null
+  let stopArrivals: (() => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
     stopBirths?.()
+    stopArrivals?.()
     booted?.stop()
     bridge?.drain('the moment passes')
   }
@@ -504,6 +554,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
+      // The ceiling as a world law, not a runtime opinion: the engine refuses a conception at
+      // it, and a replay of this log reaches the same town. Announced only when it moved.
+      if (loop.state.laws?.['population.maxMinds'] !== maxMinds)
+        bridge.announce('config_changed', { path: 'population.maxMinds', value: maxMinds })
+      for (const [path, value] of Object.entries(LIVE_PHYSICS)) {
+        if (loop.state.laws?.[path] !== value) bridge.announce('config_changed', { path, value })
+      }
       const restoring = new Map<string, RuntimeSnapshot>()
       for (const m of cast) {
         const row = dbFor(m.id)
@@ -526,51 +583,76 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           log(`stream: no art for ${kind} — ${String(err)}`)
         },
       })
+      // A face for anybody the town makes. Same wallet as the objects, its own day's share.
+      const faces = createCastArt({
+        codex: new AssetCodex(db),
+        opsDb,
+        spendableUsd: () =>
+          Math.min(
+            dailyBudget - spentToday(),
+            cap > 0 ? cap - ledgerTotalUsd(opsDb) : Number.POSITIVE_INFINITY,
+          ),
+        apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
+        ...(process.env.SJ_ART_DAILY_USD === undefined
+          ? {}
+          : { artDailyUsd: Number(process.env.SJ_ART_DAILY_USD) }),
+        onError: (id, err) => {
+          log(`stream: no face for ${id} — ${String(err)}`)
+        },
+      })
 
       // Not built in `createLiveCast`: `makeArbiter` needs the tick and `onCodified` the bridge.
       // `makeClient` points at `opsDb` — an arbiter on its own db spends outside the anomaly stop.
+      const built =
+        arbiterDb === null || opts.arbiter !== undefined
+          ? null
+          : makeArbiter({
+              db: arbiterDb,
+              llm: makeClient('arbiter'),
+              embedder,
+              tick: () => loop.state.tick,
+              vocabulary: STREAM_VOCABULARY,
+              // A codification is a world fact, so it goes in the world's log. The verb is
+              // already minted by the time this runs, so nothing here can fail it.
+              onCodified: (d: Codified) => {
+                bridge?.announce(DISCOVERY_EVENT, {
+                  recipeId: d.recipeId,
+                  name: d.name,
+                  kind: d.kind,
+                  byId: d.credit.agentId,
+                  intent: d.credit.intent,
+                  ...(d.credit.saying ? { saying: d.credit.saying } : {}),
+                  makes: d.makes,
+                })
+                art.onDiscovery({ name: d.name, makes: d.makes })
+              },
+            })
       const arbiter: SeamArbiter | undefined =
         opts.arbiter ??
-        (arbiterDb === null
+        (built === null
           ? undefined
-          : (() => {
-              const built = makeArbiter({
-                db: arbiterDb,
-                llm: makeClient('arbiter'),
-                embedder,
-                tick: () => loop.state.tick,
-                vocabulary: STREAM_VOCABULARY,
-                // A codification is a world fact, so it goes in the world's log. The verb is
-                // already minted by the time this runs, so nothing here can fail it.
-                onCodified: (d: Codified) => {
-                  bridge?.announce(DISCOVERY_EVENT, {
-                    recipeId: d.recipeId,
-                    name: d.name,
-                    kind: d.kind,
-                    byId: d.credit.agentId,
-                    intent: d.credit.intent,
-                    makes: d.makes,
-                  })
-                  art.onDiscovery({ name: d.name, makes: d.makes })
-                },
-              })
-              return {
-                adjudicate: (...args) => built.adjudicate(...args),
-                codify: (recipe: { id: string }, credit) => built.codify(recipe as Recipe, credit),
-              }
-            })())
+          : {
+              adjudicate: (...args) => built.adjudicate(...args),
+              codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
+              roster: () => built.roster(),
+              customs: () => built.customs(),
+              habits: () => built.habits(),
+              frontier: () => built.frontier(),
+              compileLaw: (ask) => built.compileLaw(ask),
+            })
 
       // A child still owed its household comes up the way a live birth does — household
       // first, then the mind — so `ensureChildren` below is what boots it.
       booted = bootMinds({
-        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
+        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id)) && !needsArrival(m, dbFor(m.id))),
         bridge,
         embedder,
         dbFor,
         turnLlm: (id) => makeClient('turn', id),
         reflectionLlm: (id) => makeClient('reflection', id),
         dreamLlm: (id) => makeClient('dream', id),
-        mindConfig: { ...STREAM_MIND_CONFIG, ...opts.mindConfig },
+        sceneClient: (id) => makeClient('scene', id),
+        mindConfig: { ...STREAM_MIND_CONFIG, idleGapTicks: idleGapTicks(), ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
         ...(arbiter === undefined ? {} : { arbiter }),
@@ -606,8 +688,53 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         opsDb,
         namingLlm: makeClient('naming'),
         maxMinds,
+        onPerson: (p) => {
+          faces.onPerson(p)
+        },
         log,
       })
+      // The road's own repair, beside the birth one: a walker whose first memory a crash cut
+      // short is booted here, not left with a mind and no reason to be in the valley.
+      void ensureArrivals({
+        cast: new Map(cast.map((m) => [m.id, m])),
+        store,
+        dbFor,
+        embedder,
+        boot: (spec) => {
+          booted?.add(spec)
+        },
+      }).catch((err: unknown) => {
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'arrival_failed',
+          detail: err instanceof Error ? err.message : String(err),
+        })
+      })
+      stopArrivals = wireArrivals({
+        booted,
+        bridge,
+        store,
+        dbFor,
+        embedder,
+        opsDb,
+        maxMinds,
+        onPerson: (p) => {
+          faces.onPerson(p)
+        },
+        log,
+      })
+      // A face still owed from before a restart. The codex already holds every founder's, so
+      // this asks only after the people the town made.
+      for (const m of cast) {
+        if (m.bornDay === undefined && m.arrivedDay === undefined) continue
+        faces.onPerson({
+          id: m.id,
+          name: m.identity.name,
+          sex: m.sex,
+          ageYears: Math.floor(m.ageDays / DAYS_PER_YEAR),
+          parents: null,
+        })
+      }
       saveRuntime = (tick: number): void => {
         for (const { agentId, snapshot } of booted?.snapshots() ?? []) {
           dbFor(agentId)
@@ -728,11 +855,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           // One at a time: the first pass on a resumed town is the whole log, and a spread
           // that wide overflows the argument stack.
           for (const ev of fresh) recognizerEvents.push(ev)
+          trimRecognizerWindow(recognizerEvents, tick, config.constructs.windowDays)
           void runConstructPass({
             events: recognizerEvents,
             baseConfig: config,
             store: new ConstructStore(arb),
-            llm: makeClient('constructs', 'town'),
+            llm: makeClient('constructs', 'town', 'ops'),
             laws: loop.state.laws,
           })
             .then((constructs) => {
@@ -786,7 +914,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             world: { config, state: loop.state },
             semantic: {
               db: opsDb,
-              llm: makeClient('semantic', 'town'),
+              llm: makeClient('semantic', 'town', 'ops'),
               records: transcriptFor(day, events),
             },
             alert: (d) => {
@@ -809,6 +937,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
       const spendAlertMs = (opts.spendAlertRealMinutes ?? LIVE_SPEND_ALERT_REAL_MINUTES) * 60 * 1000
       let nextSpendAlertAt = Date.now() + spendAlertMs
+      let lastRailAlertId = 0
       const rateWindow = opts.rateWindowRealMinutes ?? LIVE_RATE_WINDOW_REAL_MINUTES
       // One sample a tick, trimmed to the window: the rate is judged over the sim-hours these
       // ticks covered, so a loop slowed by idle pacing or paused is not read as a runaway.
@@ -818,10 +947,25 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       let nextMixCheckAt = Date.now()
       let nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
       let backfilling = false
+      // Minted verbs are used through the world log, which the arbiter cannot read: each day's
+      // acts are handed over, then whatever has gone fourteen days unused is retired.
+      let usedThroughSeq = store.lastSeq()
+      const retireTheDay = (arb: Arbiter, tick: number): void => {
+        for (const ev of store.readTypeFrom(usedThroughSeq, 'action_started')) {
+          const verb = (ev.payload as { verb?: unknown }).verb
+          if (typeof verb === 'string' && verb.includes(':')) arb.noteUsed(verb, ev.tick)
+        }
+        usedThroughSeq = store.lastSeq()
+        const retired = arb.retireUnused(tick)
+        if (retired.length > 0) log(`stream: retired ${retired.join(', ')} — ${RETIRED_REASON}`)
+      }
       bridge.onTick((tick) => {
-        tickHistory.push({ ms: Date.now(), tick })
+        // Not past a stop: the trim below sits behind the spend check, which a stopped town
+        // never reaches, so a sample pushed here would stay for the life of the process.
+        if (!stopped) tickHistory.push({ ms: Date.now(), tick })
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
+          if (built !== null) retireTheDay(built, tick)
           if (arbiterDb !== null) recognizeTheDay(arbiterDb, narratorStore, tick)
           if (narratorStore !== null) writeTheDay(narratorStore, tick)
         }
@@ -834,6 +978,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           if (projected.alerted) {
             log(`stream: spend — projected $${projected.usdPerSimDay.toFixed(2)}/sim-day`)
           }
+        }
+        // A caller that has spent its own day. One line per trip, and the town keeps running:
+        // the rail holds that caller and nobody else.
+        for (const a of alertsSince(opsDb, lastRailAlertId, 'caller_rail_tripped')) {
+          lastRailAlertId = a.id
+          log(`stream: rail — ${a.detail}`)
         }
         // One line per window, never a stop: only the operator can answer a back end that got
         // past the allow-list.
@@ -873,7 +1023,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (today >= dailyBudget) {
           console.error(dailyStopMessage(today, dailyBudget))
           stopMinds()
-          opts.onSpendStop?.(spent, cap)
+          // The day's figures, not the lifetime pair: this is the line that was crossed.
+          opts.onSpendStop?.(today, dailyBudget)
           return
         }
         // The flow, not the total. A leak is visible here four days before it is visible above.
@@ -918,6 +1069,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         REFLECTION_SETTLE_MS,
       )
       if (!settled) log('stream: a night was still being reflected on when the town closed')
+      // A line still with a back end writes to its mind's db when it lands, so it gets the
+      // same wait the last unclaimed prices get, and no longer.
+      if (!(await settle(() => booted?.busy() === true, STOP_SWEEP_MS))) {
+        log('stream: somebody was still mid-sentence when the town closed')
+      }
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try {
@@ -929,8 +1085,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       arbiterDb?.close()
       narratorDb?.close()
       // Before every report, not between them: a row still booked at the ceiling makes both
-      // the provider table and the reconciliation ratio a lie.
-      await sweepUnattributed()
+      // the provider table and the reconciliation ratio a lie. Bounded, because 25 rows at a 10 s
+      // fetch each would sit out the container's whole stop grace and take the reports with it.
+      let sweeping = true
+      void sweepUnattributed()
+        .catch(() => {
+          /* a price nobody answered for is the ceiling, which is where it already sits */
+        })
+        .finally(() => {
+          sweeping = false
+        })
+      if (!(await settle(() => sweeping, STOP_SWEEP_MS))) {
+        log('stream: the last unclaimed prices went unasked — the town closed first')
+      }
       // Each of these says nothing about a run with nothing to say, so a quiet ops surface
       // still means a quiet run.
       for (const row of reportDeadCalls(opsDb)) {

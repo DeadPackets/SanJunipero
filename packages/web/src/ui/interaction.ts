@@ -1,7 +1,7 @@
 import { agentName, kindWords, structureTitle } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { plateRows, type PlateRow } from './plateModel.js'
-import { stateWord } from './status.js'
+import { stateLine } from './status.js'
 
 export type HoverKind = 'agent' | 'structure' | 'item' | 'crop'
 
@@ -49,17 +49,32 @@ function whoIsInside(state: WorldState, structureId: string): string | null {
 // ★ THE FOOTPRINT PLATE'S WORDS — what this is, whose it is, and what is happening. Three lines
 // at most, and a line with nothing to say is not drawn at all. Named apart from
 // charAnim's nameTagText(name), which is the sprite tag itself.
-export function hoverPlate(state: WorldState | null, kind: HoverKind, id: string): PlateRow[] {
+/** `picked` is the viewer's own pick, which already wears a nameplate: the plate drops its kind
+ *  line rather than say a second time what the plate over it is already saying. Only when a NAME
+ *  row is left to lead with — an unnamed shed's kind IS its name, and a heap of bread with the
+ *  kind taken off it is a quantity of nothing. */
+export function hoverPlate(
+  state: WorldState | null,
+  kind: HoverKind,
+  id: string,
+  picked = false,
+): PlateRow[] {
+  const rows = plateFor(state, kind, id)
+  if (!picked || rows[0]?.tone !== 'kind' || !rows.some((r) => r.tone === 'name')) return rows
+  return rows.slice(1)
+}
+
+function plateFor(state: WorldState | null, kind: HoverKind, id: string): PlateRow[] {
   if (state === null) return []
   switch (kind) {
     case 'agent': {
       const a = state.agents[id]
-      // A person's plate is their name and the one word for what they are doing.
+      // A person's plate is their name and what they are doing, with the minutes left in it.
       return a === undefined
         ? []
         : plateRows([
             { text: a.name, tone: 'name' },
-            { text: stateWord(a, state.tick), tone: 'quiet' },
+            { text: stateLine(a, state.tick), tone: 'quiet' },
           ])
     }
     case 'structure': {

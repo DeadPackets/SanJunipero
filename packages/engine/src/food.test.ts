@@ -18,14 +18,7 @@ const CFG = SimConfigSchema.parse({})
 // asserted equal to this same set, so art and appetite cannot name the substance differently.
 describe('the food registry', () => {
   it('names and prices exactly the kinds it registers', () => {
-    for (const kind of [
-      FORAGE_KIND,
-      FISH_KIND,
-      PALE_MUSHROOM,
-      MUSHROOM_KIND,
-      HERB_KIND,
-      STEW_KIND,
-    ])
+    for (const kind of [FORAGE_KIND, FISH_KIND, PALE_MUSHROOM, MUSHROOM_KIND, HERB_KIND, STEW_KIND])
       expect(FOOD_KINDS, kind).toContain(kind)
     expect(new Set(Object.keys(FOOD_NUTRITION))).toEqual(FOOD_KINDS)
   })

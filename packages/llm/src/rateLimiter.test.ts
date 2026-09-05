@@ -38,6 +38,20 @@ function held<T>(): { promise: Promise<T>; settle: (v: T) => void; fail: (e: unk
   return { promise, settle, fail }
 }
 
+// The only way down is crowded: the cap gives ground to a refusal our own calls were part of,
+// and to no other. Returns the release for the call left holding a slot.
+async function drivenToSingleFile(gate: AdaptiveLimiter, from: number): Promise<() => void> {
+  const busy = held<string>()
+  void gate.run(() => busy.promise, 60_000)
+  for (let n = from; n > 1; n = Math.floor(n / 2)) {
+    void gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    await vi.advanceTimersByTimeAsync(2_000)
+  }
+  return () => {
+    busy.settle('done')
+  }
+}
+
 describe('Retry-After, as the provider spelled it', () => {
   it('reads whole seconds', () => {
     expect(retryAfterMs(refused({ 'retry-after': '7' }))).toBe(7_000)
@@ -112,12 +126,29 @@ describe('the cap the refusals set', () => {
 
   // ★ r3: 27-35% of turn attempts and 44-46% of reflection attempts were refused at the door,
   // because nothing in the process knew how many calls the key already had in flight.
-  it('halves the cap on a 429 and holds a cool-down before anyone asks again', async () => {
+  it('halves the cap on a 429 raised while our own calls were in flight', async () => {
+    const gate = new AdaptiveLimiter('pin', 4)
+    const busy = held<string>()
+    void gate.run(() => busy.promise, 60_000)
+    let asks = 0
+    const crowded = gate.run(() => {
+      asks += 1
+      return asks === 1 ? Promise.reject(refused()) : Promise.resolve('ok')
+    }, 60_000)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(await crowded).toBe('ok')
+    expect(gate.state().cap).toBe(2)
+    busy.settle('done')
+  })
+
+  // The gate's own words, three lines up from where it used to halve anyway: a lone caller
+  // refused by a shared pool is not a concurrency fault. One in flight is the least we can send.
+  it('leaves the cap alone for a lone caller, but still holds the cool-down', async () => {
     const gate = new AdaptiveLimiter('pin', 4)
     const alone = gate.run(() => Promise.reject(refused()), 1_000).catch((e: unknown) => e)
     await vi.advanceTimersByTimeAsync(0)
     expect(await alone).toBeInstanceOf(APICallError)
-    expect(gate.state().cap).toBe(2)
+    expect(gate.state().cap, 'nothing above one to give back').toBe(4)
 
     let started = false
     const next = gate.run(() => {
@@ -125,7 +156,7 @@ describe('the cap the refusals set', () => {
       return Promise.resolve('ok')
     }, 10_000)
     await vi.advanceTimersByTimeAsync(1_999)
-    expect(started, 'still inside the cool-down the refusal set').toBe(false)
+    expect(started, 'it paces where it does not throttle').toBe(false)
     await vi.advanceTimersByTimeAsync(1)
     expect(await next).toBe('ok')
   })
@@ -148,22 +179,58 @@ describe('the cap the refusals set', () => {
 
   it('never halves below one', async () => {
     const gate = new AdaptiveLimiter('pin', 4)
+    const busy = held<string>()
+    void gate.run(() => busy.promise, 60_000)
     for (let i = 0; i < 4; i++) {
-      await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+      void gate.run(() => Promise.reject(refused()), 0).catch(() => null)
       await vi.advanceTimersByTimeAsync(2_000)
     }
+    // At one, the held call is the only slot: nothing can be crowded in beside it, and the last
+    // two asks give up unsent rather than halving anything further.
     expect(gate.state().cap).toBe(1)
+    busy.settle('done')
   })
 
   it('buys a slot back after a clean run, up to the ceiling it started at', async () => {
     const gate = new AdaptiveLimiter('pin', 4)
-    await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    const busy = held<string>()
+    void gate.run(() => busy.promise, 60_000)
+    void gate.run(() => Promise.reject(refused()), 0).catch(() => null)
     await vi.advanceTimersByTimeAsync(2_000)
     expect(gate.state().cap).toBe(2)
+    busy.settle('done')
+    await vi.advanceTimersByTimeAsync(0)
     for (let i = 0; i < 5; i++) await gate.run(() => Promise.resolve('ok'), 0)
     expect(gate.state().cap).toBe(3)
     for (let i = 0; i < 20; i++) await gate.run(() => Promise.resolve('ok'), 0)
     expect(gate.state().cap, 'the ceiling is a ceiling').toBe(4)
+  })
+
+  // ★ REHEARSAL 5, 2026-09-03: 25 spells of "one call at a time for 60-72 s" and 501 minds that
+  // dozed without ever reaching the wire, on a day 219 of 261 refusals were the shared pool's.
+  // Each one both halved the cap and cleared the run of clean answers that buys a slot back, so
+  // a raise needed five in a row at an 18% refusal rate — 0.82^5, seven times over, to reach 8.
+  it('climbs back out of single file while a shared pool keeps refusing', async () => {
+    const gate = new AdaptiveLimiter('pin', 8)
+    const busy = held<string>()
+    void gate.run(() => busy.promise, 60_000)
+    for (let i = 0; i < 3; i++) {
+      void gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+      await vi.advanceTimersByTimeAsync(2_000)
+    }
+    expect(gate.state().cap, 'three crowded refusals walk 8 -> 4 -> 2 -> 1').toBe(1)
+    busy.settle('done')
+    await vi.advanceTimersByTimeAsync(0)
+
+    // One ask in five still refuses, as the ledger measured. Single file makes every one of them
+    // a lone caller, so the clean answers between them stand and five of them buy the slot back.
+    for (let i = 0; i < 15; i++) {
+      await gate
+        .run(() => (i % 5 === 4 ? Promise.reject(refused()) : Promise.resolve('ok')), 0)
+        .catch(() => null)
+      await vi.advanceTimersByTimeAsync(2_000)
+    }
+    expect(gate.state().cap, 'the cap was pinned by arithmetic, not by load').toBeGreaterThan(1)
   })
 
   // The whole point of a gate: a refusal our own concurrency caused is worth waiting out, and
@@ -243,31 +310,36 @@ describe('the patience a caller brought', () => {
 describe('the one line the operator gets', () => {
   it('says nothing until the cap has been pinned at one for a whole window', async () => {
     const gate = new AdaptiveLimiter('pin', 2)
-    await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    const release = await drivenToSingleFile(gate, 2)
     expect(gate.state().cap).toBe(1)
     expect(gate.pinnedAlert()).toBeNull()
     await vi.advanceTimersByTimeAsync(60_000)
     expect(gate.pinnedAlert()).toContain('one call at a time')
+    release()
   })
 
   it('says it once, not once per call', async () => {
     const gate = new AdaptiveLimiter('pin', 2)
-    await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    const release = await drivenToSingleFile(gate, 2)
     await vi.advanceTimersByTimeAsync(60_000)
     expect(gate.pinnedAlert()).not.toBeNull()
     expect(gate.pinnedAlert()).toBeNull()
+    release()
   })
 
   it('is armed again by a pin that recovered and then went single-file once more', async () => {
     const gate = new AdaptiveLimiter('pin', 2)
-    await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    const release = await drivenToSingleFile(gate, 2)
     await vi.advanceTimersByTimeAsync(60_000)
     expect(gate.pinnedAlert()).not.toBeNull()
+    release()
+    await vi.advanceTimersByTimeAsync(0)
     for (let i = 0; i < 5; i++) await gate.run(() => Promise.resolve('ok'), 0)
     expect(gate.state().cap).toBe(2)
-    await gate.run(() => Promise.reject(refused()), 0).catch(() => null)
+    const again = await drivenToSingleFile(gate, 2)
     await vi.advanceTimersByTimeAsync(60_000)
     expect(gate.pinnedAlert()).not.toBeNull()
+    again()
   })
 })
 

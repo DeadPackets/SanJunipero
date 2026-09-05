@@ -408,6 +408,7 @@ export type GateFailure = {
     | 'lying'
     | 'lying-axis'
     | 'stance'
+    | 'torso-drift'
   a: string
   b: string
   value: number

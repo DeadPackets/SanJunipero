@@ -8,7 +8,7 @@ import {
   genesisState,
   makeGenesisWorld,
 } from '@sj/engine'
-import { SimConfigSchema } from '@sj/shared'
+import { ADULT_AGE_DAYS, SimConfigSchema } from '@sj/shared'
 import { placesKnownLine } from '../prompt/prose.js'
 import { EngineBridge } from './bridge.js'
 
@@ -35,7 +35,7 @@ function village(): { bridge: EngineBridge; storehouseId: string } {
   // Both bodies stand far enough off that nothing below can be explained by eyesight.
   const far = { x: storehouse.x + 40, y: storehouse.y + 40 }
   for (const id of [FOUNDER, NEWBORN])
-    emit('agent_spawned', { id, name: id, x: far.x, y: far.y, ageDays: 7300 })
+    emit('agent_spawned', { id, name: id, x: far.x, y: far.y, ageDays: ADULT_AGE_DAYS })
   for (const e of foundersKnowTheVillage([FOUNDER], Object.keys(state.structures)))
     emit(e.type, e.payload)
   // Noon: the sight horizon shrinks with the light, and none of this is about eyesight.
@@ -49,7 +49,10 @@ function village(): { bridge: EngineBridge; storehouseId: string } {
     config,
     onTick: () => {},
   })
-  return { bridge: new EngineBridge({ loop, store, simConfig: config }), storehouseId: storehouse.id }
+  return {
+    bridge: new EngineBridge({ loop, store, simConfig: config }),
+    storehouseId: storehouse.id,
+  }
 }
 
 describe('★ the village a founder is born knowing', () => {

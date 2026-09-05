@@ -80,7 +80,7 @@ describe('the sentence a mind reads', () => {
 
   it('says the pot needs a fire and water, because a hungry town will try the pot', () => {
     expect(line).toContain(
-      'stew (1 meat and 1 vegetable, at a fire someone is feeding, ' +
+      'stew (1 meat and 1 vegetable, at a fire someone is keeping fed, ' +
         'with water in something you carry)',
     )
   })
@@ -126,7 +126,7 @@ describe('the road under the makeables list', () => {
 
   it('★ ranks roofs and pots in one list: the cheapest thing overall is a plank, not a post', () => {
     expect(road(quietMeadowPacket, trees)).toBe(
-      'Plank wants 1 wood; the nearest standing tree is at (31, 44).',
+      'Plank needs 1 wood; the nearest standing tree is at (31, 44).',
     )
   })
 
@@ -134,14 +134,14 @@ describe('the road under the makeables list', () => {
     // One wood covers the plank. A lamp post and a torch are both one thing short; builds run
     // first and the comparison is strict, so the post wins and wins again every turn.
     const line = road(holding({ kind: 'wood', qty: 1 }), trees)
-    expect(line).toBe('A lamp post wants 2 wood; the nearest standing tree is at (31, 44).')
+    expect(line).toBe('A lamp post needs 2 wood; the nearest standing tree is at (31, 44).')
     expect(road(holding({ kind: 'wood', qty: 1 }), trees)).toBe(line)
   })
 
   it('climbs to the next want as the hands fill, and says nothing about a place it cannot see', () => {
     // Six wood covers every wooden thing this cheap; the torch is one fiber short, and this
     // world only knows where wood is.
-    expect(road(holding({ kind: 'wood', qty: 6 }), trees)).toBe('Torch wants 1 fiber.')
+    expect(road(holding({ kind: 'wood', qty: 6 }), trees)).toBe('Torch needs 1 fiber.')
   })
 
   it('★ takes the route with fewest things missing, not the first one listed', () => {
@@ -153,19 +153,19 @@ describe('the road under the makeables list', () => {
       },
     )
     expect(line).toBe(
-      'Garment wants 2 hide; the nearest hide lying where it was left is at (9, 9).',
+      'Garment needs 2 hide; the nearest hide lying where it was left is at (9, 9).',
     )
   })
 
   it('★ counts a class input as one thing, and any member of it answers', () => {
     // Nothing meaty in hand: the pot asks for meat by its class name, not for a fish by name.
     expect(road(holding(...larderFull, { kind: 'berries', qty: 1 }), wet)).toBe(
-      'Stew wants 1 meat.',
+      'Stew needs 1 meat.',
     )
     // A fish IS meat, so that want closes and the fire is the next thing short.
     expect(
       road(holding(...larderFull, { kind: 'berries', qty: 1 }, { kind: 'fish', qty: 1 }), wet),
-    ).toBe('Stew wants a fire someone is feeding.')
+    ).toBe('Stew needs a fire someone is feeding.')
   })
 
   it('★ a condition names where it can be met, so it is a road and not just a lack', () => {
@@ -190,18 +190,18 @@ describe('the road under the makeables list', () => {
       },
     }
     expect(road(byTheFire, wet)).toBe(
-      'Stew wants water in something you carry; the nearest water lies at (34, 35).',
+      'Stew needs water in something you carry; the nearest water is at (34, 35).',
     )
   })
 
   it('a stack somebody already put down is named for what it is, not for a source', () => {
     expect(road(quietMeadowPacket, { nearestSource: at('stack', 5, 6) })).toBe(
-      'Plank wants 1 wood; the nearest wood lying where it was left is at (5, 6).',
+      'Plank needs 1 wood; the nearest wood lying where it was left is at (5, 6).',
     )
   })
 
   it('still names the want when nothing in sight answers it — a road, never a refusal', () => {
-    expect(road(quietMeadowPacket, { nearestSource: () => null })).toBe('Plank wants 1 wood.')
+    expect(road(quietMeadowPacket, { nearestSource: () => null })).toBe('Plank needs 1 wood.')
   })
 
   it('stays silent with no world to ask, so a packet from before it reads as it always did', () => {

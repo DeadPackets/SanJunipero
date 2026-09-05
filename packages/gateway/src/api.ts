@@ -1,17 +1,8 @@
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import type { SimConfig, SimEvent } from '@sj/shared'
+import { agentName, type LawRow, type SimConfig, type SimEvent } from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
-import {
-  HEAT_HORIZON_TICKS,
-  HEAT_WINDOW_TICKS,
-  heatContext,
-  heatFromScores,
-  heatSince,
-  scoreEvent,
-  type HeatScores,
-} from './heat.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
 import { notFound, sendJson, toEvent, type EventRow } from './http.js'
 
@@ -21,19 +12,12 @@ export const TALK_WINDOW_TICKS = 20 // two spoke events this close, in earshot �
  *  separator only once routing is done. Refusing the shape — every id is a slug — beats sanitising. */
 export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 
-/** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`.
- *  `heat.ts` reads the seq gaps this filter leaves as the events they were. */
+/** 0.5% of a real log — `needs_changed` alone is 59% of it — served by `idx_events_type`. */
 export const FOLD_TYPES: readonly string[] = [
   'action_completed',
   'action_started',
-  'agent_collapsed',
-  'agent_died',
-  'agent_injured',
   'agent_spoke',
-  'crop_harvested',
-  'fire_ignited',
-  'fire_spread',
-  'item_moved',
+  'law_broken',
   'structure_completed',
   'structure_planned',
 ]
@@ -48,10 +32,9 @@ export type DataApiDeps = {
 }
 
 /** What the read path keeps once an event has been folded. Every field is a count of ANSWERS —
- *  links, drama windows, deaths, buildings — and none of them is a count of events. */
+ *  links, talks, buildings — and none of them is a count of events. */
 export type Footprint = {
   provenance: number
-  heat: number
   links: number
   spokes: number
   started: number
@@ -87,7 +70,9 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   const planned = new Map<string, Planned>()
   const completedTick = new Map<string, number>()
-  const heat: HeatScores = new Map()
+  // How often each law was broken. Not folded state: the engine keeps a breach as a witness
+  // record and nothing more, and only the page ever wants the total.
+  const breaches = new Map<string, number>()
   const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
   // and the started map is keyed by agent and verb, so it is the size of the cast times three.
@@ -100,13 +85,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     weights.set(key, (weights.get(key) ?? 0) + 1)
   }
 
-  // The drama scorer's one piece of world knowledge, and the read path already keeps it: a fire
-  // at a place is scored to the person who raised the place. See `heat.dramatis`.
-  const builderOf = (id: string): string | null => planned.get(id)?.builderId ?? null
-  const heatCtx = heatContext(builderOf)
-
   const foldOne = (ev: SimEvent): void => {
-    scoreEvent(heat, ev, heatCtx)
     switch (ev.type) {
       case 'agent_spoke': {
         const p = ev.payload as { agentId: string; x: number; y: number }
@@ -147,6 +126,11 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
         completedTick.set((ev.payload as { id: string }).id, ev.tick)
         return
       }
+      case 'law_broken': {
+        const id = (ev.payload as { lawId: string }).lawId
+        breaches.set(id, (breaches.get(id) ?? 0) + 1)
+        return
+      }
       default:
     }
   }
@@ -163,19 +147,12 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
       foldOne(toEvent(r))
       foldCursor = r.seq
     }
-    // Only the last sim-day is ever served, and nothing else drops a window: unpruned this is
-    // ~1k keys per sim-day, kept for the life of the process.
-    const floorW = Math.floor((deps.mirror.state().tick - HEAT_HORIZON_TICKS) / HEAT_WINDOW_TICKS)
-    for (const key of heat.keys()) {
-      if (Number(key.slice(0, key.indexOf('\n'))) < floorW) heat.delete(key)
-    }
   }
   // On a resumed town this is the whole log, and it runs on the boot thread rather than on the
   // first stranger's GET — which would be the thread that ticks the town.
   readFold()
   deps.onFootprint?.(() => ({
     provenance: planned.size + completedTick.size,
-    heat: heat.size,
     links: weights.size,
     spokes: spokes.length,
     started: started.size,
@@ -184,19 +161,32 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
   // HELD, not reopened: an open+close per GET on the tick thread throws that file's page cache away.
-  const agentDbs = new Map<string, Database.Database>()
+  // The statements are held with the handle: the four SQL strings are literals in this file, so
+  // the map is bounded, and a re-prepare per GET is ~50-100 us on the thread that ticks the town.
+  const agentDbs = new Map<
+    string,
+    { db: Database.Database; held: Map<string, Database.Statement> }
+  >()
   const readAgentRows = <T>(agentId: string, sql: string): T[] => {
     if (!deps.agentDbDir || !AGENT_ID.test(agentId)) return []
     try {
-      let adb = agentDbs.get(agentId)
-      if (adb === undefined) {
-        adb = new Database(join(deps.agentDbDir, `${agentId}.db`), {
-          readonly: true,
-          fileMustExist: true,
-        })
-        agentDbs.set(agentId, adb)
+      let mind = agentDbs.get(agentId)
+      if (mind === undefined) {
+        mind = {
+          db: new Database(join(deps.agentDbDir, `${agentId}.db`), {
+            readonly: true,
+            fileMustExist: true,
+          }),
+          held: new Map(),
+        }
+        agentDbs.set(agentId, mind)
       }
-      return adb.prepare(sql).all(agentId) as T[]
+      let stmt = mind.held.get(sql)
+      if (stmt === undefined) {
+        stmt = mind.db.prepare(sql)
+        mind.held.set(sql, stmt)
+      }
+      return stmt.all(agentId) as T[]
     } catch {
       return []
     }
@@ -284,20 +274,40 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
     )
   })
 
-  // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
-
-  /** The last sim-day, bounded by population and not by the town's age — `readFold` has already
-   *  dropped every window older than that, so the map IS the answer's own horizon. */
-  router.route('GET', '/api/heat', (_req, res) => {
+  /** Every rule the town has agreed on, standing or let go, newest first. The predicate is
+   *  never served: which verb a sentence compiled to is ours, and `enforced` is the whole of
+   *  what a viewer is owed about it. */
+  router.route('GET', '/api/laws', (_req, res) => {
     readFold()
     sendPrebuilt(
       res,
-      cache.json('heat', () => heatSince(heatFromScores(heat), deps.mirror.state().tick)),
+      cache.json('laws', () => {
+        const state = deps.mirror.state()
+        const laws: LawRow[] = Object.values(state.socialLaws ?? {})
+          // By ordinal, not by tick: two councils can close in the same minute, and the fold's
+          // own order is the only total one.
+          .sort((a, b) => b.ordinal - a.ordinal)
+          .map((law) => ({
+            id: law.id,
+            text: law.text,
+            proposedBy: law.proposedBy,
+            proposerName: agentName(state.agents, law.proposedBy),
+            ratifiedTick: law.ratifiedTick,
+            repealedTick: law.repealedTick,
+            votes: law.votes,
+            why: law.why,
+            enforced: law.predicate.kind !== 'none',
+            breaches: breaches.get(law.id) ?? 0,
+          }))
+        return { laws }
+      }),
     )
   })
 
+  // /api/chapters moved to narratorApi.ts, where it reads C7's real chapters instead of [].
+
   return () => {
-    for (const adb of agentDbs.values()) adb.close()
+    for (const mind of agentDbs.values()) mind.db.close()
     agentDbs.clear()
   }
 }
