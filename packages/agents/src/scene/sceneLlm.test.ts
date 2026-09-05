@@ -513,8 +513,8 @@ describe('the one thing an invitation line has to settle', () => {
   })
 
   it('teaches the ask and the answer in the same breath, every line', () => {
-    expect(block()).toContain('put in "ask"')
-    expect(block()).toContain('answer it in "answer": accept or refuse')
+    expect(block()).toContain('in "ask"')
+    expect(block()).toContain('accept or refuse in "answer"')
     expect(block()).toContain('lie_with')
   })
 })

@@ -80,6 +80,7 @@ const SCENE_TURN = {
   move: 'none',
   stance: null,
   answer: null,
+  ask: null,
   leave: false,
   importance: 5,
 }

@@ -68,7 +68,7 @@ export const SCENE_ANSWER = `This moment is not an act; it is your turn to speak
 
 Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.
 
-To ask the one you speak to for something, put in "ask": court to walk out together, propose to be partners for good, lie_with to lie together under a roof of yours or theirs; leave it empty otherwise. If somebody has asked you such a thing, answer it in "answer": accept or refuse.`
+To ask the one you speak to, put court, propose or lie_with in "ask"; else leave it empty. Asked such a thing yourself, put accept or refuse in "answer".`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what there was to say.',
