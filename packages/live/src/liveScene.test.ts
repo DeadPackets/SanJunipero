@@ -69,7 +69,7 @@ const turnAnswer = (speaking: boolean): unknown => ({
   reconsider_at: null,
   thought: 'Toward the well.',
   importance: 5,
-  action: { verb: 'walk', params: { ...NO_PARAMS, x: WELLSIDE.x, y: WELLSIDE.y } },
+  action: { verb: 'walk', params: { ...NO_PARAMS, x: WELLSIDE.x, y: WELLSIDE.y }, freeform: null },
 })
 
 const SCENE_TURN = {

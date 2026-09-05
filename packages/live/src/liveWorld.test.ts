@@ -185,8 +185,8 @@ const closedTurn = (t: {
   ...t,
   action:
     t.action === undefined
-      ? { verb: 'wait', params: NO_PARAMS }
-      : { verb: t.action.verb, params: { ...NO_PARAMS, ...t.action.params } },
+      ? { verb: 'wait', params: NO_PARAMS, freeform: null }
+      : { verb: t.action.verb, params: { ...NO_PARAMS, ...t.action.params }, freeform: null },
 })
 
 // A verb the grammar has no key for takes its detail through `description`, which is the one
