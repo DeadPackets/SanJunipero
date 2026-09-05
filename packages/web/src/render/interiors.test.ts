@@ -868,3 +868,27 @@ describe('★ leaving a room gives the camera back, not the door', () => {
     expect(push.indexOf('centerOn(')).toBeLessThan(push.indexOf('setZoom'))
   })
 })
+
+// ★ `tick` is on `app.ticker`. Anything it rebuilds unconditionally is rebuilt sixty times a
+// second for as long as the viewer stands in the room.
+describe('★ a room open is not a room redrawn every frame', () => {
+  const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
+  const tick = /const tick = \([\s\S]*?\n  \}/.exec(SRC)![0]
+  const layout = /function layoutRoom\([\s\S]*?\n  \}/.exec(SRC)![0]
+
+  it('★ the veil quad is cut for a screen size, not for a frame', () => {
+    expect(tick, 'the per-frame tick re-tessellates the veil').not.toContain('veil.rect(')
+    expect(tick).toContain('drawVeil()')
+    // the guard that makes it once-per-size, and the only input it has
+    expect(SRC).toMatch(/veilFor\.w === app\.screen\.width && veilFor\.h === app\.screen\.height/)
+  })
+
+  it('★ the contact shadows are re-tessellated only when one of them moves', () => {
+    expect(layout).toContain('shadowSet.push(')
+    // cleared and redrawn inside the change guard, never outside it
+    const guard = layout.indexOf('shadowSet.some(')
+    expect(guard).toBeGreaterThan(-1)
+    expect(layout.indexOf('shadows.clear()')).toBeGreaterThan(guard)
+    expect(layout.indexOf('shadows.ellipse(')).toBeGreaterThan(guard)
+  })
+})
