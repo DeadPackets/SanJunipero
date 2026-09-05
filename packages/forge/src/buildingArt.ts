@@ -48,8 +48,8 @@ export type CommittedBuilding = {
   png: Buffer
 }
 
-/** Every committed cell, in directory order. A directory missing either file is an ERROR, not
- *  a skip: half a cell on disk is how art goes quietly missing. */
+/** Every committed cell, in directory order. A half-present directory is loud and skipped: one
+ *  bad cell must not take the other fifty down with it. */
 export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): CommittedBuilding[] {
   if (!existsSync(root)) return []
   const out: CommittedBuilding[] = []
@@ -60,19 +60,28 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
     const base = join(root, dir)
     const manifestPath = join(base, 'manifest.json'),
       cellPath = join(base, 'cell.webp')
-    for (const p of [manifestPath, cellPath]) {
-      if (!existsSync(p)) throw new Error(`buildings/${dir}: ${p.split('/').at(-1)} is missing`)
+    try {
+      for (const p of [manifestPath, cellPath]) {
+        if (!existsSync(p)) throw new Error(`${p.split('/').at(-1)} is missing`)
+      }
+      const manifest = BuildingManifestSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8')))
+      const { kind, facing } = splitFacingKind(manifest.kind)
+      // The directory name is derived from the manifest, never trusted over it, but the two
+      // disagreeing means someone renamed one of them alone.
+      const expected = facing === DEFAULT_FACING ? kind : `${kind}-${facing}`
+      if (dir !== expected)
+        throw new Error(`manifest kind "${manifest.kind}" belongs in buildings/${expected}`)
+      out.push({
+        dir,
+        kind,
+        facing,
+        codexKind: manifest.kind,
+        manifest,
+        png: readFileSync(cellPath),
+      })
+    } catch (err) {
+      console.warn(`buildings/${dir}: NO ART — ${err instanceof Error ? err.message : String(err)}`)
     }
-    const manifest = BuildingManifestSchema.parse(JSON.parse(readFileSync(manifestPath, 'utf8')))
-    const { kind, facing } = splitFacingKind(manifest.kind)
-    // The directory name is derived from the manifest, never trusted over it, but the two
-    // disagreeing means someone renamed one of them alone.
-    const expected = facing === DEFAULT_FACING ? kind : `${kind}-${facing}`
-    if (dir !== expected)
-      throw new Error(
-        `buildings/${dir}: manifest kind "${manifest.kind}" belongs in buildings/${expected}`,
-      )
-    out.push({ dir, kind, facing, codexKind: manifest.kind, manifest, png: readFileSync(cellPath) })
   }
   return out
 }

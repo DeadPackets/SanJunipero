@@ -55,6 +55,9 @@ export type BootedMinds = {
   /** True while any mind is still finishing a night's reflection. A caller that stops the
    *  world mid-reflection loses the night and pays for it anyway. */
   reflecting(): boolean
+  /** True while a scene line or a closing is still with a back end. Closing a mind's database
+   *  under one throws out of a promise nobody awaits. */
+  busy(): boolean
   stop(): void
 }
 
@@ -120,6 +123,15 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       .map((s) => ({ id: s.id, name: s.identity.name }))
   // The same function object the ordinary turn renders its roster from, so both prompts send
   // one prefix and share its cache.
+  let asking = 0
+  const whileAsking = async <T>(ask: () => Promise<T>): Promise<T> => {
+    asking += 1
+    try {
+      return await ask()
+    } finally {
+      asking -= 1
+    }
+  }
   const roster = opts.arbiter?.roster
   const customs = opts.arbiter?.customs
   const frontier = opts.arbiter?.frontier
@@ -132,18 +144,22 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     ties.seedKin(spec.kin ?? [], opts.bridge.currentTick())
     if (sceneClient !== undefined) {
       const mem = new MemoryStore(db, spec.id, opts.embedder)
-      minds.set(spec.id, {
-        llm: makeSceneLlm(sceneClient(spec.id), {
-          identity: spec.identity,
-          personality: () => ({
-            doc: personality.current().doc,
-            autobiography: mem.autobiography(),
-          }),
-          ...(roster === undefined ? {} : { roster }),
-          ...(customs === undefined ? {} : { customs }),
-          ...(frontier === undefined ? {} : { frontier }),
-          livingCast,
+      const voice = makeSceneLlm(sceneClient(spec.id), {
+        identity: spec.identity,
+        personality: () => ({
+          doc: personality.current().doc,
+          autobiography: mem.autobiography(),
         }),
+        ...(roster === undefined ? {} : { roster }),
+        ...(customs === undefined ? {} : { customs }),
+        ...(frontier === undefined ? {} : { frontier }),
+        livingCast,
+      })
+      minds.set(spec.id, {
+        llm: {
+          line: (ask) => whileAsking(() => voice.line(ask)),
+          close: (ask) => whileAsking(() => voice.close(ask)),
+        },
         ties,
         remember: async (m) => {
           await mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS })
@@ -187,6 +203,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     snapshots: () =>
       [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
     reflecting: () => [...runtimes.values()].some((r) => r.reflectionInFlight()),
+    busy: () => asking > 0,
     stop: () => {
       for (const r of runtimes.values()) r.stop()
     },

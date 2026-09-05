@@ -178,9 +178,14 @@ describe('the body reaches a mind holding the floor', () => {
     expect(decideWake(cfg, failing, clock, 10, pln(), HOLDS_FLOOR)).toBe('floor')
   })
 
-  it('keeps hearing free: a listener with the same body takes no turn', () => {
+  it('takes a failing listener out of the talk too', () => {
     const failing = withNeeds(60, 5, 71)
-    expect(wakeReasons(cfg, failing, clk(), 10, pln(), LISTENS)).toEqual([])
+    expect(decideWake(cfg, failing, clk(), 10, pln(), LISTENS)).toBe('body_alarm')
+  })
+
+  it('keeps hearing free: a merely tired listener takes no turn', () => {
+    const tired = withNeeds(60, 40, 71)
+    expect(wakeReasons(cfg, tired, clk(), 10, pln(), LISTENS)).toEqual([])
   })
 })
 
@@ -210,13 +215,14 @@ describe('decideWake — priority and floor', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
   })
 
-  it('a scene outranks every reason but a failing body, and a listener takes no turn at all', () => {
+  it('a scene outranks every reason but a failing body, whoever holds the floor', () => {
     const blocked = pln({ lastResult: 'blocked' })
     const well = withNeeds(60, 78, 71)
     const starving = withNeeds(5, 78, 71)
     expect(decideWake(cfg, well, clk(), 10, blocked, HOLDS_FLOOR)).toBe('floor')
+    expect(decideWake(cfg, well, clk(), 10, blocked, LISTENS)).toBe(null)
     expect(decideWake(cfg, starving, clk(), 10, blocked, HOLDS_FLOOR)).toBe('body_alarm')
-    expect(decideWake(cfg, starving, clk(), 10, blocked, LISTENS)).toBe(null)
+    expect(decideWake(cfg, starving, clk(), 10, blocked, LISTENS)).toBe('body_alarm')
   })
 
   it('salient_perception fires when the visible-agent set changes', () => {

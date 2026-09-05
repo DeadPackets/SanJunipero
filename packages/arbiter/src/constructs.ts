@@ -377,7 +377,17 @@ export type ConstructPassDeps = {
 export async function runConstructPass(deps: ConstructPassDeps): Promise<Construct[]> {
   const config = effectiveConfig(deps.baseConfig, deps.laws ?? lawsFromEvents(deps.events))
   if (!config.constructs.enabled) return []
-  const candidates = detectCandidates(deps.events, config)
+  // A key is the earliest gathering still in the window, and the window rolls: the same ground
+  // keeps the id it was first registered under rather than being recognized a second time.
+  const registry = deps.store.all()
+  const candidates = detectCandidates(deps.events, config).map((c) => {
+    const seen = registry.find(
+      (r) =>
+        r.id === c.key ||
+        (typeof r.anchor === 'object' && r.anchor !== null && near(r.anchor, c.anchor)),
+    )
+    return seen === undefined ? c : { ...c, key: seen.id }
+  })
   // A site the registry has already typed is not asked about again: the answer for one is
   // thrown away, and the prompt grows a block per site.
   const untyped = candidates.filter((c) => deps.store.byId(c.key) === null)
