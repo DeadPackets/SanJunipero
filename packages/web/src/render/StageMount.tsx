@@ -92,6 +92,38 @@ export function StageMount({
     let offInterior: (() => void) | null = null
     let offEvents: (() => void) | null = null
     let tickFn: (() => void) | null = null
+    let torn = false
+    // Every layer the effect got as far as building, whether it finished or threw. Once: a
+    // failed build tears down here and React's cleanup then runs over the same locals.
+    const teardown = (): void => {
+      if (torn) return
+      torn = true
+      offSync?.()
+      offEvents?.()
+      offCamera?.()
+      offInterior?.()
+      if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
+      // onKeyDown reads this ref and only guards on null, so a destroyed scene left in it is
+      // one the keyboard can still drive.
+      sceneRef.current = null
+      interiorRef.current = null
+      landmarks?.destroy()
+      toponyms?.destroy()
+      interior?.destroy()
+      chars?.destroy()
+      bubbles?.destroy()
+      acts?.destroy()
+      moments?.destroy()
+      ambient?.destroy()
+      lightPools?.destroy()
+      smoke?.destroy()
+      clouds?.destroy()
+      vignette?.destroy()
+      weather?.destroy()
+      atmosphere?.destroy()
+      scene?.destroy()
+      scene = null
+    }
     // Faces install before the scene exists so the first label drawn is already a bitmap
     // glyph; installFaces resolves even when the webfonts never do.
     void installFaces(document)
@@ -216,35 +248,14 @@ export function StageMount({
         // No WebGL, no WebGPU, or a context lost mid-build.
         if (disposed) return
         firstFrameStuck(FIRST_FRAME_COPY.blind)
-        scene?.destroy()
-        scene = null
+        teardown()
       })
     return () => {
       disposed = true
       // Fast Refresh remounts this component and the effect below destroys the scene; without
       // this line the chrome upstream keeps the dead one and throws on its next ticker call.
       if (published) onScene?.(null)
-      offSync?.()
-      offEvents?.()
-      offCamera?.()
-      offInterior?.()
-      if (tickFn !== null && scene !== null) scene.app.ticker.remove(tickFn)
-      interiorRef.current = null
-      landmarks?.destroy()
-      toponyms?.destroy()
-      interior?.destroy()
-      chars?.destroy()
-      bubbles?.destroy()
-      acts?.destroy()
-      moments?.destroy()
-      ambient?.destroy()
-      lightPools?.destroy()
-      smoke?.destroy()
-      clouds?.destroy()
-      vignette?.destroy()
-      weather?.destroy()
-      atmosphere?.destroy()
-      scene?.destroy()
+      teardown()
     }
   }, [])
 

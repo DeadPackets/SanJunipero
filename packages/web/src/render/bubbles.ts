@@ -47,7 +47,7 @@ import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { characterArt, fadeArtIn } from './textures.js'
 import { MOTION, progress } from '../ui/motion.js'
-import { characterCell } from './characters.js'
+import { characterCell, rendersOnMap } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 
@@ -175,6 +175,10 @@ export function speakerWash(rgb: number): number {
 
 /** How far a box floats over the head it belongs to. */
 export const BUBBLE_LIFT_PX = 18
+
+/** `tick` is the only reaper and it stops with `requestAnimationFrame`, so a hidden tab would
+ *  stack every line twelve minds say for as long as it is hidden. Twice the on-screen most. */
+export const BUBBLE_CAP = 24
 
 /** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
  *  of speech and it read as a town where only three people ever talk; the placer already drops
@@ -432,7 +436,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
     if (isThought && thoughtsHidden(graveTone, viewer)) return // speech is world fact and passes
     const state = store.getState()
-    if (state?.agents[agentId] === undefined) return // visible agents only
+    const speaker = state?.agents[agentId]
+    if (speaker === undefined || !rendersOnMap(speaker)) return // visible agents only
     const now = performance.now()
     if (isThought) {
       const live = bubbles.filter((b) => b.isThought)
@@ -459,6 +464,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       dimMs: null,
       side: 'above',
     })
+    while (bubbles.length > BUBBLE_CAP) bubbles.shift()!.node.destroy({ children: true })
   }
 
   return {
@@ -484,7 +490,8 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       const inv = worldTextScale(zoom) * scene.textScale
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]!
-        if (nowMs >= b.dieMs || state?.agents[b.agentId] === undefined) {
+        const said = state?.agents[b.agentId]
+        if (nowMs >= b.dieMs || said === undefined || !rendersOnMap(said)) {
           b.node.destroy({ children: true })
           bubbles.splice(i, 1)
           continue

@@ -49,6 +49,12 @@ describe('connectObservatory link status', () => {
       getItem: () => null,
       setItem: () => undefined,
     })
+    const session = new Map<string, string>()
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => session.get(k) ?? null,
+      setItem: (k: string, v: string) => void session.set(k, v),
+      removeItem: (k: string) => void session.delete(k),
+    })
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -129,6 +135,64 @@ describe('connectObservatory link status', () => {
     const snapshot = { ...SNAPSHOT, config: { mystery: 1 } }
     FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(snapshot) })
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  /** A bundle Cloudflare still serves after a protocol bump refuses the SAME hello after the
+   *  reload; without a guard every open tab fetches it again about once a second, forever. */
+  it('★ reloads once for a refusal, then reconnects instead of looping', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.drop(CLOSE_BAD_HELLO)
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    // the reload happened: the same bundle comes back up and is refused again
+    FakeWebSocket.instances = []
+    const statuses: string[] = []
+    connectObservatory({
+      url: 'ws://test/ws',
+      store: createWorldStore(),
+      onStatus: (s) => statuses.push(s),
+    })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.drop(CLOSE_BAD_HELLO)
+    expect(reload, 'a second refusal must not fetch the bundle again').toHaveBeenCalledTimes(1)
+    expect(statuses.at(-1)).toBe('reconnecting')
+  })
+
+  it('★ reloads once for a snapshot this bundle cannot read, and not again', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const bad = JSON.stringify({ ...SNAPSHOT, config: { mystery: 1 } })
+    for (const _ of [0, 1]) {
+      FakeWebSocket.instances = []
+      connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+      FakeWebSocket.instances[0]!.open()
+      FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    }
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  /** A tab that came back and READ the town is not out of date; the next real mismatch must
+   *  still be allowed its one reload. */
+  it('★ a snapshot the bundle can read clears the once-guard', () => {
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
+    const bad = JSON.stringify({ ...SNAPSHOT, config: { mystery: 1 } })
+    connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    FakeWebSocket.instances = []
+    const store = createWorldStore()
+    connectObservatory({ url: 'ws://test/ws', store })
+    FakeWebSocket.instances[0]!.open()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: JSON.stringify(SNAPSHOT) })
+    expect(store.getState()).not.toBeNull()
+    FakeWebSocket.instances[0]!.onmessage?.({ data: bad })
+    expect(reload).toHaveBeenCalledTimes(2)
   })
 
   /** A delta that will not fold leaves a half-folded town; only the server's own state is one. */

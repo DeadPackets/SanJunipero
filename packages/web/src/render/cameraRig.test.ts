@@ -113,3 +113,39 @@ describe('★ D10 — the camera lands on a whole pixel', () => {
     expect(calls).toBe(1)
   })
 })
+
+// ★ The eased transit re-pins the world point captured at `setZoom` time on every frame it
+// runs, so whatever the caller wants kept has to be at screen centre BEFORE it asks for a stop.
+describe('★ a zoom transit keeps whatever was at screen centre when it was asked for', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const centreOf = (world: Container): { sx: number; sy: number } => ({
+    sx: (1440 / 2 - world.position.x) / world.scale.x,
+    sy: (900 / 2 - world.position.y) / world.scale.y,
+  })
+
+  it('★ centring and THEN zooming lands on the point that was centred', () => {
+    const { rig, world, frame } = rigAt(3)
+    const want = { sx: 300, sy: -180 }
+    rig.centerOnScreen(want.sx, want.sy)
+    rig.setZoom(0.5)
+    for (let i = 0; i < 20; i++) frame()
+
+    expect(world.scale.x).toBe(0.5)
+    expect(centreOf(world).sx).toBeCloseTo(want.sx, 0)
+    expect(centreOf(world).sy).toBeCloseTo(want.sy, 0)
+  })
+
+  it('★ zooming first throws the centring away — the transit re-pins where it started', () => {
+    const { rig, world, frame } = rigAt(3)
+    const door = { sx: 900, sy: 420 }
+    rig.centerOnScreen(door.sx, door.sy)
+    rig.setZoom(0.5)
+    rig.centerOnScreen(300, -180)
+    for (let i = 0; i < 20; i++) frame()
+
+    expect(centreOf(world).sx).toBeCloseTo(door.sx, 0)
+  })
+})

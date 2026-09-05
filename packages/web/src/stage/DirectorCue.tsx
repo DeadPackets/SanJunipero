@@ -1,3 +1,4 @@
+import { momentTitle } from '@sj/shared'
 import { chronicleGlyph } from '../ui/importantFeed.js'
 import { CUE_ICON_PX, STAKES_MAX, type SceneCue, type StageCue } from '../ui/stageCue.js'
 
@@ -22,8 +23,8 @@ function CueGlyph({ icon }: { icon: string }) {
   )
 }
 
-/** The kind, struck like a stamp, with what is at stake measured along its foot. Two channels
- *  and one gesture: the ink says how hot and the rule says how hot, so neither is alone. */
+/** The kind in the town's own words, struck like a stamp, with what is at stake measured along
+ *  its foot. Two channels and one gesture: the ink says how hot and the rule says how hot. */
 function SceneStamp({ kind, stakes, band }: SceneCue) {
   return (
     <span
@@ -31,7 +32,7 @@ function SceneStamp({ kind, stakes, band }: SceneCue) {
       data-stakes={band}
       style={stakes === null ? undefined : { ['--stakes' as string]: stakes / STAKES_MAX }}
     >
-      {kind}
+      {momentTitle(kind, null)}
       {stakes !== null && (
         <span className="stage-sr">
           , {stakes} of {STAKES_MAX} at stake

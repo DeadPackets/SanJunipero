@@ -69,6 +69,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
 
   const filter = new ColorMatrixFilter()
   let filtered = false
+  let gradedKind: string | null = null
 
   let fromTint = -1,
     toTint = -1,
@@ -96,16 +97,21 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       sky.tint = quad.tint
       sky.alpha = skyAlpha(skyLevel(minute))
 
-      const m = gradingMatrix(state.weather.kind)
-      if (m !== null) {
-        filter.matrix = Array.from(m) as ColorMatrixFilter['matrix']
-        if (!filtered) {
-          scene.graded.filters = [filter]
-          filtered = true
+      // The matrix is a pure function of the kind, and assigning it re-uploads the filter's
+      // uniforms — so it is written when the weather turns, not on every frame of it.
+      if (state.weather.kind !== gradedKind) {
+        gradedKind = state.weather.kind
+        const m = gradingMatrix(gradedKind)
+        if (m !== null) {
+          filter.matrix = Array.from(m) as ColorMatrixFilter['matrix']
+          if (!filtered) {
+            scene.graded.filters = [filter]
+            filtered = true
+          }
+        } else if (filtered) {
+          scene.graded.filters = []
+          filtered = false
         }
-      } else if (filtered) {
-        scene.graded.filters = []
-        filtered = false
       }
     },
     destroy() {

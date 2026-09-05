@@ -262,14 +262,14 @@ export function syncEntities(
       lastAssetsSeq: store.assetsSeq(),
       onDoor: null,
       onPick: null,
-      hitZoom: scene.getZoom(),
+      hitZoom: scene.getZoomStop(),
     }
     syncStates.set(scene, sync)
     // The 24 px floor is a SCREEN size and the 0.25 overview stop makes it live, so every prism
     // is re-cut when the camera settles — not on a world tick and not per frame.
     const cut = sync
     scene.onCamera(() => {
-      const z = scene.getZoom()
+      const z = scene.getZoomStop()
       if (z === cut.hitZoom) return
       cut.hitZoom = z
       // Items and crops are in this map too and take Pixi's own sprite bounds; only a

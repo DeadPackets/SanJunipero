@@ -110,11 +110,22 @@ describe('★ it rises, then fades, and is gone at 1.8 s', () => {
 
 // The layer, driven the way the ticker drives it. No canvas stub: this draws sprites, never text.
 describe('★ the layer puts one sprite over each body, and takes them away again', () => {
+  const amara: { x: number; y: number; alive: boolean; insideId?: string } = {
+    x: 0,
+    y: 0,
+    alive: true,
+  }
+
   function harness(): {
     emit: (ev: SimEvent) => void
     layer: MomentEmoteLayer
     sprites: () => Container[]
+    goIndoors: () => void
   } {
+    amara.x = 0
+    amara.y = 0
+    amara.alive = true
+    delete amara.insideId
     const overlay = new Container()
     let handler: (evts: SimEvent[]) => void = () => {}
     const scene = {
@@ -124,7 +135,7 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
       anchorOf: () => ({ x: 0, y: 0 }),
     } as unknown as Scene
     const store = {
-      getState: () => ({ agents: { amara: { x: 0, y: 0 }, yusuf: { x: 1, y: 0 } } }),
+      getState: () => ({ agents: { amara: { ...amara }, yusuf: { x: 1, y: 0, alive: true } } }),
       onEvents: (fn: (evts: SimEvent[]) => void) => {
         handler = fn
         return () => {}
@@ -139,6 +150,9 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
       },
       layer,
       sprites: () => overlay.children[0]!.children,
+      goIndoors: () => {
+        amara.insideId = 'smithy'
+      },
     }
   }
 
@@ -153,6 +167,18 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     expect(h.sprites(), 'still standing a millisecond short').toHaveLength(2)
     h.layer.tick(at + MOMENT_EMOTE_MS + 1)
     expect(h.sprites()).toHaveLength(0)
+  })
+
+  it('★ takes a mark off a body that has gone indoors — it is not on the map to mark', async () => {
+    const h = harness()
+    await Promise.resolve()
+    const at = performance.now()
+    h.emit(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 1 }))
+    expect(h.sprites()).toHaveLength(2)
+
+    h.goIndoors()
+    h.layer.tick(at + 1)
+    expect(h.sprites(), "amara's mark floated over the smithy's roof").toHaveLength(1)
   })
 
   it('spawns nothing for a moment that wears no glyph', async () => {

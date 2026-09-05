@@ -76,7 +76,8 @@ function harness(view: Rect = WHOLE_WORLD): {
   noteStart: (id: string, verb: string, duration: number) => void
 } {
   const worldText = new Container()
-  let agents: Record<string, unknown> = {}
+  // A new object per fold and the SAME object between frames, which is what the store does.
+  let world: unknown = { agents: {}, tick: 10 }
   let boxes: readonly Rect[] = []
   const scene = {
     layers: { worldText },
@@ -84,7 +85,9 @@ function harness(view: Rect = WHOLE_WORLD): {
     getZoom: () => 1,
     wantsMotion: () => false,
     viewRect: () => view,
-    anchorOf: () => null, // the layer falls back to the record's tile, which is where a body IS
+    // no sprite built yet: the layer falls back to the record's tile. An INDOOR body is a
+    // different null — the character layer took its sprite down — and gets no chip at all.
+    anchorOf: () => null,
     tags: {
       occupied: () => [],
       setOccupied: (_owner: string, b: readonly Rect[]) => {
@@ -93,14 +96,17 @@ function harness(view: Rect = WHOLE_WORLD): {
     },
   } as unknown as Scene
   const store = {
-    getState: () => ({ agents, tick: 10 }),
+    getState: () => world,
     getTick: () => 10,
   } as unknown as WorldStore
   const layer = createActLayer(scene, store)
   return {
     layer,
     set: (...bodies) => {
-      agents = Object.fromEntries(bodies.map((b) => [(b as { id: string }).id, b]))
+      world = {
+        agents: Object.fromEntries(bodies.map((b) => [(b as { id: string }).id, b])),
+        tick: 10,
+      }
     },
     chips: () => worldText.children,
     occupied: () => boxes,
@@ -126,6 +132,27 @@ describe('a chip appears on the person doing the work', () => {
     const h = harness()
     h.set(body('nadia', { verb: 'walk', ticksRemaining: 12 }))
     h.noteStart('nadia', 'walk', 12)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(0)
+  })
+
+  it('★ says nothing about a person at work INSIDE a building', () => {
+    const h = harness()
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 30 }, { insideId: 'smithy' }))
+    h.noteStart('amara', 'forge', 30)
+    h.layer.tick()
+    expect(h.chips(), 'a chip over the roof has nobody under it').toHaveLength(0)
+    expect(h.occupied()).toEqual([])
+  })
+
+  it('★ takes the chip away when they carry the work indoors', () => {
+    const h = harness()
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 30 }))
+    h.noteStart('amara', 'forge', 30)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(1)
+
+    h.set(body('amara', { verb: 'forge', ticksRemaining: 20 }, { insideId: 'smithy' }))
     h.layer.tick()
     expect(h.chips()).toHaveLength(0)
   })
@@ -174,6 +201,28 @@ describe('the chip goes when the work does', () => {
     h.layer.tick()
     expect(h.chips()).toHaveLength(1)
     expect(h.chips()[0]).not.toBe(first)
+  })
+})
+
+// ★ `tick` is on the ticker and the world folds four times a second. Scanning every mind and
+// building two collections per frame is a bill a town asleep was paying sixty times a second.
+describe('★ the work is read from the world, not from the frame', () => {
+  it('★ re-reads only when a new fold arrives', () => {
+    const h = harness()
+    const yusuf = body('yusuf', { verb: 'chop', ticksRemaining: 30 }) as { activity: Act }
+    h.set(yusuf)
+    h.noteStart('yusuf', 'chop', 30)
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(1)
+
+    // the same world, edited underneath: a frame carries no news, so nothing is re-read
+    yusuf.activity = null
+    h.layer.tick()
+    expect(h.chips(), 'the layer re-scanned a world that had not moved').toHaveLength(1)
+
+    h.set(body('yusuf', null)) // the fold that really ended it
+    h.layer.tick()
+    expect(h.chips()).toHaveLength(0)
   })
 })
 

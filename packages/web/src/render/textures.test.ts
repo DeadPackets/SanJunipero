@@ -235,11 +235,12 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     expect(viaThen).toBe(viaPeek)
   })
 
-  it('★ a swap frees the old art on the GPU and NEVER destroys it', async () => {
+  it('★ a swap off the shared placeholder leaves it alone — the siblings are still on it', async () => {
     // The crash this states: every artless kind shares `/assets/placeholder/item.png`, so the
     // one entity whose art lands would destroy the texture all its siblings are still drawing.
     // `Assets.unload` runs `texture.destroy(true)`, which nulls `texture.source`, and the
     // batcher reads `source.alphaMode` unguarded — the whole stage goes down on the next frame.
+    // Even the soft `unload` costs every sibling a re-upload, once per kind that finds its art.
     const shared = '/assets/placeholder/item.png'
     const book = new TextureBook()
     void book.get(shared)
@@ -250,10 +251,26 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     await land('/assets/new.png')
     await p
 
-    expect(old.source.unload).toHaveBeenCalledTimes(1) // GPU copy freed; re-uploads on demand
+    expect(old.source.unload).not.toHaveBeenCalled()
     expect(Assets.unload).not.toHaveBeenCalled()
     expect(book.peek(shared)).toBe(old) // the siblings still hold a live texture
     expect(book.peek('/assets/new.png')).not.toBeNull()
+  })
+
+  it('★ a swap off art of its own frees that art, and stops handing it back', async () => {
+    const mine = '/assets/asset_old.png'
+    const book = new TextureBook()
+    void book.get(mine)
+    await land(mine)
+    const old = loads.get(mine)!.texture as { source: { unload: Mock } }
+
+    const p = book.swap(mine, '/assets/asset_new.png')
+    await land('/assets/asset_new.png')
+    await p
+
+    expect(old.source.unload).toHaveBeenCalledTimes(1) // GPU copy freed; re-uploads on demand
+    expect(Assets.unload).not.toHaveBeenCalled()
+    expect(book.peek(mine), 'a source the book unloaded is not a texture to hand out').toBeNull()
   })
 
   it('★ and no file under web/src may destroy a texture the book still hands out', () => {

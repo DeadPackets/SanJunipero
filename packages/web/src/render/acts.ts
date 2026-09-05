@@ -13,6 +13,7 @@ import {
 } from './textFaces.js'
 import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles } from './bubbles.js'
 import { tileToScreen } from './iso.js'
+import { rendersOnMap } from './characters.js'
 import { fadeArtIn } from './textures.js'
 import { stateWord, statusOf, type AgentView } from '../ui/status.js'
 import type { Rect } from './tooltip.js'
@@ -121,7 +122,13 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
   const starts = new Map<string, { verb: string; duration: number }>()
   /** ONE gate for one act: whoever the chip is willing to name is whoever the track may wrap.
    *  Read apart, a sleeper with a live `activity` wore a track and no word for it. */
-  let atWork = new Set<string>()
+  const atWork = new Set<string>()
+  // Who is at work moves with the WORLD, never with the frame. Scratch, cleared per use: a town
+  // asleep re-scanned twelve minds and built two collections sixty times a second.
+  let seenState: unknown = undefined
+  let seenTick = -1
+  const stale: string[] = []
+  const at: { id: string; sx: number; sy: number }[] = []
 
   const build = (word: string): Chip => {
     const node = new Container()
@@ -187,40 +194,51 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
       const nowTick = store.getTick()
 
       // ── who is at work, and how far in ──────────────────────────────────────────────────
-      const live = new Set<string>()
-      for (const a of Object.values(state?.agents ?? {})) {
-        const act = a.activity
-        if (act === null) {
-          // The STATE ends a chip, never an event: every way an act stops lands here as one
-          // fact, and `action_interrupted` does not even carry the verb it stopped.
-          runs.delete(a.id)
-          starts.delete(a.id)
-          continue
+      if (state !== seenState || nowTick !== seenTick) {
+        seenState = state
+        seenTick = nowTick
+        atWork.clear()
+        for (const a of Object.values(state?.agents ?? {})) {
+          const act = a.activity
+          if (act === null) {
+            // The STATE ends a chip, never an event: every way an act stops lands here as one
+            // fact, and `action_interrupted` does not even carry the verb it stopped.
+            runs.delete(a.id)
+            starts.delete(a.id)
+            continue
+          }
+          const seed = starts.get(a.id)
+          const run = trackRun(
+            runs.get(a.id) ?? null,
+            act.verb,
+            act.ticksRemaining,
+            seed?.verb === act.verb ? seed.duration : undefined,
+          )
+          runs.set(a.id, run)
+          // Indoors is off the map: the character layer has taken the body down, and a chip at
+          // the record's tile would hang over the roof they are under.
+          if (rendersOnMap(a) && actShown(a, run, nowTick)) atWork.add(a.id)
         }
-        const seed = starts.get(a.id)
-        const run = trackRun(
-          runs.get(a.id) ?? null,
-          act.verb,
-          act.ticksRemaining,
-          seed?.verb === act.verb ? seed.duration : undefined,
-        )
-        runs.set(a.id, run)
-        if (actShown(a, run, nowTick)) live.add(a.id)
+        stale.length = 0
+        for (const id of chips.keys()) if (!atWork.has(id)) stale.push(id)
+        for (const id of stale) drop(id)
       }
-      atWork = live
-      for (const id of [...chips.keys()]) if (!live.has(id)) drop(id)
-      if (live.size === 0) {
+      if (atWork.size === 0) {
         scene.tags.setOccupied('acts', [])
         return
       }
 
       // ── where they are ──────────────────────────────────────────────────────────────────
-      const at = [...live].sort().map((id) => {
+      stale.length = 0
+      for (const id of atWork) stale.push(id)
+      stale.sort()
+      at.length = 0
+      for (const id of stale) {
         const a = state!.agents[id]!
         const anchor = scene.anchorOf?.(id) ?? null
         const { sx, sy } = anchor === null ? tileToScreen(a.x, a.y) : { sx: anchor.x, sy: anchor.y }
-        return { id, sx, sy: sy + ACT_DROP_PX }
-      })
+        at.push({ id, sx, sy: sy + ACT_DROP_PX })
+      }
       const view = scene.viewRect()
       const seen = inViewSpeakers(at, view)
 

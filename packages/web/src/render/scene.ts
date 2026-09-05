@@ -19,6 +19,7 @@ import type { BubbleLayer } from './bubbles.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
   applyDepthOrder,
+  createDepthGate,
   createLayers,
   createScreenLayers,
   type DepthCounts,
@@ -193,6 +194,8 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   // The depth sort has ONE owner and runs ONCE a frame over the whole live set. Modules
   // publish the ground they stand on; nobody publishes an opinion about who is in front.
   const depthSources = new Set<() => DepthEntry[]>()
+  const depthEntries: DepthEntry[] = []
+  const depthMoved = createDepthGate()
   // what the last frame drew and what it skipped — a cull nobody can count is a claim
   let lastCounts: DepthCounts = { drawn: 0, culled: 0 }
 
@@ -314,9 +317,12 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       return at === null ? null : { sx: at.x, sy: at.y }
     },
     sortDepth: () => {
-      const entries: DepthEntry[] = []
-      for (const fn of depthSources) for (const e of fn()) entries.push(e)
-      lastCounts = applyDepthOrder(entries, viewRect())
+      depthEntries.length = 0
+      for (const fn of depthSources) for (const e of fn()) depthEntries.push(e)
+      const view = viewRect()
+      // Nothing moved, so the order it had is the order it wants.
+      if (!depthMoved(depthEntries, view)) return
+      lastCounts = applyDepthOrder(depthEntries, view)
     },
     depthCounts: () => lastCounts,
     rebakeGround,

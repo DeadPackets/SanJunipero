@@ -81,8 +81,15 @@ export const geometricEdge: EdgeRule = (a, b) => {
 
 /** Painter's order, back to front, as ids. Deterministic: two calls on the same input agree,
  *  and the order the input arrives in does not matter. */
+const seeded: DepthBox[] = []
+const after: number[][] = []
+const indeg: number[] = []
+const ready: number[] = []
+
 export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometricEdge): string[] {
-  const seeded = [...boxes].sort((a, b) => depthSeed(a) - depthSeed(b) || (a.id < b.id ? -1 : 1))
+  seeded.length = 0
+  for (const b of boxes) seeded.push(b)
+  seeded.sort((a, b) => depthSeed(a) - depthSeed(b) || (a.id < b.id ? -1 : 1))
   const n = seeded.length
   if (n > DEPTH_BUDGET) {
     fallbackFrames++
@@ -90,8 +97,16 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
     return seeded.map((b) => b.id)
   }
 
-  const after: number[][] = seeded.map(() => []) // i must be drawn BEFORE each j in after[i]
-  const indeg = new Array<number>(n).fill(0)
+  // i must be drawn BEFORE each j in after[i]. The two buffers and the seeded copy are reused
+  // across frames: one array per drawable, sixty times a second, was the sort's allocation bill.
+  after.length = n
+  for (let i = 0; i < n; i++) {
+    const row = after[i]
+    if (row === undefined) after[i] = []
+    else row.length = 0
+    indeg[i] = 0
+  }
+  indeg.length = n
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       const a = seeded[i]!,
@@ -110,7 +125,7 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
 
   // Ready nodes are taken in SEED order, so with no constraints the output IS the seed order.
   const out: string[] = []
-  const ready: number[] = []
+  ready.length = 0
   for (let i = 0; i < n; i++) if (indeg[i] === 0) ready.push(i)
   while (ready.length > 0) {
     // The smallest seed index, taken by a scan and a swap-with-last: a comparator sort plus a
