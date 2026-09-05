@@ -68,7 +68,7 @@ describe('the signpost', () => {
     const html = post('found')
     expect(html.match(/aria-expanded="true"/g)).toHaveLength(1)
     expect(html).toMatch(/data-arm="found"[^>]*aria-expanded="true"/)
-    expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(4)
+    expect(html.match(/aria-controls="paper"/g)).toHaveLength(4)
     expect(post(null).match(/aria-expanded="true"/g)).toBeNull()
   })
 
@@ -91,7 +91,7 @@ describe('the signpost', () => {
     expect(html.match(/<button/g)).toHaveLength(ARMS.length)
     expect(html).not.toContain(`>${KEY_MAP_KEY}<`)
     expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])
-    expect(html.match(/aria-controls="paper-sheet"/g)).toHaveLength(ARMS.length)
+    expect(html.match(/aria-controls="paper"/g)).toHaveLength(ARMS.length)
   })
 
   it('★ names the corner button for the sheet it opens, at 44px in a corner of its own', () => {

@@ -285,11 +285,11 @@ describe('★ the sheet answers the device, not only the window width', () => {
     )
   })
 
-  // 1000, not 480: one row of section line needs ~677px of head, and a 78% sheet only reaches
-  // that near a 970px window. Between the two the strip was overflowing its own row.
+  // The complement of the 1920px rule that widens the sheet, not 1000: with the weekday in the
+  // dateline one row of section line needs ~723px of head, and only a 1040px sheet has it.
   it('makes the tab strip a scroller before it wraps onto a third row', () => {
     expect(BARE).toMatch(
-      /@media \(max-width: 1000px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
+      /@media \(max-width: 1919\.98px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
     )
   })
 })
@@ -324,7 +324,10 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
   })
 
   it('staggers one way, at the table’s own 30ms, capped rather than truncated', () => {
-    expect(BARE).toMatch(/animation-delay: calc\(var\(--stagger-i, 6\) \* 30ms\)/)
+    // The step is a token now, so the literal lives in `:root` beside every other duration
+    // and `MOTION.enter.stagger` is the one number it may be.
+    expect(BARE).toMatch(/--stagger:\s*30ms/)
+    expect(BARE).toMatch(/animation-delay: calc\(var\(--stagger-i, 6\) \* var\(--stagger\)\)/)
     expect(BARE).not.toMatch(/animation-delay: \d+ms/)
   })
 

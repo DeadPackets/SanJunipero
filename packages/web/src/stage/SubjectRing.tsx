@@ -18,9 +18,14 @@ export const RING_LABEL: Readonly<Record<RingVerb, string>> = {
 }
 
 /** ★ A well was offered Follow, Bonds and Home. A building has a story, and a roofed one has a
- *  way in; nothing is offered an arm that would do nothing when it is pressed. */
-export function ringVerbsFor(kind: Subject['kind'], enterable: boolean): readonly RingVerb[] {
-  if (kind === 'agent') return PERSON_VERBS
+ *  way in; nothing is offered an arm that would do nothing when it is pressed — which is why a
+ *  person who owns no building is not offered Home. */
+export function ringVerbsFor(
+  kind: Subject['kind'],
+  enterable: boolean,
+  hasHome = true,
+): readonly RingVerb[] {
+  if (kind === 'agent') return hasHome ? PERSON_VERBS : PERSON_VERBS.filter((v) => v !== 'home')
   return enterable ? ['story', 'inside'] : ['story']
 }
 
@@ -56,6 +61,13 @@ function wayIn(store: WorldStore, subject: Subject | null): boolean {
   return entersOnClick(store.getConfig(), store.getState(), subject.id)
 }
 
+/** The world records ownership, never an address on the person — the same read `App` makes when
+ *  the arm is pressed, so the arm and the press cannot disagree about whether there is a home. */
+function ownsAHome(store: WorldStore, subject: Subject | null): boolean {
+  if (subject?.kind !== 'agent') return false
+  return Object.values(store.getState()?.structures ?? {}).some((s) => s.owner === subject.id)
+}
+
 export function SubjectRing({
   subject,
   scene,
@@ -72,6 +84,8 @@ export function SubjectRing({
   // its way in, and one that burns down loses it.
   const read = (): boolean => wayIn(store, subject)
   const enterable = useSyncExternalStore(store.subscribe, read, read)
+  const readHome = (): boolean => ownsAHome(store, subject)
+  const hasHome = useSyncExternalStore(store.subscribe, readHome, readHome)
   const [at, setAt] = useState(0)
   const arms = useRef<(HTMLButtonElement | null)[]>([])
   const id = subject?.id ?? null
@@ -93,7 +107,7 @@ export function SubjectRing({
   }, [id])
 
   if (subject === null) return null
-  const verbs = ringVerbsFor(subject.kind, enterable)
+  const verbs = ringVerbsFor(subject.kind, enterable, hasHome)
   // A ring that shrinks under the focus must still have ONE tab stop, or Tab cannot reach it.
   const on = Math.min(at, verbs.length - 1)
   return (

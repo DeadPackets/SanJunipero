@@ -3,6 +3,7 @@ import type { ObservatoryHandle } from '../net/socket.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { momentStamp } from '../paper/stamp.js'
 import type { MomentPlay } from '../ui/replayRun.js'
+import { useFrameCoalesced } from '../ui/onFrame.js'
 
 const GLYPH_PX = 8
 const CREAM = '#FFF6E9'
@@ -88,12 +89,38 @@ export function Transport({
   onLive: () => void
   onAt: (tick: number) => void
 }) {
-  const trackRef = useRef<HTMLDivElement>(null)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   if (play === null || mode.live) return null
+  // The strip itself is a component so the hooks below it run on every render of it: the two
+  // conditions above are what decides whether there is a strip at all.
+  return (
+    <TransportBar
+      tick={mode.tick}
+      playing={mode.replaying}
+      play={play}
+      handle={handle}
+      onLive={onLive}
+      onAt={onAt}
+    />
+  )
+}
 
-  const tick = mode.tick
-  const playing = mode.replaying
+function TransportBar({
+  tick,
+  playing,
+  play,
+  handle,
+  onLive,
+  onAt,
+}: {
+  tick: number
+  playing: boolean
+  play: MomentPlay
+  handle: ObservatoryHandle | null
+  onLive: () => void
+  onAt: (tick: number) => void
+}) {
+  const trackRef = useRef<HTMLDivElement>(null)
   const frac = playhead(tick, play)
 
   const goTo = (next: number): void => {
@@ -106,11 +133,14 @@ export function Transport({
     const r = el.getBoundingClientRect()
     goTo(seekTick((clientX - r.left) / r.width, play))
   }
+  // A drag commits once a frame: every sample went through to the scrub, and that redraws
+  // the stage and every figure on it.
+  const drag = useFrameCoalesced(pick)
   const onKey = (e: React.KeyboardEvent): void => {
     const next =
-      e.key === 'ArrowLeft'
+      e.key === 'ArrowLeft' || e.key === 'ArrowDown'
         ? tick - KEY_STEP
-        : e.key === 'ArrowRight'
+        : e.key === 'ArrowRight' || e.key === 'ArrowUp'
           ? tick + KEY_STEP
           : e.key === 'Home'
             ? play.from
@@ -149,11 +179,11 @@ export function Transport({
         aria-valuetext={momentStamp(tick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          e.currentTarget.setPointerCapture(e.pointerId)
           pick(e.clientX)
         }}
         onPointerMove={(e) => {
-          if (e.buttons === 1) pick(e.clientX)
+          if (e.buttons === 1) drag(e.clientX)
         }}
       >
         <span className="player-head" style={{ left: `${frac * 100}%` }} />

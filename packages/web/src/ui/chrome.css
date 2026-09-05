@@ -39,6 +39,8 @@
   --t-med: 240ms;
   --t-slow: 300ms; /* motion band ceiling — nothing that answers an input runs longer */
   --t-ambient: 1200ms;
+  /* MOTION.enter.stagger — the one step between two arriving items. */
+  --stagger: 30ms;
   --ease-tap: cubic-bezier(0.3, 0, 0.2, 1);
   --ease-enter: cubic-bezier(0.2, 0, 0, 1);
   --ease-move: cubic-bezier(0.4, 0, 0.2, 1);
@@ -58,6 +60,13 @@
   --f-5: 18px;
   --f-6: 22px;
   --f-7: 28px;
+  /* Off the seven-step reading ladder on purpose. The sign face is drawn on an 8px grid and
+     only whole multiples of it land on the plank's own pixels; the stream is a second medium
+     at a fixed size, read at quarter scale in a 480px player. */
+  --f-sign: 16px;
+  --f-sign-wide: 24px;
+  --f-bcast: 24px;
+  --f-bcast-lead: 32px;
 
   /* Text over art carries its own ground: ink on all four sides, then a drop so the mark
      survives a tile as light as daylight grass. Cream on that tile is 1.40:1 — load-bearing,
@@ -74,6 +83,8 @@
      three of them pulled the shadow's right edge in while the slab rose. */
   --ledge-hi: 4px 6px 0 0 var(--deep);
   --ledge-in: 1px 1px 0 0 var(--deep);
+  /* The roster's two inner slabs sit on a shorter ledge than the chrome's 4px one. */
+  --ledge-sm: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
 
   /* 9-slice pixel frames (generated art, scripts/gen-px-frames.py) */
   --px-cream: url('./px/frame-cream.webp') 10 repeat;
@@ -176,7 +187,7 @@ body {
 .badges { display: flex; gap: var(--s-2); flex-wrap: wrap; margin-top: var(--s-2); }
 .badge {
   font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em; text-transform: uppercase;
-  background: var(--cream); border-radius: 0; box-shadow: 0 0 0 2px var(--ink);
+  background: var(--cream); border-radius: 0; box-shadow: var(--frame-tight);
   padding: var(--s-1) var(--s-3);
 }
 /* A rail as well as a fill: "ill" against "well" may not be a colour on its own. */
@@ -205,16 +216,21 @@ body {
 .need-row { display: flex; align-items: center; gap: var(--s-4); margin: var(--s-2) 0; }
 .need-label { width: 4.5rem; font-size: var(--f-3); font-weight: 600; }
 .need-track {
-  flex: 1; height: 10px; background: var(--cream);
-  box-shadow: 0 0 0 2px var(--ink);
+  flex: 1; height: var(--s-5); background: var(--cream);
+  box-shadow: var(--frame-tight);
   overflow: hidden;
 }
+/* The bar is full width and SCALED to the reading: a transitioned `width` relays out the row
+   on every frame of the ease, and a person's page draws five of them. */
 .need-fill {
-  height: 100%; background-color: var(--sage);
+  width: 100%; height: 100%; transform-origin: left; background-color: var(--sage);
   background-image: repeating-linear-gradient(90deg, transparent 0 6px, rgba(255, 246, 233, 0.25) 6px 8px);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .need-fill { transition: width var(--t-med) var(--ease-enter), background-color var(--t-med); }
+  .need-fill {
+    transition: transform var(--t-med) var(--ease-enter),
+                background-color var(--t-med) var(--ease-enter);
+  }
 }
 .need-fill.low { background-color: var(--rose); }
 
@@ -301,15 +317,17 @@ body {
 .feed-glyph { flex: none; display: block; }
 @media (prefers-reduced-motion: no-preference) {
   .feed-jump {
-    transition: background-color var(--t-fast) var(--ease-enter),
-                border-left-color var(--t-fast) var(--ease-enter);
+    transition-property: background-color, border-left-color;
+    transition-timing-function: var(--ease-enter);
+    transition-duration: 0s;
   }
+  .feed-jump:hover { transition-duration: var(--t-fast); }
 }
 /* One stagger for all three lists, at the motion table's own 30ms, capped at 6 steps. */
 @media (prefers-reduced-motion: no-preference) {
   :is(.feed-line, .edition-slot, .strip-list > li) {
     animation: feed-in var(--t-fast) var(--ease-enter) backwards;
-    animation-delay: calc(var(--stagger-i, 6) * 30ms);
+    animation-delay: calc(var(--stagger-i, 6) * var(--stagger));
   }
   :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(1) { --stagger-i: 0; }
   :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(2) { --stagger-i: 1; }
@@ -372,12 +390,19 @@ body {
 .mark-glyph { display: block; }
 .mark:hover .mark-glyph, .mark:focus-visible .mark-glyph { translate: 0 -2px; }
 @media (prefers-reduced-motion: no-preference) {
-  .mark-glyph { transition: translate var(--t-fast) var(--ease-enter); }
+  .mark-glyph {
+    transition-property: translate;
+    transition-timing-function: var(--ease-enter);
+    transition-duration: 0s;
+  }
+  .mark:hover .mark-glyph, .mark:focus-visible .mark-glyph {
+    transition-duration: var(--t-fast);
+  }
 }
 /* the word for the mark: hidden until the mark is asked about, and then a real slab */
 .mark-tip {
   position: absolute; bottom: 100%; left: 50%; translate: -50% -4px; z-index: 2;
-  display: none; white-space: nowrap; max-width: min(22rem, calc(100vw - 32px));
+  display: none; white-space: nowrap; max-width: min(22rem, calc(100vw - 2 * var(--s-6)));
   overflow: hidden; text-overflow: ellipsis;
   font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--ink); background: var(--cream);
@@ -391,11 +416,10 @@ body {
 .mark:hover .mark-tip, .mark:focus .mark-tip { display: block; }
 .playhead {
   position: absolute; top: -3px; bottom: -3px; width: 3px; translate: -50%;
-  background: var(--ember); box-shadow: 0 0 0 2px var(--ink);
+  background: var(--ember); box-shadow: var(--frame-tight);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .playhead { transition: left var(--t-fast) var(--ease-enter); }
-}
+/* positioned, never transitioned: `.playhead` is dragged on pointermove, and a transition
+   lags the finger and lies about which minute is on screen — the same rule `.player-head` keeps. */
 .live-pill {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em; text-transform: uppercase;
@@ -425,7 +449,7 @@ body {
   text-transform: uppercase; color: var(--ink-quiet);
 }
 .room-lives { display: block; margin: 0; }
-.room-names, .room-empty, .room-who {
+.room-names, .room-who {
   font-family: var(--font-body); font-size: var(--f-3); color: var(--ink);
 }
 
@@ -491,7 +515,7 @@ body {
 .key-filtered {
   font-family: var(--font-px); font-size: var(--f-1);
   background: var(--ember); color: var(--deep);
-  padding: var(--s-1) var(--s-2); box-shadow: 0 0 0 2px var(--ink);
+  padding: var(--s-1) var(--s-2); box-shadow: var(--frame-tight);
 }
 
 .legend-chip {
@@ -615,7 +639,12 @@ body {
 /* the day you are watching — a rail as well as a fill, never colour alone */
 .moment-card[data-open='yes'] { background: var(--cream); border-left-color: var(--ember); }
 @media (prefers-reduced-motion: no-preference) {
-  .moment-card { transition: background-color var(--t-fast) var(--ease-enter), border-left-color var(--t-fast); }
+  .moment-card {
+    transition-property: background-color, border-left-color;
+    transition-timing-function: var(--ease-enter);
+    transition-duration: 0s;
+  }
+  .moment-card:hover { transition-duration: var(--t-fast); }
 }
 .thumb-motif { flex: none; display: block; }
 /* A filmstrip card is a fixed frame, so its content is trimmed to fit rather than clipped by the
@@ -650,7 +679,7 @@ body {
 .player-btn.live { background: var(--ember); color: var(--deep); }
 .player-glyph { display: block; }
 .player-track {
-  flex: 1; position: relative; height: 12px; cursor: pointer;
+  flex: 1; position: relative; height: var(--s-5); cursor: pointer;
   background: var(--deep); border: 2px solid var(--ink);
 }
 .player-track::after { content: ''; position: absolute; inset: var(--reach-44) 0; }
@@ -723,7 +752,7 @@ body {
   background-color: var(--sand); background-repeat: no-repeat;
   background-size: cover; background-position: center;
   image-rendering: pixelated;
-  box-shadow: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
+  box-shadow: var(--ledge-sm);
 }
 .rr-token {
   display: grid; place-items: center; image-rendering: auto;
@@ -757,7 +786,7 @@ body {
 .rr-mood {
   grid-area: mood; align-self: center; justify-self: end;
   image-rendering: pixelated;
-  background: var(--parchment); box-shadow: 0 0 0 2px var(--ink), 2px 2px 0 2px var(--deep);
+  background: var(--parchment); box-shadow: var(--ledge-sm);
 }
 .roster-row:hover .rr-mood, .roster-row.open .rr-mood { background: var(--cream); }
 .rr-place {
@@ -775,7 +804,7 @@ body {
   box-shadow: var(--ledge);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .roster-expanded { animation: panel-in var(--t-fast) var(--ease-enter); }
+  .roster-expanded { animation: panel-in var(--t-med) var(--ease-enter); }
 }
 .rx-lived { margin: 0 0 var(--s-4); font-style: italic; color: var(--ink-quiet); }
 .rx-block { margin: 0 0 var(--s-4); }
@@ -820,7 +849,7 @@ body {
   padding: var(--s-3) 0; border-bottom: 1px dotted var(--ink-quiet);
 }
 .law-row { grid-template-columns: minmax(0, 1fr) auto; }
-.law-row.changed { background: var(--honey) var(--grain); box-shadow: 0 0 0 2px var(--ink); padding: var(--s-3); }
+.law-row.changed { background: var(--honey) var(--grain); box-shadow: var(--frame-tight); padding: var(--s-3); }
 /* the human title leads; the machine path is the operator's subtitle underneath it */
 .law-title { grid-column: 1 / -1; margin: 0; font-size: var(--f-4); line-height: 1.3; }
 .law-says { grid-column: 1 / -1; margin: var(--s-1) 0 0; font-size: var(--f-3); text-wrap: pretty; }
@@ -847,7 +876,7 @@ body {
 }
 .law-cell {
   display: flex; align-items: baseline; gap: var(--s-3); min-width: 0;
-  background: var(--cream); box-shadow: 0 0 0 2px var(--ink); padding: var(--s-1) var(--s-3);
+  background: var(--cream); box-shadow: var(--frame-tight); padding: var(--s-1) var(--s-3);
 }
 .law-cell dt {
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
@@ -976,7 +1005,7 @@ body {
 /* 7 · a loading surface has a SHAPE, not a spinner. A slab at the real row height tells the
    viewer what is coming and stops the panel jumping when it lands. */
 .skeleton-row {
-  height: 40px; margin: var(--s-2) 0;
+  height: var(--s-8); margin: var(--s-2) 0;
   background: linear-gradient(90deg, var(--sand) 0 60%, var(--parchment) 60% 100%);
   box-shadow: inset 0 0 0 2px var(--parchment);
 }
@@ -1055,6 +1084,19 @@ body {
   position: absolute; width: 1px; height: 1px; margin: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+/* A roll is a canvas graph's only keyboard path, so it holds one button per node. Clipped, it
+   is dozens of tab stops a sighted keyboard user cannot see: focus brings the whole list back. */
+.sr-roll:focus-within {
+  position: static; width: auto; height: auto; overflow: visible;
+  clip-path: none; white-space: normal;
+  display: grid; gap: var(--s-1); padding: var(--s-4) 0 0; list-style: none;
+}
+.sr-roll:focus-within button {
+  width: 100%; min-height: 44px; padding: var(--s-2) var(--s-4);
+  font: inherit; text-align: left; color: var(--ink); cursor: pointer;
+  background: var(--parchment); border: 0; box-shadow: var(--frame-tight);
+}
+.sr-roll:focus-within button:hover { background: var(--sand); }
 
 /* Figures mounts one tab stop per visible person, so the arms are up to forty presses away. */
 .skip {
@@ -1080,7 +1122,7 @@ body {
   padding: 0 var(--s-1);
   border: 4px solid transparent; border-image: url('./px/nameplate.webp') 4 repeat;
   opacity: 0;
-  animation: stage-plate-in var(--t-fast) var(--ease-enter) forwards;
+  animation: stage-plate-in var(--t-med) var(--ease-enter) forwards;
 }
 @keyframes stage-plate-in { to { opacity: 1; } }
 
@@ -1111,10 +1153,10 @@ body {
 }
 .stage-ring-arms button {
   position: absolute; translate: -50% -50%;
-  font: inherit; font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  font: inherit; font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
   min-height: 44px; padding: 0 var(--s-5);
   color: var(--cream); background: var(--deep);
-  border: 0; border-radius: 20px;
+  border: 0; border-radius: 0;
   cursor: pointer;
 }
 .stage-ring-arms button:hover { background: var(--honey); color: var(--deep); }
@@ -1167,11 +1209,16 @@ body {
    between two rows of a surface where every other edge is on one. */
 .sky-arc-ground { fill: none; stroke: var(--deep); stroke-width: 5; }
 .sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2; stroke-dasharray: 1 3; }
-.sky-token { position: absolute; translate: -50% -50%; color: var(--cream); }
+/* Placed at the arc's origin and carried by a translate: easing `left` and `top` relaid the
+   whole bar out on every frame, and this one runs on the world's tick. */
+.sky-token {
+  position: absolute; left: 0; top: 0; color: var(--cream);
+  translate: calc(var(--sky-x) - 50%) calc(var(--sky-y) - 50%);
+}
 .sky-token[data-kind='sun'] { color: var(--honey); }
 @media (prefers-reduced-motion: no-preference) {
   /* The one easing on the bar, and it is a position, not an effect. */
-  .sky-token { transition: left var(--t-slow) var(--ease-move), top var(--t-slow) var(--ease-move); }
+  .sky-token { transition: translate var(--t-slow) var(--ease-move); }
 }
 /* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
    road goes and the two chips close up rather than lie about the hour. */
@@ -1215,7 +1262,7 @@ body {
   max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 2 * var(--mark-inset)));
   text-align: center; text-wrap: balance;
   pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1492,7 +1539,7 @@ body {
   display: flex; align-items: center;
   min-height: calc(22px * var(--px));
   padding: 0 calc(4px * var(--px)) calc(1px * var(--px)) calc(2px * var(--px));
-  font-family: var(--font-sign); font-size: var(--f-4); line-height: 1; white-space: nowrap;
+  font-family: var(--font-sign); font-size: var(--f-sign); line-height: 1; white-space: nowrap;
   color: var(--deep); cursor: pointer;
   /* deep ink on the plank's own wood is 8.9:1 idle, 5.5:1 pressed; the 1px light under each
      glyph is the cut edge of painted lettering, not a halo */
@@ -1514,7 +1561,7 @@ body {
 /* a ring of deep round a ring of honey: 9.6:1 between them, whatever the town is under it */
 .signpost-arm:focus-visible {
   outline: 2px solid var(--honey); outline-offset: 2px;
-  box-shadow: 0 0 0 2px var(--deep), 0 0 0 6px var(--deep);
+  box-shadow: 0 0 0 6px var(--deep);
 }
 .signpost-post {
   position: absolute; z-index: -1; left: calc(3px * var(--px)); top: calc(4px * var(--px));
@@ -1527,8 +1574,7 @@ body {
    1.5 resampled the 2x layer and left the outline one row thick, then two. */
 @media (min-width: 1920px) {
   .signpost { --px: 3; }
-  /* 3x the face's 8px grid; a size the type ladder does not carry */
-  .signpost-arm { font-size: 24px; }
+  .signpost-arm { font-size: var(--f-sign-wide); }
 }
 /* 284px of a 390px landscape phone is 73% of the screen, and the pole ran off the bottom. */
 @media (max-height: 620px) {
@@ -1601,7 +1647,7 @@ body {
   /* the arms are along the top edge here, so the sheet takes the width as well as the height */
   .paper {
     left: 50%; width: min(96%, 1040px);
-    height: calc(100dvh - 64px); border-top-width: 12px;
+    height: calc(100dvh - 64px); border-top-width: var(--s-5);
   }
   .paper-head { padding-block: var(--s-2) 0; }
 }
@@ -1617,7 +1663,7 @@ body {
   position: relative; justify-self: center;
   width: 44px; height: 5px; margin: var(--s-3) 0;
   /* 4.28:1 on parchment: the one "drag me down" affordance, so it clears the 3:1 floor. */
-  background: #8B6F4E; border-radius: 3px;
+  background: #8B6F4E;
   cursor: grab; touch-action: none;
 }
 .paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
@@ -1664,9 +1710,14 @@ body {
   color: var(--ink-quiet);
   background: transparent; border: 0; border-bottom: 2px solid transparent;
   cursor: pointer;
-  transition-property: color, border-color; transition-duration: var(--t-fast);
+  transition-property: color, border-color;
+  transition-timing-function: var(--ease-enter);
+  transition-duration: 0s;
 }
 .paper-tab:hover { color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .paper-tab:hover { transition-duration: var(--t-fast); }
+}
 /* Honey on parchment is 1.31:1. No weight change either: 600 widened the tab and shoved the
    whole strip sideways on every change. */
 .paper-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
@@ -1703,7 +1754,7 @@ body {
 /* A drop cap is the front page's own signature, and it belongs to the lead alone. */
 .edition.lead .edition-body::first-letter {
   font-family: var(--font-title); font-weight: 700; font-size: var(--f-7);
-  float: left; line-height: 0.86; padding: 2px var(--s-2) 0 0;
+  float: left; line-height: 0.86; padding: var(--s-1) var(--s-2) 0 0;
 }
 
 .paper-sheet {
@@ -1714,10 +1765,13 @@ body {
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* The one-row section line needs about 677px of head: five tabs, the date, the clock and the
-   close word. A 78% sheet only reaches that around a 970px window, so below the 1000px the
-   signpost already breaks at, the tabs take the second row to themselves and scroll along it. */
-@media (max-width: 1000px) {
+/* The one-row section line needs about 723px of head: five tabs, the date, the clock and the
+   close word. The dateline carries its weekday now, which took the date from 157px to 207px and
+   the line past what a 760px sheet can hold — measured, the date's own text was painting 50px
+   outside its track and over the first tab at every width from 1024 to 1600. The sheet is capped
+   at 760px until 1920px widens it to 1040, so 1920 is the ONLY width where one row fits, and the
+   complement of that rule is where the tabs take the second row and scroll along it. */
+@media (max-width: 1919.98px) {
   .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
     grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
@@ -1823,8 +1877,10 @@ body {
 
 /* ── the bonds tab: ONE VERTICAL SHEET, never two pictures crammed side by side ──
    The whole town first, then one person's orbit, then the grid every pair has an address in. */
-.bonds-sheet { display: grid; gap: var(--s-8); }
-.bonds-section { display: grid; gap: var(--s-4); align-content: start; }
+/* `minmax(0, 1fr)`, never `auto`: force-graph writes its own canvas width, and an auto track
+   sizes to that canvas rather than the sheet — 480px of graph inside a 326px phone sheet. */
+.bonds-sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+.bonds-section { display: grid; gap: var(--s-4); align-content: start; min-width: 0; }
 .bonds-section-head {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--s-5); flex-wrap: wrap;
@@ -1832,7 +1888,9 @@ body {
 .bonds-section-head .feed-head { margin: 0; }
 .bonds-hint { margin: 0; font-size: var(--f-1); color: var(--ink-quiet); }
 
-.bonds-graph { position: relative; display: flex; flex-direction: column; gap: var(--s-3); }
+.bonds-graph {
+  position: relative; display: flex; flex-direction: column; gap: var(--s-3); min-width: 0;
+}
 /* `overflow: hidden` and a stated height stop force-graph measuring itself bigger every frame;
    the night ground is the CELL's, because force-graph writes the canvas's own background. */
 .bonds-canvas {
@@ -1860,7 +1918,7 @@ body {
 .orbit-mark.above .orbit-name, .orbit-mark.orbit-me .orbit-name { order: -1; }
 .orbit-node {
   width: 13px; height: 13px; background: var(--sage);
-  box-shadow: 0 0 0 2px var(--ink); flex: none;
+  box-shadow: var(--frame-tight); flex: none;
 }
 .orbit-me .orbit-node { width: 19px; height: 19px; background: var(--honey); }
 .orbit-name {
@@ -2120,13 +2178,19 @@ body {
 [data-broadcast='on'] .fps-overlay { display: none; }
 
 /* 1080p into a 480px player is quarter scale, so every size below is FOUR TIMES the desk
-   chrome's; broadcast.ts's BROADCAST_CAPTIONS measures them against the 5.4px subtitle floor. */
+   chrome's; broadcast.ts's BROADCAST_CAPTIONS measures them against the 5.4px subtitle floor.
+   The stream is a second medium at a fixed size, so it carries its own two type steps rather
+   than bending the desk's seven — but the SPACING is the same ladder, at the same names. */
+[data-broadcast='on'] {
+  /* clear of the ticker (56px) and the honey rule over it (4px) */
+  --bcast-safe: 88px;
+}
 
 [data-broadcast='on'] .stage-stamp {
-  font-size: 24px;
+  font-size: var(--f-bcast);
   top: max(var(--mark-inset), env(safe-area-inset-top));
 }
-[data-broadcast='on'] .stage-cue { font-size: 24px; bottom: 88px; }
+[data-broadcast='on'] .stage-cue { font-size: var(--f-bcast); bottom: var(--bcast-safe); }
 
 /* The sky bar is gone on the stream, so the card takes the corner itself. */
 [data-broadcast='on'] .scene-card {
@@ -2141,10 +2205,11 @@ body {
 [data-broadcast='on'] .sleep-card-note { font-size: 24px; }
 
 [data-broadcast='on'] .lower-third {
-  position: absolute; left: 4%; right: auto; margin: 0; width: auto; bottom: 88px; z-index: 26;
-  display: flex; align-items: stretch; gap: 12px;
+  position: absolute; left: 4%; right: auto; margin: 0; width: auto; z-index: 26;
+  bottom: var(--bcast-safe);
+  display: flex; align-items: stretch; gap: var(--s-5);
   max-width: 64%;
-  padding: 12px;
+  padding: var(--s-5);
   background: var(--parchment); color: var(--ink);
   box-shadow: var(--frame);
   border-bottom: 6px solid var(--honey);
@@ -2157,16 +2222,16 @@ body {
 }
 [data-broadcast='on'] .lower-third-bust.none { background-color: var(--sand); }
 [data-broadcast='on'] .lower-third-body {
-  display: flex; flex-direction: column; justify-content: center; gap: 6px; min-width: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: var(--s-3); min-width: 0;
 }
 [data-broadcast='on'] .lower-third-name {
-  font-family: var(--font-px); font-size: 24px; line-height: 1.1;
+  font-family: var(--font-px); font-size: var(--f-bcast); line-height: 1.1;
   letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--cream); background: var(--ink);
-  align-self: flex-start; padding: 4px 10px;
+  align-self: flex-start; padding: var(--s-2) var(--s-5);
 }
 [data-broadcast='on'] .lower-third-words {
-  font-family: var(--font-body); font-size: 32px; font-weight: 600; line-height: 1.25;
+  font-family: var(--font-body); font-size: var(--f-bcast-lead); font-weight: 600; line-height: 1.25;
   color: var(--ink);
 }
 
@@ -2181,7 +2246,7 @@ body {
    here is both a blank bar at the top of a stream and a gap at every wrap. */
 [data-broadcast='on'] .ticker-line {
   display: inline-block; padding: 0;
-  font-family: var(--font-px); font-size: 24px; line-height: 1;
+  font-family: var(--font-px); font-size: var(--f-bcast); line-height: 1;
   letter-spacing: 0.04em;
   color: var(--cream);
 }

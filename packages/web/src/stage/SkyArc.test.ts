@@ -132,7 +132,7 @@ describe('★ the bar the viewer actually gets', () => {
   it('puts the token where the hour puts it, and moves it when the hour does', () => {
     const noon = bar(at(12))
     const evening = bar(at(20))
-    const pct = (html: string): number => Number(/left:([\d.]+)%/.exec(html)?.[1])
+    const pct = (html: string): number => Number(/--sky-x:([\d.]+)%/.exec(html)?.[1])
     expect(pct(noon)).toBeGreaterThan(0)
     expect(pct(evening)).toBeGreaterThan(pct(noon))
     expect(noon).toContain('data-kind="sun"')
@@ -170,9 +170,13 @@ describe('the bar is quiet chrome, and does not fight the town', () => {
   })
 
   it('★ eases a position and runs no loop at all', () => {
+    // A translate, not `left`/`top`: those two relaid the whole bar out on every frame of an
+    // ease that runs on the world's own tick.
     const token = /\.sky-token \{ transition:([^;]*);/.exec(CSS.replace(/\s+/g, ' '))?.[1] ?? ''
-    expect(token).toContain('left')
-    expect(token).toContain('top')
+    expect(token).toContain('translate')
+    expect(CSS.replace(/\s+/g, ' ')).toMatch(
+      /\.sky-token \{[^}]*translate: calc\(var\(--sky-x\) - 50%\) calc\(var\(--sky-y\) - 50%\)/,
+    )
     expect(CSS).not.toMatch(/@keyframes sky-/)
     // ...and the easing is inside a no-preference guard, like every other motion in the sheet
     expect(CSS).toMatch(

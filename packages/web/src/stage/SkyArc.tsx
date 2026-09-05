@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, type CSSProperties } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { WEATHER_GLYPH } from '../ui/townStats.js'
 import {
@@ -86,7 +86,7 @@ export function SkyArc({ store }: { store: WorldStore }) {
         <span
           className="sky-token"
           data-kind={token.kind}
-          style={{ left: `${at.left}%`, top: `${at.top}%` }}
+          style={{ '--sky-x': `${at.left}%`, '--sky-y': `${at.top}%` } as CSSProperties}
         >
           {/* `currentColor`, so the token's honey and cream stay in `:root` with every other
               colour the product uses rather than being retyped here. */}

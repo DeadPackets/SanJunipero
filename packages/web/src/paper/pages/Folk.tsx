@@ -6,6 +6,7 @@ import { EMPTY_LINEAGE } from '../../ui/bondModel2.js'
 import { changeLog, personalityRows, type PersonalityRow } from '../../ui/becoming.js'
 import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { households } from '../families.js'
 import { CustomsPage } from './Customs.js'
@@ -95,9 +96,13 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
 
 function Families({ store }: Pick<PageProps, 'store'>) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
-  const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
+  const read = useFeed(lineageFeed)
+  const lineage = read.data ?? EMPTY_LINEAGE
   const homes = households(lineage)
 
+  // A town with no households and a refused read look identical; only one of them is news
+  // about the town.
+  if (read.data === null && read.failed) return <OutOfReach onRetry={lineageFeed.retry} />
   if (homes.length === 0) return <p className="feed-empty">{EMPTY_COPY.families}</p>
   return (
     <ul className="families">

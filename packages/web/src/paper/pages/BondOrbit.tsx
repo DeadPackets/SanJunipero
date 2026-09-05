@@ -82,7 +82,7 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
       </div>
       {/* The picture is the answer; this is the keyboard's way through it and its text
           alternative in one list, the same bargain the town graph's roll makes. */}
-      <ul className="stage-sr" aria-label={`Everyone ${orbit.name} knows`}>
+      <ul className="stage-sr sr-roll" aria-label={`Everyone ${orbit.name} knows`}>
         {orbit.ties.map((tie) => (
           <li key={tie.id}>
             <button

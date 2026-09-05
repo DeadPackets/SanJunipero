@@ -161,7 +161,9 @@ export function BondsGraph({
     const el = boxRef.current
     if (el === null || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => {
-      setDims({ w: el.clientWidth, h: el.clientHeight })
+      const w = el.clientWidth
+      const h = el.clientHeight
+      setDims((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
     })
     ro.observe(el)
     return () => {
@@ -271,7 +273,10 @@ export function BondsGraph({
   // the component re-renders on every world tick.
   const roll = useMemo(
     () => (
-      <ul className="stage-sr" aria-label="Everyone in the graph. Choose one to open their orbit.">
+      <ul
+        className="stage-sr sr-roll"
+        aria-label="Everyone in the graph. Choose one to open their orbit."
+      >
         {graph.nodes.map((n) => (
           <li key={n.id}>
             <button
@@ -370,7 +375,7 @@ export function BondsGraph({
     // one person's orbit, then the grid every pair has an address in.
     <div className="bonds-sheet">
       <section className="bonds-section">
-        <h4 className="feed-head">Everyone, and who they are to each other</h4>
+        <h3 className="feed-head">Everyone, and who they are to each other</h3>
         <div className="bonds-graph">
           {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
               keys, and a second tablist nested in its panel would be one the keyboard cannot
@@ -462,7 +467,7 @@ export function BondsGraph({
             wireDown ? (
               <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
             ) : (
-              <p className="feed-empty" aria-busy="true">
+              <p className="feed-empty" role="status" aria-busy="true">
                 Reading the town’s ties…
               </p>
             )
@@ -517,9 +522,9 @@ export function BondsGraph({
 
       <section className="bonds-section">
         <div className="bonds-section-head">
-          <h4 className="feed-head">
+          <h3 className="feed-head">
             {orbit === null ? 'One person’s orbit' : `${orbit.name}, and everyone`}
-          </h4>
+          </h3>
           {orbit !== null && (
             <button
               type="button"
@@ -536,7 +541,7 @@ export function BondsGraph({
           bonds.failed ? (
             <OutOfReach onRetry={bondsFeed.retry} />
           ) : (
-            <p className="feed-empty" aria-busy={!bonds.loaded}>
+            <p className="feed-empty" role="status" aria-busy={!bonds.loaded}>
               {EMPTY_COPY.bonds}
             </p>
           )
@@ -548,7 +553,7 @@ export function BondsGraph({
       </section>
 
       <section className="bonds-section">
-        <h4 className="feed-head">Every pair has one address</h4>
+        <h3 className="feed-head">Every pair has one address</h3>
         {matrix.rows.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.bonds}</p>
         ) : (

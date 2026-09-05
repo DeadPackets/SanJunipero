@@ -63,7 +63,7 @@ export function KeyMap({
       if (t?.closest(`[aria-controls='${KEY_MAP_ID}']`) != null) return
       if (!(sheet.current?.contains(t) ?? false)) onOpenChange(false)
     }
-    window.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointerdown', onDown, { passive: true })
     return () => {
       window.removeEventListener('pointerdown', onDown)
     }

@@ -66,6 +66,7 @@ export function RosterListView({
               <RosterRowView row={row} open={openId === row.id} onToggle={onToggle} />
               {openId === row.id && becomingOf !== undefined && (
                 <RosterExpanded
+                  id={`rx-${row.id}`}
                   becoming={becomingOf(row.id)}
                   onOpenFull={() => onOpenFull?.(row.id)}
                 />

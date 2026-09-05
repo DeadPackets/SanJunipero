@@ -26,7 +26,7 @@ export function Signpost({
           data-arm={arm}
           // A disclosure set, not four toggles: each arm opens the one sheet on its own page.
           aria-expanded={open === arm}
-          aria-controls="paper-sheet"
+          aria-controls="paper"
           onClick={() => {
             onOpen(arm)
           }}
