@@ -16,7 +16,14 @@ export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; r
 
 // The road out of a collapse. World one closed every one of these: Amara died ten feet from a
 // neighbour's door having tried fifteen times to shout, and been refused each time.
-const DOWNED_VERBS: ReadonlySet<string> = new Set(['eat', 'sleep', 'speak', 'walk'])
+const DOWNED_VERBS: ReadonlySet<string> = new Set([
+  'drink',
+  'eat',
+  'exit',
+  'sleep',
+  'speak',
+  'walk',
+])
 
 // The same act, hung on the end of the one that makes it possible.
 const carrying = (go: IntentResult, verb: string, params: Record<string, unknown>): IntentResult =>

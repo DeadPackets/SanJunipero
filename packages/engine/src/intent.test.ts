@@ -98,6 +98,16 @@ describe('submitIntent', () => {
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(false)
   })
 
+  it('a body on the ground may still drink at the water and step out of a room', () => {
+    const river = patchAgent(makeWorld(['~.......']), 'a1', { collapsedSinceTick: 5, x: 1, y: 0 })
+    expect(submitIntent(river, DEFAULT_CONFIG, 'a1', 'drink', {}).ok).toBe(true)
+    const indoors = patchAgent(makeWorld(), 'a1', {
+      collapsedSinceTick: 5,
+      insideId: 'structure_1',
+    })
+    expect(submitIntent(indoors, DEFAULT_CONFIG, 'a1', 'exit', {}).ok).toBe(true)
+  })
+
   it('rejects unknown verbs and unreachable destinations with in-world reasons', () => {
     const s = makeWorld(['..~.', '..~.', '..~.'])
     const noVerb = submitIntent(s, DEFAULT_CONFIG, 'a1', 'dance', {})
