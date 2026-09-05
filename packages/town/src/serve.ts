@@ -39,9 +39,9 @@ const countEnv = (name: string): number | undefined =>
 /** A refusal the ledger raised is a budget event, not a fault: the container restarts on a
  *  non-zero exit and the next boot re-reads the same ledger, so exiting would leave the viewer
  *  dark for the day the rolling window takes to free. Any other failure still refuses. */
-export async function castOrScripted<E extends Error>(
+export async function castOrScripted(
   build: () => Promise<LiveCast>,
-  Held: abstract new (...args: never[]) => E,
+  Held: abstract new (...args: never[]) => Error,
 ): Promise<LiveCast | null> {
   try {
     return await build()

@@ -1418,8 +1418,12 @@ describe('★ the chronicle, written on the day boundary', () => {
 // ★ Every tile a body crosses is a row, and the array held all of them since boot — the whole
 // log on a resumed town — inside a 1.5 GB container, re-walked whole at every day boundary.
 describe('★ the recognizer holds the window it reads, not the town’s whole life', () => {
-  const moved = (day: number): SimEvent =>
-    ({ seq: day, tick: day * MINUTES_PER_DAY, type: 'agent_moved', payload: {} }) as SimEvent
+  const moved = (day: number): SimEvent => ({
+    seq: day,
+    tick: day * MINUTES_PER_DAY,
+    type: 'agent_moved',
+    payload: {},
+  })
 
   it('drops the days no gathering can still be joined to', () => {
     const events = Array.from({ length: 30 }, (_, day) => moved(day))

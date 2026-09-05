@@ -27,7 +27,7 @@ const counted = (db: Database.Database): { db: Database.Database; rows: () => nu
           get(s, p, r) {
             if (p !== 'all') return Reflect.get(s, p, r) as unknown
             return (...args: unknown[]) => {
-              const out = s.all(...args) as unknown[]
+              const out = s.all(...args)
               rows += out.length
               return out
             }

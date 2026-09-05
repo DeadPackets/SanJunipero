@@ -394,7 +394,7 @@ describe('a grave where the life ended', () => {
 
   it('is never cut into the way itself: a body that falls on the road is buried beside it', () => {
     const paved = map()
-    for (let y = 0; y < paved.length; y++) paved[y]![2] = 7
+    for (const row of paved) row[2] = 7
     paved[4]![3] = 8
     const s = fold(
       genesisState(CFG, paved),

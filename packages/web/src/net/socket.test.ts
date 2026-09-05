@@ -165,7 +165,7 @@ describe('connectObservatory link status', () => {
     const reload = vi.fn()
     vi.stubGlobal('location', { reload })
     const bad = JSON.stringify({ ...SNAPSHOT, config: { mystery: 1 } })
-    for (const _ of [0, 1]) {
+    for (let round = 0; round < 2; round++) {
       FakeWebSocket.instances = []
       connectObservatory({ url: 'ws://test/ws', store: createWorldStore() })
       FakeWebSocket.instances[0]!.open()

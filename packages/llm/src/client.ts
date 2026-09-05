@@ -332,7 +332,7 @@ export class LlmClient {
           throw new NoObjectGeneratedError({
             message: why,
             text: JSON.stringify(r.toolCalls[0]?.input ?? null),
-            response: r.response,
+            response: r.finalStep.response,
             usage: r.usage,
             finishReason: r.finishReason,
           })

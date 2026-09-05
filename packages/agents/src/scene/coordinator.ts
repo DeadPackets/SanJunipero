@@ -258,7 +258,7 @@ export class SceneCoordinator {
       }
       if (scene.floor === null) continue
       const held = this.#floorSince.get(scene.id)
-      if (held === undefined || held.agentId !== scene.floor) {
+      if (held?.agentId !== scene.floor) {
         this.#floorSince.set(scene.id, { agentId: scene.floor, atMs: this.#now() })
         continue
       }
