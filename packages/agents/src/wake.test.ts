@@ -561,6 +561,14 @@ describe('★ a felt event buys one turn, not one a tick', () => {
     expect(wakeReasons(cfg, tended, clock, 12, pln())).toEqual(['salient_perception'])
   })
 
+  it('does not wake a maker to say their fish was eaten; the next turn hears it', () => {
+    const clock = clk()
+    const relied = pkt({ feltEvents: ['your_work_used_ate'] })
+    expect(wakeReasons(cfg, relied, clock, 10, pln())).not.toContain('salient_perception')
+    const both = pkt({ feltEvents: ['your_work_used_ate', 'rain_started'] })
+    expect(wakeReasons(cfg, both, clock, 12, pln())).toEqual(['salient_perception'])
+  })
+
   it('wakes again when the same thing happens after the first has aged out', () => {
     const clock = clk()
     expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])

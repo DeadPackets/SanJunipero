@@ -189,11 +189,12 @@ export function wakeReasons(
 
   // Floor-exempt: physical rousing, and whatever happened TO this body. A felt event sits in the
   // window for all 66 of its ticks, so only what is new since the last ask is worth a turn.
+  // Word that your work was used is news for the next turn, not a turn of its own: a maker
+  // woken for every meal eaten off their catch is a turn a meal.
+  const heard = packet.feltEvents.filter((e) => !e.startsWith('your_work_used_'))
   const spentFelt = clock.feltSeen ?? []
-  const felt =
-    packet.feltEvents.length > spentFelt.length ||
-    packet.feltEvents.some((e) => !spentFelt.includes(e))
-  clock.feltSeen = [...packet.feltEvents]
+  const felt = heard.length > spentFelt.length || heard.some((e) => !spentFelt.includes(e))
+  clock.feltSeen = [...heard]
   if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
   if (felt) reasons.push('salient_perception')
   if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
