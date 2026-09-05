@@ -102,12 +102,18 @@ export class SceneCoordinator {
     })
   }
 
-  /** A word said by a mind in no scene. Inside an open scene's earshot it is a line of THAT
-   *  scene and the mouth joins it; otherwise, if anyone who could answer heard it, it opens one
-   *  between the speaker and the mind they spoke to, and everybody else stands and listens. */
+  /** A word the world took. Said inside the mouth's own talk — an ordinary turn that resolved
+   *  after the scene opened around it — it is a line of that talk. Inside another open scene's
+   *  earshot it is a line of THAT scene and the mouth joins it; otherwise, if anyone who could
+   *  answer heard it, it opens one between the speaker and the mind they spoke to, and everybody
+   *  else stands and listens. */
   noteSpoken(agentId: string, text: string, tick: number): Scene | null {
-    if (this.sceneFor(agentId) !== null) return null
     const said = sanitizeSpokenText(text)
+    const mine = this.sceneFor(agentId)
+    if (mine !== null) {
+      this.#recordLine(mine, agentId, said, '', 'none', null, tick)
+      return mine
+    }
     const joined = this.#joinNearby(agentId, said, tick)
     if (joined !== null) return joined
     const heard = this.#bridge
