@@ -25,10 +25,12 @@ export const MOMENT_EMOTE_ABOVE_PX = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_
 /** Which pixel a moment wears. A heart for a bond gained, the crack for one lost, the lit bulb
  *  for anything the town worked out or wrote down, and the ember mark for a ruling it undid. */
 export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
-  // A death is mourned, not wounded; a birth is the family's; an arrival is a stranger's star.
+  // A death is mourned, not wounded; a birth is the family's; an arrival is a stranger's star,
+  // and a departure is the rain of somebody the town will not see again.
   agent_died: 'rain',
   agent_born: 'heart',
-  agent_spawned: 'star',
+  agent_arrived: 'star',
+  agent_departed: 'rain',
   invited: 'question',
   invitation_accepted: 'heart',
   invitation_refused: 'rain',

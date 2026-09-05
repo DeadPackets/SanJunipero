@@ -26,7 +26,9 @@ export const AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/
 export const FOLD_TYPES: readonly string[] = [
   'action_completed',
   'action_started',
+  'agent_arrived',
   'agent_collapsed',
+  'agent_departed',
   'agent_died',
   'agent_expressed',
   'agent_injured',

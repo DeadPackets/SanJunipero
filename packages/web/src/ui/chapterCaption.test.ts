@@ -75,7 +75,9 @@ describe('★ the cue speaks for a death, a birth, a build, a partnership and an
       'invitation_refused',
     ])
       expect(CUE_TYPES, t).toContain(t)
-    expect(CUE_TYPES).toContain('agent_spawned')
+    expect(CUE_TYPES).toContain('agent_arrived')
+    expect(CUE_TYPES).toContain('agent_departed')
+    expect(CUE_TYPES, 'the founding is not news to the town').not.toContain('agent_spawned')
     expect(CUE_TYPES, 'a shared roof decides nothing').not.toContain('co_slept')
   })
 
@@ -97,15 +99,23 @@ describe('★ the cue speaks for a death, a birth, a build, a partnership and an
     )
   })
 
-  it('★ says an arrival, which the chronicle leaves out — the founding is not news', () => {
-    const spawn = ev('agent_spawned', { id: 'a9', name: 'Nadia', x: 1, y: 1, ageDays: 20 })
-    expect(cueFor(spawn, state)?.text).toBe('Nadia came to the town.')
-    expect(cueFor(ev('agent_spawned', { id: 'a9' }), state)).toBeNull()
+  // Payloads per the arrivals design §2; the engine's own lane lands the schemas that parse them.
+  it('★ says who came up the valley road, off the payload — the roster has no stranger yet', () => {
+    const came = ev('agent_arrived', { id: 'a9', name: 'Nadia', sex: 'f', ageDays: 20, x: 1, y: 1 })
+    expect(cueFor(came, state)?.text).toBe('Nadia came up the valley road.')
+    expect(cueFor(came, state)?.icon).toBe('star')
+    expect(cueFor(ev('agent_arrived', { id: 'a9' }), state)).toBeNull()
+  })
+
+  it('★ and says who went down it', () => {
+    const went = ev('agent_departed', { agentId: 'a1' })
+    expect(cueFor(went, state)?.text).toBe('Rahel went down the valley road.')
+    expect(cueFor(went, state)?.bodies).toEqual(['a1'])
   })
 
   it('★ the pixel rises off the right head: `id` is the person only where it IS one', () => {
     expect(bodiesOf(ev('agent_born', { id: 'a2', motherId: 'a1' }))).toEqual(['a2', 'a1'])
-    expect(bodiesOf(ev('agent_spawned', { id: 'a9', name: 'Nadia' }))).toEqual(['a9'])
+    expect(bodiesOf(ev('agent_arrived', { id: 'a9', name: 'Nadia' }))).toEqual(['a9'])
     // a finished building's `id` is the BUILDING, and no pixel may rise off it
     expect(bodiesOf(ev('structure_completed', { id: 's1' }))).toEqual([])
     expect(bodiesOf(ev('agent_died', { agentId: 'a1', byId: 'a2' }))).toEqual(['a1', 'a2'])

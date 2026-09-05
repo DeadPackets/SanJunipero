@@ -5,7 +5,9 @@ import { DEFAULT_CONFIG, type HeatWindow, type SimEvent } from '@sj/shared'
 export const HEAT_WINDOW_TICKS = 60
 export const HEAT_WEIGHTS: Record<string, number> = {
   agent_died: 20,
+  agent_departed: 14,
   partnership_dissolved: 14,
+  agent_arrived: 12,
   discovery_made: 12,
   fire_ignited: 12,
   law_ratified: 12,
@@ -94,6 +96,9 @@ function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
   }
   if (typeof p.agentId === 'string') return p.agentId
   switch (ev.type) {
+    // The body the road brought: `id` is the person here, the way it is on a birth.
+    case 'agent_arrived':
+      return p.id ?? null
     case 'discovery_made':
       return p.byId ?? null
     // One night pays one of the pair, the way one fire pays one person: the camera can only be

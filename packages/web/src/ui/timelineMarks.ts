@@ -14,6 +14,7 @@ export const MARK_KINDS = [
   'changed',
   'quarrel',
   'joined',
+  'left',
   'discovery',
 ] as const
 export type MarkKind = (typeof MARK_KINDS)[number]
@@ -29,6 +30,7 @@ export const MARK_WEIGHT: Readonly<Record<MarkKind, number>> = {
   death: 14,
   birth: 14,
   joined: 12,
+  left: 12,
   quarrel: 12,
   chapter: 10,
   built: 8,
@@ -130,6 +132,8 @@ export const MARK_GLYPH: Readonly<Record<MarkKind, MarkPixel[]>> = {
   quarrel: art('ii...ii', 'iii.iii', '.iiiii.', '..iii..', '.iiiii.', 'iii.iii', 'ii...ii'),
   // an arrival: an arrow coming down onto the ground
   joined: art('...i...', '...i...', '.iiiii.', '..iii..', '...i...', '.......', 'iiiiiii'),
+  // a departure: the road out, pointing away
+  left: art('.......', '...i...', '....i..', 'iiiiiii', '....i..', '...i...', '.......'),
   // a key — the day a door opened. HONEY is the ward; INK carries the whole silhouette, so the
   // shape survives the colour being taken away (7.63:1 on the sand track).
   discovery: art('..iii..', '.ii.ii.', '.ii.ii.', '..iii..', '...i...', '...ihi.', '...ih..'),
@@ -141,7 +145,8 @@ export const MARK_GLYPH: Readonly<Record<MarkKind, MarkPixel[]>> = {
 const EVENT_MARK: Readonly<Record<string, MarkKind>> = {
   agent_died: 'death',
   agent_born: 'birth',
-  agent_spawned: 'joined',
+  agent_arrived: 'joined',
+  agent_departed: 'left',
   agent_injured: 'quarrel',
   structure_completed: 'built',
 }
@@ -153,6 +158,7 @@ export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: numb
     birth: { one: 'A child was born', many: (n) => `${n} children were born` },
     built: { one: 'A building was finished', many: (n) => `${n} buildings were finished` },
     joined: { one: 'Someone arrived in the town', many: (n) => `${n} people arrived in the town` },
+    left: { one: 'Someone left the town', many: (n) => `${n} people left the town` },
     quarrel: { one: 'A quarrel', many: (n) => `${n} quarrels` },
     changed: { one: 'Someone changed', many: (n) => `${n} people changed` },
     // these two carry the narrator's own words, so the fallback is only ever a safety net

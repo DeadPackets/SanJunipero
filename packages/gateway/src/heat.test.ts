@@ -48,7 +48,9 @@ describe('heat stub', () => {
     expect(HEAT_WINDOW_TICKS).toBe(60)
     expect(HEAT_WEIGHTS).toEqual({
       agent_died: 20,
+      agent_departed: 14,
       partnership_dissolved: 14,
+      agent_arrived: 12,
       discovery_made: 12,
       fire_ignited: 12,
       law_ratified: 12,
@@ -367,5 +369,27 @@ describe('heat stub', () => {
         ]),
       ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'ana', score: 12 + 4 + 2 + 12 + 9 }])
     })
+  })
+})
+
+// The two presence events, with the payload shapes the arrivals design fixes; the engine's own
+// lane lands the zod schemas that will parse these literals.
+describe('the road is drama the camera can point at', () => {
+  it('scores the person the road brought, off `id` — there is no `agentId` on an arrival', () => {
+    expect(
+      score([ev(1, 10, 'agent_arrived', { id: 'mira', name: 'Mira', sex: 'f', x: 65, y: 127 })]),
+    ).toEqual([{ fromTick: 0, toTick: 59, agentId: 'mira', score: HEAT_WEIGHTS.agent_arrived }])
+  })
+
+  it('scores the leaver harder than the arrival, and as hard as a parting', () => {
+    expect(score([ev(1, 10, 'agent_departed', { agentId: 'reza' })])).toEqual([
+      { fromTick: 0, toTick: 59, agentId: 'reza', score: HEAT_WEIGHTS.agent_departed },
+    ])
+    expect(HEAT_WEIGHTS.agent_departed!).toBeGreaterThan(HEAT_WEIGHTS.agent_arrived!)
+    expect(HEAT_WEIGHTS.agent_departed).toBe(HEAT_WEIGHTS.partnership_dissolved)
+  })
+
+  it('fetches both, or the weights above are a table nothing reads', () => {
+    for (const type of ['agent_arrived', 'agent_departed']) expect(FOLD_TYPES, type).toContain(type)
   })
 })

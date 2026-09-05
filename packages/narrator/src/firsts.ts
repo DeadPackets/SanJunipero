@@ -10,8 +10,9 @@ const p = (ev: SimEvent): Record<string, unknown> => (ev.payload ?? {}) as Recor
 
 /** What one event does to the count of souls. A caller rewinding a day runs it backwards. */
 export function populationDelta(ev: SimEvent): number {
-  if (ev.type === 'agent_spawned' || ev.type === 'agent_born') return 1
-  return ev.type === 'agent_died' ? -1 : 0
+  if (ev.type === 'agent_spawned' || ev.type === 'agent_born' || ev.type === 'agent_arrived')
+    return 1
+  return ev.type === 'agent_died' || ev.type === 'agent_departed' ? -1 : 0
 }
 
 export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
