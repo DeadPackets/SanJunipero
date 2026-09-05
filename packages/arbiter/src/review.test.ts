@@ -164,6 +164,13 @@ describe('ReviewStore', () => {
     expect(review.pending()).toEqual([])
   })
 
+  it('approve says a rule nobody ever wrote is no rule, not a reverted one', () => {
+    const { review } = makeReview()
+    expect(() => {
+      review.approve(999)
+    }).toThrow(/no such rule 999/)
+  })
+
   it('approve throws on a tombstoned rule', () => {
     const { db, review, rulebook, codex } = makeReview()
     const { ruleId } = codify(
