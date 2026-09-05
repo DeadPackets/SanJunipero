@@ -229,9 +229,10 @@ describe('★ A SCENE OPENS IN THE SERVED WORLD', () => {
     // talk opened lands in the thread too; every line after those was taken by the floor.
     expect(lines.length).toBeGreaterThan(1)
     expect(lines[0]!.payload.text).toBe(OPENING_WORD)
-    const taken = lines.filter((l) => l.payload.text === SCENE_LINE)
-    expect(taken.length).toBeGreaterThan(0)
-    expect(taken[0]!.payload.agentId).not.toBe(lines[0]!.payload.agentId)
+    expect(lines.some((l) => l.payload.text === SCENE_LINE)).toBe(true)
+    // The floor moves with every line: no mouth speaks twice in a row.
+    for (let i = 1; i < lines.length; i++)
+      expect(lines[i]!.payload.agentId).not.toBe(lines[i - 1]!.payload.agentId)
     expect(new Set(lines.map((l) => l.payload.agentId))).toEqual(new Set(['amara', 'omar']))
   }, 120_000)
 

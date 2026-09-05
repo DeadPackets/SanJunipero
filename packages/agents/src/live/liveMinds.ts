@@ -79,7 +79,7 @@ export type BootMindsOpts = {
   mindConfig?: Partial<MindConfig>
   /** The sim day a first personality is stamped with. See `hasPersonality`. */
   day?: number
-  onThought?: (t: { tick: number; agentId: string; text: string }) => void
+  onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
   /** Per-mind runtime state to put back after `start`, which is what clears it. */
   restoring?: ReadonlyMap<string, RuntimeSnapshot>
   /** Adjudication and codification, injected because agents may not import the arbiter. */
