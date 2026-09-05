@@ -828,7 +828,7 @@ export function wantLine(want: WantKind | null): string {
 /** What the whole valley is holding, counted off the world and not off one pair of eyes. */
 export type TownStock = { wood: number; food: number; hearths: number; mouths: number }
 
-// A hearth burns about two logs a night at the live physics, so this is what a stocked town has.
+// A log burns a night at the live physics; two nights in hand is the least a stocked town holds.
 const LOGS_PER_HEARTH = 2
 
 /** The work each material comes out of, and how a body doing it is said. */
