@@ -14,6 +14,7 @@ import {
 } from '@sj/shared'
 import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
+import type { Law } from './lawShapes.js'
 
 export type { TileId }
 
@@ -98,6 +99,10 @@ export type AgentBody = {
   // Tags a minted verb left on this body, readable by anyone who can see it. Absent until the
   // first one, so a town that has invented nothing hashes as it always did.
   marks?: Record<string, string>
+  // What a standing law asks this body to have done: the tick of a prerequisite act, or the
+  // period a tithe was paid in. Written only while a law names the verb, so a town that has
+  // agreed nothing hashes as it always did.
+  lawMarks?: Record<string, number>
   skills: Record<string, number> // track → xp
   activity: null | {
     verb: string
@@ -201,6 +206,9 @@ export type WorldState = {
   // Runtime overrides of world physics, keyed by dotted config path. Absent until the
   // first config_changed; hashed, snapshotted and replayed like every other fact.
   laws?: Record<string, unknown>
+  // Every rule the town itself has agreed on, by id. Absent until the first one passes, so a
+  // town that has never held a council hashes exactly as it always did.
+  socialLaws?: Record<string, Law>
   // How many times the map has grown. Absent until the first world_grown, so a world that
   // never widens hashes as it always did. Read only through growthsSoFar().
   growths?: number

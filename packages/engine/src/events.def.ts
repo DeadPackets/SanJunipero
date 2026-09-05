@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { InvitationVerbSchema, TOWN_FACINGS } from '@sj/shared'
+import { LAW_TEXT_MAX, LawPredicateSchema } from './lawShapes.js'
 
 export const TickAdvanced = z.object({}).strict()
 export const AgentSpawned = z
@@ -333,6 +334,44 @@ export const SceneClosed = z
         .strict(),
     ),
     closeReason: z.enum(['ended', 'left', 'night', 'capped', 'timeout']),
+  })
+  .strict()
+
+// The town writing its own rules. A proposal and a breach fold to a witness record; only a
+// ratification and a repeal move state. The predicate is compiled once, at the close of the
+// council that passed it, and rides here — so replay never asks the court anything.
+export const LawProposed = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+  })
+  .strict()
+export const LawRatified = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    why: z.string().max(200),
+    predicate: LawPredicateSchema,
+    votes: z
+      .object({ for: z.array(z.string().min(1)), against: z.array(z.string().min(1)) })
+      .strict(),
+  })
+  .strict()
+export const LawBroken = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    verb: z.string().min(1),
+    witnesses: z.array(z.string().min(1)),
+  })
+  .strict()
+export const LawRepealed = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
   })
   .strict()
 

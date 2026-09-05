@@ -11,6 +11,7 @@ import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
 import { hears } from './earshot.js'
 import { composePerception } from './perception.js'
+import { witnessesOf } from './socialLaws.js'
 import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
 import { ev } from './testutil/world.js'
@@ -710,6 +711,67 @@ describe('composePerception: witnessed takings', () => {
     expect(
       composePerception(theftWorld(), off, 'bystander', [taken('omar', 'salma', 4, 4)]).seen,
     ).toEqual([])
+  })
+})
+
+describe('composePerception: a rule the town broke', () => {
+  const LAW_TEXT = 'Nobody takes from the store after dark.'
+
+  function lawWorld(): WorldState {
+    const s = makeWorld([
+      { id: 'omar', x: 4, y: 4 },
+      { id: 'salma', x: 5, y: 4 },
+      { id: 'distant', x: 40, y: 40 },
+    ])
+    return fold(
+      s,
+      ev('law_ratified', {
+        lawId: 'law_1',
+        agentId: 'salma',
+        text: LAW_TEXT,
+        why: 'they said so',
+        predicate: { kind: 'forbid', verb: 'take' },
+        votes: { for: ['salma'], against: [] },
+      }),
+      DEFAULT_CONFIG,
+    )
+  }
+
+  const broke = (s: WorldState, breaker: string): SimEvent =>
+    ev('law_broken', {
+      lawId: 'law_1',
+      agentId: breaker,
+      verb: 'take',
+      witnesses: witnessesOf(s, DEFAULT_CONFIG, breaker),
+    })
+
+  it('everyone the breach was witnessed by is told what was done and what was agreed', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'salma', [broke(s, 'omar')]).seen).toEqual([
+      { kind: 'law_broken', breakerName: 'omar', lawText: LAW_TEXT, self: false },
+    ])
+  })
+
+  it('the breaker gets their own copy: being seen is what a forbid costs', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'omar', [broke(s, 'omar')]).seen).toEqual([
+      { kind: 'law_broken', breakerName: 'omar', lawText: LAW_TEXT, self: true },
+    ])
+  })
+
+  it('past the horizon, or behind a wall, nobody saw a thing', () => {
+    const s = lawWorld()
+    expect(composePerception(s, DEFAULT_CONFIG, 'distant', [broke(s, 'omar')]).seen).toEqual([])
+    const walled = goInside(withHouse(lawWorld()), 'salma')
+    expect(
+      composePerception(walled, DEFAULT_CONFIG, 'salma', [broke(walled, 'omar')]).seen,
+    ).toEqual([])
+  })
+
+  it('names the sentence the town said and never the id it is filed under', () => {
+    const s = lawWorld()
+    const p = composePerception(s, DEFAULT_CONFIG, 'salma', [broke(s, 'omar')])
+    expect(JSON.stringify(p.seen)).not.toContain('law_1')
   })
 })
 
