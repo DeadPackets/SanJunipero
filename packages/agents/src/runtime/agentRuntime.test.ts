@@ -441,7 +441,7 @@ async function setup(opts: {
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
-  return { world, loop, bridge, runtime, llm, mem, personality, agentDb }
+  return { world, loop, bridge, runtime, llm, mem, personality, agentDb, embedder }
 }
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
@@ -1816,6 +1816,50 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => prompts.length >= first + 4, 60)
     expect(prompts.slice(first + 1).filter(hears)).toEqual([])
     expect(runtime.dayLogSnapshot().filter((l) => l.includes('Rain soon.'))).toHaveLength(1)
+  })
+
+  // A restart used to leave the map empty, so the same idea inside the window bought the ruling
+  // a second time — the one thing the precedent exists to stop.
+  it('carries what the court has already ruled across a restart', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold that shape',
+        class: 'physically_impossible',
+      }
+    }
+    const tries = {
+      thought: 'I will try it.',
+      action: { freeform: 'weave reeds into a mat' },
+      importance: 3,
+    }
+    const shared = await setup({
+      model: turnModel([tries], tries),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(shared.loop, () => seen.length >= 1, 200)
+    const snap = shared.runtime.snapshot()
+    expect(snap.refused).toHaveLength(1)
+    shared.runtime.stop()
+
+    const resumed = new AgentRuntime({
+      db: shared.agentDb,
+      llm: shared.llm,
+      embedder: shared.embedder,
+      identity: tamarIdentity,
+      personality: shared.personality,
+      bridge: shared.bridge,
+      config: FAST_MIND,
+      adjudicator,
+    })
+    resumed.start(AGENT)
+    resumed.restore(snap)
+    await stepUntil(shared.loop, () => seen.length >= 2, 200)
+    expect(seen, 'the mind answered itself off the precedent it came back with').toHaveLength(1)
   })
 
   // One map held both the court's precedents and the sentences the mind already carries, on one

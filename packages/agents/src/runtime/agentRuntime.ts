@@ -288,6 +288,9 @@ export type RuntimeStats = { turns: number; dozes: number; reflections: number; 
 
 // What a mind is carrying at a tick boundary, in a shape that survives a JSON round trip. Cost
 // is absent on purpose: it is in the database and would be double-counted here.
+/** One remembered key and what it stood for, in a shape that survives a JSON round trip. */
+type Remembered = [string, { tick: number; reason: string }]
+
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
@@ -309,6 +312,16 @@ export type RuntimeSnapshot = {
   /** The scene this mind is standing in, if any. Every participant carries the whole thing, and
    *  a restore keys it by id, so one scene comes back once however many minds saved it. */
   scene?: Scene | null | undefined
+  /** What the court has already refused, and the sentences the mind already carries. Absent,
+   *  a resume buys a ruling it had already paid for and writes a memory it already holds. */
+  refused?: Remembered[] | undefined
+  held?: Remembered[] | undefined
+  /** The utterances counted toward warmth last tick, and the ones already told. Absent, every
+   *  word still inside the recent window is credited and read as news a second time. */
+  heardKeys?: string[] | undefined
+  heardTold?: string[] | undefined
+  /** When the heap on this mind's own doorstep was last named. */
+  doorstepSaidTick?: number | null | undefined
 }
 
 function freshClock(): MindClock {
@@ -470,6 +483,9 @@ export class AgentRuntime {
     this.#company = new Map()
     this.#heardKeys = new Set()
     this.#heardTold = new Set()
+    this.#refusedIntents = new Map()
+    this.#heldTexts = new Map()
+    this.#doorstepSaidTick = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     // From here forward only: a mind that resumes must not remember a day it was not there for.
     this.#lastActSeq = this.#bridge.lastSeq()
@@ -507,6 +523,11 @@ export class AgentRuntime {
       still: this.#still,
       company: [...this.#company].map(([id, c]) => ({ id, ...c })),
       scene: this.#scenes?.sceneFor(this.#agentId) ?? null,
+      refused: [...this.#refusedIntents].map(([k, v]) => [k, { ...v }]),
+      held: [...this.#heldTexts].map(([k, v]) => [k, { ...v }]),
+      heardKeys: [...this.#heardKeys],
+      heardTold: [...this.#heardTold],
+      doorstepSaidTick: this.#doorstepSaidTick,
     }
   }
 
@@ -533,6 +554,11 @@ export class AgentRuntime {
     this.#spoken = [...(s.spoken ?? [])]
     this.#still = s.still ?? null
     this.#company = new Map((s.company ?? []).map(({ id, ...c }) => [id, { ...c }]))
+    this.#refusedIntents = new Map((s.refused ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heldTexts = new Map((s.held ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heardKeys = new Set(s.heardKeys ?? [])
+    this.#heardTold = new Set(s.heardTold ?? [])
+    this.#doorstepSaidTick = s.doorstepSaidTick ?? null
     this.#scenes?.adopt(s.scene)
   }
 
