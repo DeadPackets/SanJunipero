@@ -110,8 +110,9 @@ describe('decideWake — one case per reason', () => {
     ['boredom', pkt(), clk(), 130, pln(), 'boredom', ['boredom']],
   ]
   it.each(cases)('%s', (_name, packet, clock, tick, plan, expected, every, floor) => {
-    expect(decideWake(cfg, packet, clock, tick, plan, floor)).toBe(expected)
-    expect(wakeReasons(cfg, packet, clock, tick, plan, floor)).toEqual(every)
+    // A clock apiece: the gate spends the felt latch on the ask, so asking twice is not one ask.
+    expect(decideWake(cfg, packet, { ...clock }, tick, plan, floor)).toBe(expected)
+    expect(wakeReasons(cfg, packet, { ...clock }, tick, plan, floor)).toEqual(every)
   })
 })
 
@@ -499,6 +500,43 @@ describe('a mind that has never taken a turn', () => {
   it('waits out the floor again once it HAS taken one', () => {
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 2, pln())).toBe(null)
     expect(decideWake(cfg, pkt(), clk({ lastTurnTick: 1 }), 61, pln())).toBe('boredom')
+  })
+})
+
+// ★ One rainfall sat in the perception window for all 66 of its ticks, and the felt rung is
+// above the idle gate: every awake mind bought a turn on every one of them.
+
+describe('★ a felt event buys one turn, not one a tick', () => {
+  const rained = pkt({ feltEvents: ['rain_started'] })
+
+  it('wakes for the rain once and stays quiet while it is still in the window', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    for (const tick of [11, 20, 40, 70]) {
+      expect(wakeReasons(cfg, rained, clock, tick, pln()), `tick ${tick}`).not.toContain(
+        'salient_perception',
+      )
+    }
+  })
+
+  it('wakes again for a second thing felt under the first', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    const tended = pkt({ feltEvents: ['rain_started', 'you_were_tended'] })
+    expect(wakeReasons(cfg, tended, clock, 12, pln())).toEqual(['salient_perception'])
+  })
+
+  it('wakes again when the same thing happens after the first has aged out', () => {
+    const clock = clk()
+    expect(wakeReasons(cfg, rained, clock, 10, pln())).toEqual(['salient_perception'])
+    expect(wakeReasons(cfg, pkt(), clock, 80, pln())).not.toContain('salient_perception')
+    expect(wakeReasons(cfg, rained, clock, 90, pln())).toContain('salient_perception')
+  })
+
+  it('holds nothing against a mind that was dozing when it happened', () => {
+    const clock = clk({ dozeUntilTick: 50 })
+    expect(wakeReasons(cfg, rained, clock, 40, pln())).toEqual([])
+    expect(wakeReasons(cfg, rained, clock, 50, pln())).toContain('salient_perception')
   })
 })
 

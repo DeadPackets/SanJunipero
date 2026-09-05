@@ -70,6 +70,9 @@ export type MindClock = {
   gatheringDay: number | null
   wakeRetryAtTick: number
   prevVisibleIds: string[]
+  // The felt tags this mind has already been asked about. Optional: a checkpoint written before
+  // it existed still resumes, and an absent latch costs one turn, not sixty-six.
+  feltSeen?: string[]
 }
 
 type Intent = z.infer<typeof IntentSchema>
@@ -118,7 +121,10 @@ export function decideWake(
  *  read on two rungs now: felt is immediate, noticed waits for the idle gap.
  *
  *  A reason gated behind a `return` still ends the list: the backoff, the retry rung and the idle
- *  floor each stop the ladder, and what they stop was never going to be returned either. */
+ *  floor each stop the ladder, and what they stop was never going to be returned either.
+ *
+ *  Asked once a tick, and an answer with anything in it is a turn — so the felt latch is spent
+ *  here. Asking twice at one tick answers the second ask as if the first had bought the turn. */
 export function wakeReasons(
   cfg: MindConfig,
   packet: PerceptionPacket,
@@ -161,8 +167,13 @@ export function wakeReasons(
 
   const sinceLast = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
 
-  // Floor-exempt: physical rousing, and whatever happened TO this body.
-  const felt = packet.feltEvents.length > 0
+  // Floor-exempt: physical rousing, and whatever happened TO this body. A felt event sits in the
+  // window for all 66 of its ticks, so only what is new since the last ask is worth a turn.
+  const spentFelt = clock.feltSeen ?? []
+  const felt =
+    packet.feltEvents.length > spentFelt.length ||
+    packet.feltEvents.some((e) => !spentFelt.includes(e))
+  clock.feltSeen = [...packet.feltEvents]
   if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
   if (felt) reasons.push('salient_perception')
   if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
