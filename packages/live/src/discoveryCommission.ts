@@ -5,6 +5,7 @@ import { insertLlmCall } from '@sj/llm'
 import {
   PER_ASSET_STOP_USD,
   BudgetGuard,
+  loadForgeConfig,
   loadReferenceSheet,
   type AssetCodex,
   type Forge,
@@ -78,7 +79,8 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
     const sheet = await (refs ??= loadReferenceSheet())
-    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet })
+    // The eye draws the retry-vs-blocked line, so it reads the operator's config, not the defaults.
+    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet, config: loadForgeConfig() })
     return createForge({
       codex: opts.codex,
       refs: sheet,

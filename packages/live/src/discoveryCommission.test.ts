@@ -235,6 +235,16 @@ describe('the commission path is live-only, and it IS wired', () => {
     expect(src).not.toContain('makeVlmJudge')
   })
 
+  it('the eye is built with the forge config the operator set, not the defaults', () => {
+    // `makeVisionJudge` falls back to DEFAULT_FORGE_CONFIG, and it is the eye — not the gate —
+    // that draws the retry-vs-blocked line.
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'discoveryCommission.ts'),
+      'utf8',
+    )
+    expect(src).toMatch(/makeVisionJudge\(\{[^}]*config: loadForgeConfig\(\)/)
+  })
+
   it('liveWorld commissions on the codification', () => {
     const live = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'liveWorld.ts'), 'utf8')
     expect(live).toContain('createDiscoveryArt(')
