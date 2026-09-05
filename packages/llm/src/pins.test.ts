@@ -333,6 +333,7 @@ it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh 
     }
     expect(luna.callSettingsFor('arbiter').reasoning).toEqual({ effort: 'max' })
     expect(luna.callSettingsFor('scene').maxOutputTokens).toBe(300 + 6000)
+    expect(luna.callSettingsFor('arbiter').maxOutputTokens).toBe(4000 + 24_000)
     expect(luna.requestTimeoutMsFor('scene')).toBeGreaterThanOrEqual(90_000)
     expect(luna.callSettingsFor('turn').dailyUsd).toBeCloseTo(3.31 * 15)
   } finally {

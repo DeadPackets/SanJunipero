@@ -261,15 +261,19 @@ const NO_SETTINGS: CallSettings = {}
  *  tokens before the answer. An experiment lever; the pinned fleet is what ships. */
 const FLEET: 'pinned' | 'luna' = process.env.SJ_FLEET === 'luna' ? 'luna' : 'pinned'
 const LUNA_OUTPUT_ROOM = 6000
+// A ruling at max reasoning spent 9,000 tokens thinking and hit a 10,000 ceiling twice in r21.
+const LUNA_RULING_ROOM = 24_000
 const LUNA_RAIL_FACTOR = 15
 
 function onLuna(caller: string, pinned: CallSettings): CallSettings {
+  const ruling = RULING_CALLERS.includes(caller)
   return {
     ...pinned,
     model: RULING_MODEL,
     providerOrder: RULING_PROVIDER_ORDER,
-    reasoning: { effort: RULING_CALLERS.includes(caller) ? 'max' : 'xhigh' },
-    maxOutputTokens: (pinned.maxOutputTokens ?? 2000) + LUNA_OUTPUT_ROOM,
+    reasoning: { effort: ruling ? 'max' : 'xhigh' },
+    maxOutputTokens:
+      (pinned.maxOutputTokens ?? 2000) + (ruling ? LUNA_RULING_ROOM : LUNA_OUTPUT_ROOM),
     minTimeoutMs: Math.max(pinned.minTimeoutMs ?? 0, 90_000),
     ...(pinned.dailyUsd === undefined ? {} : { dailyUsd: pinned.dailyUsd * LUNA_RAIL_FACTOR }),
   }
