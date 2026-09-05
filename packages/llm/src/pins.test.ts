@@ -151,11 +151,13 @@ it("★ pre-flight runs the turn's own model on the turn's own back end", () => 
 // Wafer's tail is prefill, not decode: 14.7 s p95 and 41.0 s max on 300-token answers. A bound
 // derived from the 1,500-token ceiling alone is 34.1 s — under the max, so the floor still rules.
 it('★ a GLM caller is bounded by its provider tail, not only by its output ceiling', () => {
-  expect(requestTimeoutMsFor('turn')).toBe(45_000)
-  expect(requestTimeoutMsFor('reflection')).toBe(45_000)
+  expect(requestTimeoutMsFor('turn')).toBe(70_000)
+  expect(requestTimeoutMsFor('reflection')).toBe(70_000)
   expect(requestTimeoutMsFor('constructs')).toBe(MIN_REQUEST_TIMEOUT_MS)
-  // Above the floor the ceiling still rules: 2,500 tokens at 44 tok/s.
-  expect(requestTimeoutMsFor('dream')).toBe(Math.ceil((2500 / 44) * 1000))
+  // A dream's 2,500 tokens need 56.8 s, which the route's own tail now covers.
+  expect(requestTimeoutMsFor('dream')).toBe(70_000)
+  // Above the floor the ceiling still rules: 13,000 tokens at 44 tok/s.
+  expect(requestTimeoutMsFor('reflection.edit')).toBe(Math.ceil((13000 / 44) * 1000))
   expect(requestTimeoutMsFor('narrator')).toBe(Math.ceil((22000 / 44) * 1000))
 })
 
@@ -169,9 +171,9 @@ it('★ the turn and the scene sample at temperature 1, and no other caller pins
 })
 
 // A scene line the coordinator has already given up on is a billed answer nobody reads. Its
-// bound is under `FLOOR_TIMEOUT_MS` (30 s in @sj/agents), so the call dies before the floor does.
+// bound is under `FLOOR_TIMEOUT_MS` (45 s in @sj/agents), so the call dies before the floor does.
 it('★ a scene line is bounded under the floor that will take it away', () => {
-  expect(requestTimeoutMsFor('scene')).toBeLessThan(30_000)
+  expect(requestTimeoutMsFor('scene')).toBeLessThan(45_000)
   expect(callSettingsFor('scene').maxOutputTokens).toBe(300)
 })
 

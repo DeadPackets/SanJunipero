@@ -6,7 +6,9 @@ export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
 // with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
 // The order of these two buys nothing: with `allow_fallbacks:false` this list is an ALLOW-LIST
 // and OpenRouter picks inside it. Flipping it 2026-09-03 changed no routing at all — 72 of 72
-// mind calls still went to Wafer — so a real preference needs `only` plus `sort`, not a reorder.
+// mind calls still went to Wafer — so the mind route now sends the pair as `provider.only`,
+// which naming an order would have disabled: OpenRouter drops sticky routing whenever one is
+// named, and without stickiness a mind's 594-token identity prefix never cached once in r13.
 // Worth doing, and measured: over 2.96 sim-days DeepInfra answered 610 calls at $0.0000857 each
 // and failed none, while Wafer answered 502 at $0.000350 — 4.1x — and refused 155 more upstream.
 // A refusal also dozes the mind six ticks, and 21 landed on scene lines, stopping a conversation
@@ -141,7 +143,9 @@ export type CallSettings = {
 
 // Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
 // answers, so a bound derived from the output ceiling alone aborts honest answers and re-bills.
-const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 45_000 }
+// 70 s and not 45: over r13 the turn's p99 was 38.9 s and its longest honest answer 43.5 s, with
+// reflection at 41.2 s — the old bound sat inside the real tail and cut 35 answers off unbilled.
+const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 70_000 }
 const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
 // Measured at this effort and no other: at 'low' it answered in 4.4 s p50 with every ruling on
 // the schema. The ceiling is 2x the longest recipe the bake-off saw, reasoning included.
@@ -191,12 +195,13 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // Pre-flight's act bar gates exactly the pair the turn will run on. It never leaves that pair.
   preflight: { ...ON_GLM, maxOutputTokens: 2500, dailyUsd: RAIL_FLOOR_USD },
   // One long memory set down short at the night boundary. The ask is two or three sentences;
-  // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
+  // 300 leaves room for a long promise without letting a gist grow back into the row it
+  // replaces. Not 200: 27 of r13's 786 gists stopped mid-mark on that ceiling.
   'reflection.gist': {
     ...ON_DEEPSEEK,
     providerOrder: GIST_PROVIDER_ORDER,
     reasoning: { enabled: false },
-    maxOutputTokens: 200,
+    maxOutputTokens: 300,
     dailyUsd: 0.27,
   },
   // The court writes what the town can never take back, so it is the one place the fleet pays
@@ -205,10 +210,11 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   council: { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
   'law.compile': { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
-  // share one warm prefix; bounded under the scene's own 30 s floor, which drops a later answer.
+  // share one warm prefix; bounded under the scene's own floor timeout, which drops a later
+  // answer. 40 s and not 25: 14 lines aborted at 25 s against a measured p99 of 17.9 s.
   scene: {
     ...ON_GLM,
-    minTimeoutMs: 25_000,
+    minTimeoutMs: 40_000,
     maxQueueWaitMs: 10_000,
     maxOutputTokens: 300,
     temperature: 1,

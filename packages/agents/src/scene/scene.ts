@@ -146,8 +146,9 @@ export function lineCapFor(talkers: number): number {
 const WRAP_CUE_BEFORE_CAP = 2
 /** Two silent floors close a scene the provider stopped answering for. */
 export const CLOSING_TIMEOUTS = 2
-/** Wall clock, not ticks: a mind that never answers is a provider stall, not a slow hour. */
-export const FLOOR_TIMEOUT_MS = 30_000
+/** Wall clock, not ticks: a mind that never answers is a provider stall, not a slow hour. Above
+ *  the scene caller's own 40 s bound, or the floor moves on while the line is still coming. */
+export const FLOOR_TIMEOUT_MS = 45_000
 
 /** Stable across a snapshot and a restore, because it is derived from the two things that do
  *  not change: when the scene opened and who was in it. */

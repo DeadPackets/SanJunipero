@@ -77,6 +77,23 @@ function tiesFrom(
   return out
 }
 
+/** The mark `actImportance` gives an act a life turns on — a making, a giving, a teaching, a
+ *  lying-with — where a walk or a drink is 1 or 2 and a refusal is 3. */
+const CHANGED_BY_ACT_IMPORTANCE = 6
+/** The two tie kinds that are a quarrel rather than a bond. */
+const CONFLICT_TIES: readonly TieDelta['kind'][] = ['slight', 'grudge']
+
+/** Whether the day held what the nightly edit asks about. Its own prompt says "most days hold
+ *  nothing like that", and over r13 an act this big landed on 14 mind-days in 40. A collapse and
+ *  a death are NOT caught here: every perception is written at a flat importance of 3. */
+function heldSomethingToChangeFor(
+  dayMemories: readonly MemoryRow[],
+  ties: readonly TieDelta[],
+): boolean {
+  if (ties.some((t) => t.settled !== true && CONFLICT_TIES.includes(t.kind))) return true
+  return dayMemories.some((m) => m.kind === 'action' && m.importance >= CHANGED_BY_ACT_IMPORTANCE)
+}
+
 export const FALLBACK_DAY_TITLE = 'A long day'
 export const FALLBACK_AUTOBIOGRAPHY = 'A long day. Too tired to make sense of it.'
 export const FALLBACK_DIGEST_CHARS = 2000
@@ -154,6 +171,23 @@ export async function runSleepReflection(deps: {
     )
   }
 
+  // 3b. What the day left standing between this mind and the people in it. The note in step 5 is
+  //     prose the mind reads; these are rows the scene block and the quarrel upgrade read. Third
+  //     of the three night dumps and issued right behind them, because all three open on the
+  //     same day of memories and only a call landing on that prefix reads it warm.
+  let tieDeltas: TieDelta[] = []
+  if (ties !== undefined) {
+    const listed = await step(() =>
+      llm.listTies(
+        dayMemories,
+        ties.cast.map((p) => p.name),
+      ),
+    )
+    tieDeltas = listed === null ? [] : tiesFrom(listed, ties)
+    ties.store.apply(tieDeltas, ties.tick, 'reflection')
+  }
+  const tiesWritten = tieDeltas.length
+
   // 4. Day node with child scene ids — mechanical when the night went dark.
   const daySummary = await step(() =>
     llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text }))),
@@ -186,28 +220,16 @@ export async function runSleepReflection(deps: {
     ledgersUpdated.push(person)
   }
 
-  // 5b. What the day left standing between this mind and the people in it. The note above is
-  //     prose the mind reads; these are rows the scene block and the quarrel upgrade read.
-  let tiesWritten = 0
-  if (ties !== undefined) {
-    const listed = await step(() =>
-      llm.listTies(
-        dayMemories,
-        ties.cast.map((p) => p.name),
-      ),
-    )
-    const deltas = listed === null ? [] : tiesFrom(listed, ties)
-    ties.store.apply(deltas, ties.tick, 'reflection')
-    tiesWritten = deltas.length
-  }
-
   // 6. Autobiography paragraph.
   const personalityDoc = personality.current().doc
   const paragraph = await step(() => llm.autobiographyParagraph(daySummaryText, personalityDoc))
   mem.appendAutobiography(day, paragraph ?? FALLBACK_AUTOBIOGRAPHY)
 
-  // 7. Personality edit — ≤1 by construction, drift-limiter validates.
-  const proposal = await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
+  // 7. Personality edit — ≤1 by construction, drift-limiter validates. Only on a day that held
+  //    something to change for: this one call resends the whole day at 6,598 tokens a time.
+  const proposal = heldSomethingToChangeFor(dayMemories, tieDeltas)
+    ? await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
+    : null
 
   // 8. Gists — the day's long rows plus what a refused night left behind. Outside the latch on
   //    purpose: a degraded night is the one that grows that backlog, and the batch self-limits.
@@ -276,8 +298,8 @@ function freshMemories(memories: MemoryRow[]): CompactMemory[] {
   return compactMemories(kept)
 }
 
-// Both night dumps open with these same bytes and carry their own instruction after the day,
-// so the day is one prefix they share instead of one each provider must read twice.
+// All three night dumps open with these same bytes and carry their own instruction after the
+// day, so the day is one prefix they share instead of one each provider must read three times.
 const NIGHT_SYSTEM = 'Before sleep, the day comes back to you.'
 
 function nightPrompt(dayMemories: MemoryRow[], instruction: string[]): LlmPrompt {

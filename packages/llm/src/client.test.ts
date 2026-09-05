@@ -20,9 +20,11 @@ const idOf = (r: Reserved): number => {
 import {
   BudgetExceededError,
   LlmClient,
+  MIN_QUEUE_WAIT_MS,
   defaultExtraBody,
   retryBackoffMs,
   servedProvider,
+  type RequestBody,
 } from './client.js'
 import { DEFAULT_MAX_CONCURRENCY, limiterFor, resetLimiters } from './rateLimiter.js'
 import {
@@ -985,12 +987,51 @@ describe('default OpenRouter path extraBody', () => {
   it('builds models + provider pinning from pins.ts', () => {
     expect(defaultExtraBody()).toEqual({
       models: [MIND_MODEL, ...FALLBACK_MODELS],
-      provider: { order: PROVIDER_ORDER, allow_fallbacks: false },
+      provider: { only: PROVIDER_ORDER, allow_fallbacks: false, require_parameters: true },
     })
     expect(defaultExtraBody(['x/y'], ['P'])).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: false },
+      provider: { only: ['P'], allow_fallbacks: false, require_parameters: true },
     })
+  })
+
+  // Naming an order is what turns OpenRouter's stickiness off, so the mind route may never send
+  // one: its 594-token per-mind prefix cached 0 times in r13 while `provider.order` was set.
+  it('★ the mind route sends `only`, every other route keeps its ordered preference', () => {
+    const db = openDb()
+    const provider = (caller: string): RequestBody['provider'] =>
+      new LlmClient({ db, caller }).requestBody().provider
+    expect(provider('turn').only).toEqual(PROVIDER_ORDER)
+    expect(provider('turn').order).toBeUndefined()
+    expect(provider('scene').only).toEqual(PROVIDER_ORDER)
+    expect(provider('narrator').order).toEqual(PROSE_PROVIDER_ORDER)
+    expect(provider('narrator').only).toBeUndefined()
+    expect(provider('arbiter').order).toEqual(RULING_PROVIDER_ORDER)
+  })
+
+  // Sticky routing keys off this and nothing else. One per mind, not per caller: the turn and
+  // the scene line carry the same identity block and want the same warm back end.
+  it('★ names the mind asking, so its next call lands on the back end holding its prefix', () => {
+    const db = openDb()
+    expect(new LlmClient({ db, caller: 'turn', agentId: 'nadia' }).requestBody().session_id).toBe(
+      'sj-nadia',
+    )
+    expect(new LlmClient({ db, caller: 'scene', agentId: 'nadia' }).requestBody().session_id).toBe(
+      'sj-nadia',
+    )
+    // Nobody's call: the narrator and the court have no prefix of their own to keep warm.
+    expect(new LlmClient({ db, caller: 'narrator' }).requestBody()).not.toHaveProperty('session_id')
+  })
+
+  // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output. The allow-list still
+  // carries the bans no flag reports; this drops the endpoints that cannot do the ask.
+  it('★ asks for the parameters the request uses, on every route', () => {
+    const db = openDb()
+    for (const caller of ['turn', 'scene', 'reflection', 'narrator', 'arbiter']) {
+      expect(new LlmClient({ db, caller }).requestBody().provider.require_parameters, caller).toBe(
+        true,
+      )
+    }
   })
 
   // A live town pins the provider as an allow-list: 9 of 309 rehearsal-3 calls hopped to
@@ -1009,15 +1050,15 @@ describe('default OpenRouter path extraBody', () => {
   // or a GLM caller's json_schema lands on a back end that answers with a thought and no act.
   it('★ each caller sends its own fleet row, model and back end together', () => {
     const db = openDb()
-    const body = (caller: string): { models: string[]; order: string[] } => {
+    const body = (caller: string): { models: string[]; homes: string[] | undefined } => {
       const b = new LlmClient({ db, caller }).requestBody()
-      return { models: b.models, order: b.provider.order }
+      return { models: b.models, homes: b.provider.only ?? b.provider.order }
     }
-    expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
+    expect(body('turn')).toEqual({ models: [MIND_MODEL], homes: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
-    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: PROSE_PROVIDER_ORDER })
+    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], homes: PROSE_PROVIDER_ORDER })
     // The court is the one caller off the fleet's two models: what it writes is permanent.
-    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], order: RULING_PROVIDER_ORDER })
+    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], homes: RULING_PROVIDER_ORDER })
   })
 
   // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
@@ -1025,8 +1066,9 @@ describe('default OpenRouter path extraBody', () => {
   it('★ the request body carries exactly the pinned allow-list', () => {
     expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: PROVIDER_ORDER,
+      only: PROVIDER_ORDER,
       allow_fallbacks: false,
+      require_parameters: true,
     })
   })
 
@@ -1050,7 +1092,11 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({
+      only: PROVIDER_ORDER,
+      allow_fallbacks: false,
+      require_parameters: true,
+    })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
@@ -1058,7 +1104,7 @@ describe('default OpenRouter path extraBody', () => {
   it('opting back into provider fallbacks is possible, and says so in the body', () => {
     expect(defaultExtraBody(['x/y'], ['P'], true)).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: true },
+      provider: { only: ['P'], allow_fallbacks: true, require_parameters: true },
     })
   })
 
@@ -1067,7 +1113,7 @@ describe('default OpenRouter path extraBody', () => {
   it('carries a reasoning setting into the body, and sends none when none is asked for', () => {
     expect(defaultExtraBody(['x/y'], ['P'], true, { enabled: false })).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: true },
+      provider: { only: ['P'], allow_fallbacks: true, require_parameters: true },
       reasoning: { enabled: false },
     })
     expect(defaultExtraBody(['x/y'], ['P'], true, { effort: 'low' }).reasoning).toEqual({
@@ -1220,8 +1266,8 @@ describe('★ one unified call discipline, the arbiter included', () => {
       expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
     }
     // Wafer's tail is prefill, not decode: the turn's 600-token ceiling needs 13.6 s and its
-    // answers have taken 41.0 s, so this one caller is bounded by the provider instead.
-    expect(bound('turn')).toBe(45_000)
+    // answers have taken 43.5 s, so this one caller is bounded by the provider instead.
+    expect(bound('turn')).toBe(70_000)
     for (const caller of [
       'arbiter',
       'reflection',
@@ -1259,6 +1305,25 @@ describe('★ one unified call discipline, the arbiter included', () => {
     expect(
       (db.prepare('SELECT generation_id AS g FROM llm_calls').get() as { g: string | null }).g,
     ).toBe('gen-abc')
+  })
+
+  // ★ An answer the schema turned away still billed, and `note` never ran to record what served
+  // it. r13 booked 3 such `semantic` rows at the ceiling with no id to ask OpenRouter about.
+  it('★ writes it for a refused answer too, which is the row that books at the ceiling', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'not json at all', generationId: 'gen-dead' }])
+    await expect(
+      new LlmClient({ model, db, caller: 'semantic' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow()
+    const row = db.prepare('SELECT generation_id AS g, ok FROM llm_calls').get() as {
+      g: string | null
+      ok: number
+    }
+    expect([row.g, row.ok]).toEqual(['gen-dead', 0])
   })
 })
 
@@ -1564,6 +1629,25 @@ describe('the fleet meets the provider through one gate', () => {
     expect(alertsOf(db, 'llm_call_failed')[0]).toContain('turn: 1 attempt(s)')
     held.open()
     await Promise.all(blocking)
+  })
+
+  // ★ 9 of r13's 13 dozes read "no slot after 0 ms": the first attempt stalled out the whole
+  // queue budget and the re-ask reached a full pool with nothing left to wait with.
+  it('★ a re-ask joins the gate with real patience, not the 0 ms its stall left behind', async () => {
+    const db = openDb()
+    const gate = limiterFor(PROVIDER_ORDER.join(','))
+    const waits: number[] = []
+    const straightThrough = gate.run.bind(gate)
+    vi.spyOn(gate, 'run').mockImplementation(async (exec, maxWaitMs) => {
+      waits.push(maxWaitMs)
+      return await straightThrough(exec, maxWaitMs)
+    })
+    const model = mockModel([{ fail: true }, { text: 'ok' }])
+    await new LlmClient({ model, db, caller: 'turn', maxQueueWaitMs: 0 }).text({
+      messages: [{ role: 'user', content: 'u' }],
+    })
+    expect(waits[0], 'the first attempt spends exactly the patience it was pinned').toBe(0)
+    expect(waits[1], 'and the re-ask is not sent to the gate empty-handed').toBe(MIN_QUEUE_WAIT_MS)
   })
 
   // The gate's state is worth one line to the operator, not one line per call: a pin stuck at

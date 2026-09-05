@@ -119,24 +119,48 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
-// `provider.order` is only an allow-list with `allow_fallbacks:false`, the default here: 8 of the
-// 30 endpoints serving MIND_MODEL cannot do structured output, so a hop to one is a hard failure.
+/** What one caller sends OpenRouter over and above the prompt: which models may answer, which
+ *  back ends may serve, and which mind is asking. */
+export type RequestBody = {
+  models: string[]
+  provider: {
+    only?: string[]
+    order?: string[]
+    allow_fallbacks: boolean
+    require_parameters: boolean
+  }
+  reasoning?: ReasoningSetting
+  session_id?: string
+}
+
+// The pinned back ends are an allow-list either way with `allow_fallbacks:false`, the default
+// here: 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so a hop to one is
+// a hard failure. The mind route names them under `only` and every other route under `order`,
+// because OpenRouter drops sticky routing the moment an order is named, and the mind is the one
+// route with a per-mind prefix worth keeping warm. `require_parameters` narrows to the endpoints
+// that can serve what the request asks for; it cannot REPLACE the allow-list, which bans back
+// ends that answer well-formed JSON with no act inside it — no capability flag reports that.
 export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
   providerOrder: string[] = PROVIDER_ORDER,
   allowFallbacks = false,
   reasoning?: ReasoningSetting,
   model: string = MIND_MODEL,
-): {
-  models: string[]
-  provider: { order: string[]; allow_fallbacks: boolean }
-  reasoning?: ReasoningSetting
-} {
+  sessionId?: string,
+): RequestBody {
+  const homes = model === MIND_MODEL ? { only: providerOrder } : { order: providerOrder }
   return {
     models: [model, ...fallbackModels],
-    provider: { order: providerOrder, allow_fallbacks: allowFallbacks },
+    provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: true },
     ...(reasoning === undefined ? {} : { reasoning }),
+    ...(sessionId === undefined ? {} : { session_id: sessionId }),
   }
+}
+
+/** OpenRouter's sticky-routing key, sent top level. One per mind and not per caller, so a mind's
+ *  turn and its scene line land on the same back end and share the one prefix they both carry. */
+function sessionIdFor(agentId: string | null): string | undefined {
+  return agentId === null ? undefined : `sj-${agentId}`
 }
 
 // OpenRouter names the back end in its own metadata and again in the raw body; neither is
@@ -213,6 +237,12 @@ const RATE_LIMIT_WAIT_MS = 2_000
 
 // How long a caller with no pinned patience will queue behind the gate before giving its tick up.
 const DEFAULT_QUEUE_WAIT_MS = 15_000
+
+/** What a RE-ASK gets at the gate however little of the call's budget the attempt before it
+ *  left. A first attempt that stalled out its whole patience handed the retry 0 ms, which dozed
+ *  the mind the instant the pool was full: 9 of r13's 13 dozes. Half the 9.9 s turn p50, which
+ *  is several hand-backs at a cap of 8; a pool still full when it runs out dozes as before. */
+export const MIN_QUEUE_WAIT_MS = 5_000
 
 /** How long to wait before re-asking; nothing at all unless the refusal was a rate limit.
  *  Public so a test can prove the shape without waiting it out. */
@@ -547,7 +577,7 @@ export class LlmClient {
       try {
         return await this.limiter.run(
           () => this.attemptOnce(model, modelName, exec, bill),
-          Math.max(0, queueUntil - Date.now()),
+          Math.max(sends === 1 ? 0 : MIN_QUEUE_WAIT_MS, queueUntil - Date.now()),
         )
       } catch (err) {
         lastError = err
@@ -645,7 +675,9 @@ export class LlmClient {
         this.llmCallRow({
           model: served,
           provider,
-          generationId: facts.generationId ?? null,
+          // The refusal carries the generation it came from, and `note` never ran to record it:
+          // without this the 3 rows r13 booked at the ceiling had no id to ask OpenRouter about.
+          generationId: dead?.response?.id ?? facts.generationId ?? null,
           ...tokens,
           costUsd: deadCost,
           estimatedCostUsd: deadCost,
@@ -666,13 +698,14 @@ export class LlmClient {
   }
 
   /** Public so a test can prove what a live call sends without making one. */
-  requestBody(): ReturnType<typeof defaultExtraBody> {
+  requestBody(): RequestBody {
     return defaultExtraBody(
       FALLBACK_MODELS,
       this.providerOrder,
       this.allowProviderFallbacks,
       this.reasoning ?? undefined,
       this.modelId,
+      sessionIdFor(this.agentId),
     )
   }
 
