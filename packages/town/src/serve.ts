@@ -24,12 +24,14 @@ export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 const numEnv = (name: string, ok: (n: number) => boolean): number | undefined => {
   const raw = process.env[name]
   if (raw === undefined) return undefined
-  const asked = Number(raw)
+  // `Number('') === 0`: a bare `SJ_SPEND_CAP_USD=` would read as a cap of zero, and every
+  // `cap > 0` guard downstream is off at zero.
+  const asked = raw.trim() === '' ? Number.NaN : Number(raw)
   if (ok(asked)) return asked
   console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
   return undefined
 }
-const usdEnv = (name: string): number | undefined =>
+export const usdEnv = (name: string): number | undefined =>
   numEnv(name, (n) => Number.isFinite(n) && n >= 0)
 const countEnv = (name: string): number | undefined =>
   numEnv(name, (n) => Number.isInteger(n) && n >= 1)

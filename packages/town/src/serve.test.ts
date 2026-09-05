@@ -4,13 +4,41 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { startDevWorld } from './devWorld.js'
-import { castOrScripted } from './serve.js'
+import { castOrScripted, usdEnv } from './serve.js'
 
 class Held extends Error {}
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-serve-'))
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true })
+})
+
+// ★ `SJ_SPEND_CAP_USD=` with nothing after it read as $0, and every `cap > 0` guard — the boot
+// check, the per-caller backstop, the runtime stop — is off at zero.
+describe('★ a spend knob with nothing after the = is unset, never a cap of zero', () => {
+  afterAll(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('leaves the built-in ceiling standing, and says the value was ignored', () => {
+    const said = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      vi.stubEnv('SJ_SPEND_CAP_USD', '  ')
+      expect(usdEnv('SJ_SPEND_CAP_USD')).toBeUndefined()
+      vi.stubEnv('SJ_SPEND_DAILY_USD', '')
+      expect(usdEnv('SJ_SPEND_DAILY_USD')).toBeUndefined()
+      expect(said.mock.calls.map((c) => String(c[0])).join('\n')).toContain('SJ_SPEND_DAILY_USD')
+    } finally {
+      said.mockRestore()
+    }
+  })
+
+  it('still takes a cap an operator meant, zero included', () => {
+    vi.stubEnv('SJ_SPEND_CAP_USD', '0')
+    expect(usdEnv('SJ_SPEND_CAP_USD')).toBe(0)
+    vi.stubEnv('SJ_SPEND_CAP_USD', '12.5')
+    expect(usdEnv('SJ_SPEND_CAP_USD')).toBe(12.5)
+  })
 })
 
 describe('★ a ledger refusal holds the minds, never the viewer', () => {
