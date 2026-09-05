@@ -354,14 +354,24 @@ export async function startDevWorld(
   // moves `loop.speed` and `loop.paused`, and an interval already armed cannot be re-timed.
   const beatMs = opts.realMsPerTick ?? DEV_MS_PER_TICK
   // A throw out of one tick must not take the beat with it: skipping `arm()` freezes the world
-  // for good, with no line anywhere. One alert per distinct fault, so a repeating one is quiet.
+  // for good, with no line anywhere. A repeating fault speaks at 1, 10, 100 …: quiet enough not
+  // to fill the log, loud enough that a frozen world cannot pass for a healthy one.
   let lastFault = ''
+  let faults = 0
+  let loudAt = 1
   const beatFailed = (err: unknown): void => {
     const why = err instanceof Error ? err.message : String(err)
-    if (why === lastFault) return
-    lastFault = why
-    console.error(`dev world: tick ${loop.state.tick} threw — ${why}`)
-    cast?.ops?.alert('tick_failed', why)
+    if (why !== lastFault) {
+      lastFault = why
+      faults = 0
+      loudAt = 1
+    }
+    faults += 1
+    if (faults !== loudAt) return
+    loudAt *= 10
+    const times = faults === 1 ? '' : `${faults} times `
+    console.error(`dev world: tick ${loop.state.tick} threw ${times}— ${why}`)
+    cast?.ops?.alert('tick_failed', `${why} (${faults} in a row)`)
   }
   const beat = (): void => {
     try {
