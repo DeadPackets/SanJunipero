@@ -143,6 +143,30 @@ describe('makeImageClient', () => {
     ).rejects.toBeInstanceOf(ImageGenError)
     expect(none).toEqual([])
   })
+  it('★ a request that never became a picture gives its reserve back', async () => {
+    const refused = fakeFetch(() => ({ status: 429, json: { error: 'slow down' } }))
+    const given = new BudgetGuard(1)
+    await expect(
+      makeImageClient({ apiKey: 'k', fetchFn: refused.fn, budget: given }).generateCandidates(
+        'p',
+        [],
+        1,
+      ),
+    ).rejects.toBeInstanceOf(ImageGenError)
+    expect(given.total).toBe(0)
+
+    // A billed reply keeps its reserve, picture or no picture.
+    const billed = fakeFetch(() => ({ status: 200, json: { usage: { cost: EST_COST_PER_IMAGE } } }))
+    const kept = new BudgetGuard(1)
+    await expect(
+      makeImageClient({ apiKey: 'k', fetchFn: billed.fn, budget: kept }).generateCandidates(
+        'p',
+        [],
+        1,
+      ),
+    ).rejects.toBeInstanceOf(ImageGenError)
+    expect(kept.total).toBeCloseTo(3 * EST_COST_PER_IMAGE)
+  })
   it('asking for no slots refuses with an Error, never with the value undefined', async () => {
     const { fn, calls } = fakeFetch(() => ok)
     await expect(
