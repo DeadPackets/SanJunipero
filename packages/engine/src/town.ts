@@ -20,7 +20,8 @@ import {
   type WorldRect,
   type WorldXY,
 } from '@sj/shared'
-import { bridgeAt } from './path.js'
+import { DEFAULT_CONFIG, type SimConfig } from '@sj/shared'
+import { bridgeAt, firstReachable, type Point } from './path.js'
 import { authoredOrigin, type WorldState } from './state.js'
 
 // TOWN_SQUARE is in the authored frame; the array origin walks as the world grows, so the
@@ -151,4 +152,38 @@ export function layBlock(
     }
   }
   return out
+}
+
+/** How many people this valley is holding: every body still here, and every child on the way.
+ *  The one number a birth, an arrival and the ceiling are all measured against. */
+export function headcount(state: WorldState): number {
+  let n = 0
+  for (const a of Object.values(state.agents)) {
+    if (!a.alive || a.departed !== undefined) continue
+    n += a.pregnant === undefined ? 1 : 2
+  }
+  return n
+}
+
+/** Where the valley road meets the edge of the map: the tile of the map's rim nearest the
+ *  square's own column that a foot can actually reach from the square. The south edge first,
+ *  because that is where the ground is open; `null` only for a world with no town. */
+export function roadRimOf(state: WorldState, config: SimConfig = DEFAULT_CONFIG): Point | null {
+  const square = townSquareOf(state)
+  if (square === null) return null
+  const h = state.terrain.length
+  const w = state.terrain[0]!.length
+  const row = (y: number): Point[] =>
+    Array.from({ length: w }, (_, x) => ({ x, y })).sort(
+      (a, b) => Math.abs(a.x - square.x) - Math.abs(b.x - square.x) || a.x - b.x,
+    )
+  const column = (x: number): Point[] =>
+    Array.from({ length: h }, (_, y) => ({ x, y })).sort(
+      (a, b) => Math.abs(a.y - square.y) - Math.abs(b.y - square.y) || a.y - b.y,
+    )
+  for (const tiles of [row(h - 1), row(0), column(w - 1), column(0)]) {
+    const hit = firstReachable(state, square, tiles, config)
+    if (hit !== null) return hit
+  }
+  return null
 }

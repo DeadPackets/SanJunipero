@@ -109,6 +109,9 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_aged',
   'agent_collapsed',
   'agent_spawned',
+  // Parked by the arrivals lane: the road's two events are the chronicle lane's to weigh.
+  'agent_arrived',
+  'agent_departed',
   'agent_spoke',
   'agent_conceived',
   // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.

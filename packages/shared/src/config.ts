@@ -375,6 +375,16 @@ const ReproductionSchema = z
   })
   .strict()
 
+// The one ceiling on the town: how many people the valley holds at once. Twelve founders, four
+// off the road, the rest born here. The runtime keeps its own copy as the last line.
+export const POPULATION_MAX_DEFAULT = 20
+
+const PopulationSchema = z
+  .object({
+    maxMinds: z.number().int().positive().default(POPULATION_MAX_DEFAULT),
+  })
+  .strict()
+
 const SpoilageSchema = z
   .object({
     enabled: z.boolean().default(true),
@@ -686,6 +696,7 @@ export const SimConfigSchema = z
     crafting: CraftingSchema.prefault({}),
     structures: StructuresSchema.prefault({}),
     reproduction: ReproductionSchema.prefault({}),
+    population: PopulationSchema.prefault({}),
     spoilage: SpoilageSchema.prefault({}),
     seasons: SeasonsSchema.prefault({}),
     tools: ToolsSchema.prefault({}),

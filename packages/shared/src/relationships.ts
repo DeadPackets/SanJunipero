@@ -18,3 +18,7 @@ export const RELATIONSHIP_EVENT_TYPES = [
   'partnership_formed',
   'partnership_dissolved',
 ] as const
+
+// Who is in the valley at all. Not a relationship, but read through the same tail: a coming and
+// a going both change who the people in a talk can be talking to.
+export const PRESENCE_EVENT_TYPES = ['agent_arrived', 'agent_departed'] as const

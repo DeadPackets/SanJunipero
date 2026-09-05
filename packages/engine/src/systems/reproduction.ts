@@ -1,6 +1,7 @@
 import { DAYS_PER_YEAR, MINUTES_PER_DAY, simTimeFromTick, type SimConfig } from '@sj/shared'
 import { BIRTH_NAMES } from '../data/names.js'
 import { mintId, type AgentBody, type WorldState } from '../state.js'
+import { headcount } from '../town.js'
 import type { TickCtx } from '../tickCtx.js'
 
 export type Sex = 'f' | 'm'
@@ -16,13 +17,16 @@ export const CONCEPTION_CHANCE_PER_ACT = 0.2
 
 const yearsOf = (a: AgentBody): number => Math.floor(a.ageDays / DAYS_PER_YEAR)
 
-// One f, one m, and the woman of childbearing age with no child already on the way.
+// One f, one m, and the woman of childbearing age with no child already on the way — in a town
+// whose law allows children at all, and which has room for one more person.
 export function motherAndFather(
   state: WorldState,
   config: SimConfig,
   aId: string,
   bId: string,
 ): { motherId: string; fatherId: string } | null {
+  if (!config.reproduction.enabled) return null
+  if (headcount(state) >= config.population.maxMinds) return null
   const a = state.agents[aId]
   const b = state.agents[bId]
   if (!a || !b || sexOf(a) === sexOf(b)) return null

@@ -44,6 +44,8 @@ import {
   AgentRecovered,
   AgentSlept,
   AgentSpoke,
+  AgentArrived,
+  AgentDeparted,
   AgentSpawned,
   AgentTended,
   SceneOpened,
@@ -922,6 +924,66 @@ export function fold(
           ...state.agents,
           [p.agentId]: { ...body, alive: false, asleep: false, activity: null },
         },
+      }
+    }
+    // Somebody walked up the valley road. The same body a founding makes, plus the day they came
+    // — which is what lets the town see a stranger as one for a while, and then stop.
+    case 'agent_arrived': {
+      const p = AgentArrived.parse(event.payload)
+      if (state.agents[p.id]) throw new Error(`agent_arrived for a body already here: ${p.id}`)
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.id]: {
+            id: p.id,
+            name: p.name,
+            x: p.x,
+            y: p.y,
+            alive: true,
+            asleep: false,
+            needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
+            hp: config.health.maxHp,
+            injuries: [],
+            ill: false,
+            ageDays: p.ageDays,
+            sex: p.sex,
+            arrived: { day: Math.floor(event.tick / MINUTES_PER_DAY) },
+            skills: {},
+            activity: null,
+            collapsedSinceTick: null,
+            zeroHungerSinceTick: null,
+          },
+        },
+        counters: bumpCounter(state.counters, p.id),
+      }
+    }
+    // Somebody walked back down it, and took what they were carrying. The body stays, as a dead
+    // one does: the name is still owed to everyone who knew it, and late events still land.
+    case 'agent_departed': {
+      const p = AgentDeparted.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_departed for unknown agent ${p.agentId}`)
+      if (!a.alive) throw new Error(`agent_departed for a body already gone: ${p.agentId}`)
+      const { insideId: _, ...body } = a
+      const items = Object.fromEntries(
+        Object.entries(state.items).filter(
+          ([, i]) => !(i.loc.t === 'agent' && i.loc.id === p.agentId),
+        ),
+      )
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.agentId]: {
+            ...body,
+            alive: false,
+            asleep: false,
+            activity: null,
+            departed: { day: Math.floor(event.tick / MINUTES_PER_DAY) },
+          },
+        },
+        items,
       }
     }
     // The wound on the record, and only that: the hp comes off through the `agent_harmed` the

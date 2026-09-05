@@ -1,6 +1,7 @@
 import {
   isBeddedKind,
   isHearthKind,
+  MINUTES_PER_DAY,
   isRoofedKind,
   isTravelled,
   lightBandAt,
@@ -68,7 +69,13 @@ export type PerceivedAgent = {
   // Absent on a well body, so a healthy town reads exactly as it always did — and never a number.
   // The packet carries the phrase, because the phrase is what a pair of eyes actually gets.
   condition?: string
+  // A face the valley has only just seen for the first time. Absent once the town has had
+  // STRANGER_DAYS to get used to it, and absent on everyone born here.
+  stranger?: true
 } & Markings
+
+/** How long a body off the road still reads as one to everyone who looks at it. */
+export const STRANGER_DAYS = 3
 
 // Tags a minted verb left, readable by anyone who can see the thing. Absent when unmarked.
 export type Markings = { marks?: Record<string, string> }
@@ -205,6 +212,8 @@ export type SeenEvent =
   // Something the town agreed against, done where somebody could see it. `self` is the breaker's
   // own copy: being seen is the whole of what a forbid costs.
   | { kind: 'law_broken'; breakerName: string; lawText: string; self: boolean }
+  // Somebody came up the valley road where this pair of eyes could see the edge of the map.
+  | { kind: 'stranger_arrived'; name: string }
 
 // What the ground under and around the feet is like. Absent on plain earth, so a packet from
 // a town with no roads reads exactly as it always did. A fact about hauling, not a site score.
@@ -392,6 +401,8 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
     .map((a) => {
       const worn = wornProse(state, a.id)
       const condition = conditionProse(state, config, a.id)
+      const day = Math.floor(state.tick / MINUTES_PER_DAY)
+      const stranger = a.arrived !== undefined && day - a.arrived.day <= STRANGER_DAYS
       return {
         id: a.id,
         name: a.name,
@@ -403,6 +414,7 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
         ageBand: ageBand(config, a.ageDays),
         ...(worn === undefined ? {} : { worn }),
         ...(condition === undefined ? {} : { condition }),
+        ...(stranger ? { stranger: true as const } : {}),
         ...marked(a),
       }
     })
@@ -801,6 +813,17 @@ function perceiveSeen(lens: Lens, recentEvents: SimEvent[]): SeenEvent[] {
       name: p.name,
       ...(typeof p.saying === 'string' ? { saying: sanitizeSpokenText(p.saying) } : {}),
     })
+  }
+
+  // An arrival is a thing at a place: whoever had that stretch of the valley's edge in sight
+  // watched somebody walk in out of it, and nobody else did.
+  for (const ev of recentEvents) {
+    if (ev.type !== 'agent_arrived') continue
+    const p = ev.payload as { id?: unknown; name?: unknown; x?: unknown; y?: unknown }
+    if (typeof p.id !== 'string' || typeof p.name !== 'string' || p.id === self.id) continue
+    if (typeof p.x !== 'number' || typeof p.y !== 'number') continue
+    if (indoors !== null || !lens.withinSight(p.x, p.y)) continue
+    seen.push({ kind: 'stranger_arrived', name: p.name })
   }
 
   // A global mystery reaches every open pair of eyes, walls and distance no object; a
