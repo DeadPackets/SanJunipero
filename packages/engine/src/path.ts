@@ -180,16 +180,25 @@ function heapPop(heap: Node[]): Node {
 // for every other mark too. Absent when a route was found or the budget cut the search short.
 type SearchOut = { found: PathSearch | null; reached: Set<number> | null }
 
-// One walk is searched by `validate` and again by `duration` over the same immutable world, so
-// the answer is kept against the identity of that world and the config it was judged under.
-const memo = new WeakMap<WorldState, { config: SimConfig; key: string; out: SearchOut }>()
+// A search reads the ground and what stands on it and nothing else, so its answer outlives every
+// other change to the world: the walk `validate` searched, `duration` searches again, and the
+// fold of the event searches a third time, all over the same terrain and the same structures.
+const MEMO_MAX = 64
+type Memo = { structures: WorldState['structures']; config: SimConfig; out: Map<string, SearchOut> }
+const memo = new WeakMap<TileId[][], Memo>()
 
 function search(state: WorldState, from: Point, to: Point, config: SimConfig): SearchOut {
   const key = `${from.x},${from.y}|${to.x},${to.y}`
-  const hit = memo.get(state)
-  if (hit?.config === config && hit.key === key) return hit.out
+  let hit = memo.get(state.terrain)
+  if (hit === undefined || hit.structures !== state.structures || hit.config !== config) {
+    hit = { structures: state.structures, config, out: new Map() }
+    memo.set(state.terrain, hit)
+  }
+  const known = hit.out.get(key)
+  if (known !== undefined) return known
   const out = runSearch(state, from, to, config)
-  memo.set(state, { config, key, out })
+  if (hit.out.size >= MEMO_MAX) hit.out.clear()
+  hit.out.set(key, out)
   return out
 }
 

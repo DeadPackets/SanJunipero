@@ -212,7 +212,10 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
       600,
     )
     const before = { ...s }
-    expect(Object.keys(before.traffic ?? {}).length).toBeGreaterThan(0)
+    // Which cells of the flat grid carry a footfall, in the order the grid holds them.
+    const wornCells = (t: number[] | undefined): number[] =>
+      (t ?? []).flatMap((v, i) => (v > 0 ? [i] : []))
+    expect(wornCells(before.traffic).length).toBeGreaterThan(0)
 
     const grown = pass(before, GROWS, MINUTES_PER_DAY)
     const growth = grown.events.find((e) => e.type === 'world_grown')!
@@ -227,16 +230,10 @@ describe('G11a-M2: the map grows, everything on it moves with it, and the log re
     for (const id of Object.keys(before.structures)) {
       expect(grown.state.structures[id]!.y).toBe(before.structures[id]!.y + dy)
     }
-    const shifted = Object.keys(before.traffic!)
-      .map((k) => {
-        const [x, y] = k.split(',').map(Number)
-        return `${x},${y! + dy}`
-      })
-      .sort()
+    const width = before.terrain[0]!.length
+    const shifted = wornCells(before.traffic).map((i) => i + dy * width)
     // Asked of the growth alone: the same midnight decays these one-footfall tiles off the map.
-    expect(Object.keys(apply(before, GROWS, [growth], MINUTES_PER_DAY).traffic!).sort()).toEqual(
-      shifted,
-    )
+    expect(wornCells(apply(before, GROWS, [growth], MINUTES_PER_DAY).traffic)).toEqual(shifted)
   })
 
   // ★ THE GROUND THAT ARRIVES IS THE WORLD CONTINUED. The river is a reason for the town's

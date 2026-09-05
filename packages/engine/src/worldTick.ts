@@ -160,13 +160,14 @@ const SYSTEMS: System[] = [
 ]
 
 // Each emit folds immediately, so every system is generated against the already-folded state.
+// A driver that folds what it writes hands its `apply` in and the tick folds through that, once.
 // ctx.config is a getter: a law flipped at this boundary is true for every system that runs after.
 export function createWorldTick(
   config: SimConfig,
   rng: RngStreams,
   laws?: LawQueue,
-): (state: WorldState) => WorldTickResult {
-  return (initial) => {
+): (state: WorldState, apply?: (type: string, payload: unknown) => WorldState) => WorldTickResult {
+  return (initial, apply) => {
     let state = initial
     const events: PendingEvent[] = []
     const ctx: TickCtx = {
@@ -177,7 +178,10 @@ export function createWorldTick(
       needs: new Map(),
       state: () => state,
       emit: (type, payload) => {
-        state = fold(state, { seq: 0, tick: state.tick, type, payload }, config)
+        state =
+          apply === undefined
+            ? fold(state, { seq: 0, tick: state.tick, type, payload }, config)
+            : apply(type, payload)
         events.push({ type, payload })
       },
     }

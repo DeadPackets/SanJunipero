@@ -62,6 +62,28 @@ describe('TickLoop', () => {
     expect(store.latestSnapshot()!.tick).toBe(10)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
   })
+  it('writes the snapshot after the tick has committed, not inside it', () => {
+    const db = openDb(':memory:')
+    const store = new EventStore(db)
+    const inside: boolean[] = []
+    const saveSnapshot = store.saveSnapshot.bind(store)
+    store.saveSnapshot = (tick, seq, state, rng) => {
+      inside.push(db.inTransaction)
+      saveSnapshot(tick, seq, state, rng)
+    }
+    const l = new TickLoop({
+      store,
+      state: genesisState(DEFAULT_CONFIG),
+      rng: new RngStreams('t'),
+      snapshotEveryTicks: 2,
+      onTick: () => {},
+    })
+    l.step()
+    l.step()
+    expect(inside).toEqual([false])
+    expect(stateHash(replayLatest(store, DEFAULT_CONFIG).state)).toBe(stateHash(l.state))
+  })
+
   it('restores tick and state when the transaction throws, and can step again', () => {
     let thrown = false
     const { store, loop: l } = loop(({ tick, emit }) => {

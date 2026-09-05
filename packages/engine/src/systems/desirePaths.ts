@@ -18,17 +18,18 @@ export function decayTraffic(value: number, config: SimConfig): number {
 // a tile that stopped being a trail — paved, overgrown, flooded — drops out entirely.
 export function quietPathsAt(
   state: WorldState,
-  traffic: Record<string, number>,
+  traffic: number[],
   day: number,
   config: SimConfig,
 ): Record<string, number> {
   const out: Record<string, number> = {}
+  const width = state.terrain[0]!.length
   for (let y = 0; y < state.terrain.length; y++) {
     const row = state.terrain[y]!
     for (let x = 0; x < row.length; x++) {
       if (row[x] !== T_PATH) continue
       const key = tileKey(x, y)
-      if ((traffic[key] ?? 0) >= config.desirePaths.regrowThreshold) continue
+      if ((traffic[y * width + x] ?? 0) >= config.desirePaths.regrowThreshold) continue
       out[key] = state.quietSince?.[key] ?? day
     }
   }
@@ -42,9 +43,12 @@ export function desirePathsSystem(ctx: TickCtx): void {
   if (time.hour !== 0 || time.minute !== 0) return
   const day = Math.floor(ctx.state().tick / MINUTES_PER_DAY)
 
-  for (const key of Object.keys(ctx.state().traffic ?? {}).sort()) {
-    if ((ctx.state().traffic?.[key] ?? 0) < cfg.wearThreshold) continue
-    const { x, y } = fromTileKey(key)
+  const traffic = ctx.state().traffic ?? []
+  const width = ctx.state().terrain[0]!.length
+  for (let i = 0; i < traffic.length; i++) {
+    if (traffic[i]! < cfg.wearThreshold) continue
+    const x = i % width
+    const y = (i - x) / width
     if (ctx.state().terrain[y]?.[x] !== T_GRASS) continue
     ctx.emit('tile_changed', { x, y, from: T_GRASS, to: T_PATH, reason: 'worn' })
   }

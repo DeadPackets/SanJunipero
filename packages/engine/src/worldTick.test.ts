@@ -412,4 +412,25 @@ describe('worldTick: replay safety', () => {
     expect(out.events.length).toBeGreaterThan(0)
     expect(applyAll(s, out.events, FAST, s.tick)).toEqual(out.state)
   })
+
+  it('folds through the driver when one is handed in, so each event is folded once', () => {
+    let s = makeWorld()
+    s = fold(s, ev('tick_advanced', {}, s.tick + 1), FAST)
+    const folded: string[] = []
+    let driven = s
+    const apply = (type: string, payload: unknown): WorldState => {
+      folded.push(type)
+      driven = fold(driven, ev(type, payload, driven.tick), FAST)
+      return driven
+    }
+    const out = createWorldTick(FAST, new RngStreams('t'))(s, apply)
+    expect(out.events.length).toBeGreaterThan(0)
+    // One fold per event, and the world the systems ran against is the driver's own.
+    expect(folded).toEqual(out.events.map((e) => e.type))
+    expect(out.state).toBe(driven)
+    // And the same tick either way.
+    const alone = createWorldTick(FAST, new RngStreams('t'))(s)
+    expect(out.events).toEqual(alone.events)
+    expect(out.state).toEqual(alone.state)
+  })
 })

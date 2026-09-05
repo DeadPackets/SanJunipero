@@ -358,6 +358,8 @@ describe('G11a-W5: feet wear a trail, and grass takes it back', () => {
     desirePaths: { wearThreshold: WEAR_AT },
   })
   const MID = { x: 5, y: 7 }
+  const footfalls = (s: WorldState, x: number, y: number): number =>
+    s.traffic?.[y * s.terrain[0]!.length + x] ?? 0
 
   // A body walking a line, back and forth, `crossings` times over the middle tile.
   function trodden(crossings: number): WorldState {
@@ -378,13 +380,13 @@ describe('G11a-W5: feet wear a trail, and grass takes it back', () => {
     expect(CFG.desirePaths.wearThreshold).toBe(120) // the number the world itself ships with
 
     const short = trodden(WEAR_AT - 1)
-    expect(short.traffic?.[`${MID.x},${MID.y}`]).toBe(WEAR_AT - 1)
+    expect(footfalls(short, MID.x, MID.y)).toBe(WEAR_AT - 1)
     const quiet = pass(short, WORN, MINUTES_PER_DAY)
     expect(quiet.events.filter((e) => e.type === 'tile_changed')).toEqual([])
     expect(quiet.state.terrain[MID.y]![MID.x]).toBe(0)
 
     const enough = trodden(WEAR_AT)
-    expect(enough.traffic?.[`${MID.x},${MID.y}`]).toBe(WEAR_AT)
+    expect(footfalls(enough, MID.x, MID.y)).toBe(WEAR_AT)
     const out = pass(enough, WORN, MINUTES_PER_DAY)
     const worn = out.events.filter((e) => e.type === 'tile_changed')
     // The three tiles the route passes THROUGH wear; the two it starts and ends on are

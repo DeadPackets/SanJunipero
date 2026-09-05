@@ -36,6 +36,13 @@ function meadow(rows: string[] = ['...', '...', '...'], config = CFG): WorldStat
   )
 }
 
+// The flat traffic grid of a meadow, written as the few tiles that carry a count.
+function grid(worn: readonly (readonly [number, number, number])[], w = 3, h = 3): number[] {
+  const out = new Array<number>(w * h).fill(0)
+  for (const [x, y, n] of worn) out[y * w + x] = n
+  return out
+}
+
 function withWalker(s: WorldState, config = CFG): WorldState {
   const spawned = fold(
     s,
@@ -72,7 +79,7 @@ const tileEvents = (r: WorldTickResult) => r.events.filter((e) => e.type === 'ti
 
 describe('traffic: the walk itself is the record', () => {
   it("counts a walker's steps, ignores a body that simply appears, and stays absent when the law is off", () => {
-    expect(cross(withWalker(meadow()), 3).traffic).toEqual({ [tileKey(1, 1)]: 3 })
+    expect(cross(withWalker(meadow()), 3).traffic).toEqual([0, 0, 0, 0, 3, 0, 0, 0, 0])
     const teleported = fold(
       fold(
         meadow(),
@@ -128,17 +135,17 @@ describe('desirePathsSystem: wear', () => {
 
   it('every counter falls a tenth a night, floored', () => {
     const after = midnight(cross(withWalker(meadow()), 120), 1).state
-    expect(after.traffic).toEqual({ [tileKey(1, 1)]: 108 })
-    expect(midnight(after, 2).state.traffic).toEqual({ [tileKey(1, 1)]: 97 })
-    // And a counter the fall takes to zero leaves the map, rather than being carried at zero.
-    expect(midnight({ ...after, traffic: { [tileKey(1, 1)]: 1 } }, 2).state.traffic).toBeUndefined()
+    expect(after.traffic).toEqual([0, 0, 0, 0, 108, 0, 0, 0, 0])
+    expect(midnight(after, 2).state.traffic).toEqual([0, 0, 0, 0, 97, 0, 0, 0, 0])
+    // And a grid the fall takes to nothing leaves the world, rather than being carried as zeroes.
+    expect(midnight({ ...after, traffic: grid([[1, 1, 1]]) }, 2).state.traffic).toBeUndefined()
   })
 })
 
 describe('desirePathsSystem: overgrowth', () => {
   const QUIET_TILE = tileKey(1, 1)
   function quietPath(traffic: number): WorldState {
-    return { ...meadow(['...', '.p.', '...']), traffic: { [QUIET_TILE]: traffic } }
+    return { ...meadow(['...', '.p.', '...']), traffic: grid([[1, 1, traffic]]) }
   }
   function run(
     s: WorldState,
@@ -172,14 +179,14 @@ describe('desirePathsSystem: overgrowth', () => {
   it('a trail that fills up again loses its stamp and starts the count over', () => {
     const gone = midnight(quietPath(10), 1)
     expect(gone.state.quietSince).toEqual({ [QUIET_TILE]: 1 })
-    const busy = midnight({ ...gone.state, traffic: { [QUIET_TILE]: 100 } }, 2)
+    const busy = midnight({ ...gone.state, traffic: grid([[1, 1, 100]]) }, 2)
     expect(busy.state.quietSince).toBeUndefined()
-    const requiet = midnight({ ...busy.state, traffic: { [QUIET_TILE]: 10 } }, 3)
+    const requiet = midnight({ ...busy.state, traffic: grid([[1, 1, 10]]) }, 3)
     expect(requiet.state.quietSince).toEqual({ [QUIET_TILE]: 3 })
   })
 
   it('a trail well used is never taken away', () => {
-    const busy = run({ ...meadow(['...', '.p.', '...']), traffic: { [QUIET_TILE]: 10000 } }, 1, 21)
+    const busy = run({ ...meadow(['...', '.p.', '...']), traffic: grid([[1, 1, 10000]]) }, 1, 21)
     expect(busy.events).toEqual([])
     expect(busy.state.terrain[1]![1]).toBe(8)
   })
@@ -189,7 +196,7 @@ describe('world_grown moves the counters with the ground', () => {
   it('translates both sparse maps when the origin shifts', () => {
     const s = {
       ...meadow(['...', '.p.', '...']),
-      traffic: { [tileKey(1, 1)]: 10 },
+      traffic: grid([[1, 1, 10]]),
       quietSince: { [tileKey(1, 1)]: 4 },
     }
     const grown = fold(
@@ -201,7 +208,7 @@ describe('world_grown moves the counters with the ground', () => {
       }),
       CFG,
     )
-    expect(grown.traffic).toEqual({ [tileKey(3, 1)]: 10 })
+    expect(grown.traffic).toEqual(grid([[3, 1, 10]], 5, 3))
     expect(grown.quietSince).toEqual({ [tileKey(3, 1)]: 4 })
     const south = fold(
       s,
@@ -212,6 +219,18 @@ describe('world_grown moves the counters with the ground', () => {
       }),
       CFG,
     )
-    expect(south.traffic).toEqual({ [tileKey(1, 1)]: 10 })
+    // The rows the flat grid indexes by are wider or more numerous now, so it is re-laid even
+    // when the origin holds still.
+    expect(south.traffic).toEqual(grid([[1, 1, 10]], 3, 4))
+    const east = fold(
+      s,
+      ev('world_grown', {
+        edge: 'e',
+        depth: 2,
+        tiles: Array.from({ length: 3 }, () => [0, 0]),
+      }),
+      CFG,
+    )
+    expect(east.traffic).toEqual(grid([[1, 1, 10]], 5, 3))
   })
 })

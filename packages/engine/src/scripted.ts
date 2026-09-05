@@ -7,7 +7,7 @@ import { createWorldTick } from './worldTick.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { RngStreams } from './rng.js'
 import { EventStore } from './eventStore.js'
-import { TickLoop } from './tickLoop.js'
+import { TickLoop, type TickHandler } from './tickLoop.js'
 import { openDb } from './db.js'
 
 // Deterministic scripted policies: pure functions of perception, no Math.random and no hidden
@@ -363,10 +363,7 @@ function bedGate(
   return intent
 }
 
-export type ScriptedOnTick = (ctx: {
-  tick: number
-  emit: (type: string, payload: unknown) => void
-}) => void
+export type ScriptedOnTick = TickHandler
 
 // getState() must return the *current* loop state; every decision is recomputed from it, so the
 // handler has no hidden mutable state and replays bit-identically from the store.
@@ -377,12 +374,12 @@ export function makeScriptedOnTick(
 ): ScriptedOnTick {
   const policies = makePolicies(config)
   const worldTick = createWorldTick(config, rng)
-  return ({ tick, emit }) => {
+  return ({ tick, emit, apply }) => {
     scriptedTimeline(config, tick, emit)
 
     // World pipeline (weather, fire, crops, wildlife, needs, health, aging, actions, collapse/death).
-    const result = worldTick(getState())
-    for (const e of result.events) emit(e.type, e.payload)
+    const result = worldTick(getState(), apply)
+    if (apply === undefined) for (const e of result.events) emit(e.type, e.payload)
 
     // build is one long continuous activity and submitIntent rejects any other intent while it
     // runs, so the Builder's rest break and eat break are scripted here.
