@@ -250,9 +250,9 @@ function sendCard(
 export function mountShareCard(router: Router, deps: ShareCardDeps): void {
   const spriteFor = makeSpriteReader(deps.getCodex)
 
-  /** A REAL postcard for the minute somebody shared: the room that was running, its faces, its
-   *  place, on a plate the colour of that hour. The day's own title card is what answers when
-   *  the link points between rooms, or before the town has held a scene at all. */
+  /** A REAL postcard for the day somebody shared: its leading room, that room's faces and
+   *  place, on a plate the colour of its hour. The day's own title card is what answers before
+   *  the town has held a scene at all. */
   const momentCard = async (day: number, tick: number): Promise<string> => {
     const scene = momentAt(deps.moments?.() ?? [], tick, day)
     if (scene === null) {
@@ -282,7 +282,7 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
     sendCard(
       res,
       asked.png,
-      momentCard(day, momentToTick(day, asked.name)),
+      momentCard(day, day * MINUTES_PER_DAY),
       day < live ? CACHE_CLOSED : CACHE_LIVE,
     )
   })

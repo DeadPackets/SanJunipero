@@ -42,6 +42,27 @@ function scriptedWorld(dbPath: string): Database.Database {
     onTick: ({ tick, emit }) => {
       if (tick === 1)
         emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+      // Two rooms an hour apart on day 0, so the minute a link names picks between them.
+      if (tick === 120)
+        emit('scene_opened', {
+          id: 'sc_1',
+          kind: 'talk',
+          participants: ['alice'],
+          topic: 'the well',
+          stakes: 3,
+        })
+      if (tick === 130)
+        emit('scene_closed', { id: 'sc_1', summary: '', deltas: [], closeReason: 'ended' })
+      if (tick === 600)
+        emit('scene_opened', {
+          id: 'sc_2',
+          kind: 'quarrel',
+          participants: ['alice'],
+          topic: 'the fence',
+          stakes: 8,
+        })
+      if (tick === 610)
+        emit('scene_closed', { id: 'sc_2', summary: '', deltas: [], closeReason: 'ended' })
     },
   })
   // Into day 2: a card is refused for a day the town has not lived, so the fixture must live
@@ -225,6 +246,18 @@ describe('the card route and the tags the app is served with', () => {
     const noon = await (await fetch(`${base}/card/moment/1/12:00.svg`)).text()
     const night = await (await fetch(`${base}/card/moment/1/23:59.svg`)).text()
     expect(noon).toBe(night)
+  })
+
+  /** Day 0 held two rooms an hour apart. The minute is dropped, so both minutes — and the
+   *  midnight the tags point at — are one card, one raster, one scan. */
+  it('★ a day that held rooms still answers with one card for every minute of it', async () => {
+    const rooms = await Promise.all(
+      ['02:00', '10:00', '00:00'].map(async (t) =>
+        (await fetch(`${base}/card/moment/0/${t}.svg`)).text(),
+      ),
+    )
+    expect(rooms[0]).toBe(rooms[1])
+    expect(rooms[0]).toBe(rooms[2])
   })
 
   // Twitter, Slack, Discord, Facebook, LinkedIn and iMessage all refuse an SVG for `og:image`.
