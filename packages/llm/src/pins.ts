@@ -59,6 +59,7 @@ export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   // Re-reconciled 2026-09-03: reported/estimated ran 0.668 over 502 calls while DeepInfra ran
   // 0.99, so the old row over-booked Wafer by half and raised 1,232 price-divergence alerts.
   [route(MIND_MODEL, 'Wafer')]: { input: 0.1, output: 0.35, cacheRead: 0.02 },
+  [route(RULING_MODEL, 'OpenAI')]: { input: 0.2, output: 1.2, cacheRead: 0.02 },
   [route(MIND_MODEL, 'DeepInfra')]: { input: 0.075, output: 0.25, cacheRead: 0.016 },
   [route(PROSE_MODEL, 'DeepInfra')]: { input: 0.08, output: 0.18, cacheRead: 0.016 },
   [route(PROSE_MODEL, 'Inceptron')]: { input: 0.13, output: 0.28, cacheRead: 0.03 },
@@ -118,7 +119,7 @@ export function pricesFor(
 // no caller on that half of the fleet names the field; the DeepSeek half keeps its own pins.
 export type ReasoningSetting =
   | { enabled: false }
-  | { effort: 'minimal' | 'low' | 'medium' | 'high' }
+  | { effort: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' }
 
 // What one caller's calls are pinned to, over and above the routing every call shares. An
 // absent field leaves that dial exactly where it sat before the dial existed.
@@ -255,12 +256,33 @@ export const PINNED_CALLERS: string[] = Object.keys(SETTINGS_BY_CALLER)
 
 const NO_SETTINGS: CallSettings = {}
 
+/** `SJ_FLEET=luna`: the whole town on the ruling model, served by OpenAI, reasoning at xhigh and
+ *  at max for a ruling. Output ceilings and rails widen because a reasoning model spends its
+ *  tokens before the answer. An experiment lever; the pinned fleet is what ships. */
+const FLEET: 'pinned' | 'luna' = process.env.SJ_FLEET === 'luna' ? 'luna' : 'pinned'
+const LUNA_OUTPUT_ROOM = 6000
+const LUNA_RAIL_FACTOR = 15
+
+function onLuna(caller: string, pinned: CallSettings): CallSettings {
+  return {
+    ...pinned,
+    model: RULING_MODEL,
+    providerOrder: RULING_PROVIDER_ORDER,
+    reasoning: { effort: RULING_CALLERS.includes(caller) ? 'max' : 'xhigh' },
+    maxOutputTokens: (pinned.maxOutputTokens ?? 2000) + LUNA_OUTPUT_ROOM,
+    minTimeoutMs: Math.max(pinned.minTimeoutMs ?? 0, 90_000),
+    ...(pinned.dailyUsd === undefined ? {} : { dailyUsd: pinned.dailyUsd * LUNA_RAIL_FACTOR }),
+  }
+}
+
 export function callSettingsFor(caller: string): CallSettings {
-  return SETTINGS_BY_CALLER[caller] ?? NO_SETTINGS
+  const pinned = SETTINGS_BY_CALLER[caller] ?? NO_SETTINGS
+  return FLEET === 'luna' ? onLuna(caller, pinned) : pinned
 }
 
 /** Which of the fleet's models answers for this caller. An unpinned caller keeps the mind's. */
 export function modelFor(caller: string): string {
+  if (FLEET === 'luna') return RULING_MODEL
   return SETTINGS_BY_CALLER[caller]?.model ?? MIND_MODEL
 }
 
@@ -273,9 +295,9 @@ export const MIN_REQUEST_TIMEOUT_MS = 30_000
 /** A call may not outlive the time its own output ceiling needs to fill. Derived rather than
  *  pinned, so raising a ceiling above cannot silently start aborting honest answers. */
 export function requestTimeoutMsFor(caller: string): number {
-  const pinned = SETTINGS_BY_CALLER[caller]
-  const floor = pinned?.minTimeoutMs ?? MIN_REQUEST_TIMEOUT_MS
-  const ceiling = pinned?.maxOutputTokens
+  const pinned = callSettingsFor(caller)
+  const floor = pinned.minTimeoutMs ?? MIN_REQUEST_TIMEOUT_MS
+  const ceiling = pinned.maxOutputTokens
   if (ceiling === undefined) return floor
   return Math.max(floor, Math.ceil((ceiling / SLOWEST_OUTPUT_TOKENS_PER_S) * 1000))
 }

@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { CLOSED_KEYS, PLAN_MAX_STEPS } from '@sj/shared'
 import {
   CEILING_PRICE_PER_M,
@@ -319,4 +319,24 @@ it('only the night chain that compounds waits a burst out', () => {
 it('an unpinned caller keeps the routing it has always had', () => {
   expect(callSettingsFor('nobody-pinned-this')).toEqual({})
   expect(modelFor('nobody-pinned-this')).toBe(MIND_MODEL)
+})
+
+it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh and at max for a ruling', async () => {
+  vi.stubEnv('SJ_FLEET', 'luna')
+  vi.resetModules()
+  try {
+    const luna = await import('./pins.js')
+    for (const caller of ['turn', 'scene', 'reflection.gist', 'narrator', 'nobody']) {
+      expect(luna.modelFor(caller)).toBe(RULING_MODEL)
+      expect(luna.callSettingsFor(caller).providerOrder).toEqual(RULING_PROVIDER_ORDER)
+      expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'xhigh' })
+    }
+    expect(luna.callSettingsFor('arbiter').reasoning).toEqual({ effort: 'max' })
+    expect(luna.callSettingsFor('scene').maxOutputTokens).toBe(300 + 6000)
+    expect(luna.requestTimeoutMsFor('scene')).toBeGreaterThanOrEqual(90_000)
+    expect(luna.callSettingsFor('turn').dailyUsd).toBeCloseTo(3.31 * 15)
+  } finally {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  }
 })
