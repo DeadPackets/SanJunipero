@@ -12,7 +12,7 @@ export const MAX_BODY_BYTES = 4096
 /** The served origin proxies `/admin/*` here, so every request arrives from 127.0.0.1 and there
  *  is no caller to count against: the run of refusals is the channel's, and shuts it for all. */
 export const MAX_AUTH_FAILURES = 10
-export const LOCKOUT_MS = 60_000
+const LOCKOUT_MS = 60_000
 
 const LawRequest = z.object({ path: z.string().min(1), value: z.unknown() })
 

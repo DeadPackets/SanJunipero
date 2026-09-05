@@ -40,10 +40,10 @@ export type SceneVoice = {
 // How far back a mind reads before answering. Six lines is three exchanges for a pair: long
 // enough to see the shape of the talk, short enough that the last thing said is still the
 // loudest. At twelve it is half a round, which reads as people talking past each other.
-export const THREAD_LINES_SHOWN = 6
+const THREAD_LINES_SHOWN = 6
 /** Twelve is where the window stops earning its tokens: past it the block outgrows the system
  *  prompt the cache is keeping warm, and the last thing said stops being the loudest. */
-export const THREAD_LINES_MAX = 12
+const THREAD_LINES_MAX = 12
 
 /** A whole round of talk, floored at the pair's six lines and capped at twelve — the shape
  *  `lineCapFor` has, over the same cast. */

@@ -72,7 +72,7 @@ export type MindClock = {
   prevVisibleIds: string[]
   // The felt tags this mind has already been asked about. Optional: a checkpoint written before
   // it existed still resumes, and an absent latch costs one turn, not sixty-six.
-  feltSeen?: string[]
+  feltSeen?: string[] | undefined
 }
 
 type Intent = z.infer<typeof IntentSchema>

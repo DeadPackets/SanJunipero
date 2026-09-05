@@ -52,12 +52,12 @@ export type BondsDeps = {
  *  24-act window, six rollup rows and three scalars — a constant, whatever the town's age.
  *  Kept alive between rebuilds, so a rebuild costs the rows since the last one and not the
  *  town's whole history. */
-export type BondsFold = {
+type BondsFold = {
   apply(events: Iterable<SimEvent>): void
   read(asOfTick: number): BondsResponse
 }
 
-export function makeBondsFold(earshot: number): BondsFold {
+function makeBondsFold(earshot: number): BondsFold {
   const drafts = new Map<string, BondFold>()
 
   const between = (a: string, b: string): BondFold | null => {

@@ -93,5 +93,8 @@
   },
   "rules": {
     "duplicates": "warn"
-  }
+  },
+  "ignoreDependencies": [
+    "playwright-core"
+  ]
 }
