@@ -189,19 +189,32 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   // agent memory DBs are optional (scripted world) — missing file or table reads as []
   // HELD, not reopened: an open+close per GET on the tick thread throws that file's page cache away.
-  const agentDbs = new Map<string, Database.Database>()
+  // The statements are held with the handle: the four SQL strings are literals in this file, so
+  // the map is bounded, and a re-prepare per GET is ~50-100 us on the thread that ticks the town.
+  const agentDbs = new Map<
+    string,
+    { db: Database.Database; held: Map<string, Database.Statement> }
+  >()
   const readAgentRows = <T>(agentId: string, sql: string): T[] => {
     if (!deps.agentDbDir || !AGENT_ID.test(agentId)) return []
     try {
-      let adb = agentDbs.get(agentId)
-      if (adb === undefined) {
-        adb = new Database(join(deps.agentDbDir, `${agentId}.db`), {
-          readonly: true,
-          fileMustExist: true,
-        })
-        agentDbs.set(agentId, adb)
+      let mind = agentDbs.get(agentId)
+      if (mind === undefined) {
+        mind = {
+          db: new Database(join(deps.agentDbDir, `${agentId}.db`), {
+            readonly: true,
+            fileMustExist: true,
+          }),
+          held: new Map(),
+        }
+        agentDbs.set(agentId, mind)
       }
-      return adb.prepare(sql).all(agentId) as T[]
+      let stmt = mind.held.get(sql)
+      if (stmt === undefined) {
+        stmt = mind.db.prepare(sql)
+        mind.held.set(sql, stmt)
+      }
+      return stmt.all(agentId) as T[]
     } catch {
       return []
     }
@@ -302,7 +315,7 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
   })
 
   return () => {
-    for (const adb of agentDbs.values()) adb.close()
+    for (const mind of agentDbs.values()) mind.db.close()
     agentDbs.clear()
   }
 }
