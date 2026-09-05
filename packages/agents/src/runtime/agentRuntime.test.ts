@@ -1818,6 +1818,42 @@ describe('arbiter seam (T19)', () => {
     expect(runtime.dayLogSnapshot().filter((l) => l.includes('Rain soon.'))).toHaveLength(1)
   })
 
+  // The provider was still thinking when the body died. The answer is paid for, but a corpse
+  // cannot act, cannot think out loud to the viewer, and cannot write in its own book.
+  it('a turn that lands after its mind died writes nothing and publishes nothing', async () => {
+    const thoughts: { text: string }[] = []
+    const gate = gatedModel()
+    const { world, loop, bridge, agentDb } = await setup({
+      model: gate.model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      onThought: (t) => {
+        thoughts.push(t)
+      },
+    })
+    await stepUntil(loop, () => gate.calls.count >= 1, 50)
+    const thoughtsBefore = memoriesOfKind(agentDb, 'thought').length
+
+    bridge.announce('hp_changed', { agentId: AGENT, delta: -1000 })
+    await stepUntil(loop, () => loop.state.agents[AGENT]?.alive === false, 20)
+    gate.resolve(
+      JSON.stringify(
+        askedShape({
+          thought: 'One more step to the water.',
+          action: { verb: 'walk', params: { x: 9, y: 9 } },
+          importance: 2,
+        }),
+      ),
+    )
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(thoughts, 'nothing of a corpse reaches the viewer').toEqual([])
+    expect(memoriesOfKind(agentDb, 'thought')).toHaveLength(thoughtsBefore)
+    expect(startedVerbs(world.engineDb)).toEqual([])
+  })
+
   // A restart used to leave the map empty, so the same idea inside the window bought the ruling
   // a second time — the one thing the precedent exists to stop.
   it('carries what the court has already ruled across a restart', async () => {

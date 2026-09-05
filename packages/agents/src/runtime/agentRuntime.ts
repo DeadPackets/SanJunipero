@@ -1201,6 +1201,9 @@ export class AgentRuntime {
     // refusal the mind has now been told about is not told twice.
     this.#pendingRecall = null
     this.#lastOutcome = null
+    // The body died while the provider was thinking. The call is paid for and booked; a corpse
+    // still acts on nothing, thinks out loud to nobody and writes in no book.
+    if (!this.#started) return
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
