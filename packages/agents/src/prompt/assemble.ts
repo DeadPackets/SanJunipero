@@ -78,9 +78,9 @@ const DAYLOG_COMPACTION_TOKENS = 6000
 export const JOURNAL_LINES = 5
 const JOURNAL_MAX_CHARS = 1200
 
-/** Two, because one line back cannot show a rut and a page of them is the mind talking to
- *  itself instead of to the town. */
-export const OWN_WORDS_SHOWN = 2
+/** Four, the same window the scene path keeps of a mind's own last lines. Two could not show a
+ *  rut four turns wide, and a page of them is the mind talking to itself instead of to the town. */
+export const OWN_WORDS_SHOWN = 4
 
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard

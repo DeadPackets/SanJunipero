@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FELT_TAGS, LAWS_SHOWN, LAW_TEXT_MAX, MYSTERIES } from '@sj/engine'
 import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
-import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
+import { assemblePrompt, compactDayLog, OWN_WORDS_SHOWN, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
@@ -227,13 +227,16 @@ describe('perceptionToProse', () => {
     ])
   })
 
-  it('★ two lines at most, and one is said just once', () => {
-    const said = ['first', 'second', 'third', 'fourth']
+  // Four now, the scene path's own window: two lines back cannot show a rut four turns wide.
+  it('★ four lines at most, and one is said just once', () => {
+    const said = ['first', 'second', 'third', 'fourth', 'fifth']
     const a = assemblePrompt(fixtureBlocks({ now: { prose: 'The sun stands high.', said } }))
     const block = a.messages.at(-1)!.content
-    expect(block.split('\n')).toHaveLength(2)
-    expect(block).not.toContain('second')
-    expect(block).toBe('You said: "third"\nYou just said: "fourth"')
+    expect(block.split('\n')).toHaveLength(OWN_WORDS_SHOWN)
+    expect(block).not.toContain('first')
+    expect(block).toBe(
+      'You said: "second"\nYou said: "third"\nYou said: "fourth"\nYou just said: "fifth"',
+    )
 
     const one = assemblePrompt(
       fixtureBlocks({ now: { prose: 'The sun stands high.', said: ['only'] } }),
