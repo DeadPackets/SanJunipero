@@ -13,6 +13,7 @@ export const RULING_CALLERS: readonly string[] = ['arbiter', 'council', 'law.com
 // the chronicle, the court and the tier-2.5 pass are town work at any cast size.
 export const PER_MIND_CALLERS: readonly string[] = [
   'turn',
+  'turn.compact',
   'reflection',
   'reflection.edit',
   'dream',
@@ -145,6 +146,10 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
     temperature: 1,
     dailyUsd: 50,
   },
+  // The day log folded short when it outgrows its block, mid-day. Restated, not judged: on the
+  // turn's own pin it thought for 1,000 tokens per fold and wrote 104 of them into r21's ledger
+  // under the turn's name, 5% of the bill and zero cache.
+  'turn.compact': { ...ON_LUNA, ...RESTATES, maxOutputTokens: 1500, dailyUsd: 1 },
   // A night's ledger is the longest thought a mind has: p99 6,837, and 7,750 cut two of 255.
   reflection: {
     ...ON_LUNA,

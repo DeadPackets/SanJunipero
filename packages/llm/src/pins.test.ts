@@ -83,7 +83,14 @@ it('★ every pinned caller runs on the one fleet model at its one home', () => 
     expect(callSettingsFor(caller).providerOrder, caller).toEqual(PROVIDER_ORDER)
   }
   for (const caller of PER_MIND_CALLERS) expect(PINNED_CALLERS, caller).toContain(caller)
-  expect([...PER_MIND_CALLERS]).toEqual(['turn', 'reflection', 'reflection.edit', 'dream', 'scene'])
+  expect([...PER_MIND_CALLERS]).toEqual([
+    'turn',
+    'turn.compact',
+    'reflection',
+    'reflection.edit',
+    'dream',
+    'scene',
+  ])
 })
 
 // r21 spent 58% of its bill on reasoning tokens. A ruling thinks hardest, a turn or a line
@@ -103,6 +110,7 @@ it('★ three efforts: rulings judge, turns and lines think, restatements do not
   ])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'high' })
   for (const caller of [
+    'turn.compact',
     'reflection.gist',
     'scene.close',
     'semantic',

@@ -353,6 +353,7 @@ const idlePlan = (): PlanState => ({ queue: [], lastResult: 'idle', size: 0 })
 export class AgentRuntime {
   readonly #db: Database.Database
   readonly #llm: LlmClient
+  readonly #compactor: LlmClient
   readonly #embedder: { embed(t: string): Promise<Float32Array> }
   readonly #identity: IdentityCore
   readonly #personality: PersonalityStore
@@ -456,6 +457,7 @@ export class AgentRuntime {
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
+    this.#compactor = deps.llm.forCaller('turn.compact')
     this.#embedder = deps.embedder
     this.#identity = deps.identity
     this.#personality = deps.personality
@@ -1213,7 +1215,7 @@ export class AgentRuntime {
     let turn: Turn
     try {
       if (assembled.needsCompaction) {
-        const summary = await this.#llm.text({
+        const summary = await this.#compactor.text({
           system: COMPACTION_SYSTEM,
           messages: [{ role: 'user', content: this.#dayLog.join('\n') }],
         })

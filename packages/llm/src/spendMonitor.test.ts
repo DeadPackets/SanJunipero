@@ -92,7 +92,15 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
   // anywhere but here, a conversation loop can hold the floor at any rate the day's budget allows.
   it('counts only what a mind spends its own calls on, the words it says among them', () => {
     const db = openDb()
-    const mind = ['turn', 'reflection', 'reflection.edit', 'dream', 'scene', 'recall']
+    const mind = [
+      'turn',
+      'turn.compact',
+      'reflection',
+      'reflection.edit',
+      'dream',
+      'scene',
+      'recall',
+    ]
     expect(MIND_CALLERS).toEqual(mind)
     for (const caller of mind) {
       seedProviderCall(db, { agoMinutes: 1, caller, provider: 'Baidu' })
@@ -102,7 +110,7 @@ describe('★ projectCallRate — the tripwire counts calls, not dollars', () =>
     }
 
     const r = projectCallRate(db, { minds: 1, windowRealMinutes: 15, now: NOW })
-    expect(r.sampledCalls, 'town work was billed to the cast').toBe(6)
+    expect(r.sampledCalls, 'town work was billed to the cast').toBe(mind.length)
   })
 
   it('leaves a call older than the window out of the flow', () => {
