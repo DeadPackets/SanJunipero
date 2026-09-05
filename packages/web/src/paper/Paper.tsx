@@ -6,7 +6,7 @@ import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
 import { dateline } from './stamp.js'
 import { PageBody } from './pages/index.js'
-import type { Thing } from './pages/types.js'
+import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
 import {
   PAGE_TABS,
@@ -71,6 +71,7 @@ export function Paper({
   if (page !== null && page !== shown) setShown(page)
 
   const key = shown ?? 'folk'
+  const [notice, setNotice] = useState<PaperNotice | null>(null)
 
   // [open, key]: switching arms unmounts the focused tab, and focus would fall to <body>.
   useEffect(() => {
@@ -234,6 +235,11 @@ export function Paper({
             </div>
           </div>
         </header>
+        {key === 'laws' && notice !== null && (
+          <p className="laws-notice" role={notice.ok ? undefined : 'alert'}>
+            {notice.words}
+          </p>
+        )}
         <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
           {open ? (
             // Keyed by the page, not the tab: a tab switch must not drop the page's feeds and
@@ -256,6 +262,7 @@ export function Paper({
                 onPlay={onPlay}
                 onLive={onLive}
                 onMoment={onMoment}
+                onNotice={setNotice}
               />
             </PageBoundary>
           ) : null}

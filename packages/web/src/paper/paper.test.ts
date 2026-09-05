@@ -395,6 +395,24 @@ describe('★ every page that can be quiet can also be out of reach', () => {
   })
 })
 
+// An operator can press Set and shut the sheet in the same breath, and the paper unmounts its
+// body on close: an answer held in the body is an answer nobody ever reads.
+describe('★ the operator’s answer outlives the page it was asked from', () => {
+  it('is the paper’s state, and the page only hands it over', () => {
+    const paper = src('./Paper.tsx')
+    expect(paper).toContain('useState<PaperNotice | null>(null)')
+    expect(paper).toContain('className="laws-notice"')
+    expect(paper).toContain('onNotice={setNotice}')
+  })
+
+  it('is written by both operator write paths and held by neither', () => {
+    const laws = src('./pages/Laws.tsx')
+    expect(laws, 'the page keeps no answer of its own').not.toContain('setNotice')
+    expect(laws).toContain('onNotice({')
+    expect(laws).toContain('<ExportLink token={operatorToken} onNotice={refused} />')
+  })
+})
+
 // `renderToStaticMarkup` rethrows rather than catching, so the two branches are asked of the
 // class's own `render` instead of being triggered by a throwing child.
 describe('★ a page that throws costs the viewer the page, not the town', () => {

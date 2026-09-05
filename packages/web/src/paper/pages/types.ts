@@ -3,6 +3,10 @@ import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import type { MomentPlay } from '../../ui/replayRun.js'
 
+/** The operator's answer to a write. It is the paper's, not the page's: the paper unmounts its
+ *  body on close, and a law asked for on the way out still has to be reported. */
+export type PaperNotice = { words: string; ok: boolean }
+
 /** A thing on the ground the viewer clicked. A structure is a `Subject`; these are not. */
 export type Thing = { kind: 'item' | 'crop'; id: string }
 
@@ -29,6 +33,7 @@ export type PageProps = {
   /** WATCH a moment: the sheet closes, the bodies walk, and it stops where the moment does. */
   onPlay: (play: MomentPlay) => void
   onLive: () => void
+  onNotice: (notice: PaperNotice | null) => void
   /** The recorded day the filmstrip has open, so the address bar names it. */
   onMoment: (id: number | null) => void
 }

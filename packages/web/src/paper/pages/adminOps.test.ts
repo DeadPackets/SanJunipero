@@ -152,6 +152,7 @@ describe('★ the whole page is the operator’s, and a viewer without a key see
         onPlay: () => {},
         onLive: () => {},
         onMoment: () => {},
+        onNotice: () => {},
       }),
     )
 

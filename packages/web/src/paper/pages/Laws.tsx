@@ -169,9 +169,8 @@ function LawEdit({
 
 // Operator-only. Says so out loud, and offers nothing at all without a token, so a viewer who
 // wanders onto the tab sees no control surface to guess at.
-function Admin({ store, operatorToken }: PageProps) {
+function Admin({ store, operatorToken, onNotice }: PageProps) {
   const seq = useLawsSeq(store)
-  const [notice, setNotice] = useState<{ words: string; ok: boolean } | null>(null)
   const [pending, setPending] = useState<string | null>(null)
   const rows = useMemo(
     () =>
@@ -187,7 +186,7 @@ function Admin({ store, operatorToken }: PageProps) {
 
   async function submit(row: EditRow, raw: string): Promise<void> {
     setPending(row.path)
-    setNotice(null)
+    onNotice(null)
     const r = await postLaw(fetch, {
       endpoint: ADMIN_ENDPOINT,
       token: operatorToken!,
@@ -196,7 +195,7 @@ function Admin({ store, operatorToken }: PageProps) {
     })
     setPending(null)
     // Never write the new value here: the page moves when the delta lands.
-    setNotice({
+    onNotice({
       words: r.ok ? `${row.path} — asked; it lands at the next tick.` : r.message,
       ok: r.ok,
     })
@@ -204,7 +203,7 @@ function Admin({ store, operatorToken }: PageProps) {
 
   // The three sections above report failures only; an empty string is their "it went through".
   const refused = (words: string): void => {
-    setNotice(words === '' ? null : { words, ok: false })
+    onNotice(words === '' ? null : { words, ok: false })
   }
 
   return (
@@ -212,11 +211,6 @@ function Admin({ store, operatorToken }: PageProps) {
       <p className="sheet-note operator">
         The operator’s page — the one write path in the whole product. A mind never sees it.
       </p>
-      {notice !== null && (
-        <p className="laws-notice" role={notice.ok ? undefined : 'alert'}>
-          {notice.words}
-        </p>
-      )}
       <ClockSection token={operatorToken} onNotice={refused} />
       <SpendSection token={operatorToken} />
       <RulingsSection token={operatorToken} onNotice={refused} />
