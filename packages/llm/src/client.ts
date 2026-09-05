@@ -11,7 +11,7 @@ import {
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import { assertNoGlassLeak } from '@sj/shared'
+import { assertNoGlassLeak, strictSchemaFaults } from '@sj/shared'
 import {
   insertAlert,
   insertLlmCall,
@@ -119,6 +119,8 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
+const strictChecked = new Set<string>()
+
 /** What one caller sends OpenRouter over and above the prompt: which models may answer, which
  *  back ends may serve, and which mind is asking. */
 export type RequestBody = {
@@ -131,6 +133,7 @@ export type RequestBody = {
   }
   reasoning?: ReasoningSetting
   session_id?: string
+  prompt_cache_key?: string
 }
 
 // The pinned back ends are an allow-list either way with `allow_fallbacks:false`, the default
@@ -156,6 +159,11 @@ export function defaultExtraBody(
     provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: false },
     ...(reasoning === undefined ? {} : { reasoning }),
     ...(sessionId === undefined ? {} : { session_id: sessionId }),
+    // OpenAI routes a prompt to a cache by this key and passes it through OpenRouter: probed
+    // 2026-09-05, the same 6.8k prefix missed 3 of 5 times without it and hit every time with it.
+    ...(sessionId === undefined || !model.startsWith('openai/')
+      ? {}
+      : { prompt_cache_key: sessionId }),
   }
 }
 
@@ -360,6 +368,13 @@ export class LlmClient {
     schema: z.ZodType<T>,
     bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
+    // OpenAI's decoder refuses a shape rather than bending it; say which, once, before the bill.
+    if (this.modelId.startsWith('openai/') && !strictChecked.has(this.caller)) {
+      strictChecked.add(this.caller)
+      const faults = strictSchemaFaults(schema)
+      if (faults.length > 0)
+        this.alert('schema_not_strict', `${this.caller}: ${faults.slice(0, 3).join('; ')}`)
+    }
     return this.invoke(async (model, note) => {
       if (this.transport === 'tool') {
         const r = await generateText({

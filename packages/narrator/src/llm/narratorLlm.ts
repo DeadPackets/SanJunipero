@@ -29,7 +29,7 @@ export const EraSummarySchema = z
   })
   .strict()
 
-const NewspaperCopySchema = z
+export const NewspaperCopySchema = z
   .object({
     headline: z.string().min(1),
     body: z.string().min(1),
@@ -37,7 +37,7 @@ const NewspaperCopySchema = z
   })
   .strict()
 
-const BiographySchema = z.object({ title: z.string().min(1), body: z.string().min(1) }).strict()
+export const BiographySchema = z.object({ title: z.string().min(1), body: z.string().min(1) }).strict()
 
 export type NarratorLlmClient = Pick<LlmClient, 'object' | 'text'>
 

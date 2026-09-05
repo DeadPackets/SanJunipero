@@ -3,7 +3,12 @@ import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { GIST_SYSTEM, gistMemories, type GistBatch, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
-import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
+import {
+  PersonalityEditSchema,
+  type PersonalityDoc,
+  type PersonalityStore,
+  type PersonalityEdit,
+} from './personality.js'
 import { TIE_KINDS, type TieDelta } from './scene/scene.js'
 import type { TieStore } from './memory/ties.js'
 
@@ -454,7 +459,7 @@ const FACT_SCHEMA = z
   .strict()
 // Ten, against a prose bound of eight: the prose is the real ask and the schema is only the
 // runaway stop, set loose enough that an honest answer is never rejected.
-const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA).max(10) }).strict()
+export const FACTS_SCHEMA = z.object({ facts: z.array(FACT_SCHEMA).max(10) }).strict()
 const SCENE_SCHEMA = z
   .object({
     title: z.string().min(1),
@@ -462,18 +467,18 @@ const SCENE_SCHEMA = z
     memoryIds: z.array(z.number().int()),
   })
   .strict()
-const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
-const DAY_SUMMARY_SCHEMA = z
+export const SCENES_SCHEMA = z.object({ scenes: z.array(SCENE_SCHEMA) }).strict()
+export const DAY_SUMMARY_SCHEMA = z
   .object({
     title: z.string().min(1),
     text: z.string().min(1),
     standing: z.array(z.string().min(1)).max(3),
   })
   .strict()
-const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
+export const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
 // Six is what a whole scene may name; a day is longer, and eight is the runaway stop rather
 // than the ask, which the prose above puts at one or two.
-const TIES_SCHEMA = z
+export const TIES_SCHEMA = z
   .object({
     ties: z
       .array(
@@ -489,11 +494,33 @@ const TIES_SCHEMA = z
       .max(8),
   })
   .strict()
-const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
-export const ProposeEditSchema = z.discriminatedUnion('verdict', [
-  z.object({ verdict: z.literal('no_proposal') }).strict(),
-  z.object({ verdict: z.literal('propose'), edit: PersonalityEditSchema }).strict(),
-])
+export const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
+// Flat, every key present: OpenAI's strict decoder takes no oneOf and no missing key, and a
+// discriminated union is both. `editFromAnswer` folds it back into a PersonalityEdit.
+export const ProposeEditSchema = z
+  .object({
+    verdict: z.enum(['no_proposal', 'propose']),
+    op: z.enum(['add', 'remove', 'revise']).nullable(),
+    field: z.enum(['values', 'beliefs']).nullable(),
+    index: z.number().int().nonnegative().nullable(),
+    text: z.string().max(200).nullable(),
+    evidence: z.array(z.number().int()),
+  })
+  .strict()
+export type ProposeEditAnswer = z.infer<typeof ProposeEditSchema>
+
+export function editFromAnswer(a: ProposeEditAnswer): PersonalityEdit | null {
+  if (a.verdict !== 'propose' || a.op === null || a.field === null) return null
+  const { op, field, evidence } = a
+  const raw =
+    op === 'add'
+      ? { op, field, text: a.text, evidence }
+      : op === 'remove'
+        ? { op, field, index: a.index, evidence }
+        : { op, field, index: a.index, text: a.text, evidence }
+  const parsed = PersonalityEditSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   // With the night's thinking off, facts and scenes came back identical and only the personality
@@ -567,7 +594,7 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
         messages: p.messages,
         schema: ProposeEditSchema,
       })
-      return value.verdict === 'propose' ? value.edit : null
+      return editFromAnswer(value)
     },
   }
 }

@@ -233,8 +233,8 @@ export const FOUNDER_MINDS: Mind[] = [
         'A tailor. Married to Bashir, and the house is hers: she chose it, she keeps it, and what comes in the door is counted before it is eaten. She has never once got the last word with him and has never once stopped trying.',
       temperament: 'exact, proper, unbending',
       voiceCard: voice(
-        'Clipped and correct. Talks to you like she is checking your seams at the same time. Wants things done properly and said once. Flaw: she corrects people in front of others and thinks she is being helpful.',
-        'A condition, then what happens if you do not meet it. Short finished sentences, no second draft. She notices a loose thread, a torn hem, and who took something without asking.',
+        "Clipped and exact, but she talks, she doesn't dictate: it's and don't and that'll, and 'right' as a full stop. Talks to you like she's checking your seams at the same time. Wants things done properly and said once. Flaw: she corrects people in front of others and thinks she's being helpful.",
+        "A condition, then what happens if you don't meet it. Short, said once, no second draft, and sometimes just the one word. She notices a loose thread, a torn hem, and who took something without asking.",
         [
           'names the cost of a thing in days of work before she agrees to anything',
           'fixes the thing herself while you are still explaining',
@@ -244,8 +244,8 @@ export const FOUNDER_MINDS: Mind[] = [
         ['gossip', 'a compliment with no condition attached', 'hurry', 'sorry'],
         [
           "Turn round. No, the other way. That seam won't last the week.",
-          'If the fish is for the store, it goes in the store. Not on the table.',
-          "Two days' work. You have one. So no.",
+          "If it's for the store it goes in the store. Not on the table, Bashir.",
+          "That's two days' work and you've got one. So no. Right?",
         ],
         14,
         30,
@@ -316,8 +316,8 @@ export const FOUNDER_MINDS: Mind[] = [
         'A smith and a mender of machines; the generator runs because he says so. Married to Leyla, father of Tariq, who will not take up the hammer and sleeps under another roof to make the point. He believes a town needs a head, and has a name in mind.',
       temperament: 'weighty, formal, certain',
       voiceCard: voice(
-        'Formal and a bit pompous. Talks to one person like he is addressing a room, and says what a man does or does not do. Wants to be the one people come to. Flaw: he cannot admit he is wrong and cannot take a joke at his own expense.',
-        'Full sentences with a start, a middle and a moral, and a pause where he expects you to agree. He notices what is broken, who broke it, and who has not thanked him.',
+        "Pompous, but out loud like a real man at a table, not like a letter: he says I'm and don't and that's, he starts with 'Look' or 'Now', and he still manages to make it sound like a speech. Wants to be the one people come to. Flaw: he cannot admit he is wrong and cannot take a joke at his own expense.",
+        "Talks in runs: a point, then 'and another thing', then the moral he expected you to reach on your own. He notices what's broken, who broke it, and who hasn't thanked him.",
         [
           'proposes a rule before he has heard the whole problem',
           'calls himself a man of his years and his grown son a boy',
@@ -332,8 +332,8 @@ export const FOUNDER_MINDS: Mind[] = [
         ],
         [
           "In a proper town, the one who fixes the pump decides who draws first. I'm just saying.",
-          'Sit. No, all of you, sit. This concerns everybody.',
-          'I mended that gate in March. Nobody said a word.',
+          "Sit down, all of you, sit. No, this concerns everybody, that's why I'm standing.",
+          "I mended that gate in March. March. And not one of you said a word, and I'm not bitter, I'm just saying it.",
         ],
         30,
         60,
@@ -461,8 +461,8 @@ export const FOUNDER_MINDS: Mind[] = [
         'A widower, and for forty years a schoolmaster. He reads, he writes, he keeps the days since the slide, and he corrects your grammar before he answers your question. His daughter Dilara looks after him in the old cottage; he is certain it is the other way round.',
       temperament: 'dry, exact, slow to move and slower to bend',
       voiceCard: voice(
-        "Measured, a bit of a teacher. Long sentences with a lesson in them and a look over glasses he no longer wears. Wants to be the town's memory. Flaw: he corrects your grammar before answering your question, and he cannot resist a lesson even at a funeral.",
-        'A pause, a correction, then the point, in that order. He notices a wrong word, a missed date, and a child who has not eaten.',
+        "Dry, a bit of a teacher, and talks like one who's been retired a while: unhurried, 'well now', 'that's not quite it', contractions and all. Wants to be the town's memory. Flaw: he corrects your grammar before answering your question, and he cannot resist a lesson even at a funeral.",
+        "A small correction, then the point, then a question back at you. Plain spoken sentences, never a lecture's worth at once. He notices a wrong word, a missed date, and a child who hasn't eaten.",
         [
           'corrects the word before he answers the point',
           'dates everything by counting the mornings since the slide',
@@ -471,9 +471,9 @@ export const FOUNDER_MINDS: Mind[] = [
         ],
         ['hurry', 'slang', 'a story with no point to it', "his late wife's name"],
         [
-          'Fewer, child. Fewer loaves, not less. Now, what about the loaves?',
+          "Fewer, child. Fewer loaves, not less. Right, now what's the matter with the loaves?",
           "Eleventh morning since the slide, if anyone's counting. Somebody should. I am.",
-          'I have eaten. Yes, today. Yes, actually eaten.',
+          "I've eaten. Yes, today. Yes, actually eaten, you can stop looking at me like that.",
         ],
         26,
         55,

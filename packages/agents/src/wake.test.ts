@@ -158,24 +158,25 @@ describe('wakeReasons — what else was true when the winner was recorded', () =
 })
 
 // Nothing closes a talk for being late any more, so the body alarm is the only thing left that
-// can reach a mouth running down mid-sentence.
-describe('the body reaches a mind holding the floor', () => {
+// can reach a mouth running down mid-sentence, and it waits for the line to be said.
+describe('the body reaches a mind in a talk', () => {
   it('leaves a merely tired floor-holder talking', () => {
     const tired = withNeeds(60, 40, 71)
     expect(decideWake(cfg, tired, clk(), 10, pln(), HOLDS_FLOOR)).toBe('floor')
   })
 
-  it('takes a failing one off the floor', () => {
+  it('lets a failing one say its line, and rings the beat after, in the talk', () => {
     const failing = withNeeds(60, 5, 71)
-    expect(decideWake(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toBe('body_alarm')
-    expect(wakeReasons(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toContain('body_alarm')
+    expect(decideWake(cfg, failing, clk(), 10, pln(), HOLDS_FLOOR)).toBe('floor')
+    expect(decideWake(cfg, failing, clk(), 10, pln(), LISTENS)).toBe('body_alarm')
+    expect(wakeReasons(cfg, failing, clk(), 10, pln(), LISTENS)).toContain('body_alarm')
   })
 
-  it('rings once and then gives the floor back, because a spent alarm is disarmed', () => {
+  it('rings once and then listens again, because a spent alarm is disarmed', () => {
     const failing = withNeeds(60, 5, 71)
     const clock = clk()
     disarmBodyAlarm(cfg, failing.self.body, clock)
-    expect(decideWake(cfg, failing, clock, 10, pln(), HOLDS_FLOOR)).toBe('floor')
+    expect(decideWake(cfg, failing, clock, 10, pln(), LISTENS)).toBe(null)
   })
 
   it('takes a failing listener out of the talk too', () => {
@@ -215,13 +216,13 @@ describe('decideWake — priority and floor', () => {
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
   })
 
-  it('a scene outranks every reason but a failing body, whoever holds the floor', () => {
+  it('a scene outranks every reason but a failing body, and the floor outranks even that', () => {
     const blocked = pln({ lastResult: 'blocked' })
     const well = withNeeds(60, 78, 71)
     const starving = withNeeds(5, 78, 71)
     expect(decideWake(cfg, well, clk(), 10, blocked, HOLDS_FLOOR)).toBe('floor')
     expect(decideWake(cfg, well, clk(), 10, blocked, LISTENS)).toBe(null)
-    expect(decideWake(cfg, starving, clk(), 10, blocked, HOLDS_FLOOR)).toBe('body_alarm')
+    expect(decideWake(cfg, starving, clk(), 10, blocked, HOLDS_FLOOR)).toBe('floor')
     expect(decideWake(cfg, starving, clk(), 10, blocked, LISTENS)).toBe('body_alarm')
   })
 
@@ -330,14 +331,14 @@ describe('decideWake — asleep gate', () => {
     expect(decideWake(cfg, asleepAtNight(['rain_started']), clk(), 10, pln())).toBe(null)
   })
 
-  it('wakes on body_alarm while asleep', () => {
+  it('wakes on body_alarm while asleep, when the need is one a bed cannot mend', () => {
     const packet = {
       ...asleep(),
       self: {
         ...asleep().self,
         body: {
           ...quietMeadowPacket.self.body,
-          needs: { ...quietMeadowPacket.self.body.needs, energy: 9 },
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 9 },
         },
       },
     }
@@ -441,6 +442,11 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
 
   it('a sleeper dying of thirst is woken by its own body', () => {
     expect(decideWake(cfg, sleeping(withThirst(4)), clk(), 900, pln())).toBe('body_alarm')
+  })
+
+  it('★ a sleeper worn to nothing sleeps on: tiredness is what the bed is for', () => {
+    expect(decideWake(cfg, sleeping(withNeeds(60, 4, 71)), clk(), 900, pln())).toBe(null)
+    expect(decideWake(cfg, withNeeds(60, 4, 71), clk(), 900, pln())).toBe('body_alarm')
   })
 
   it('a packet from before thirst existed reads as a full body', () => {

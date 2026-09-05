@@ -23,9 +23,10 @@ export type MindConfig = {
 export const DEFAULT_MIND_CONFIG: MindConfig = {
   idleGapTicks: 30,
   boredomTicks: 60,
-  // Thirst rings with hunger; any named affliction rings at its first severity. Hunger and
-  // energy ring late (D1): a body turn should be rare enough to read as an emergency.
-  bodyAlarm: { hunger: 15, energy: 10, warmth: 20, thirst: 25, affliction: 1 },
+  // Thirst rings with hunger; any named affliction rings at its first severity. Hunger rings
+  // late (D1). Energy rings at 25: at 10 the bell came an hour before the body dropped, and r18
+  // lost ten of its eleven collapses to minds still up and talking at 23:00 with no way to a bed.
+  bodyAlarm: { hunger: 15, energy: 25, warmth: 20, thirst: 25, affliction: 1 },
   alarmHysteresis: 10,
   journalTicks: 10,
   dozeTicks: 60,
@@ -150,9 +151,13 @@ export function wakeReasons(
   // plan wake out of it is a turn spent being refused for hands that are full.
   if (packet.self.activity === 'lie_with' && !packet.self.asleep && !rousing && !failing) return []
 
-  // A listener takes no turn at all — that is what makes hearing free.
-  if (floor.inScene && !packet.self.asleep && !rousing && !failing) {
-    return floor.holdsFloor ? ['floor'] : []
+  // A listener takes no turn at all — that is what makes hearing free. A failing body that holds
+  // the floor says its line first; the alarm reaches it the beat after, still in the talk, where
+  // its turn can eat, say goodbye or walk off in a way the others remember. r16 counted 250 alarm
+  // turns and 90 of 117 talks ending on a body that left without a word.
+  if (floor.inScene && !packet.self.asleep && !rousing) {
+    if (floor.holdsFloor) return ['floor']
+    if (!failing) return []
   }
 
   const reasons: WakeReason[] = []
@@ -161,7 +166,9 @@ export function wakeReasons(
     // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
     // the re-arm point, so the alarm has to ring again until the body rises.
     if (tick < clock.wakeRetryAtTick) return reasons
-    if (bodyAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
+    // Sleep is the cure for a low energy, not a reason to rise: r20 saw Halim woken by his own
+    // tiredness bell eleven times in one night and drop each time before he was back in bed.
+    if (sleeperAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
     // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
     const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
     const dawn = clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)
@@ -220,8 +227,8 @@ function ringing(cfg: MindConfig, body: AlarmBody): string[] {
   return keys
 }
 
-function bodyAlarmBelow(cfg: MindConfig, body: AlarmBody): boolean {
-  return ringing(cfg, body).length > 0
+function sleeperAlarmBelow(cfg: MindConfig, body: AlarmBody): boolean {
+  return ringing(cfg, body).some((key) => key !== 'energy')
 }
 
 function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alarmArmed']): boolean {

@@ -287,7 +287,7 @@ market — a recurring occasion of goods changing hands
 custom — a recurring occasion that is plainly none of the four above; use it freely, the list is not the world
 Answer for every key you are given and invent no keys. Name the kind only. Never a name for the thing itself: a name comes out of their own mouths or not at all.`
 
-const ClassificationSchema = z
+export const ClassificationSchema = z
   .object({
     rulings: z.array(z.object({ key: z.string().min(1), type: z.string().min(1) }).strict()),
   })

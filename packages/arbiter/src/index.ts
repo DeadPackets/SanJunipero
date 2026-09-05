@@ -17,3 +17,6 @@ export * from './constructs.js'
 export * from './constructStore.js'
 
 export * from './schema.js'
+export { StrictLawCompileSchema } from './council.js'
+export { ExpressiveRulingSchema } from './expressive.js'
+export { ClassificationSchema } from './constructs.js'

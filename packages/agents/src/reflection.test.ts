@@ -22,6 +22,7 @@ import {
   autobiographyPrompt,
   proposeEditPrompt,
   ProposeEditSchema,
+  editFromAnswer,
   FALLBACK_AUTOBIOGRAPHY,
   FALLBACK_DAY_TITLE,
   FALLBACK_DIGEST_CHARS,
@@ -975,19 +976,36 @@ describe('makeReflectionLlm prompts', () => {
   })
 
   it('propose verdict schema accepts no_proposal and shaped edits, rejects temperament', () => {
-    expect(ProposeEditSchema.safeParse({ verdict: 'no_proposal' }).success).toBe(true)
+    const none = {
+      verdict: 'no_proposal',
+      op: null,
+      field: null,
+      index: null,
+      text: null,
+      evidence: [],
+    }
+    expect(ProposeEditSchema.safeParse(none).success).toBe(true)
+    expect(editFromAnswer(ProposeEditSchema.parse(none))).toBeNull()
+    const add = {
+      verdict: 'propose',
+      op: 'add',
+      field: 'values',
+      index: null,
+      text: 'fairness',
+      evidence: [memories[0]!.id],
+    }
+    expect(ProposeEditSchema.safeParse(add).success).toBe(true)
+    expect(editFromAnswer(ProposeEditSchema.parse(add))).toEqual({
+      op: 'add',
+      field: 'values',
+      text: 'fairness',
+      evidence: [memories[0]!.id],
+    })
+    expect(ProposeEditSchema.safeParse({ ...add, field: 'temperament' }).success).toBe(false)
     expect(
-      ProposeEditSchema.safeParse({
-        verdict: 'propose',
-        edit: { op: 'add', field: 'values', text: 'fairness', evidence: [memories[0]!.id] },
-      }).success,
-    ).toBe(true)
-    expect(
-      ProposeEditSchema.safeParse({
-        verdict: 'propose',
-        edit: { op: 'add', field: 'temperament', text: 'fierce', evidence: [1] },
-      }).success,
-    ).toBe(false)
+      editFromAnswer(ProposeEditSchema.parse({ ...add, text: null })),
+      'an add with no text is no edit',
+    ).toBeNull()
   })
 })
 
@@ -997,7 +1015,19 @@ describe('★ the night bills its personality edit under its own name', () => {
   it('writes reflection.edit rows the by-caller ledger can price on their own', async () => {
     const db = new Sqlite(':memory:')
     migrateLlmTables(db)
-    const model = mockModel([{ json: { facts: [] } }, { json: { verdict: 'no_proposal' } }])
+    const model = mockModel([
+      { json: { facts: [] } },
+      {
+        json: {
+          verdict: 'no_proposal',
+          op: null,
+          field: null,
+          index: null,
+          text: null,
+          evidence: [],
+        },
+      },
+    ])
     const llm = makeReflectionLlm(
       new LlmClient({ model, db, caller: 'reflection', agentId: AGENT }),
     )

@@ -215,7 +215,7 @@ describe('the runtime hands its mind to a scene', () => {
 
   // Nothing closes a talk for being late any more, so this is the last thing that can reach a
   // mouth still going while the body behind it gives out.
-  it('lets a body alarm end the night of the mind holding the floor', async () => {
+  it('a body alarm reaches the mind holding the floor once its line is said, and the talk goes on', async () => {
     const h = await twoMinds({
       speech: 'Omar. Six planks, you said.',
       mindConfig: { bodyAlarm: { hunger: 0, energy: 10, warmth: 0, thirst: 0, affliction: 1 } },
@@ -223,9 +223,12 @@ describe('the runtime hands its mind to a scene', () => {
     await stepUntil(h.loop, () => (h.sceneCalls.get(OMAR) ?? 0) > 0)
     const holder = h.coordinator.open()[0]?.floor
     expect(holder, 'somebody is holding the floor').toBeTruthy()
+    const before = h.turnCalls.get(holder!)!.n
     h.emitNext('needs_changed', { id: holder!, changes: [{ need: 'energy', delta: -96 }] })
-    await stepUntil(h.loop, () => h.coordinator.open().length === 0, 10)
-    expect(h.coordinator.open(), 'the body took them out of the talk').toHaveLength(0)
+    await stepUntil(h.loop, () => h.turnCalls.get(holder!)!.n > before, 40)
+    expect(h.turnCalls.get(holder!)!.n, 'the alarm bought a turn').toBeGreaterThan(before)
+    expect(h.coordinator.open(), 'and the talk went on around it').toHaveLength(1)
+    expect(h.coordinator.open()[0]!.participants).toContain(holder)
   })
 
   // An audience member is not a participant, so `sceneFor` gives it nothing and the wake ladder

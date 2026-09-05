@@ -1021,6 +1021,29 @@ describe('default OpenRouter path extraBody', () => {
     expect(prose.session_id).toBeUndefined()
   })
 
+  it('★ an OpenAI model carries the mind’s session id as its prompt cache key too', () => {
+    const luna = defaultExtraBody(
+      [],
+      ['OpenAI'],
+      false,
+      undefined,
+      'openai/gpt-5.6-luna',
+      'sj-amara',
+    )
+    expect(luna.prompt_cache_key).toBe('sj-amara')
+    const glm = defaultExtraBody(
+      FALLBACK_MODELS,
+      PROVIDER_ORDER,
+      false,
+      undefined,
+      MIND_MODEL,
+      'sj-amara',
+    )
+    expect(glm.prompt_cache_key).toBeUndefined()
+    const noMind = defaultExtraBody([], ['OpenAI'], false, undefined, 'openai/gpt-5.6-luna')
+    expect(noMind.prompt_cache_key).toBeUndefined()
+  })
+
   // Sticky routing keys off this and nothing else. One per mind, not per caller: the turn and
   // the scene line carry the same identity block and want the same warm back end.
   it('★ names the mind asking, so its next call lands on the back end holding its prefix', () => {

@@ -51,6 +51,7 @@ import {
   absenceLine,
   type Company,
   gatheringLine,
+  inTalkLine,
   type ProseWorld,
   type WalkMark,
   standingWallsLine,
@@ -224,6 +225,7 @@ export function brokeOffLine(verb: string, why: string): string {
 
 /** The verb that takes a body's hands off what they are doing. */
 const STOP = 'stop'
+const LEAVES_A_TALK: ReadonlySet<string> = new Set(['walk', 'sleep', 'leave_town'])
 
 // What a body says to itself when it stops before it meant to. It never asked; the hands came
 // off the work because the body was failing under it.
@@ -668,9 +670,6 @@ export class AgentRuntime {
     // The body's own reflex, and it costs the mind nothing. The legs are left out of it: a walk
     // is how a hungry body reaches food, so breaking one off takes the road away too.
     if (reason === 'body_alarm' && working) this.#breakOff(packet.self.activity!)
-    // A mouth mid-sentence is hands at work: the same alarm takes this mind out of the talk. The
-    // others keep it, and it ends only where too few of them are left to answer each other.
-    if (reason === 'body_alarm' && floor.holdsFloor) this.#scenes?.leave(this.#agentId, tick)
     if (reason !== null) {
       // Latched on the turn, not on the reason: a dusk the mind was never billed for is a dusk
       // it has not had.
@@ -836,6 +835,15 @@ export class AgentRuntime {
     }
   }
 
+  /** Who this mind is in a talk with, by the names its eyes have for them. */
+  #talkingWith(packet: PerceptionPacket): string[] {
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    if (scene === null) return []
+    return scene.participants
+      .filter((id) => id !== this.#agentId)
+      .map((id) => packet.visible.agents.find((a) => a.id === id)?.name ?? id)
+  }
+
   #submitPendingIfIdle(activity: string | null): Promise<void> {
     if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
     // `stop` is the one act aimed AT the hands rather than done with them: holding it until they
@@ -850,6 +858,9 @@ export class AgentRuntime {
         if (this.#pendingIntent !== intent) return
         if (res.ok) {
           this.#pendingIntent = null
+          // Legs or bed taken mid-talk is leaving it on purpose; the others are told once the body goes.
+          if (LEAVES_A_TALK.has(intent.verb))
+            this.#scenes?.walkingOff(this.#agentId, this.#bridge.currentTick())
           return
         }
         if (res.reason.startsWith('already busy')) return
@@ -1145,6 +1156,7 @@ export class AgentRuntime {
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),
+      inTalkLine(this.#talkingWith(packet)),
       roadOutLine(wake.includes('morning') ? this.#roadCause : null),
       wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]
@@ -1371,22 +1383,28 @@ export class AgentRuntime {
       this.#noteAccepted(said, await this.#bridge.submit(this.#agentId, said))
     }
 
-    if (turn.action) {
+    // Words given as speech and again as a speak act are one line, not two: r16 opened 6 of
+    // its 122 talks with the same line twice.
+    const action =
+      turn.speech && turn.action && !('freeform' in turn.action) && turn.action.verb === 'speak'
+        ? null
+        : turn.action
+    if (action) {
       // `experiment {description}` is the same door as freeform said the other
       // way round — CAPABILITIES offers both, so both reach the arbiter.
       const attempt =
-        'freeform' in turn.action
-          ? turn.action.freeform
-          : turn.action.verb === 'experiment' && typeof turn.action.params.description === 'string'
-            ? turn.action.params.description
+        'freeform' in action
+          ? action.freeform
+          : action.verb === 'experiment' && typeof action.params.description === 'string'
+            ? action.params.description
             : null
       if (attempt !== null && attempt.length > 0 && this.#adjudicator !== null) {
         await this.#adjudicateFreeform(attempt, true)
       } else {
         const intent: Intent =
-          'freeform' in turn.action
-            ? { verb: 'experiment', params: { description: turn.action.freeform } }
-            : { verb: turn.action.verb, params: turn.action.params }
+          'freeform' in action
+            ? { verb: 'experiment', params: { description: action.freeform } }
+            : { verb: action.verb, params: action.params }
         await this.#holdIntent(intent)
       }
     }
