@@ -52,12 +52,11 @@ export const SIMILARITY_SHORT_CIRCUIT = 0.92
 export const RETIREMENT_DAYS = 14
 export const RETIRED_REASON = 'unused for fourteen days'
 
-// Impossible classes that depend on who asked (skills, inventory) must never
-// become global precedent; only context-independent classes short-circuit.
-const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set([
-  'physically_impossible',
-  'beyond_adjacency',
-])
+// Impossible classes that depend on who asked (skills, inventory) or on how far the town has
+// climbed must never become global precedent; only context-independent classes short-circuit.
+// `beyond_adjacency` is not one: the codex grows, and the court also reaches for it to say
+// somebody was not standing near enough.
+const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible'])
 
 // Invalid LLM verdicts (e.g. a map naming a verb that does not exist) get this
 // many total tries before the diegetic fallback below.
@@ -491,8 +490,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
-      // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
-      // corrected verdict is what gets recorded, so an exploit never becomes precedent.
+      // An attempt whose recipe canon the codex has not earned is beyond adjacency.
       let verdict: Verdict = value
       if (value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)) {
         // Every attempt rehearsals 6, 7 and 8 ruled died right here — all of them — and the
@@ -509,7 +507,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         }
       }
 
-      // Stage 4 — record the ruling as shared precedent.
+      // Stage 4 — record the ruling as shared precedent. A refusal that says the ladder is too
+      // short is returned, never recorded: the rung it wanted may be earned tomorrow.
+      if (verdict.kind === 'impossible' && verdict.class === 'beyond_adjacency') return verdict
       await rulings.record(intent, verdict, tick())
 
       return verdict

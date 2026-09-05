@@ -454,6 +454,22 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(llm.objectCalls).toBe(0)
   })
 
+  it('stage-2 short-circuit falls through for a stored beyond-the-ladder refusal', async () => {
+    const llm = new ScriptedLlm(() => ropeVerdict)
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    const stored: Verdict = {
+      kind: 'impossible',
+      reason: 'this would need a craft the town has not yet reached',
+      class: 'beyond_adjacency',
+    }
+
+    await new RulingsStore(db, embedder).record('twist reeds to rope', stored, 100)
+
+    const verdict = await arbiter.adjudicate('rope twist reeds', TAMAR_CTX)
+    expect(verdict).toEqual(ropeVerdict)
+    expect(llm.objectCalls).toBe(1)
+  })
+
   it('stage-2 short-circuit falls through to the LLM for stored agent-contextual impossible verdicts', async () => {
     const llm = new ScriptedLlm(() => ropeVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
@@ -747,6 +763,35 @@ describe('the adjacency frontier reaches the arbiter (C9 batch-10, user ruling 1
     expect(said, JSON.stringify(llm.alerts)).toBeDefined()
     expect(said!.detail).toContain('fire_making')
     expect(said!.detail).toContain(ESEN_INTENT.slice(0, 20))
+  })
+
+  it('★ never records the beyond-the-ladder correction, because the ladder grows', async () => {
+    const invented: Verdict = {
+      ...smokedFish,
+      recipe: { ...smokedFishRecipe, canon: ['fire_making'] },
+    }
+    const llm = new ScriptedLlm(() => invented)
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    expect(await arbiter.adjudicate(ESEN_INTENT, esenCtx)).toEqual(beyondAdjacency)
+
+    const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
+    expect(n).toBe(0)
+  })
+
+  it('★ never records a court-chosen beyond-the-ladder refusal either', async () => {
+    const positional: Verdict = {
+      kind: 'impossible',
+      reason: 'Yusuf is not standing nearby',
+      class: 'beyond_adjacency',
+    }
+    const llm = new ScriptedLlm(() => positional)
+    const { db, arbiter } = await makeSmokehouseRig(llm)
+
+    expect(await arbiter.adjudicate('I hold the plank out to Yusuf', esenCtx)).toEqual(positional)
+
+    const n = (db.prepare('SELECT COUNT(*) AS n FROM rulings').get() as { n: number }).n
+    expect(n).toBe(0)
   })
 
   it('★ the ladder grows: a codified attempt earns its rung and the court is shown the next', async () => {
