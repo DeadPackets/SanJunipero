@@ -473,6 +473,18 @@ export function makeDirector(
     prime(db, tick) {
       atTick(tick)
       const dayStart = Math.floor(tick / MINUTES_PER_DAY) * MINUTES_PER_DAY
+      // The day's scenes, replayed: a gateway restarted mid-quarrel would otherwise hold the
+      // camera on bodies until that quarrel turned or closed.
+      const scenes = db
+        .prepare(
+          `SELECT seq, tick, type, payload FROM events
+            WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_closed')
+              AND tick >= ? ORDER BY seq`,
+        )
+        .all(dayStart) as { seq: number; tick: number; type: string; payload: string }[]
+      for (const r of scenes) {
+        foldOne({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })
+      }
       const seen = db
         .prepare(
           `SELECT DISTINCT type FROM events

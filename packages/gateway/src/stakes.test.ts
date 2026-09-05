@@ -306,4 +306,30 @@ describe('a resumed town', () => {
     expect(PEAK_SCORE).toBeLessThanOrEqual(20)
     db.close()
   })
+
+  it('★ has the day’s open quarrel on camera at its very first frame', async () => {
+    const { default: Database } = await import('better-sqlite3')
+    const db = new Database(':memory:')
+    db.exec(
+      'CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT, tick INTEGER, type TEXT, payload TEXT)',
+    )
+    const at = MINUTES_PER_DAY * 2 + 600
+    const put = db.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)')
+    const open = opened(at - 40, QUARREL, 'quarrel', ['nadia', 'yusuf'], 8)
+    put.run(open.tick, open.type, JSON.stringify(open.payload))
+    // and one that closed long enough ago to be past its summary hold
+    put.run(
+      at - 300,
+      'scene_opened',
+      JSON.stringify({ id: 'scene_old', kind: 'talk', participants: ['omar', 'salma'], stakes: 5 }),
+    )
+    put.run(at - 200, 'scene_closed', JSON.stringify({ id: 'scene_old', summary: 'x', deltas: [] }))
+    const d = director()
+    d.prime(db, at)
+    const frame = d.frame(at)
+    expect(frame.cut?.sceneId).toBe(QUARREL)
+    expect(frame.cut?.agentIds).toEqual(['nadia', 'yusuf'])
+    expect(frame.cut?.why).toContain('falling out')
+    db.close()
+  })
 })
