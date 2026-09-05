@@ -823,6 +823,17 @@ export function wantLine(want: WantKind | null): string {
   return want === null ? '' : `Today the thing you want most is ${want}. Who could give you that?`
 }
 
+/** Said on every turn a mind is in a talk. The turn and the talk are two asks of the same mind,
+ *  and r13 closed 49 of 106 talks because the turn walked off or went to bed without knowing. */
+export function inTalkLine(withNames: readonly string[]): string {
+  if (withNames.length === 0) return ''
+  const them =
+    withNames.length === 1
+      ? withNames[0]!
+      : `${withNames.slice(0, -1).join(', ')} and ${withNames.at(-1)}`
+  return `You are in a conversation with ${them} right now. Stay where you are unless you have a reason to go: answer wait and keep talking. If you do leave, say so out loud first; ${them} will remember whether you walked off or said goodbye.`
+}
+
 /** How long a mind goes without anybody's company before the road out is worth saying. */
 export const RESTLESS_DAYS = 6
 /** How long the road stays open in the words of the one who took it before you. */

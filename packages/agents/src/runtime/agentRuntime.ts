@@ -51,6 +51,7 @@ import {
   absenceLine,
   type Company,
   gatheringLine,
+  inTalkLine,
   type ProseWorld,
   type WalkMark,
   standingWallsLine,
@@ -224,6 +225,7 @@ export function brokeOffLine(verb: string, why: string): string {
 
 /** The verb that takes a body's hands off what they are doing. */
 const STOP = 'stop'
+const LEAVES_A_TALK: ReadonlySet<string> = new Set(['walk', 'sleep', 'leave_town'])
 
 // What a body says to itself when it stops before it meant to. It never asked; the hands came
 // off the work because the body was failing under it.
@@ -836,6 +838,15 @@ export class AgentRuntime {
     }
   }
 
+  /** Who this mind is in a talk with, by the names its eyes have for them. */
+  #talkingWith(packet: PerceptionPacket): string[] {
+    const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
+    if (scene === null) return []
+    return scene.participants
+      .filter((id) => id !== this.#agentId)
+      .map((id) => packet.visible.agents.find((a) => a.id === id)?.name ?? id)
+  }
+
   #submitPendingIfIdle(activity: string | null): Promise<void> {
     if (this.#pendingIntent === null || this.#pendingInFlight) return Promise.resolve()
     // `stop` is the one act aimed AT the hands rather than done with them: holding it until they
@@ -850,6 +861,9 @@ export class AgentRuntime {
         if (this.#pendingIntent !== intent) return
         if (res.ok) {
           this.#pendingIntent = null
+          // Legs or bed taken mid-talk is leaving it on purpose, and the others are told so.
+          if (LEAVES_A_TALK.has(intent.verb))
+            this.#scenes?.leave(this.#agentId, this.#bridge.currentTick(), 'walked')
           return
         }
         if (res.reason.startsWith('already busy')) return
@@ -1145,6 +1159,7 @@ export class AgentRuntime {
       stasisLine(this.#still, tick),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),
+      inTalkLine(this.#talkingWith(packet)),
       roadOutLine(wake.includes('morning') ? this.#roadCause : null),
       wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
     ]

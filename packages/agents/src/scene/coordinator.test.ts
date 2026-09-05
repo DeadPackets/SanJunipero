@@ -24,6 +24,7 @@ import { EngineBridge } from '../runtime/bridge.js'
 import { openAgentDb } from '../memory/schema.js'
 import { TieStore } from '../memory/ties.js'
 import {
+  EARSHOT_GRACE_TICKS,
   TALK_BUDGET_TICKS,
   MAX_COMPILES_PER_DAY,
   SceneCoordinator,
@@ -442,15 +443,43 @@ describe('every way a scene ends', () => {
     expect(closeReasonOf(h)).toBe('left')
   })
 
-  it('walking out of earshot ends it once nobody is left', async () => {
+  it('walking out of earshot ends it once nobody is left, after the length of a doorway', async () => {
     const h = harness({})
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
     expect(h.coordinator.open()).toHaveLength(1)
     h.emitNext('agent_moved', { id: OMAR, x: 21, y: 3 })
     h.loop.step()
-    h.coordinator.onTick(NOON)
+    for (let t = 0; t < EARSHOT_GRACE_TICKS; t++) h.coordinator.onTick(NOON + t)
+    await flush()
+    expect(h.coordinator.open(), 'a step through a door is not leaving').toHaveLength(1)
+    h.coordinator.onTick(NOON + EARSHOT_GRACE_TICKS)
     await flush()
     expect(h.coordinator.open()).toHaveLength(0)
+    expect(closeReasonOf(h)).toBe('left')
+  })
+
+  it('★ coming back within the doorway’s length is as if nobody left', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    h.emitNext('agent_moved', { id: OMAR, x: 21, y: 3 })
+    h.loop.step()
+    for (let t = 0; t < EARSHOT_GRACE_TICKS - 1; t++) h.coordinator.onTick(NOON + t)
+    h.emitNext('agent_moved', { id: OMAR, x: 4, y: 3 })
+    h.loop.step()
+    for (let t = 0; t < 3 * EARSHOT_GRACE_TICKS; t++)
+      h.coordinator.onTick(NOON + EARSHOT_GRACE_TICKS + t)
+    await flush()
+    expect(h.coordinator.open()).toHaveLength(1)
+    expect(h.coordinator.open()[0]!.participants).toEqual([NADIA, OMAR].sort())
+  })
+
+  it('★ walking off on purpose is remembered on both sides', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    h.coordinator.leave(OMAR, NOON + 1, 'walked')
+    await flush()
+    expect(memoriesOf(h, NADIA)).toContain('Omar walked off while you were still talking.')
+    expect(memoriesOf(h, OMAR)).toContain('You walked off from Nadia mid-talk.')
     expect(closeReasonOf(h)).toBe('left')
   })
 

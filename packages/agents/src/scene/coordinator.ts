@@ -83,6 +83,10 @@ const OPENING_STAKES = STAKES_BY_KIND.talk
  *  hours: r13 measured six hours a day in talks against a fifth of an hour of work, and a talk
  *  somebody is named into, or an ask, a quarrel or a rule, still opens. */
 export const TALK_BUDGET_TICKS = 180
+/** How long a talker may be out of earshot before the talk goes on without them. Eight ticks is a
+ *  doorway: r14 closed 31 of 59 talks with both people at one tile, one inside and one at the door,
+ *  and the same pair opened a new talk indoors a minute later. */
+export const EARSHOT_GRACE_TICKS = 8
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
 // How many of its own last lines a mind is shown before it speaks again.
@@ -128,6 +132,7 @@ export class SceneCoordinator {
   readonly #laws: LawSeam | null
   readonly #lapsed = new Set<string>()
   readonly #talked = new Map<string, { day: number; ticks: number }>()
+  readonly #away = new Map<string, number>()
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
@@ -410,9 +415,18 @@ export class SceneCoordinator {
 
   /** The body took this mind out of the talk. One person's alarm drops that person; the talk
    *  ends only where too few are left to answer each other. */
-  leave(agentId: string, tick: number): void {
+  leave(agentId: string, tick: number, how: 'quiet' | 'walked' = 'quiet'): void {
     const scene = this.sceneFor(agentId)
     if (scene === null) return
+    // A body that walks off mid-talk is noticed: the others remember it, and so does the walker.
+    if (how === 'walked') {
+      const name = this.#nameOf(agentId) ?? agentId
+      const others = scene.participants.filter((id) => id !== agentId)
+      for (const id of others)
+        this.#tell(id, `${name} walked off while you were still talking.`, 5, tick)
+      const them = others.map((id) => this.#nameOf(id) ?? id).join(' and ')
+      if (them.length > 0) this.#tell(agentId, `You walked off from ${them} mid-talk.`, 3, tick)
+    }
     this.#part(scene, agentId, tick)
     if (scene.participants.length < TALKERS_NEEDED) {
       void this.#close(scene, 'left', tick).catch(this.#sink)
@@ -600,7 +614,21 @@ export class SceneCoordinator {
     const ear = spoke[spoke.length - 1]?.agentId ?? scene.anchor
     const within = new Set([ear, ...this.#bridge.earshot(ear)])
     const here = (id: string): boolean => within.has(id) && this.#canTalk(id)
-    for (const id of scene.participants.filter((id) => !here(id))) this.#part(scene, id, tick)
+    for (const id of scene.participants) {
+      const key = `${scene.id}:${id}`
+      if (here(id)) {
+        this.#away.delete(key)
+        continue
+      }
+      // Asleep or dead is gone at once; merely out of earshot gets the length of a doorway.
+      if (!this.#canTalk(id)) {
+        this.#part(scene, id, tick)
+        continue
+      }
+      const since = this.#away.get(key) ?? tick
+      this.#away.set(key, since)
+      if (tick - since >= EARSHOT_GRACE_TICKS) this.#part(scene, id, tick)
+    }
     scene.audience = scene.audience.filter(here)
   }
 

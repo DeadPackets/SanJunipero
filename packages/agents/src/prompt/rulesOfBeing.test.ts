@@ -9,7 +9,7 @@ import {
 } from '@sj/shared'
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
 import { assemblePrompt } from './assemble.js'
-import { calendarLine, perceptionToProse } from './prose.js'
+import { calendarLine, inTalkLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES, WORKED_TURN } from './rulesOfBeing.js'
 import { readMindTurn, StrictTurnSchema } from '../turn.js'
 import { fixtureBlocks, quietMeadowPacket, tamarIdentity } from '../testutil/fixtures.js'
@@ -386,5 +386,18 @@ describe('CAPABILITIES — the four acts that need another person to agree', () 
       const line = CAPABILITIES.split('\n').find((l) => l.startsWith(`${verb}:`))!
       expect(line, verb).not.toMatch(FORBIDDEN_FRAMING)
     }
+  })
+})
+
+// r13: 49 of 106 talks ended because the turn walked off or went to bed without knowing it was
+// in one. The turn is told, every turn it is, and told the others will remember how it left.
+describe('a mind in a talk is told so', () => {
+  it('names who it is talking to and what leaving costs, and says nothing when it is not in one', () => {
+    expect(inTalkLine([])).toBe('')
+    const one = inTalkLine(['Omar'])
+    expect(one).toContain('You are in a conversation with Omar right now.')
+    expect(one).toContain('answer wait and keep talking')
+    expect(one).toContain('Omar will remember whether you walked off or said goodbye.')
+    expect(inTalkLine(['Omar', 'Salma', 'Nadia'])).toContain('with Omar, Salma and Nadia right now')
   })
 })
