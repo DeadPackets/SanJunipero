@@ -349,7 +349,9 @@ export class AgentRuntime {
   readonly #config: MindConfig
   readonly #reflectionLlm: ReflectionLlm | null
   readonly #dreamLlm: DreamLlm | null
-  readonly #onThought: ((t: { tick: number; agentId: string; text: string }) => void) | null
+  readonly #onThought:
+    | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
+    | null
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
   readonly #wantBias: WantBias
@@ -428,7 +430,9 @@ export class AgentRuntime {
     config?: Partial<MindConfig> | undefined
     reflectionLlm?: ReflectionLlm | undefined
     dreamLlm?: DreamLlm | undefined
-    onThought?: ((t: { tick: number; agentId: string; text: string }) => void) | undefined
+    onThought?:
+      | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
+      | undefined
     adjudicator?: Adjudicator | undefined
     /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
     scenes?: SceneCoordinator | undefined
@@ -1282,7 +1286,12 @@ export class AgentRuntime {
       importance: turn.importance,
       tags: EMPTY_TAGS,
     })
-    this.#onThought?.({ tick, agentId: this.#agentId, text: turn.thought })
+    this.#onThought?.({
+      tick,
+      agentId: this.#agentId,
+      text: turn.thought,
+      importance: turn.importance,
+    })
 
     // The beat is spent casting back: whatever else the answer carried is let go, plan aside.
     if (recalled !== null) {

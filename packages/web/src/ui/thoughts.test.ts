@@ -3,7 +3,13 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { ThoughtsButton } from '../stage/ThoughtsButton.js'
-import { rememberThoughts, thoughtsHidden, thoughtsSetting } from './thoughts.js'
+import {
+  BUBBLE_IMPORTANCE,
+  rememberThoughts,
+  shouldBubble,
+  thoughtsHidden,
+  thoughtsSetting,
+} from './thoughts.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 
@@ -75,6 +81,43 @@ describe('★ two hands on the wisp gate', () => {
   // Speech is world fact and passes either way, so the gate is asked only for a thought.
   it('★ and the spawner asks the gate rather than a flag of its own', () => {
     expect(src('../render/bubbles.ts')).toMatch(/isThought && thoughtsHidden\(/)
+  })
+})
+
+describe('★ the importance gate over the heads', () => {
+  const t = (agentId: string, importance: number) => ({ agentId, importance })
+  const ALONE: readonly string[] = []
+
+  // ★ Twelve minds thinking every turn is twelve wisps, which is the opposite of easy to
+  // follow. The weight the mind gave the turn is what decides.
+  it('★ draws a heavy thought and lets a light one go by', () => {
+    expect(shouldBubble(t('omar', BUBBLE_IMPORTANCE), null, ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', 10), null, ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', BUBBLE_IMPORTANCE - 1), null, ALONE)).toBe(false)
+    expect(shouldBubble(t('omar', 1), null, ALONE)).toBe(false)
+  })
+
+  // ★ The person the viewer is watching is the one whose head they are reading.
+  it('★ keeps every thought of the camera subject, however light', () => {
+    expect(shouldBubble(t('omar', 1), 'omar', ALONE)).toBe(true)
+    expect(shouldBubble(t('omar', 1), 'leyla', ALONE)).toBe(false)
+  })
+
+  // ★ A room the town is holding open IS the thing being watched; its heads all speak.
+  it('★ keeps every thought of anyone in the open scene', () => {
+    expect(shouldBubble(t('leyla', 2), null, ['omar', 'leyla'])).toBe(true)
+    expect(shouldBubble(t('tariq', 2), null, ['omar', 'leyla'])).toBe(false)
+  })
+
+  it('★ the gate is 6, and it is the same number the plan named', () => {
+    expect(BUBBLE_IMPORTANCE).toBe(6)
+  })
+
+  // ★ The T toggle is upstream of all of it: a viewer who turned the wisps off gets none,
+  // subject and scene included. `bubbles.ts` asks `thoughtsHidden` before it draws.
+  it('★ the spawner still asks the T gate, so this one never overrules it', () => {
+    expect(src('../render/bubbles.ts')).toMatch(/isThought && thoughtsHidden\(/)
+    expect(src('../render/StageMount.tsx')).toContain('shouldBubble(')
   })
 })
 
