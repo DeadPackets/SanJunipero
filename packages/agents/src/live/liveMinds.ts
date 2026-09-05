@@ -114,6 +114,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       : new SceneCoordinator({
           bridge: opts.bridge,
           mindFor: (id) => minds.get(id) ?? null,
+          ...(opts.arbiter?.compileLaw === undefined ? {} : { laws: opts.arbiter.compileLaw }),
         })
   // The closed roll a scene line is held to. Read per line, never snapshot: `cast` keeps the
   // dead for a newborn to read its parents from, and a birth adds to it mid-scene.
@@ -152,6 +153,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         }),
         ...(roster === undefined ? {} : { roster }),
         ...(customs === undefined ? {} : { customs }),
+        laws: () => opts.bridge.lawTexts(),
         ...(frontier === undefined ? {} : { frontier }),
         livingCast,
       })

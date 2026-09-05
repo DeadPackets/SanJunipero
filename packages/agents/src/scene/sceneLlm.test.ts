@@ -14,6 +14,7 @@ import {
   type SceneVoice,
 } from './sceneLlm.js'
 import { openScene, SceneTurnSchema, type SceneAsk, type SceneLine } from './scene.js'
+import { scanPromptForGlassLeak } from '@sj/shared'
 import { askPhrase } from './invitations.js'
 
 const ZERO_USAGE = {
@@ -540,5 +541,69 @@ describe('what a scene turn may name', () => {
     }
     expect(SceneTurnSchema.safeParse(turn({ ask: 'marry' })).success).toBe(false)
     expect(SceneTurnSchema.safeParse(turn({ ask: undefined })).success).toBe(false)
+  })
+})
+
+describe('a rule put to the room', () => {
+  const PROPOSAL = 'From now on nobody takes from the store after dark.'
+  const asCouncil = (agentId = 'tamar'): SceneAsk => {
+    const a = ask({ agentId })
+    a.scene.kind = 'council'
+    a.scene.proposal = {
+      lawText: PROPOSAL,
+      proposedBy: 'yusuf',
+      stances: {},
+      predicate: { kind: 'none' },
+    }
+    return a
+  }
+
+  it('says nothing at all in an ordinary talk', () => {
+    expect(block()).not.toContain(PROPOSAL)
+    expect(block()).not.toContain('stance')
+  })
+
+  it('tells whoever has to answer what was put and how to answer it', () => {
+    const said = block(asCouncil())
+    expect(said).toContain(`Yusuf has put a rule to everyone here: "${PROPOSAL}"`)
+    expect(said).toContain('"stance": for, against, or unsure')
+  })
+
+  it('tells the one who put it to hear them out instead', () => {
+    const said = block(asCouncil('yusuf'))
+    expect(said).toContain('You have put a rule to everyone here')
+    expect(said).not.toContain('Say where you stand')
+  })
+
+  it('never hands over our word for such a gathering, or a rule’s own name', () => {
+    for (const said of [block(asCouncil()), block(asCouncil('yusuf'))]) {
+      expect(said.toLowerCase()).not.toContain('council')
+      expect(said).not.toContain('law_')
+      expect(scanPromptForGlassLeak(said)).toEqual([])
+    }
+  })
+
+  it('stands after the thread, so every byte above it stays where it was', () => {
+    const said = block(asCouncil())
+    expect(said.indexOf('What has been said')).toBeLessThan(said.indexOf('has put a rule'))
+    expect(said.indexOf('has put a rule')).toBeLessThan(said.indexOf('It is your turn'))
+  })
+})
+
+describe('what the town has agreed reaches a scene line too', () => {
+  it('sends the laws the ordinary turn sends, so the prefix runs to the end', () => {
+    const laws = ['Nobody takes another\u2019s planks.']
+    const turnSystem = assemblePrompt({
+      ...fixtureBlocks(),
+      rulesOfBeing: RULES_OF_BEING,
+      identity: CARDED,
+      laws,
+    }).system
+    const { model, prompts } = answering(TURN)
+    const llm = makeSceneLlm(client(model), voice({ laws: () => laws }))
+    return llm.line(ask()).then(() => {
+      expect(turnSystem).toContain('The town has agreed these, and holds one another to them:')
+      expect(prompts[0]).toContain(turnSystem)
+    })
   })
 })

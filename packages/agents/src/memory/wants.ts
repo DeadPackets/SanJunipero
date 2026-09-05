@@ -19,8 +19,7 @@ export const WANT_RISE_PER_TICK = 0.017
  *  reaches it, and past that more waiting says nothing a morning line could act on. */
 export const WANT_CAP = 100
 
-/** What feeds a want, one occasion per row of the contract. `law_broken` has no source in the
- *  world yet; Task 13 raises it. */
+/** What feeds a want, one occasion per row of the contract. */
 export const FED_BY = {
   scene: 'belonging',
   partner_scene: 'affection',
@@ -40,10 +39,6 @@ export const FED_BY = {
 } as const satisfies Record<string, WantKind>
 
 export type WantOccasion = keyof typeof FED_BY
-
-/** Wants whose only occasion nothing raises yet. `law_broken` arrives with Task 13; delete the
- *  entry the day it does, and the want becomes askable on its own. */
-const UNFEEDABLE: ReadonlySet<WantKind> = new Set<WantKind>(['order'])
 
 /** How much faster than everybody else this mind feels one of these. Read off the voice card
  *  and carried in the persona; a kind with no entry rises at the common rate. */
@@ -76,6 +71,7 @@ export function occasionsInPacket(packet: PerceptionPacket, selfName: string): W
   for (const s of packet.seen) {
     if (s.kind === 'discovery') found.add('discovery_witnessed')
     if (s.kind === 'item_taken' && s.ownerName === selfName) found.add('item_taken_from_you')
+    if (s.kind === 'law_broken' && !s.self) found.add('law_broken')
   }
   if (packet.feltEvents.includes('you_were_attacked')) found.add('slight')
   return [...found]
@@ -125,12 +121,9 @@ export class WantStore {
       )
   }
 
-  /** The one the morning line names: highest, and on a tie whichever went unfed longest.
-   *  A want nothing in the world can answer yet is skipped — it only ever climbs, so it would
-   *  otherwise be every mind's answer from the fourth day on. */
+  /** The one the morning line names: highest, and on a tie whichever went unfed longest. */
   top(tick: number): WantKind {
-    const askable = this.levels(tick).filter((w) => !UNFEEDABLE.has(w.kind))
-    return askable[0]?.kind ?? WANT_KINDS[0]
+    return this.levels(tick)[0]?.kind ?? WANT_KINDS[0]
   }
 
   levelOf(kind: WantKind, tick: number): number {

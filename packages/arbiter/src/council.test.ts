@@ -172,8 +172,9 @@ describe('letting a rule go', () => {
 
   it('drops a number no standing rule answers to', async () => {
     const { compile } = rig([answer({ repeals: 7 })])
-    expect((await compile(asking('Enough of that.', [{ ordinal: 1, text: 'A rule.' }]))).repeals)
-      .toBeNull()
+    expect(
+      (await compile(asking('Enough of that.', [{ ordinal: 1, text: 'A rule.' }]))).repeals,
+    ).toBeNull()
   })
 })
 

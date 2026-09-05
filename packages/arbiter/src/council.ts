@@ -77,7 +77,9 @@ function renderStanding(standing: readonly { ordinal: number; text: string }[]):
 
 function renderPlaces(places: readonly LawPlace[]): string {
   if (places.length === 0) return 'The town shares no building a rule could name.'
-  const rows = places.map((p) => `  ${p.id} — ${p.kind}${p.name === undefined ? '' : ` (${p.name})`}`)
+  const rows = places.map(
+    (p) => `  ${p.id} — ${p.kind}${p.name === undefined ? '' : ` (${p.name})`}`,
+  )
   return ['Buildings the whole town uses, by the name a rule must write:', ...rows].join('\n')
 }
 
@@ -93,7 +95,12 @@ export function assembleCompilePrompt(
   const said = ask.text.replace(/\s+/g, ' ').trim().slice(0, INTENT_MAX_CHARS)
   return {
     system: COMPILE_INSTRUCTION,
-    user: [renderStanding(ask.standing), renderPlaces(ask.places), renderThings(itemKinds), `Rule: <<<${said}>>>`]
+    user: [
+      renderStanding(ask.standing),
+      renderPlaces(ask.places),
+      renderThings(itemKinds),
+      `Rule: <<<${said}>>>`,
+    ]
       .filter((p) => p.length > 0)
       .join('\n\n'),
   }

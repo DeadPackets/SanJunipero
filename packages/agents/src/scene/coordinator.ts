@@ -1,23 +1,29 @@
-import { dayPhaseFromTick, sanitizeSpokenText } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY, sanitizeSpokenText } from '@sj/shared'
+import { LAW_TEXT_MAX, type LawPredicate } from '@sj/engine'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
+import type { LawSeam } from '../runtime/arbiterSeam.js'
 import type { Tie, TieStore } from '../memory/ties.js'
 import type { WantOccasion } from '../memory/wants.js'
 import {
   addressedIn,
   appendLine,
   CLOSING_TIMEOUTS,
+  councilDecided,
   FLOOR_TIMEOUT_MS,
   idNamed,
+  lawIdOf,
   lineCapOf,
   nextFloor,
   openScene,
   TALKERS_NEEDED,
+  tallyCouncil,
   threadFor,
   upgradedKind,
   wrapUpDue,
   type Scene,
   type SceneLlm,
   type SceneTurn,
+  type Stance,
   type TieDelta,
 } from './scene.js'
 import {
@@ -42,14 +48,22 @@ export type SceneMind = {
   feed?(occasions: readonly WantOccasion[], tick: number): void
 }
 
+type Proposal = NonNullable<Scene['proposal']>
 /** A scene as a checkpoint holds it. The three fields a talk gained when it learned to have an
- *  audience are absent in anything written before that, and a live run has to resume anyway. */
-type StoredScene = Omit<Scene, 'audience' | 'anchor' | 'timeouts'> &
-  Partial<Pick<Scene, 'audience' | 'anchor' | 'timeouts'>>
+ *  audience are absent in anything written before that, and so are the two a proposal gained
+ *  when a council learned to count; a live run has to resume anyway. */
+type StoredScene = Omit<Scene, 'audience' | 'anchor' | 'timeouts' | 'proposal'> &
+  Partial<Pick<Scene, 'audience' | 'anchor' | 'timeouts'>> & {
+    proposal?: Omit<Proposal, 'proposedBy' | 'stances'> &
+      Partial<Pick<Proposal, 'proposedBy' | 'stances'>>
+  }
 
 export type SceneCoordinatorOpts = {
   bridge: EngineBridge
   mindFor: (agentId: string) => SceneMind | null
+  /** The court, for the one call a passed rule makes. Absent, a town still writes its rules —
+   *  they are kept in words only, and the neighbours are the whole of the enforcement. */
+  laws?: LawSeam
   /** The wall clock the floor timeout is measured on. Injected so a test need not wait 30 s. */
   now?: () => number
   onError?: (kind: string, detail: string) => void
@@ -62,6 +76,16 @@ const GATHERING_MINIMUM = 3
 // A coordinator with nobody to tell drops what it would have reported.
 const NO_REPORT = (): void => {
   /* nothing to tell */
+}
+/** Beyond this many rules in one day the court is not asked again. The limiter and the budget
+ *  both see every call; this is the bound on a day where the town does nothing but agree. */
+export const MAX_COMPILES_PER_DAY = 6
+/** What a rule comes to with no court to read it: remembered, quoted in every prompt, and held
+ *  to by nobody but the neighbours. */
+const WORDS_ONLY = {
+  predicate: { kind: 'none' } as LawPredicate,
+  repeals: null,
+  why: 'kept in words only',
 }
 
 /** Which want each of them answers. A partnership feeds affection, a birth feeds legacy, and
@@ -86,6 +110,7 @@ function wantsFrom(fact: RelationshipFact): [string, WantOccasion][] {
 export class SceneCoordinator {
   readonly #bridge: EngineBridge
   readonly #mindFor: (agentId: string) => SceneMind | null
+  readonly #laws: LawSeam | null
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
@@ -97,6 +122,8 @@ export class SceneCoordinator {
   readonly #floorSince = new Map<string, { agentId: string; atMs: number }>()
   #token = 0
   #lastTick = -1
+  #compileDay = -1
+  #compilesToday = 0
   /** How far into the log the relationship scan has read. Starts where the world stands, so a
    *  restart never replays yesterday's weddings. */
   #lastSeq: number
@@ -104,6 +131,7 @@ export class SceneCoordinator {
   constructor(opts: SceneCoordinatorOpts) {
     this.#bridge = opts.bridge
     this.#mindFor = opts.mindFor
+    this.#laws = opts.laws ?? null
     this.#now = opts.now ?? Date.now
     this.#onError = opts.onError ?? NO_REPORT
     this.#lastSeq = opts.bridge.lastSeq()
@@ -128,12 +156,22 @@ export class SceneCoordinator {
     if (scene === null || scene === undefined) return
     if (scene.closedTick !== null) return
     if (this.#scenes.has(scene.id)) return
-    const back = structuredClone(scene)
+    const { proposal, ...back } = structuredClone(scene)
+    const anchor = back.anchor ?? back.participants[0] ?? ''
     this.#scenes.set(back.id, {
       ...back,
       audience: back.audience ?? [],
-      anchor: back.anchor ?? back.participants[0] ?? '',
+      anchor,
       timeouts: back.timeouts ?? 0,
+      ...(proposal === undefined
+        ? {}
+        : {
+            proposal: {
+              ...proposal,
+              proposedBy: proposal.proposedBy ?? anchor,
+              stances: proposal.stances ?? {},
+            },
+          }),
     })
   }
 
@@ -167,7 +205,7 @@ export class SceneCoordinator {
       stakes: OPENING_STAKES,
     })
     scene.kind = this.#kindAfter(scene, said, tick)
-    if (scene.kind === 'council') scene.proposal = { lawText: said, predicate: { kind: 'none' } }
+    if (scene.kind === 'council') this.#propose(scene, agentId, said)
     this.#scenes.set(scene.id, scene)
     this.#bridge.announce('scene_opened', {
       id: scene.id,
@@ -271,8 +309,9 @@ export class SceneCoordinator {
     if (said.length > 0) {
       void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
     }
-    this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick)
-    if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
+    this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick, turn.stance)
+    if (councilDecided(scene)) await this.#close(scene, 'ended', tick)
+    else if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
   }
 
   /** The body took this mind out of the talk. One person's alarm drops that person; the talk
@@ -355,14 +394,21 @@ export class SceneCoordinator {
     move: Scene['thread'][number]['move'],
     to: string | null,
     tick: number,
+    stance: Stance | null = null,
   ): void {
     appendLine(scene, { agentId, text, aside, move, tick })
     const upgraded = this.#kindAfter(scene, text, tick)
     if (upgraded !== scene.kind) {
       scene.kind = upgraded
       if (upgraded === 'council' && scene.proposal === undefined) {
-        scene.proposal = { lawText: text, predicate: { kind: 'none' } }
+        this.#propose(scene, agentId, text)
       }
+    }
+    // A vote is one of the others answering the rule; the one who put it is already for it, and
+    // a stance said outside a council answers nothing.
+    const proposal = scene.proposal
+    if (proposal !== undefined && stance !== null && agentId !== proposal.proposedBy) {
+      proposal.stances[agentId] = stance
     }
     const next = this.#floorAfter(scene, agentId, text, to)
     if (next !== null) this.#admit(scene, next, tick)
@@ -460,6 +506,7 @@ export class SceneCoordinator {
       deltas,
       closeReason: reason,
     })
+    await this.#settleCouncil(scene, tick)
     if (summary.length === 0) return
     // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
     // had anything at stake in still happened.
@@ -469,6 +516,78 @@ export class SceneCoordinator {
       if (mind === null) continue
       await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
     }
+  }
+
+  /** Somebody has put a rule to the room. The words are the record — the town heard them said,
+   *  and the same sentence is what a refusal quotes back for as long as the rule stands. */
+  #propose(scene: Scene, agentId: string, text: string): void {
+    const lawText = text.slice(0, LAW_TEXT_MAX)
+    scene.proposal = { lawText, proposedBy: agentId, stances: {}, predicate: { kind: 'none' } }
+    this.#bridge.announce('law_proposed', { lawId: lawIdOf(scene), agentId, text: lawText })
+  }
+
+  /** What a closed council leaves the town. A vote that failed leaves the argument and nothing
+   *  else; one that passed asks the court once what of it the world can hold them to, and the
+   *  answer rides in the event, so a replay of the log asks nobody anything. */
+  async #settleCouncil(scene: Scene, tick: number): Promise<void> {
+    const proposal = scene.proposal
+    if (scene.kind !== 'council' || proposal === undefined) return
+    const tally = tallyCouncil(scene)
+    if (!tally.passed) return
+    const { lawText, proposedBy } = proposal
+    const answer = await this.#compile(lawText, tick)
+    const letGo =
+      answer.repeals === null
+        ? undefined
+        : this.#bridge.socialLaws().find((l) => l.ordinal === answer.repeals)
+    if (letGo !== undefined) {
+      this.#bridge.announce('law_repealed', {
+        lawId: letGo.id,
+        agentId: proposedBy,
+        text: lawText,
+      })
+      return
+    }
+    proposal.predicate = answer.predicate
+    this.#bridge.announce('law_ratified', {
+      lawId: lawIdOf(scene),
+      agentId: proposedBy,
+      text: lawText,
+      why: answer.why,
+      predicate: answer.predicate,
+      votes: { for: tally.for, against: tally.against },
+    })
+  }
+
+  /** The one call a rule ever makes. A court that is not there, one that throws, and a day that
+   *  has already asked six times all come to the same place: the rule stands in words. */
+  async #compile(
+    text: string,
+    tick: number,
+  ): Promise<{ predicate: LawPredicate; repeals: number | null; why: string }> {
+    const laws = this.#laws
+    if (laws === null || !this.#mayCompile(tick)) return WORDS_ONLY
+    try {
+      return await laws({
+        text,
+        standing: this.#bridge.socialLaws().map((l) => ({ ordinal: l.ordinal, text: l.text })),
+        places: this.#bridge.publicPlaces(),
+      })
+    } catch (err) {
+      this.#onError('law_compile', err instanceof Error ? err.message : String(err))
+      return WORDS_ONLY
+    }
+  }
+
+  #mayCompile(tick: number): boolean {
+    const day = Math.floor(tick / MINUTES_PER_DAY)
+    if (day !== this.#compileDay) {
+      this.#compileDay = day
+      this.#compilesToday = 0
+    }
+    if (this.#compilesToday >= MAX_COMPILES_PER_DAY) return false
+    this.#compilesToday += 1
+    return true
   }
 
   /** Every relationship the log has written since the last look, and the one place their ties,

@@ -4,16 +4,20 @@ import type { Tie } from '../memory/ties.js'
 import {
   addressedIn,
   appendLine,
+  councilDecided,
+  lawIdOf,
   lineCapFor,
   nextFloor,
   openScene,
   proposesALaw,
   sceneId,
   SceneTurnSchema,
+  tallyCouncil,
   threadFor,
   upgradedKind,
   wrapUpDue,
   type Scene,
+  type Stance,
 } from './scene.js'
 
 const NAMES: Record<string, string> = {
@@ -261,6 +265,81 @@ describe('the kind a scene becomes', () => {
     expect(upgradedKind(s, 'The fire is lit.', { tiesOf: noTies, nameOf, gathering: true })).toBe(
       'gathering',
     )
+  })
+})
+
+describe('what a room sounds like putting a rule to itself', () => {
+  const proposals = [
+    'From now on the well is drawn at dawn',
+    'From this day the fire is banked before bed',
+    'Let us agree the store is shut after dark',
+    'We should all carry back what we take',
+    'The rule is one sack each',
+    'Nobody may take another’s planks',
+    'Nobody shall fish the pool above the ford',
+    'We let go of the rule about the fire',
+    'The fire tax is no longer ours to keep',
+  ]
+
+  it('hears each of them', () => {
+    for (const said of proposals) expect(proposesALaw(said), said).toBe(true)
+  })
+
+  it('does not hear a plain sentence about the same things', () => {
+    expect(proposesALaw('I drew water at dawn')).toBe(false)
+    expect(proposesALaw('The store was shut when I got there')).toBe(false)
+    expect(proposesALaw('Nobody came to the fire tonight')).toBe(false)
+  })
+})
+
+describe('how a room counts itself', () => {
+  const council = (proposedBy: string, stances: Record<string, Stance>): Scene => {
+    const s = scene(['nadia', 'omar', 'salma'])
+    s.kind = 'council'
+    s.proposal = { lawText: 'One sack each.', proposedBy, stances, predicate: { kind: 'none' } }
+    return s
+  }
+
+  it('counts the one who put it as for it', () => {
+    const tally = tallyCouncil(council('nadia', { omar: 'for' }))
+    expect(tally.for).toEqual(['nadia', 'omar'])
+    expect(tally.passed).toBe(true)
+  })
+
+  it('passes a room that is only unsure, because silence is not opposition', () => {
+    const tally = tallyCouncil(council('nadia', { omar: 'unsure', salma: 'unsure' }))
+    expect(tally.unsure).toEqual(['omar', 'salma'])
+    expect(tally.passed).toBe(true)
+  })
+
+  it('fails one against two', () => {
+    expect(tallyCouncil(council('nadia', { omar: 'against', salma: 'against' })).passed).toBe(false)
+  })
+
+  it('passes nothing nobody answered', () => {
+    const tally = tallyCouncil(council('nadia', {}))
+    expect(tally.for).toEqual(['nadia'])
+    expect(tally.passed, 'a rule said to a departing back is not a rule').toBe(false)
+  })
+
+  it('ignores a stance the one who put it wrote about their own rule', () => {
+    expect(tallyCouncil(council('nadia', { nadia: 'against' })).passed).toBe(false)
+  })
+
+  it('is decided once everybody else has answered, and not before', () => {
+    expect(councilDecided(council('nadia', { omar: 'for' }))).toBe(false)
+    expect(councilDecided(council('nadia', { omar: 'for', salma: 'against' }))).toBe(true)
+  })
+
+  it('decides nothing in a talk that carries no rule', () => {
+    expect(councilDecided(scene())).toBe(false)
+    expect(tallyCouncil(scene()).passed).toBe(false)
+  })
+
+  it('names the rule after the talk that made it', () => {
+    const s = scene(['nadia', 'omar'])
+    expect(lawIdOf(s)).toBe(s.id.replace('scene_', 'law_'))
+    expect(lawIdOf(s).startsWith('law_')).toBe(true)
   })
 })
 

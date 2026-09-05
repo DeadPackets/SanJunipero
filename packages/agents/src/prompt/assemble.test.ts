@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { FELT_TAGS, MYSTERIES } from '@sj/engine'
+import { FELT_TAGS, LAWS_SHOWN, LAW_TEXT_MAX, MYSTERIES } from '@sj/engine'
 import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
 import { assemblePrompt, compactDayLog, type PromptBlocks } from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
@@ -1201,6 +1201,62 @@ describe('what stands within reach', () => {
   })
 })
 
+describe('what the town has agreed', () => {
+  const LAW = 'Nobody takes from the store after dark.'
+  const said = (laws: string[]): string => assemblePrompt(fixtureBlocks({ laws })).system
+
+  it('quotes the sentences the town actually said', () => {
+    expect(said([LAW])).toContain('The town has agreed these, and holds one another to them:')
+    expect(said([LAW])).toContain(`"${LAW}"`)
+  })
+
+  it('sends the same bytes it always did while the town has agreed nothing', () => {
+    expect(said([])).toBe(assemblePrompt(fixtureBlocks()).system)
+    expect(assemblePrompt(fixtureBlocks({ laws: [] })).blockTokens.laws).toBeUndefined()
+  })
+
+  it('shows the newest eight and no more, however many stand', () => {
+    const many = Array.from({ length: 12 }, (_, i) => `Rule number ${i} stands.`)
+    const system = said(many)
+    expect(system).not.toContain('Rule number 3 stands.')
+    expect(system).toContain('Rule number 4 stands.')
+    expect(system).toContain('Rule number 11 stands.')
+  })
+
+  it('renders no line longer than a rule is allowed to be', () => {
+    const system = said([`${'x'.repeat(400)}`])
+    for (const line of system.split('\n').filter((l) => l.startsWith('"'))) {
+      expect(line.length).toBeLessThanOrEqual(LAW_TEXT_MAX + 2)
+    }
+  })
+
+  it('costs what eight sentences cost, and not a token more', () => {
+    const many = Array.from({ length: 12 }, () => 'y'.repeat(LAW_TEXT_MAX))
+    expect(assemblePrompt(fixtureBlocks({ laws: many })).blockTokens.laws).toBeLessThanOrEqual(
+      LAWS_SHOWN * 32 + 16,
+    )
+  })
+
+  it('sits after what the town has named and above one mind’s own name', () => {
+    const system = assemblePrompt(
+      fixtureBlocks({ customs: ['Long Turning'], laws: [LAW], frontier: ['A store in common'] }),
+    ).system
+    expect(system.indexOf('The town has taken to')).toBeLessThan(
+      system.indexOf('The town has agreed these'),
+    )
+    expect(system.indexOf('The town has agreed these')).toBeLessThan(
+      system.indexOf('Nobody here has done any of these'),
+    )
+    expect(system.indexOf('The town has agreed these')).toBeLessThan(system.indexOf('Name: Tamar'))
+  })
+
+  // A rule has an id and a number of its own, and a mind may hear neither: the words alone.
+  it('hands over no word from the plane that keeps the rules', () => {
+    expect(scanPromptForGlassLeak(said([LAW, 'One sack each from the store.']))).toEqual([])
+    expect(said([LAW])).not.toContain('law_')
+  })
+})
+
 // The prompt's bill, itemised: which block bought which tokens, and which of them the cache
 // can keep. Measurement only — nothing here changes a byte a mind reads.
 describe('blockTokens', () => {
@@ -1214,6 +1270,7 @@ describe('blockTokens', () => {
     'shared',
     'roster',
     'customs',
+    'laws',
     'identity',
     'personality',
     'journal',
@@ -1244,6 +1301,7 @@ describe('blockTokens', () => {
           },
         ],
         customs: ['Long Turning'],
+        laws: ['Nobody takes what is not theirs.'],
         journal: [{ day: 2, text: 'The weir held.' }],
         recalled: { query: 'my mother', memories: ['She kept bees.'] },
         lastOutcome: lastTurnLine('eat', 'the food must be in your hands'),
