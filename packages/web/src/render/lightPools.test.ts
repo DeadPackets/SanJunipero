@@ -73,6 +73,7 @@ import {
   poolDiscAlpha,
   poolRadiusPx,
   poolStrengthAt,
+  windowSpot,
 } from './lightPools.js'
 import type { Scene } from './scene.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -201,8 +202,10 @@ describe('the pool is a pool of light and not a pale plate', () => {
     ]
     const [r, , b] = after(POOL_COLOR)
     expect(r - b).toBeGreaterThan(0)
-    const [hr, , hb] = after(0xf2c879)
-    expect(hr - hb).toBeLessThan(0)
+    // Not vacuous: cream still turns cold under the same multiply. Honey used to be the foil
+    // here and the raised night floor now keeps it warm — which is the point of raising it.
+    const [cr, , cb] = after(0xfff6e9)
+    expect(cr - cb).toBeLessThan(0)
   })
 
   it("covers the flame's own reach on the iso ground, wide as it is tall by the tile ratio", () => {
@@ -252,6 +255,65 @@ describe('a cell point lands on the art wherever the entity layer put the sprite
   })
 })
 
+describe('★ a lit hearth is seen through a window (task 18)', () => {
+  const points = (window?: { x: number; y: number }, flame?: { x: number; y: number }) => ({
+    ...(window === undefined ? {} : { window }),
+    ...(flame === undefined ? {} : { flame }),
+  })
+
+  // Only the cabin's art ever named a window; cottage, farmhouse and house went dark with a
+  // fire burning in them. A hearth the art does not PAINT is a fire indoors, and a fire
+  // indoors reaches the town through the wall.
+  it('★ falls back to the front face for a hearth house whose art names no window', () => {
+    const at = windowSpot(points(), 512, 512)
+    expect(at).toEqual({ x: 256, y: 370 })
+  })
+
+  it('★ keeps the art’s own window wherever the art names one', () => {
+    expect(windowSpot(points({ x: 130, y: 370 }), 512, 512)).toEqual({ x: 130, y: 370 })
+  })
+
+  // A fire pit and a lamp post paint their flame: the light is already on screen and a window
+  // on an open fire would be a second, invented source.
+  it('★ gives no window to a source whose flame the art paints', () => {
+    expect(windowSpot(points(undefined, { x: 130, y: 167 }), 256, 256)).toBeNull()
+  })
+
+  it('★ scales with the painted cell, so a farmhouse is lit at its own height', () => {
+    expect(windowSpot(points(), 768, 768)).toEqual({ x: 384, y: 555 })
+  })
+
+  it('answers null before the art has landed', () => {
+    expect(windowSpot(null, 512, 512)).toBeNull()
+    expect(windowSpot(points(), 1, 1)).toBeNull()
+  })
+
+  // ★ THE GATE IS THE FLAME LIST ITSELF: `flamesAt` drops a structure whose `fueledUntilTick`
+  // has passed, so an unlit hearth reaches no light at all and no glow can be placed for it.
+  it('★ no flame, no glow: an unfueled hearth is not in the list the glow is drawn from', () => {
+    const lit: LitWorld = {
+      agents: {},
+      items: {},
+      structures: {
+        h: {
+          id: 'h',
+          kind: 'house',
+          x: 4,
+          y: 4,
+          w: 2,
+          h: 2,
+          stage: 'complete',
+          fueledUntilTick: 700,
+        },
+      },
+    } as unknown as LitWorld
+    const cold = JSON.parse(JSON.stringify(lit)) as LitWorld
+    ;(cold.structures.h as { fueledUntilTick?: number }).fueledUntilTick = 100
+    expect(flamesAt(lit, 600, DEFAULT_CONFIG).map((f) => f.id)).toEqual(['h'])
+    expect(flamesAt(cold, 600, DEFAULT_CONFIG)).toEqual([])
+  })
+})
+
 describe('what this pass must not have broken', () => {
   const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
   const code = src
@@ -290,7 +352,7 @@ describe('what this pass must not have broken', () => {
   it('★ NO door glow: light comes only from a source the art shows lit (ruling 21)', () => {
     expect(code).not.toMatch(/door/i)
     expect(src).toContain('pts.flame')
-    expect(src).toContain('pts.window')
+    expect(src).toContain('points.window')
   })
 
   it("★ pins BOTH the texture and the sprites against pixi's GC", () => {

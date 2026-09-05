@@ -1138,3 +1138,25 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
   })
 })
+
+// ── ★ GOLDEN HOUR ON THE GROUND (task 18) ────────────────────────────────────────────────
+
+describe('★ the contact shadow reads the sun the arc draws', () => {
+  const shadowSrc = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+
+  it('★ takes the cast off `skyModel`, so the arc and the ground agree about the hour', () => {
+    expect(shadowSrc).toContain("from '../ui/skyModel.js'")
+    expect(shadowSrc).toMatch(/const sun = shadowCast\(nowTick\)/)
+    expect(shadowSrc).toContain('e.shadow.position.set(sx + sun.dx, sy)')
+    expect(shadowSrc).toContain('e.shadow.scale.set(sun.scaleX, sun.scaleY)')
+    expect(shadowSrc).toContain('e.shadow.alpha = SHADOW_ALPHA * sun.alpha')
+  })
+
+  // ★ ONE READ FOR THE WHOLE CAST. The sun's height is a function of the minute, not of who is
+  // standing in it, so asking it per body would be twelve calls a frame for one answer.
+  it('★ asks once a frame, outside the loop over the bodies', () => {
+    const after = shadowSrc.slice(shadowSrc.indexOf('const sun = shadowCast'))
+    expect(after.indexOf('for (const { a, e, pos, bobY } of drawing)')).toBeGreaterThan(0)
+    expect(shadowSrc.split('shadowCast(')).toHaveLength(2) // exactly one call in the file
+  })
+})

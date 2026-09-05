@@ -15,6 +15,7 @@ import { createAtmosphere, type Atmosphere } from './atmosphere.js'
 import { createWeatherLayer, type WeatherLayer } from './weatherFx.js'
 import { createAmbient, type AmbientDirector } from './ambient.js'
 import { createLightPools, type LightPools } from './lightPools.js'
+import { createFireflies, type FireflyLayer } from './fireflies.js'
 import { createSmoke, type SmokeLayer } from './smoke.js'
 import { createClouds, type CloudLayer } from './clouds.js'
 import { createVignette, type Vignette } from './vignette.js'
@@ -86,6 +87,7 @@ export function StageMount({
     let weather: WeatherLayer | null = null
     let ambient: AmbientDirector | null = null
     let lightPools: LightPools | null = null
+    let fireflies: FireflyLayer | null = null
     let smoke: SmokeLayer | null = null
     let clouds: CloudLayer | null = null
     let vignette: Vignette | null = null
@@ -120,6 +122,7 @@ export function StageMount({
       moments?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
+      fireflies?.destroy()
       smoke?.destroy()
       clouds?.destroy()
       vignette?.destroy()
@@ -184,6 +187,7 @@ export function StageMount({
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)
+        fireflies = createFireflies(s, store)
         smoke = createSmoke(s, store)
         clouds = createClouds(s, store)
         vignette = createVignette(s.app) // last onto app.stage: over the weather
@@ -228,6 +232,7 @@ export function StageMount({
           weather?.tick(dt)
           ambient?.tick(dt)
           lightPools?.tick(dt)
+          fireflies?.tick(dt)
           smoke?.tick(dt)
           clouds?.tick(dt)
           vignette?.tick()

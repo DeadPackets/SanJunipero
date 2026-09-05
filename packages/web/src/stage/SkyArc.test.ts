@@ -12,7 +12,12 @@ import {
   SUN_UP_MIN,
   arcPercent,
   arcPoint,
+  GOLDEN_ELEVATION,
+  SHADOW_MAX_STRETCH,
+  SHADOW_REST,
   dayWord,
+  moonAltitude,
+  shadowCast,
   skyKind,
   skyToken,
   skyWord,
@@ -201,5 +206,81 @@ describe('the bar is quiet chrome, and does not fight the town', () => {
       /top: calc\(max\(var\(--mark-inset\)/,
     )
     expect(CSS.replace(/\s+/g, ' ')).toContain("[data-broadcast='on'] .sky-bar { display: none; }")
+  })
+})
+
+// ── ★ THE SAME TRAVELLER, ON THE GROUND (task 18) ────────────────────────────────────────
+//
+// The arc says where the sun and the moon are. The light on the town has to read the SAME
+// traveller, or the picture and the mark over it disagree about the hour.
+
+describe('★ the moon lights the town it is drawn over', () => {
+  it('★ is nothing while the sun is up, and highest in the middle of the night', () => {
+    for (const h of [6, 12, 18, 20]) expect(moonAltitude(at(h)), `${h}:00`).toBe(0)
+    expect(moonAltitude(at(21))).toBeCloseTo(0, 6)
+    expect(moonAltitude(at(1))).toBeGreaterThan(0.99) // 21:00 to 05:00, so 01:00 is the top
+  })
+
+  it('rises and sets with the same token the arc puts on the road', () => {
+    for (const m of [0, 200, 1300, 1439]) {
+      const tok = skyToken(m)
+      expect(moonAltitude(m) > 0, `minute ${m}`).toBe(tok.kind === 'moon' && tok.along > 0)
+    }
+    expect(moonAltitude(at(2))).toBeCloseTo(Math.sin(Math.PI * skyToken(at(2)).along), 12)
+  })
+
+  it('never leaves the unit band, at any minute of any day', () => {
+    for (let m = 0; m < MINUTES_PER_DAY * 2; m++) {
+      expect(moonAltitude(m)).toBeGreaterThanOrEqual(0)
+      expect(moonAltitude(m)).toBeLessThanOrEqual(1)
+    }
+  })
+})
+
+describe('★ golden hour: a low sun throws a long shadow', () => {
+  it('★ casts nothing at all at noon — the blob under the feet is the whole of it', () => {
+    expect(shadowCast(at(12))).toEqual(SHADOW_REST)
+  })
+
+  it('★ draws out through the golden band and is home before the sun sets', () => {
+    const dusk = shadowCast(at(20, 30))
+    expect(dusk.scaleX).toBeGreaterThan(1.5)
+    expect(dusk.scaleX).toBeLessThanOrEqual(SHADOW_MAX_STRETCH)
+    const higher = shadowCast(at(17))
+    expect(higher.scaleX).toBeLessThan(dusk.scaleX)
+    expect(higher.scaleX).toBeGreaterThanOrEqual(1)
+    // and nothing snaps at the minute the light goes: the last lit minute is already at rest
+    expect(shadowCast(at(20, 59)).scaleX).toBeLessThan(1.05)
+  })
+
+  it('★ falls AWAY from the sun: east at dawn, west at dusk', () => {
+    expect(shadowCast(at(6)).dx).toBeGreaterThan(0)
+    expect(shadowCast(at(20, 30)).dx).toBeLessThan(0)
+    expect(shadowCast(at(12)).dx).toBe(0)
+  })
+
+  it('★ softens as it lengthens — a long shadow is a weak one', () => {
+    expect(shadowCast(at(20, 30)).alpha).toBeLessThan(1)
+    expect(shadowCast(at(12)).alpha).toBe(1)
+  })
+
+  it('★ the night has no cast shadow at all: the moon is a wash, not a lamp', () => {
+    for (const h of [22, 0, 3]) expect(shadowCast(at(h)), `${h}:00`).toEqual(SHADOW_REST)
+  })
+
+  it('is continuous and bounded across the whole day', () => {
+    let prev = shadowCast(0)
+    for (let m = 1; m < MINUTES_PER_DAY; m++) {
+      const c = shadowCast(m)
+      expect(c.scaleX).toBeGreaterThanOrEqual(1)
+      expect(c.scaleX).toBeLessThanOrEqual(SHADOW_MAX_STRETCH)
+      expect(Math.abs(c.scaleX - prev.scaleX), `minute ${m}`).toBeLessThan(0.1)
+      prev = c
+    }
+  })
+
+  it("the golden band is a fraction of the sun's own height, not an hour of its own", () => {
+    expect(GOLDEN_ELEVATION).toBeGreaterThan(0)
+    expect(GOLDEN_ELEVATION).toBeLessThan(1)
   })
 })

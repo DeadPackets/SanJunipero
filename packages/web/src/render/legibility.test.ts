@@ -54,10 +54,13 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
     const r = bandRatios(LANDMARK_INK, LANDMARK_PLATE)
     expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
     expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
-    // and the ground it used to be painted on could never have carried it
-    for (const ground of Object.values(TILE_COLORS)) {
-      expect(bandRatios(LANDMARK_INK, ground).night).toBeLessThan(AA_RATIO)
-    }
+    // ...and the ground it used to be painted on cannot be relied on to carry it. Under the
+    // raised night floor the pale paving (#e8d5bc) clears at 4.60:1 and every other tile does
+    // not, so a name that read its own ground would pass on the plaza and fail on the grass.
+    const grounds = Object.values(TILE_COLORS)
+    const clear = grounds.filter((g) => bandRatios(LANDMARK_INK, g).night >= AA_RATIO)
+    expect(clear.length).toBeLessThanOrEqual(1)
+    expect(bandRatios(LANDMARK_INK, TILE_COLORS[0]!).night).toBeLessThan(AA_RATIO)
   })
 
   it('keeps speech and thought on different PAPER, both of which hold the ink after dark', () => {

@@ -59,7 +59,14 @@ vi.mock('pixi.js', () => {
 })
 import type { WorldState } from '@sj/engine/state'
 import type { Scene } from './scene.js'
-import { SKY_MAX_ALPHA, createAtmosphere, skyAlpha } from './atmosphere.js'
+import {
+  MOON_COLOR,
+  MOON_MAX_ALPHA,
+  SKY_MAX_ALPHA,
+  createAtmosphere,
+  skyAlpha,
+} from './atmosphere.js'
+import { moonAltitude } from '../ui/skyModel.js'
 import { clockTint } from './tints.js'
 
 describe('the sky gradient (U4)', () => {
@@ -167,5 +174,39 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     const sky = lights.children.find((c) => c.blendMode === 'screen')!
     expect(sky.tint).toBe(quad.tint)
     expect(sky.alpha).toBeCloseTo(skyAlpha(0), 6)
+  })
+})
+
+// ── ★ THE MOON ON THE ARC LIGHTS THE ROOFS UNDER IT (task 18) ────────────────────────────
+
+describe('★ the moon', () => {
+  const moonOf = (lights: Node): Node =>
+    lights.children.filter((c) => c.blendMode === 'screen').at(-1)!
+
+  it('★ is a second screened ramp in `lights`, over the same masked ground', () => {
+    const { lights } = drive()
+    const screened = lights.children.filter((c) => c.blendMode === 'screen')
+    expect(screened).toHaveLength(2)
+    expect(moonOf(lights).mask).not.toBeNull()
+    expect(moonOf(lights).tint).toBe(MOON_COLOR)
+  })
+
+  it('★ is dark all day and rides its own altitude at night', () => {
+    const { atm, lights, state } = drive()
+    atm.update(state(720, 'sunny'))
+    expect(moonOf(lights).alpha).toBe(0)
+    atm.update(state(60, 'sunny'))
+    expect(moonOf(lights).alpha).toBeCloseTo(MOON_MAX_ALPHA * moonAltitude(60), 6)
+    expect(moonOf(lights).alpha).toBeGreaterThan(0)
+  })
+
+  it('★ is cool where every other light in the town is warm, and stays under its ceiling', () => {
+    expect((MOON_COLOR >> 16) & 0xff).toBeLessThan(MOON_COLOR & 0xff)
+    const { atm, lights, state } = drive()
+    for (let m = 0; m < 1440; m += 7) {
+      atm.update(state(m, 'sunny'))
+      expect(moonOf(lights).alpha, `minute ${m}`).toBeLessThanOrEqual(MOON_MAX_ALPHA)
+    }
+    expect(MOON_MAX_ALPHA).toBeLessThanOrEqual(0.2)
   })
 })
