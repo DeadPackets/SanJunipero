@@ -296,7 +296,7 @@ export function createCharacterLayer(
   // The inflation floor is a SCREEN size, so a zoom change re-cuts every capsule. Cheap: it
   // fires on a camera stop, not on a frame.
   const recutOnZoom = (): void => {
-    const zoom = scene.getZoom()
+    const zoom = scene.getZoomStop()
     if (zoom === hitZoom) return
     hitZoom = zoom
     for (const e of entries.values()) {

@@ -135,7 +135,7 @@ vi.mock('pixi.js', () => {
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
 import { CELL, CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
 import { characterCell, createCharacterLayer } from './characters.js'
-import { ZOOM_STOPS } from './camera.js'
+import { ZOOM_STOPS, type ZoomStop } from './camera.js'
 import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
 import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
@@ -235,6 +235,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     layers,
     entities: layers.entities,
     getZoom: () => 1,
+    getZoomStop: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
     tags: { occupied: () => [], show: () => {}, hide: () => {} },
@@ -846,18 +847,20 @@ type MockSpriteT = {
   hitArea: { points: number[] } | null
 }
 /** `Scene.sortDepth` returns `void` in the product; the mock returns the entries, so the type has to be replaced rather than intersected. */
-type PickScene = Omit<Scene, 'sortDepth' | 'getZoom'> & {
+type PickScene = Omit<Scene, 'sortDepth' | 'getZoom' | 'getZoomStop'> & {
   sortDepth: () => { box: DepthBox; node: MockSpriteT }[]
   getZoom: () => number
+  getZoomStop: () => ZoomStop
 }
 
 describe('★ five people on one tile are five separate hit targets', () => {
   const NAMES = ['amara', 'nadia', 'omar', 'salma', 'yusuf']
 
   /** A scene whose zoom the test can move, so the 24 px floor is exercised where it is live. */
-  function zoomableScene(zoom: number): PickScene {
+  function zoomableScene(zoom: ZoomStop): PickScene {
     const s = makeScene() as unknown as PickScene
     s.getZoom = () => zoom
+    s.getZoomStop = () => zoom
     return s
   }
 

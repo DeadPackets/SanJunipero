@@ -484,11 +484,11 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     scene: Scene
     store: WorldStore
     book: TextureBook
-    zoom: { at: number }
+    zoom: { at: number; stop: number }
     cameras: Cam[]
     doors: string[]
   } {
-    const zoom = { at: 1 }
+    const zoom = { at: 1, stop: 1 }
     const cameras: Cam[] = []
     const doors: string[] = []
     const scene = {
@@ -497,6 +497,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
       },
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => zoom.at,
+      getZoomStop: () => zoom.stop,
       onCamera: (cb: Cam) => {
         cameras.push(cb)
         return () => {}
@@ -543,12 +544,25 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     syncEntities(h.scene, h.book, h.store, () => {})
     const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
     const before = [...(sprite.hitArea as unknown as { points: number[] }).points]
-    h.zoom.at = 0.25
+    h.zoom.stop = 0.25
     for (const cb of h.cameras) cb()
     const after = (sprite.hitArea as unknown as { points: number[] }).points
     expect(after).not.toEqual(before)
     expect(after).toEqual(structureHitPoints('house', 2, 2, 1, 0.25, false))
     expect(polygonBounds(after).w * 0.25).toBeGreaterThanOrEqual(24 - 1e-9)
+  })
+
+  it('★ a frame of a zoom transit re-cuts nothing — the rest stop is the camera stop', () => {
+    const h = harness([house])
+    syncEntities(h.scene, h.book, h.store, () => {})
+    const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
+    const before = [...(sprite.hitArea as unknown as { points: number[] }).points]
+    // the eased transit from 1 to 0.25 hands a new scale to every frame
+    for (const s of [0.83, 0.61, 0.42, 0.3]) {
+      h.zoom.at = s
+      for (const cb of h.cameras) cb()
+      expect((sprite.hitArea as unknown as { points: number[] }).points).toEqual(before)
+    }
   })
 
   it('★ a building WITH art gets the art prism in the frame it appears, not a round trip later', () => {
@@ -689,6 +703,7 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
       },
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => 1,
+      getZoomStop: () => 1,
       onCamera: () => () => {},
       addDepthSource: () => () => {},
     } as unknown as Scene
