@@ -143,6 +143,13 @@ describe('makeImageClient', () => {
     ).rejects.toBeInstanceOf(ImageGenError)
     expect(none).toEqual([])
   })
+  it('asking for no slots refuses with an Error, never with the value undefined', async () => {
+    const { fn, calls } = fakeFetch(() => ok)
+    await expect(
+      makeImageClient({ apiKey: 'k', fetchFn: fn }).generateCandidates('p', [], 0),
+    ).rejects.toBeInstanceOf(ImageGenError)
+    expect(calls).toHaveLength(0)
+  })
   it('books the extra when the actual cost exceeds the reserve', async () => {
     const { fn } = fakeFetch(() => ({
       status: 200,

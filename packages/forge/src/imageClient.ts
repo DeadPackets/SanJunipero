@@ -103,7 +103,7 @@ export function makeImageClient(opts: {
         if (s.value instanceof ImageGenError) genErr ??= s.value
         else good.push(s.value)
       }
-      if (good.length === 0) throw budgetErr ?? genErr!
+      if (good.length === 0) throw budgetErr ?? genErr ?? new ImageGenError('none', 0, 'no slots')
       return good
     },
   }
