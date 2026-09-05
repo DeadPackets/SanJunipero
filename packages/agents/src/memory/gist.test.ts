@@ -12,7 +12,7 @@ import {
 } from './gist.js'
 
 const TAGS: MemoryTags = { people: [], place: 'meadow', objects: [], topics: [] }
-const LONG = `Omar promised three planks by tomorrow. ${'The meadow is wide and quiet. '.repeat(20)}`
+const LONG = `Omar promised three planks by tomorrow. ${'The meadow is wide and quiet. '.repeat(30)}`
 const SHORT = 'Omar promised three planks by tomorrow.'
 
 async function store(): Promise<MemoryStore> {

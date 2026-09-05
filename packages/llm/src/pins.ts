@@ -195,12 +195,13 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // Pre-flight's act bar gates exactly the pair the turn will run on. It never leaves that pair.
   preflight: { ...ON_GLM, maxOutputTokens: 2500, dailyUsd: RAIL_FLOOR_USD },
   // One long memory set down short at the night boundary. The ask is two or three sentences;
-  // 200 leaves room for a long promise without letting a gist grow back into the row it replaces.
+  // 300 leaves room for a long promise without letting a gist grow back into the row it
+  // replaces. Not 200: 27 of r13's 786 gists stopped mid-mark on that ceiling.
   'reflection.gist': {
     ...ON_DEEPSEEK,
     providerOrder: GIST_PROVIDER_ORDER,
     reasoning: { enabled: false },
-    maxOutputTokens: 200,
+    maxOutputTokens: 300,
     dailyUsd: 0.27,
   },
   // The court writes what the town can never take back, so it is the one place the fleet pays

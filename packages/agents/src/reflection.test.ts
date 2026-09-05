@@ -185,7 +185,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
 describe('runSleepReflection pipeline', () => {
   it('the night gists the day’s long rows and pins what the mind is about', async () => {
     const { mem, personality } = await makeStores()
-    const long = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(20)}`
+    const long = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(30)}`
     await seedDay(mem, DAY, [{ text: long, people: ['Omar'], importance: 6 }, ...SINGLE_PERSON_DAY])
     const llm = new ScriptedReflectionLlm(null)
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
@@ -601,7 +601,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     expect(res.fallback).toBe(false)
   })
 
-  const LONG_ROW = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(20)}`
+  const LONG_ROW = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(30)}`
   const longDay = (mem: MemoryStore): Promise<MemoryRow[]> =>
     seedDay(mem, DAY, [{ text: LONG_ROW, people: ['Omar'], importance: 6 }, ...SINGLE_PERSON_DAY])
 

@@ -2,8 +2,10 @@ import { setTimeout as pause } from 'node:timers/promises'
 import { BudgetExceededError } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './store.js'
 
-/** Below this a row is already its own gist, and the call would cost more than it saves. */
-export const GIST_MIN_CHARS = 400
+/** Below this a row is already its own gist, and the call would cost more than it saves. 700
+ *  and not 400: r13's gists ran a 490-token input for a 96-token answer, so the short half of
+ *  that band paid a whole call to save a line. */
+export const GIST_MIN_CHARS = 700
 
 export type GistLlm = { gist(text: string): Promise<string> }
 
