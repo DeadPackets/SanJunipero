@@ -34,7 +34,6 @@ import { describeEvent } from './chronicleFormat.js'
 import { chronicleLabel } from './importantFeed.js'
 import { hoverPlate } from './interaction.js'
 import { placeOf } from './place.js'
-import { LAW_COPY } from './lawCopy.js'
 import { EMPTY_COPY } from './townStats.js'
 import { stateWord, conditionsOf, CONDITION_WORD } from './status.js'
 import { BROADCAST_CAPTIONS } from './broadcast.js'
@@ -163,12 +162,8 @@ export function broadcastStrings(state: WorldState): StringSite[] {
     for (const row of hoverPlate(state, 'agent', a.id)) push('hover', row.text)
   }
 
-  // the world laws, the empty states and every control label
-  for (const [path, copy] of Object.entries(LAW_COPY)) {
-    push(`law ${path} title`, copy.title)
-    push(`law ${path} sentence`, copy.sentence)
-    push(`law ${path} unit`, copy.unit)
-  }
+  // the empty states and every control label. The Laws page's own strings are scanned where
+  // they are rendered — see the Laws page suite — because the town writes them, not us.
   for (const [k, v] of Object.entries(EMPTY_COPY)) push(`empty ${k}`, v)
   return out
 }
