@@ -370,6 +370,9 @@ export class AgentRuntime {
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
+  // The night this mind has actually finished writing down. `#reflectedNight` is latched before
+  // the seven calls begin, so only this one may reach a checkpoint.
+  #nightWritten: number | null = null
   #reflectionInFlight = false
   #pendingDreamMood: string | null = null
   #pendingRecall: Recalled | null = null
@@ -458,6 +461,7 @@ export class AgentRuntime {
     this.#wakeOwed = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
+    this.#nightWritten = null
     this.#pendingDreamMood = null
     this.#pendingRecall = null
     this.#lastOutcome = null
@@ -494,7 +498,7 @@ export class AgentRuntime {
       },
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
-      reflectedNight: this.#reflectedNight,
+      reflectedNight: this.#nightWritten,
       wasNight: this.#wasNight,
       pendingDreamMood: this.#pendingDreamMood,
       pendingRecall: this.#pendingRecall,
@@ -521,6 +525,7 @@ export class AgentRuntime {
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
     this.#reflectedNight = s.reflectedNight
+    this.#nightWritten = s.reflectedNight
     this.#wasNight = s.wasNight
     this.#pendingDreamMood = s.pendingDreamMood
     this.#pendingRecall = s.pendingRecall ?? null
@@ -1349,7 +1354,10 @@ export class AgentRuntime {
     if (this.#reflectedNight === day) return
     this.#reflectedNight = day
     await this.#letGoOfStaleTies()
-    if (this.#reflectionLlm === null) return
+    if (this.#reflectionLlm === null) {
+      this.#nightWritten = day
+      return
+    }
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
     const ties = this.#ties
@@ -1369,6 +1377,7 @@ export class AgentRuntime {
     } catch (err) {
       this.#llm.alert('reflection_failed', messageOf(err))
     }
+    this.#nightWritten = day
     try {
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({

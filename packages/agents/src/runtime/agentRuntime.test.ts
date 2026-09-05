@@ -364,6 +364,15 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   }
 }
 
+/** The same reflection, held at its first call so a checkpoint can be taken mid-night. */
+class GatedReflectionLlm extends ScriptedReflectionLlm {
+  gate: Promise<void> = Promise.resolve()
+  override async extractFacts(dayMemories: MemoryRow[]) {
+    await this.gate
+    return super.extractFacts(dayMemories)
+  }
+}
+
 class ScriptedDreamLlm implements DreamLlm {
   calls = 0
   mood = 'peaceful'
@@ -1038,6 +1047,30 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 100)
     expect(runtime.stats().reflections).toBe(1)
     expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+  })
+
+  // Seven calls under a slow back end is minutes. A checkpoint written inside them used to say
+  // the night was done, and the resume never wrote that day at all.
+  it('does not call the night written in a checkpoint taken while it is still running', async () => {
+    let release!: () => void
+    const reflection = new GatedReflectionLlm()
+    reflection.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { loop, runtime, mem, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
+    expect(runtime.snapshot().reflectedNight, 'nothing is written yet').toBeNull()
+
+    release()
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 200)
+    expect(runtime.snapshot().reflectedNight).toBe(0)
   })
 
   it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
