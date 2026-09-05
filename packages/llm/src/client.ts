@@ -148,10 +148,12 @@ export function defaultExtraBody(
   model: string = MIND_MODEL,
   sessionId?: string,
 ): RequestBody {
-  const homes = model === MIND_MODEL ? { only: providerOrder } : { order: providerOrder }
+  // r15: sent as `only`, the pair landed every call on DeepInfra, which rate-limited 27% of them
+  // upstream and dozed the fleet; `order` keeps Wafer first, as r13 measured it. Stickiness is lost.
+  const homes = { order: providerOrder }
   return {
     models: [model, ...fallbackModels],
-    provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: true },
+    provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: false },
     ...(reasoning === undefined ? {} : { reasoning }),
     ...(sessionId === undefined ? {} : { session_id: sessionId }),
   }
