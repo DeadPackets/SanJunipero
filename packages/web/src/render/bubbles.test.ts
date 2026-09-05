@@ -17,6 +17,7 @@ import {
   bubbleInked,
   bubbleLife,
   bubbleShown,
+  BUBBLE_CAP,
   clampBubble,
   dominantColor,
   inViewSpeakers,
@@ -567,17 +568,15 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
     })
   })
 
+  type Body = { x: number; y: number; alive: boolean; insideId?: string }
+
   function harness(): {
     layer: ReturnType<typeof createBubbleLayer>
-    amara: { x: number; y: number; alive: boolean; insideId?: string }
+    amara: Body
     said: () => Container[]
   } {
     const bubbleLayer = new Container()
-    const amara: { x: number; y: number; alive: boolean; insideId?: string } = {
-      x: 4,
-      y: 4,
-      alive: true,
-    }
+    const amara: Body = { x: 4, y: 4, alive: true }
     const scene = {
       layers: { bubbles: bubbleLayer },
       textScale: 1,
@@ -609,5 +608,13 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
     h.amara.insideId = 'smithy'
     h.layer.tick(performance.now())
     expect(h.said()).toHaveLength(0)
+  })
+
+  // ★ `tick` is the ONLY reaper and it runs on the ticker, which stops with `requestAnimationFrame`
+  // in a hidden tab. The socket keeps delivering, and `onEvents` spawns inline.
+  it('★ a tab nobody is looking at does not stack speech without limit', () => {
+    const h = harness()
+    for (let i = 0; i < BUBBLE_CAP * 3; i++) h.layer.spawnSpeech('amara', `line ${String(i)}`)
+    expect(h.said()).toHaveLength(BUBBLE_CAP)
   })
 })

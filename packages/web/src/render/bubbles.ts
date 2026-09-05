@@ -176,6 +176,10 @@ export function speakerWash(rgb: number): number {
 /** How far a box floats over the head it belongs to. */
 export const BUBBLE_LIFT_PX = 18
 
+/** `tick` is the only reaper and it stops with `requestAnimationFrame`, so a hidden tab would
+ *  stack every line twelve minds say for as long as it is hidden. Twice the on-screen most. */
+export const BUBBLE_CAP = 24
+
 /** ★ Everybody the camera can see gets a word. The nearest three was a rule about a screenful
  *  of speech and it read as a town where only three people ever talk; the placer already drops
  *  what it cannot fit. One pass, no sort — this ran per frame.
@@ -460,6 +464,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       dimMs: null,
       side: 'above',
     })
+    while (bubbles.length > BUBBLE_CAP) bubbles.shift()!.node.destroy({ children: true })
   }
 
   return {
