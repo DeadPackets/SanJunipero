@@ -33,6 +33,7 @@ import {
   OWN_WORDS_SHOWN,
 } from '../prompt/assemble.js'
 import {
+  heardKey,
   heardProse,
   makeablesLine,
   roadLine,
@@ -60,6 +61,7 @@ import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
+  BODY_NOOPS,
   isBlankAnswer,
   parseTurnWithRepair,
   StrictTurnSchema,
@@ -143,21 +145,6 @@ export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 // Engine-side words: a parameter schema spelled out in braces, or a registry name. Every
 // other engine reason is the town's own sentence now and reaches the mind whole.
 const MACHINE_REASON = /\{[^}]*\}|^(?:unknown verb:|no such agent)/
-
-// Words for standing still. The body was already doing it, so the moment is a quiet beat: no
-// refusal to remember, and nothing for a god to rule on.
-const BODY_NOOPS = new Set([
-  'stand',
-  'sit',
-  'wait',
-  'rest',
-  'look',
-  'think',
-  'none',
-  'nothing',
-  'pause',
-  'stay',
-])
 
 // A word for standing still, or one of the turn's own field names read off the list it was
 // asked in: `plan` is a thing a mind writes, never a thing a body does.
@@ -301,6 +288,9 @@ export type RuntimeStats = { turns: number; dozes: number; reflections: number; 
 
 // What a mind is carrying at a tick boundary, in a shape that survives a JSON round trip. Cost
 // is absent on purpose: it is in the database and would be double-counted here.
+/** One remembered key and what it stood for, in a shape that survives a JSON round trip. */
+type Remembered = [string, { tick: number; reason: string }]
+
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
@@ -322,6 +312,16 @@ export type RuntimeSnapshot = {
   /** The scene this mind is standing in, if any. Every participant carries the whole thing, and
    *  a restore keys it by id, so one scene comes back once however many minds saved it. */
   scene?: Scene | null | undefined
+  /** What the court has already refused, and the sentences the mind already carries. Absent,
+   *  a resume buys a ruling it had already paid for and writes a memory it already holds. */
+  refused?: Remembered[] | undefined
+  held?: Remembered[] | undefined
+  /** The utterances counted toward warmth last tick, and the ones already told. Absent, every
+   *  word still inside the recent window is credited and read as news a second time. */
+  heardKeys?: string[] | undefined
+  heardTold?: string[] | undefined
+  /** When the heap on this mind's own doorstep was last named. */
+  doorstepSaidTick?: number | null | undefined
 }
 
 function freshClock(): MindClock {
@@ -372,15 +372,20 @@ export class AgentRuntime {
   #turnInFlight = false
   #wakeOwed = false
   #reframedThisTurn = false
-  // What this mind has already been refused, when, and why. Read before the god is asked again,
-  // and again before a sentence it already carries is written into the day a second time.
+  // What this mind has already been refused, when, and why. Read before the god is asked again.
   #refusedIntents = new Map<string, { tick: number; reason: string }>()
+  // The sentences the mind already carries, so one thing that happened is written down once.
+  // Its own budget: an act writes one of these every turn, and a precedent is rare and dear.
+  #heldTexts = new Map<string, { tick: number; reason: string }>()
   // How far down the world's log this mind has read its own finished acts.
   #lastActSeq = 0
   // The thought behind the act now in flight. The god is shown it; the precedent key is not.
   #lastThought = ''
   #stats = { turns: 0, dozes: 0, reflections: 0 }
   #reflectedNight: number | null = null
+  // The night this mind has actually finished writing down. `#reflectedNight` is latched before
+  // the seven calls begin, so only this one may reach a checkpoint.
+  #nightWritten: number | null = null
   #reflectionInFlight = false
   #pendingDreamMood: string | null = null
   #pendingRecall: Recalled | null = null
@@ -401,6 +406,9 @@ export class AgentRuntime {
   // Last tick's utterances. The recent window holds one for as long as it is recent, so only a
   // key that was not there a tick ago is a new word rather than the same word again.
   #heardKeys = new Set<string>()
+  // Every utterance this mind has already been told about, on the same reasoning: what the last
+  // turn read is not news on this one.
+  #heardTold = new Set<string>()
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -466,6 +474,7 @@ export class AgentRuntime {
     this.#wakeOwed = false
     this.#stats = { turns: 0, dozes: 0, reflections: 0 }
     this.#reflectedNight = null
+    this.#nightWritten = null
     this.#pendingDreamMood = null
     this.#pendingRecall = null
     this.#lastOutcome = null
@@ -473,6 +482,10 @@ export class AgentRuntime {
     this.#still = null
     this.#company = new Map()
     this.#heardKeys = new Set()
+    this.#heardTold = new Set()
+    this.#refusedIntents = new Map()
+    this.#heldTexts = new Map()
+    this.#doorstepSaidTick = null
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     // From here forward only: a mind that resumes must not remember a day it was not there for.
     this.#lastActSeq = this.#bridge.lastSeq()
@@ -501,7 +514,7 @@ export class AgentRuntime {
       },
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
-      reflectedNight: this.#reflectedNight,
+      reflectedNight: this.#nightWritten,
       wasNight: this.#wasNight,
       pendingDreamMood: this.#pendingDreamMood,
       pendingRecall: this.#pendingRecall,
@@ -510,6 +523,11 @@ export class AgentRuntime {
       still: this.#still,
       company: [...this.#company].map(([id, c]) => ({ id, ...c })),
       scene: this.#scenes?.sceneFor(this.#agentId) ?? null,
+      refused: [...this.#refusedIntents].map(([k, v]) => [k, { ...v }]),
+      held: [...this.#heldTexts].map(([k, v]) => [k, { ...v }]),
+      heardKeys: [...this.#heardKeys],
+      heardTold: [...this.#heardTold],
+      doorstepSaidTick: this.#doorstepSaidTick,
     }
   }
 
@@ -528,6 +546,7 @@ export class AgentRuntime {
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
     this.#reflectedNight = s.reflectedNight
+    this.#nightWritten = s.reflectedNight
     this.#wasNight = s.wasNight
     this.#pendingDreamMood = s.pendingDreamMood
     this.#pendingRecall = s.pendingRecall ?? null
@@ -535,6 +554,11 @@ export class AgentRuntime {
     this.#spoken = [...(s.spoken ?? [])]
     this.#still = s.still ?? null
     this.#company = new Map((s.company ?? []).map(({ id, ...c }) => [id, { ...c }]))
+    this.#refusedIntents = new Map((s.refused ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heldTexts = new Map((s.held ?? []).map(([k, v]) => [k, { ...v }]))
+    this.#heardKeys = new Set(s.heardKeys ?? [])
+    this.#heardTold = new Set(s.heardTold ?? [])
+    this.#doorstepSaidTick = s.doorstepSaidTick ?? null
     this.#scenes?.adopt(s.scene)
   }
 
@@ -721,7 +745,7 @@ export class AgentRuntime {
     for (const a of packet.visible.agents) if (a.id !== this.#agentId) met(a.id, a.name)
     const keys = new Set<string>()
     for (const h of packet.heard) {
-      const key = `${h.speakerId}\u0000${h.text}`
+      const key = heardKey(h)
       keys.add(key)
       const them = met(h.speakerId, h.name)
       // The window holds one utterance for as long as it is recent, so only a key that was not
@@ -898,27 +922,28 @@ export class AgentRuntime {
   }
 
   #rememberRefusal(description: string, reason: string): void {
-    this.#remember(sameIntent(description), reason)
+    this.#remember(this.#refusedIntents, sameIntent(description), reason)
   }
 
-  #remember(key: string, reason: string): void {
-    this.#refusedIntents.delete(key)
-    this.#refusedIntents.set(key, { tick: this.#bridge.currentTick(), reason })
+  #remember(
+    into: Map<string, { tick: number; reason: string }>,
+    key: string,
+    reason: string,
+  ): void {
+    into.delete(key)
+    into.set(key, { tick: this.#bridge.currentTick(), reason })
     // Insertion-ordered, so the first key is the oldest.
-    while (this.#refusedIntents.size > REFUSAL_MEMORY_SIZE) {
-      this.#refusedIntents.delete(this.#refusedIntents.keys().next().value!)
-    }
+    while (into.size > REFUSAL_MEMORY_SIZE) into.delete(into.keys().next().value!)
   }
 
   /** Whether this mind already carries this sentence from inside the refusal window. kamal
-   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval.
-   *  The NUL keeps these keys apart from the intents the arbiter's precedent is looked up by. */
+   *  stored 87 action memories with 9 texts between them, and every copy competed in retrieval. */
   #alreadyHeld(text: string): boolean {
-    const key = `\u0000${sameIntent(text)}`
-    const held = this.#refusedIntents.get(key)
+    const key = sameIntent(text)
+    const held = this.#heldTexts.get(key)
     if (held !== undefined && this.#bridge.currentTick() - held.tick < REFUSAL_MEMORY_TICKS)
       return true
-    this.#remember(key, text)
+    this.#remember(this.#heldTexts, key, text)
     return false
   }
 
@@ -939,6 +964,9 @@ export class AgentRuntime {
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     this.#noteAccepted(head, res)
+    // A head answered after the turn replaced the plan speaks for a queue that is gone: reading
+    // it would wipe the plan the mind just paid for.
+    if (this.#plan.queue[0] !== head) return
     if (res.ok) return
     // A word for standing still is a step spent, not a plan refused: the body was already doing
     // it, so the queue carries on from the next step instead of dying at this one.
@@ -971,6 +999,10 @@ export class AgentRuntime {
   #handleNight(tick: number, packet: PerceptionPacket): void {
     const isNight = packet.time.isNight
     if (this.#wasNight && !isNight) {
+      // A mind that never lay down still lived the day. The night is over either way, and a day
+      // nobody wrote down is a day the mind never gets back.
+      const owed = nightOf(tick - 1)
+      if (owed >= 0 && this.#reflectedNight !== owed) void this.#runNight(owed)
       if (this.#pendingDreamMood !== null) {
         const cur = this.#personality.current().doc.current
         this.#personality.updateCurrent({ ...cur, mood: this.#pendingDreamMood })
@@ -1035,7 +1067,9 @@ export class AgentRuntime {
     )
     // The prompt keeps another mouth's bytes out of the narrator's block; this mind's own
     // memory still holds the whole moment.
-    const heard = heardProse(packet)
+    const heard = heardProse(packet, this.#heardTold)
+    // Rebuilt from the window, so a key that has aged out of it is gone from here too.
+    this.#heardTold = new Set(packet.heard.map(heardKey))
     const moment = heard.length > 0 ? `${prose} ${heard}` : prose
     this.#prevMomentSentences = appendMoment(this.#dayLog, this.#prevMomentSentences, moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these
@@ -1167,6 +1201,9 @@ export class AgentRuntime {
     // refusal the mind has now been told about is not told twice.
     this.#pendingRecall = null
     this.#lastOutcome = null
+    // The body died while the provider was thinking. The call is paid for and booked; a corpse
+    // still acts on nothing, thinks out loud to nobody and writes in no book.
+    if (!this.#started) return
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
@@ -1346,7 +1383,10 @@ export class AgentRuntime {
     if (this.#reflectedNight === day) return
     this.#reflectedNight = day
     await this.#letGoOfStaleTies()
-    if (this.#reflectionLlm === null) return
+    if (this.#reflectionLlm === null) {
+      this.#nightWritten = day
+      return
+    }
     this.#stats.reflections += 1
     this.#reflectionInFlight = true
     const ties = this.#ties
@@ -1366,6 +1406,7 @@ export class AgentRuntime {
     } catch (err) {
       this.#llm.alert('reflection_failed', messageOf(err))
     }
+    this.#nightWritten = day
     try {
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({
@@ -1414,8 +1455,6 @@ export class AgentRuntime {
     return out
   }
 
-  // A sentence the mind is already carrying is not written again: nine texts in eighty-seven
-  // rows is eight-odd copies competing in retrieval for one thing that happened.
   /** Bookkeeping around a turn the town has already been billed for. A method the client never
    *  grew is a type error now, so what is left here is a database too busy to write. */
   #book(write: () => void): void {

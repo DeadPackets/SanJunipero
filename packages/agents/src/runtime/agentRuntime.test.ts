@@ -364,6 +364,15 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   }
 }
 
+/** The same reflection, held at its first call so a checkpoint can be taken mid-night. */
+class GatedReflectionLlm extends ScriptedReflectionLlm {
+  gate: Promise<void> = Promise.resolve()
+  override async extractFacts(dayMemories: MemoryRow[]) {
+    await this.gate
+    return super.extractFacts(dayMemories)
+  }
+}
+
 class ScriptedDreamLlm implements DreamLlm {
   calls = 0
   mood = 'peaceful'
@@ -432,7 +441,7 @@ async function setup(opts: {
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
-  return { world, loop, bridge, runtime, llm, mem, personality, agentDb }
+  return { world, loop, bridge, runtime, llm, mem, personality, agentDb, embedder }
 }
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
@@ -639,6 +648,67 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(startedVerbs(world.engineDb)).toEqual([])
     expect(completedVerbs(world.engineDb)).toEqual([])
     expect(memoriesOfKind(agentDb, 'action')).toHaveLength(1)
+  })
+
+  // The bridge settles a submit at the START of the next tick, before any tick callback runs, so
+  // a turn resolving in the 2 s between the two lands its new plan first and the old head's
+  // answer arrives after it.
+  it('drops a plan-head answer that belongs to a plan the turn already replaced', async () => {
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve
+    })
+    let calls = 0
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        calls += 1
+        const answer =
+          calls === 1
+            ? {
+                thought: 'Walk out there, then make the thing.',
+                plan: [
+                  { verb: 'walk', params: { x: 20, y: 20 } },
+                  { verb: 'frobnicate', params: {} },
+                ],
+                reconsider_at: '00:03',
+                importance: 3,
+              }
+            : {
+                thought: 'No — the bread first.',
+                plan: [{ verb: 'walk', params: { x: 5, y: 6 } }],
+                importance: 3,
+              }
+        if (calls === 2) await gate
+        // Nothing after the two: a third turn would install the plan again and hide the wipe.
+        if (calls > 2) await new Promise(() => {})
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(askedShape(answer)) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: ZERO_USAGE,
+          warnings: [],
+        }
+      },
+    })
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, boredomTicks: 10_000 },
+      simConfig: SLOW_BODY,
+    })
+    // The stale head goes out while the replacing turn is still in flight: opening the gate here
+    // is the interleaving, not a delay bolted onto the test.
+    const real = bridge.submit.bind(bridge)
+    bridge.submit = (agentId, intent, onResult) => {
+      if (intent.verb === 'frobnicate') openGate()
+      return real(agentId, intent, onResult)
+    }
+    await stepUntil(loop, () => calls >= 2 && runtime.snapshot().plan.queue.length === 1, 400)
+    for (let i = 0; i < 30; i++) await flush()
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
+
+    loop.step()
+    await flush()
+    expect(runtime.snapshot().plan.lastResult).toBe('running')
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
   })
 
   // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
@@ -960,6 +1030,47 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(runtime.stats().reflections).toBe(0)
     expect(mem.summaryNodes('day', 0)).toHaveLength(0)
     expect(personality.current().version).toBe(1)
+  })
+
+  // A mind that talked past dawn or worked a plan all night never lay down, so the sleep gate
+  // never caught it and the day went unwritten for good.
+  it('writes the night down at dawn for a mind that never lay down', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= DAY_1_DAWN_TICK, 3000)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 100)
+    expect(runtime.stats().reflections).toBe(1)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+  })
+
+  // Seven calls under a slow back end is minutes. A checkpoint written inside them used to say
+  // the night was done, and the resume never wrote that day at all.
+  it('does not call the night written in a checkpoint taken while it is still running', async () => {
+    let release!: () => void
+    const reflection = new GatedReflectionLlm()
+    reflection.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { loop, runtime, mem, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
+    expect(runtime.snapshot().reflectedNight, 'nothing is written yet').toBeNull()
+
+    release()
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 200)
+    expect(runtime.snapshot().reflectedNight).toBe(0)
   })
 
   it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
@@ -1681,6 +1792,153 @@ describe('arbiter seam (T19)', () => {
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 400)
 
     expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
+  })
+
+  // The recent window holds an utterance for 66 ticks, so a mind taking a turn every few ticks
+  // was told the same greeting as news three times and wrote it into the day three times.
+  it('tells a mind a word it heard once, not on every turn the word is still in the window', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    bridge.announce('agent_spawned', { id: 'omar', name: 'Omar', x: 3, y: 4, ageDays: 30 })
+    bridge.announce('agent_spoke', { agentId: 'omar', text: 'Rain soon.', x: 3, y: 4 })
+    // The heard block rides its own message, so this is the "happening now" reading of the line
+    // and not the day log's record of the moment it landed in.
+    const hears = (p: CapturedMessage[]): boolean =>
+      p.some((m) => m.text.startsWith('You hear Omar say: "Rain soon."'))
+    await stepUntil(loop, () => prompts.some(hears), 60)
+    const first = prompts.findIndex(hears)
+    expect(first, 'the mind was told at all').toBeGreaterThanOrEqual(0)
+
+    await stepUntil(loop, () => prompts.length >= first + 4, 60)
+    expect(prompts.slice(first + 1).filter(hears)).toEqual([])
+    expect(runtime.dayLogSnapshot().filter((l) => l.includes('Rain soon.'))).toHaveLength(1)
+  })
+
+  // The provider was still thinking when the body died. The answer is paid for, but a corpse
+  // cannot act, cannot think out loud to the viewer, and cannot write in its own book.
+  it('a turn that lands after its mind died writes nothing and publishes nothing', async () => {
+    const thoughts: { text: string }[] = []
+    const gate = gatedModel()
+    const { world, loop, bridge, agentDb } = await setup({
+      model: gate.model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      onThought: (t) => {
+        thoughts.push(t)
+      },
+    })
+    await stepUntil(loop, () => gate.calls.count >= 1, 50)
+    const thoughtsBefore = memoriesOfKind(agentDb, 'thought').length
+
+    bridge.announce('hp_changed', { agentId: AGENT, delta: -1000 })
+    await stepUntil(loop, () => loop.state.agents[AGENT]?.alive === false, 20)
+    gate.resolve(
+      JSON.stringify(
+        askedShape({
+          thought: 'One more step to the water.',
+          action: { verb: 'walk', params: { x: 9, y: 9 } },
+          importance: 2,
+        }),
+      ),
+    )
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(thoughts, 'nothing of a corpse reaches the viewer').toEqual([])
+    expect(memoriesOfKind(agentDb, 'thought')).toHaveLength(thoughtsBefore)
+    expect(startedVerbs(world.engineDb)).toEqual([])
+  })
+
+  // A restart used to leave the map empty, so the same idea inside the window bought the ruling
+  // a second time — the one thing the precedent exists to stop.
+  it('carries what the court has already ruled across a restart', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: 'the reeds will not hold that shape',
+        class: 'physically_impossible',
+      }
+    }
+    const tries = {
+      thought: 'I will try it.',
+      action: { freeform: 'weave reeds into a mat' },
+      importance: 3,
+    }
+    const shared = await setup({
+      model: turnModel([tries], tries),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(shared.loop, () => seen.length >= 1, 200)
+    const snap = shared.runtime.snapshot()
+    expect(snap.refused).toHaveLength(1)
+    shared.runtime.stop()
+
+    const resumed = new AgentRuntime({
+      db: shared.agentDb,
+      llm: shared.llm,
+      embedder: shared.embedder,
+      identity: tamarIdentity,
+      personality: shared.personality,
+      bridge: shared.bridge,
+      config: FAST_MIND,
+      adjudicator,
+    })
+    resumed.start(AGENT)
+    resumed.restore(snap)
+    await stepUntil(shared.loop, () => seen.length >= 2, 200)
+    expect(seen, 'the mind answered itself off the precedent it came back with').toHaveLength(1)
+  })
+
+  // One map held both the court's precedents and the sentences the mind already carries, on one
+  // sixteen-slot budget: nine ideas spend eighteen slots and the first precedent is gone.
+  it('keeps a precedent through the sentences the same acts write down', async () => {
+    const seen: string[] = []
+    const adjudicator: Adjudicator = async (intent) => {
+      seen.push(intent)
+      return {
+        kind: 'impossible',
+        reason: `${intent} will not hold that shape`,
+        class: 'physically_impossible',
+      }
+    }
+    const ideas = [
+      'weave reeds into a mat',
+      'bank the fire with river clay',
+      'split the elm with a wedge',
+      'salt the fish for winter',
+      'dam the brook below the ford',
+      'sink a post at the corner',
+      'boil the bones for glue',
+      'peg the roof against the wind',
+      'card the wool by the hearth',
+    ]
+    const { loop, agentDb } = await setup({
+      model: turnModel(
+        [...ideas, ideas[0]!].map((freeform) => ({
+          thought: 'I will try it.',
+          action: { freeform },
+          importance: 3,
+        })),
+      ),
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+      adjudicator,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= ideas.length, 400)
+    for (let i = 0; i < 20; i++) {
+      loop.step()
+      await flush()
+    }
+    expect(seen).toEqual(ideas)
   })
 
   // ★ Run D spent 3 of its 9 rulings on `stand`, `think` and `none player`, ~11 ticks of

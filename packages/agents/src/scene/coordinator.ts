@@ -58,9 +58,12 @@ export class SceneCoordinator {
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
-  /** The ask now in flight, per scene: who was asked and when, in wall-clock ms. A late answer
-   *  to a stale token is dropped — the floor has already moved on. */
-  readonly #asked = new Map<string, { agentId: string; atMs: number; token: number }>()
+  /** The ask now in flight, per scene, as the token it was made under. A late answer to a stale
+   *  token is dropped — the floor has already moved on. */
+  readonly #asked = new Map<string, number>()
+  /** When the floor was last handed over, in wall-clock ms. Measured from the hand-off and not
+   *  from the ask, because a mouth that never asks is exactly what a stalled talk is made of. */
+  readonly #floorSince = new Map<string, { agentId: string; atMs: number }>()
   #token = 0
   #lastTick = -1
 
@@ -99,12 +102,18 @@ export class SceneCoordinator {
     })
   }
 
-  /** A word said by a mind in no scene. Inside an open scene's earshot it is a line of THAT
-   *  scene and the mouth joins it; otherwise, if anyone who could answer heard it, it opens one
-   *  between the speaker and the mind they spoke to, and everybody else stands and listens. */
+  /** A word the world took. Said inside the mouth's own talk — an ordinary turn that resolved
+   *  after the scene opened around it — it is a line of that talk. Inside another open scene's
+   *  earshot it is a line of THAT scene and the mouth joins it; otherwise, if anyone who could
+   *  answer heard it, it opens one between the speaker and the mind they spoke to, and everybody
+   *  else stands and listens. */
   noteSpoken(agentId: string, text: string, tick: number): Scene | null {
-    if (this.sceneFor(agentId) !== null) return null
     const said = sanitizeSpokenText(text)
+    const mine = this.sceneFor(agentId)
+    if (mine !== null) {
+      this.#recordLine(mine, agentId, said, '', 'none', null, tick)
+      return mine
+    }
     const joined = this.#joinNearby(agentId, said, tick)
     if (joined !== null) return joined
     const heard = this.#bridge
@@ -170,7 +179,7 @@ export class SceneCoordinator {
       scene.anchor = scene.participants[0] ?? scene.anchor
     }
     if (scene.floor === agentId) {
-      scene.floor = scene.participants.length === 0 ? null : scene.anchor
+      this.#floorTo(scene, scene.participants.length === 0 ? null : scene.anchor)
     }
   }
 
@@ -182,7 +191,7 @@ export class SceneCoordinator {
     const mind = this.#mindFor(agentId)
     if (mind === null) return
     const token = ++this.#token
-    this.#asked.set(scene.id, { agentId, atMs: this.#now(), token })
+    this.#asked.set(scene.id, token)
     let turn: SceneTurn
     try {
       turn = await mind.llm.line({
@@ -202,7 +211,7 @@ export class SceneCoordinator {
       return
     }
     // The floor moved while the provider was thinking: a timeout already counted this as a pass.
-    if (this.#asked.get(scene.id)?.token !== token) return
+    if (this.#asked.get(scene.id) !== token) return
     this.#asked.delete(scene.id)
     // Or the mouth left the talk while the provider was thinking: went to bed, or walked out of
     // earshot. Saying the line now would wake a sleeper with its own words.
@@ -247,11 +256,15 @@ export class SceneCoordinator {
         void this.#close(scene, 'left', tick).catch(this.#sink)
         continue
       }
-      const ask = this.#asked.get(scene.id)
-      if (ask !== undefined && this.#now() - ask.atMs >= FLOOR_TIMEOUT_MS) {
-        this.#asked.delete(scene.id)
-        void this.#timedOut(scene, tick).catch(this.#sink)
+      if (scene.floor === null) continue
+      const held = this.#floorSince.get(scene.id)
+      if (held === undefined || held.agentId !== scene.floor) {
+        this.#floorSince.set(scene.id, { agentId: scene.floor, atMs: this.#now() })
+        continue
       }
+      if (this.#now() - held.atMs < FLOOR_TIMEOUT_MS) continue
+      this.#asked.delete(scene.id)
+      void this.#timedOut(scene, tick).catch(this.#sink)
     }
   }
 
@@ -268,7 +281,7 @@ export class SceneCoordinator {
       return
     }
     scene.passes += 1
-    scene.floor = this.#floorAfter(scene, quiet, '', null)
+    this.#floorTo(scene, this.#floorAfter(scene, quiet, '', null))
   }
 
   /** A provider that never came back. The floor moves on and nobody is asked twice for the same
@@ -279,7 +292,15 @@ export class SceneCoordinator {
       await this.#close(scene, 'timeout', tick)
       return
     }
-    scene.floor = this.#floorAfter(scene, scene.floor ?? scene.anchor, '', null)
+    this.#floorTo(scene, this.#floorAfter(scene, scene.floor ?? scene.anchor, '', null))
+  }
+
+  /** Every hand-off of the floor: the stall clock starts here, not where the mouth gets round
+   *  to asking. */
+  #floorTo(scene: Scene, next: string | null): void {
+    scene.floor = next
+    if (next === null) this.#floorSince.delete(scene.id)
+    else this.#floorSince.set(scene.id, { agentId: next, atMs: this.#now() })
   }
 
   #recordLine(
@@ -301,7 +322,7 @@ export class SceneCoordinator {
     }
     const next = this.#floorAfter(scene, agentId, text, to)
     if (next !== null) this.#admit(scene, next, tick)
-    scene.floor = next
+    this.#floorTo(scene, next)
     this.#bridge.announce('scene_line', { id: scene.id, agentId, text, move })
   }
 
@@ -359,6 +380,7 @@ export class SceneCoordinator {
     scene.closeReason = reason
     scene.floor = null
     this.#asked.delete(scene.id)
+    this.#floorSince.delete(scene.id)
     this.#scenes.delete(scene.id)
     // Everyone who was ever in it gets the memory, not only whoever was left at the end.
     const cast = [...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)])].sort()

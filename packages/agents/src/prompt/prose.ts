@@ -787,10 +787,25 @@ function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
 
 // Renders mechanics as fiction. Every clause here states a fact and names no act — no remedy,
 // no counsel, no comparison; the inference is the mind's.
-/** Every utterance in earshot, one per line. Kept out of the perception prose: a delimiter a
- *  speaker cannot write stops a forged attribution, and only separation stops a forged voice. */
-export function heardProse(packet: PerceptionPacket): string {
-  return packet.heard.map((h) => heardLine(h.name, h.text)).join('\n')
+/** One utterance, as the thing that was said rather than the moment it is read in. The recent
+ *  window holds it for as long as it is recent, so the same key twice is one word, not two. */
+export const heardKey = (h: { speakerId: string; text: string }): string =>
+  `${h.speakerId}\u0000${h.text}`
+
+const NOTHING_TOLD: ReadonlySet<string> = new Set()
+
+/** Every utterance in earshot this ear has not been told yet, one per line. Kept out of the
+ *  perception prose: a delimiter a speaker cannot write stops a forged attribution, and only
+ *  separation stops a forged voice. Once a thing is said it stays said, so a line already told
+ *  is not told again as though it were happening now. */
+export function heardProse(
+  packet: PerceptionPacket,
+  told: ReadonlySet<string> = NOTHING_TOLD,
+): string {
+  return packet.heard
+    .filter((h) => !told.has(heardKey(h)))
+    .map((h) => heardLine(h.name, h.text))
+    .join('\n')
 }
 
 // Long enough to name the walls a mind keeps aiming at, short enough that a crowded square

@@ -126,6 +126,21 @@ export const FALLBACK_TURN: Turn = {
 // only ever hands those over with nothing in them.
 const ACTS_ASKING_NOTHING = new Set(['sleep', 'wake', 'stop', 'exit', 'doff', 'drink', 'forage'])
 
+/** Words for standing still. The registry has none of them and the runtime reads every one as a
+ *  quiet beat, so asking a mind again to fill one in buys a call for an act with nowhere to go. */
+export const BODY_NOOPS: ReadonlySet<string> = new Set([
+  'stand',
+  'sit',
+  'wait',
+  'rest',
+  'look',
+  'think',
+  'none',
+  'nothing',
+  'pause',
+  'stay',
+])
+
 // A try at something new carries no verb of its own, so neither reader below can speak for it.
 const namedAct = (turn: Turn): z.infer<typeof IntentSchema> | null => {
   const action = turn.action
@@ -153,6 +168,7 @@ export function actWithoutItsDetail(turn: Turn): string | null {
   const action = namedAct(turn)
   if (action === null) return null
   if (ACTS_ASKING_NOTHING.has(action.verb) || TURN_FIELDS.has(action.verb)) return null
+  if (BODY_NOOPS.has(action.verb)) return null
   if (action.verb.includes(':')) return null
   return Object.values(action.params).every(isBlankAnswer) ? action.verb : null
 }

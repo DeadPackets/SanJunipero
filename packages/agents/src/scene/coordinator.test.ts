@@ -211,8 +211,8 @@ describe('a scene opens on a word somebody heard', () => {
 
   it('does not open a second scene for a mind already in one', () => {
     const h = harness({})
-    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
-    expect(h.coordinator.noteSpoken(NADIA, 'Still waiting.', NOON + 1)).toBeNull()
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(h.coordinator.noteSpoken(NADIA, 'Still waiting.', NOON + 1)?.id).toBe(scene?.id)
     expect(h.coordinator.open()).toHaveLength(1)
   })
 
@@ -435,6 +435,36 @@ describe('every way a scene ends', () => {
       .sort((a, b) => a.scene.thread.length - b.scene.thread.length)
     expect(asks.find((a) => a.scene.thread.length === 8)?.wrapUp, 'the ninth line').toBe(false)
     expect(asks.find((a) => a.scene.thread.length === 9)?.wrapUp, 'the tenth line').toBe(true)
+  })
+
+  // An ordinary turn whose provider was still thinking when the scene opened around it comes
+  // back with a word, and the world takes it. Only the thread makes it a line anybody reads.
+  it('takes a word from a mouth already in a talk as a line of that talk', () => {
+    const h = harness({})
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    const again = h.coordinator.noteSpoken(NADIA, 'And a bench for the door.', NOON + 1)
+
+    expect(again?.id, 'the same talk, not a second one').toBe(scene.id)
+    expect(scene.thread.map((l) => l.text)).toEqual([
+      'Omar. Six planks.',
+      'And a bench for the door.',
+    ])
+  })
+
+  // The floor-holder's runtime may be dozing off a failed provider: it never calls `takeFloor`,
+  // so nothing was ever asked and the talk used to stand still for the whole doze.
+  it('moves the floor off a mouth that never asks at all', () => {
+    let clock = 0
+    const h = harness({ now: () => clock })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    expect(h.coordinator.open()[0]?.floor).toBe(OMAR)
+
+    clock += FLOOR_TIMEOUT_MS
+    h.coordinator.onTick(NOON + 1)
+    const scene = h.coordinator.open()[0]
+    expect(scene?.timeouts).toBe(1)
+    expect(scene?.floor, 'the floor went back to the anchor').toBe(NADIA)
+    expect(h.calls.get(OMAR) ?? 0, 'and nobody was billed for the silence').toBe(0)
   })
 
   it('a stall is not a pass, and two of them close it as a timeout', async () => {

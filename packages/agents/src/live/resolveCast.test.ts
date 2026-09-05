@@ -42,6 +42,9 @@ function log() {
     ) => {
       store.append(tick, 'agent_born', { id, name, sex, motherId, fatherId, x: 3, y: 3 })
     },
+    die: (id: string, tick = 0) => {
+      store.append(tick, 'agent_died', { agentId: id, cause: 'starvation' })
+    },
     noise: (n: number) => {
       for (let i = 0; i < n; i += 1) store.append(0, 'agent_moved', { id: MOTHER, x: i, y: 0 })
     },
@@ -95,6 +98,21 @@ describe('resolveCast — the town at boot is the founders plus everyone born si
     const l = log()
     l.bear('agent_9', 'Nobody', 'stranger', FATHER)
     expect(resolveCast(FOUNDERS, l.store, 10).map((m) => m.id)).toEqual([MOTHER, FATHER])
+  })
+
+  // The live path admits a birth while `alive() + booting < maxMinds`, so a town that has buried
+  // somebody has a slot. A resume that counted the dead lost that child's mind for good.
+  it('counts the living at the ceiling, the way the live birth does', () => {
+    const l = log()
+    l.bear('agent_3', 'Mira', MOTHER, FATHER)
+    l.die(MOTHER)
+    l.bear('agent_4', 'Idris', MOTHER, FATHER, 'm')
+    expect(resolveCast(FOUNDERS, l.store, 3).map((m) => m.id)).toEqual([
+      MOTHER,
+      FATHER,
+      'agent_3',
+      'agent_4',
+    ])
   })
 
   it('stops at the population ceiling — the log may hold more than the town will boot', () => {

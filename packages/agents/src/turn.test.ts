@@ -10,6 +10,7 @@ import {
   TurnSchema,
   TurnSchemaActionRequired,
   actWithoutItsDetail,
+  BODY_NOOPS,
   fromClosed,
   parseTurnWithRepair,
   readMindTurn,
@@ -430,6 +431,20 @@ describe('an act with nothing named in it', () => {
     expect(actWithoutItsDetail(turn({ verb: 'walk', params: { x: 0, y: 0 } }))).toBeNull()
     expect(actWithoutItsDetail(turn({ freeform: 'I lean on the fence and watch' }))).toBeNull()
     expect(actWithoutItsDetail(TurnSchema.parse({ ...validTurn, action: null }))).toBeNull()
+  })
+
+  // Run D's own evidence: the runtime keeps a set of ten words for standing still, so minds do
+  // answer with them. Each one used to buy a full-prompt repair before the world shrugged it off.
+  it('is not raised for a word for standing still, which buys no second call', async () => {
+    for (const verb of BODY_NOOPS) {
+      expect(actWithoutItsDetail(turn({ verb, params: {} })), verb).toBeNull()
+      const answer = await parseTurnWithRepair(
+        { ...validTurn, plan: null, action: { verb, params: {} } },
+        () => Promise.reject(new Error(`${verb} asked for a repair`)),
+        () => {},
+      )
+      expect(answer.thought, verb).toBe(validTurn.thought)
+    }
   })
 
   it('cannot arrive as a blank string at all: the decoder is given the floor', () => {
