@@ -326,6 +326,7 @@ describe('the pool is priced by the world the store describes, not by the defaul
       getConfig: () => config,
       assetRecords: () => [],
       assetsSeq: () => 0,
+      onEvents: () => () => {},
     } as unknown as WorldStore
     createLightPools(scene, store).tick(16)
     return children[0]!.children[0]!
@@ -411,6 +412,7 @@ describe('★ art that lands after the first frame', () => {
       getConfig: () => DEFAULT_CONFIG,
       assetRecords: () => records,
       assetsSeq: () => records.length,
+      onEvents: () => () => {},
     } as unknown as WorldStore
 
     const pools = createLightPools(scene, store)

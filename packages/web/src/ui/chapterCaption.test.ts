@@ -62,12 +62,21 @@ describe('★ the caption is the narrator’s own voice, at zero calls', () => {
   })
 })
 
-// ★ Five kinds of moment a replay is most often OF said nothing at all while it played.
-describe('★ the cue speaks for a death, a birth, a build, a night kept and an arrival', () => {
-  it('★ prints all five, and every one off a chronicle line the town already had', () => {
-    for (const t of ['agent_died', 'agent_born', 'structure_completed', 'co_slept'])
+// ★ The kinds of moment a replay is most often OF said nothing at all while it played.
+describe('★ the cue speaks for a death, a birth, a build, a partnership and an arrival', () => {
+  it('★ prints them all, and every one off a chronicle line the town already had', () => {
+    for (const t of [
+      'agent_died',
+      'agent_born',
+      'structure_completed',
+      'partnership_formed',
+      'partnership_dissolved',
+      'invitation_accepted',
+      'invitation_refused',
+    ])
       expect(CUE_TYPES, t).toContain(t)
     expect(CUE_TYPES).toContain('agent_spawned')
+    expect(CUE_TYPES, 'a shared roof decides nothing').not.toContain('co_slept')
   })
 
   const ev = (type: string, payload: unknown) => ({ seq: 1, tick: 5, type, payload })
@@ -100,6 +109,6 @@ describe('★ the cue speaks for a death, a birth, a build, a night kept and an 
     // a finished building's `id` is the BUILDING, and no pixel may rise off it
     expect(bodiesOf(ev('structure_completed', { id: 's1' }))).toEqual([])
     expect(bodiesOf(ev('agent_died', { agentId: 'a1', byId: 'a2' }))).toEqual(['a1', 'a2'])
-    expect(bodiesOf(ev('co_slept', { aId: 'a1', bId: 'a1' }))).toEqual(['a1'])
+    expect(bodiesOf(ev('partnership_formed', { aId: 'a1', bId: 'a1' }))).toEqual(['a1'])
   })
 })
