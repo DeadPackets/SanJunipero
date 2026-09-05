@@ -45,3 +45,4 @@ export {
   type NarratorLlmClient,
 } from './llm/narratorLlm.js'
 export type * from './types.js'
+export { BiographySchema, NewspaperCopySchema } from './llm/narratorLlm.js'

@@ -11,7 +11,7 @@ import {
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type Database from 'better-sqlite3'
 import { z } from 'zod'
-import { assertNoGlassLeak } from '@sj/shared'
+import { assertNoGlassLeak, strictSchemaFaults } from '@sj/shared'
 import {
   insertAlert,
   insertLlmCall,
@@ -118,6 +118,8 @@ const EMPTY_USAGE: LanguageModelUsage = {
   inputTokenDetails: { noCacheTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
+
+const strictChecked = new Set<string>()
 
 /** What one caller sends OpenRouter over and above the prompt: which models may answer, which
  *  back ends may serve, and which mind is asking. */
@@ -366,6 +368,13 @@ export class LlmClient {
     schema: z.ZodType<T>,
     bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
+    // OpenAI's decoder refuses a shape rather than bending it; say which, once, before the bill.
+    if (this.modelId.startsWith('openai/') && !strictChecked.has(this.caller)) {
+      strictChecked.add(this.caller)
+      const faults = strictSchemaFaults(schema)
+      if (faults.length > 0)
+        this.alert('schema_not_strict', `${this.caller}: ${faults.slice(0, 3).join('; ')}`)
+    }
     return this.invoke(async (model, note) => {
       if (this.transport === 'tool') {
         const r = await generateText({

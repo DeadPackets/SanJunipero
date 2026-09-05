@@ -57,7 +57,7 @@ export function dreamFragmentsMessage(fragments: MemoryRow[]): string {
   return ['What comes back to you:', ...fragments.map((f) => f.text)].join('\n')
 }
 
-const DREAM_SCHEMA = z.object({ text: z.string().min(1), mood: z.string().min(1) }).strict()
+export const DREAM_SCHEMA = z.object({ text: z.string().min(1), mood: z.string().min(1) }).strict()
 
 export function makeDreamLlm(client: LlmClient): DreamLlm {
   return {

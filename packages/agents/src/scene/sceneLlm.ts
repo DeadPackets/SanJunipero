@@ -317,7 +317,7 @@ Then the ties. A tie is one thing one person now holds about another: a promise,
 
 Name nobody who was not in the conversation.`
 
-const CloseAnswerSchema = z
+export const CloseAnswerSchema = z
   .object({
     summary: z.string(),
     ties: z.array(
