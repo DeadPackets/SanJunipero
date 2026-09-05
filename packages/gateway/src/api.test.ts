@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ADULT_AGE_DAYS, BondsResponseSchema, DEFAULT_CONFIG, bondId } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  BondsResponseSchema,
+  DEFAULT_CONFIG,
+  LawsResponseSchema,
+  bondId,
+} from '@sj/shared'
+import { LAW_FIXTURE } from '@sj/shared/testutil'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
@@ -420,5 +427,174 @@ describe('★ the five acts of a relationship reach the read path', () => {
     expect(b?.acts).toEqual([{ kind: 'partner', count: 1, firstTick: 8, lastTick: 8 }])
     expect(b?.kind, 'they parted at tick 9').not.toBe('partner')
     expect(b?.warmth).toBeLessThan(0)
+  })
+})
+
+/** The Laws page's whole supply. The rows are joined off the FOLDED state and a breach count the
+ *  read path keeps, so what the page says survives a restart as long as the log does. */
+describe('★ /api/laws serves the rules the town wrote, and how often they were broken', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwlaws-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('laws-test'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['omar', 'Omar'],
+            ['salma', 'Salma'],
+            ['yusuf', 'Yusuf'],
+            ['amara', 'Amara'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        // One council a tick, in fixture order: the page's "newest first" is the reverse of this.
+        for (const [i, f] of LAW_FIXTURE.entries()) {
+          if (tick !== 10 + i) continue
+          emit('law_proposed', { lawId: f.id, agentId: f.proposedBy, text: f.text })
+          emit('law_ratified', {
+            lawId: f.id,
+            agentId: f.proposedBy,
+            text: f.text,
+            why: f.why,
+            predicate: f.predicate,
+            votes: f.votes,
+          })
+        }
+        if (tick === 20)
+          emit('law_broken', {
+            lawId: 'law_slate',
+            agentId: 'yusuf',
+            verb: 'take',
+            witnesses: ['nadia'],
+          })
+        if (tick === 21)
+          emit('law_broken', { lawId: 'law_slate', agentId: 'omar', verb: 'take', witnesses: [] })
+        if (tick === 22)
+          emit('law_repealed', {
+            lawId: 'law_fire_tax',
+            agentId: 'salma',
+            text: LAW_FIXTURE[1]!.text,
+          })
+      },
+    })
+    for (let i = 0; i < 25; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads newest first, in the town’s own words, with the proposer named', async () => {
+    const body = LawsResponseSchema.parse(await (await fetch(`${base}/api/laws`)).json())
+    expect(body.laws.map((l) => l.id)).toEqual(['law_well_order', 'law_fire_tax', 'law_slate'])
+    expect(body.laws.map((l) => l.proposerName)).toEqual(['Amara', 'Salma', 'Nadia'])
+    expect(body.laws.find((l) => l.id === 'law_slate')).toEqual({
+      id: 'law_slate',
+      text: LAW_FIXTURE[0]!.text,
+      proposedBy: 'nadia',
+      proposerName: 'Nadia',
+      ratifiedTick: 10,
+      repealedTick: null,
+      votes: { for: ['nadia', 'omar'], against: [] },
+      why: LAW_FIXTURE[0]!.why,
+      enforced: true,
+      breaches: 2,
+    })
+  })
+
+  it('keeps a rule the town let go of, and holds nothing against the unbroken', async () => {
+    const body = LawsResponseSchema.parse(await (await fetch(`${base}/api/laws`)).json())
+    const gone = body.laws.find((l) => l.id === 'law_fire_tax')!
+    expect(gone.repealedTick).toBe(22)
+    expect(gone.breaches).toBe(0)
+    expect(body.laws.find((l) => l.id === 'law_well_order')!.breaches).toBe(0)
+  })
+
+  // Which verb the court compiled a sentence to is ops-plane, and `enforced` is the whole of
+  // what a viewer is owed about it.
+  it('says whether the world holds anybody to it, and never how', async () => {
+    const raw = await (await fetch(`${base}/api/laws`)).text()
+    for (const word of ['predicate', 'require_before', 'ordinal', 'itemKind'])
+      expect(raw, word).not.toContain(word)
+  })
+})
+
+/** A viewer opening the page twice in one tick must not re-scan the world, and a viewer opening
+ *  it after a council must not be served the answer from before it. */
+describe('★ the laws body is built once a generation and dropped when the world moves', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwlawseq-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('serves the same string twice, and a new one once a law lands', () => {
+    const db = openDb(join(dir, 'world.db'))
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('laws-seq'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', { id: 'nadia', name: 'Nadia', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        if (tick === 3)
+          emit('law_ratified', {
+            lawId: 'law_slate',
+            agentId: 'nadia',
+            text: LAW_FIXTURE[0]!.text,
+            why: LAW_FIXTURE[0]!.why,
+            predicate: LAW_FIXTURE[0]!.predicate,
+            votes: LAW_FIXTURE[0]!.votes,
+          })
+      },
+    })
+    loop.step()
+    const mirror = new WorldMirror({ db, config: DEFAULT_CONFIG, terrain: GRASS })
+    const routes = new Map<string, RouteHandler>()
+    const close = mountDataApi(
+      {
+        route: (m, path, fn) => {
+          routes.set(`${m} ${path}`, fn)
+        },
+      },
+      { db, mirror, config: DEFAULT_CONFIG },
+    )
+    const get = (): string => {
+      let body = ''
+      routes.get('GET /api/laws')!(
+        { url: '/api/laws' } as IncomingMessage,
+        {
+          writeHead: () => {},
+          end: (b: string) => {
+            body = b
+          },
+        } as unknown as ServerResponse,
+        {},
+      )
+      return body
+    }
+
+    const empty = get()
+    expect(JSON.parse(empty)).toEqual({ laws: [] })
+    expect(get()).toBe(empty)
+
+    for (let i = 0; i < 3; i++) loop.step()
+    mirror.poll()
+    const after = LawsResponseSchema.parse(JSON.parse(get()))
+    expect(after.laws.map((l) => l.id)).toEqual(['law_slate'])
+
+    close()
+    db.close()
   })
 })

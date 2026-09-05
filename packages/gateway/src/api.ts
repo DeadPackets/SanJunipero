@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import type { SimConfig, SimEvent } from '@sj/shared'
+import { agentName, type LawRow, type SimConfig, type SimEvent } from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import {
@@ -41,7 +41,9 @@ export const FOLD_TYPES: readonly string[] = [
   'invited',
   'item_moved',
   'law_broken',
+  'law_proposed',
   'law_ratified',
+  'law_repealed',
   'partnership_dissolved',
   'partnership_formed',
   'structure_completed',
@@ -97,6 +99,9 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
 
   const planned = new Map<string, Planned>()
   const completedTick = new Map<string, number>()
+  // How often each law was broken. Not folded state: the engine keeps a breach as a witness
+  // record and nothing more, and only the page ever wants the total.
+  const breaches = new Map<string, number>()
   const heat: HeatScores = new Map()
   const weights = new Map<string, number>() // `${source}\n${target}\n${kind}` → weight
   // Bounded by construction: a spoke older than the talk window can never pair with a new one,
@@ -155,6 +160,11 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
       }
       case 'structure_completed': {
         completedTick.set((ev.payload as { id: string }).id, ev.tick)
+        return
+      }
+      case 'law_broken': {
+        const id = (ev.payload as { lawId: string }).lawId
+        breaches.set(id, (breaches.get(id) ?? 0) + 1)
         return
       }
       default:
@@ -303,6 +313,36 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
               a.kind.localeCompare(b.kind),
           )
         return { nodes, links }
+      }),
+    )
+  })
+
+  /** Every rule the town has agreed on, standing or let go, newest first. The predicate is
+   *  never served: which verb a sentence compiled to is ours, and `enforced` is the whole of
+   *  what a viewer is owed about it. */
+  router.route('GET', '/api/laws', (_req, res) => {
+    readFold()
+    sendPrebuilt(
+      res,
+      cache.json('laws', () => {
+        const state = deps.mirror.state()
+        const laws: LawRow[] = Object.values(state.socialLaws ?? {})
+          // By ordinal, not by tick: two councils can close in the same minute, and the fold's
+          // own order is the only total one.
+          .sort((a, b) => b.ordinal - a.ordinal)
+          .map((law) => ({
+            id: law.id,
+            text: law.text,
+            proposedBy: law.proposedBy,
+            proposerName: agentName(state.agents, law.proposedBy),
+            ratifiedTick: law.ratifiedTick,
+            repealedTick: law.repealedTick,
+            votes: law.votes,
+            why: law.why,
+            enforced: law.predicate.kind !== 'none',
+            breaches: breaches.get(law.id) ?? 0,
+          }))
+        return { laws }
       }),
     )
   })
