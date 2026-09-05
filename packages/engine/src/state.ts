@@ -210,9 +210,9 @@ export type WorldState = {
   // Where the array's (0, 0) stands in the AUTHORED frame. Growing north or west moves it, south
   // or east never does; absent while the frames agree, so such a world hashes exactly as it did.
   origin?: { x: number; y: number } | undefined
-  // Footfalls per tile, keyed "x,y" — sparse, because a 128x128 array of zeroes is a hash of
-  // nothing. Absent until the first step anybody takes.
-  traffic?: Record<string, number>
+  // Footfalls per tile, a flat grid indexed y * width + x — every step copies the whole of it,
+  // and copying numbers is a memcpy where copying keys was a rehash. Absent until the first step.
+  traffic?: number[]
   // The day each standing trail went quiet; absent while every trail is still in use.
   quietSince?: Record<string, number>
   // The day each standing sapling was seeded, keyed "x,y" — the maturity clock, sparse and

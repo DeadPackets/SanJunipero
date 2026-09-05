@@ -215,12 +215,12 @@ export function fold(
       const agents = { ...state.agents, [p.id]: { ...a, x: p.x, y: p.y } }
       // A trail is worn by feet, not by arriving: only a body mid-walk marks the ground.
       if (!countsAsFootfall(state, p.id, config)) return { ...state, agents }
-      const key = tileKey(p.x, p.y)
-      return {
-        ...state,
-        agents,
-        traffic: { ...state.traffic, [key]: (state.traffic?.[key] ?? 0) + 1 },
-      }
+      const width = state.terrain[0]!.length
+      const traffic =
+        state.traffic?.slice() ?? new Array<number>(state.terrain.length * width).fill(0)
+      const i = p.y * width + p.x
+      traffic[i] = (traffic[i] ?? 0) + 1
+      return { ...state, agents, traffic }
     }
     case 'needs_changed': {
       const p = NeedsChanged.parse(event.payload)
@@ -1166,7 +1166,27 @@ export function fold(
 
       const dx = p.edge === 'w' ? p.depth : 0
       const dy = p.edge === 'n' ? p.depth : 0
-      if (dx === 0 && dy === 0) return { ...state, terrain, growths }
+      // The flat grid is indexed by the map's width, so a wider or taller map re-lays it even
+      // when the origin holds still.
+      const relayTraffic = (m: number[]): number[] => {
+        const nw = terrain[0]!.length
+        const out = new Array<number>(terrain.length * nw).fill(0)
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const v = m[y * w + x] ?? 0
+            if (v !== 0) out[(y + dy) * nw + (x + dx)] = v
+          }
+        }
+        return out
+      }
+      if (dx === 0 && dy === 0) {
+        return {
+          ...state,
+          terrain,
+          growths,
+          ...(state.traffic === undefined ? {} : { traffic: relayTraffic(state.traffic) }),
+        }
+      }
 
       // Params are translated on the `{x, y}` pair every landed coordinate-taking verb uses
       // (walk, till, plant, build): a destination in the old frame is a different tile now.
@@ -1263,7 +1283,7 @@ export function fold(
         origin,
         ...(fauna === undefined ? {} : { fauna }),
         ...(forageables === undefined ? {} : { forageables }),
-        ...(state.traffic === undefined ? {} : { traffic: shiftKeys(state.traffic) }),
+        ...(state.traffic === undefined ? {} : { traffic: relayTraffic(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
         ...(state.saplings === undefined ? {} : { saplings: shiftSaplings(state.saplings) }),
       }
@@ -1272,12 +1292,7 @@ export function fold(
     // trail the town has stopped using. Pure arithmetic over what the world already holds.
     case 'traffic_decayed': {
       TrafficDecayed.parse(event.payload)
-      const traffic: Record<string, number> = {}
-      // A tile worn back to nothing leaves the map — every reader of it is already `?? 0`.
-      for (const [key, value] of Object.entries(state.traffic ?? {})) {
-        const worn = decayTraffic(value, config)
-        if (worn > 0) traffic[key] = worn
-      }
+      const traffic = (state.traffic ?? []).map((value) => decayTraffic(value, config))
       const quietSince = quietPathsAt(
         state,
         traffic,
@@ -1285,7 +1300,8 @@ export function fold(
         config,
       )
       const next: WorldState = { ...state }
-      if (Object.keys(traffic).length > 0) next.traffic = traffic
+      // A world walked back to nothing loses the grid entirely, rather than carrying zeroes.
+      if (traffic.some((v) => v > 0)) next.traffic = traffic
       else delete next.traffic
       if (Object.keys(quietSince).length > 0) next.quietSince = quietSince
       else delete next.quietSince
