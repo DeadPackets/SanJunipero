@@ -42,8 +42,8 @@ export class ChapterRenderError extends Error {
   }
 }
 
-// The incremental one-day job: segment -> score -> firsts -> institutions (week
-// boundaries only) -> chapter. Idempotent per day (chapters.day is UNIQUE).
+// The incremental one-day job: segment -> score -> firsts -> institutions -> chapter.
+// Idempotent per day (chapters.day is UNIQUE).
 export async function narrateDay(deps: {
   store: NarratorStore
   llm: NarratorLlm
@@ -192,18 +192,20 @@ export async function narrateDay(deps: {
     throw new ChapterRenderError(renderFailure, { semanticRan, milestones })
   const rendered = chapter!
 
-  if (day % 7 === 0) {
-    for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
-      const { foundingSceneIndex, ...rest } = inst
-      const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
-      if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
-        deps.alert?.(
-          `unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`,
-        )
-        continue
-      }
-      store.insertInstitution({ ...rest, foundingSceneId })
+  // A thing the town does is recognised the day it recurs, not on the day of the week the
+  // detector happens to run; the roster is what keeps a standing role from being founded twice.
+  const founded = new Set(store.institutions().map((i) => `${i.kind}\n${i.name}`))
+  for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
+    const { foundingSceneIndex, ...rest } = inst
+    if (founded.has(`${rest.kind}\n${rest.name}`)) continue
+    const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
+    if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
+      deps.alert?.(
+        `unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`,
+      )
+      continue
     }
+    store.insertInstitution({ ...rest, foundingSceneId })
   }
 
   return { chapter: rendered, heat: heats, milestones, semanticRan }

@@ -137,16 +137,32 @@ describe('narrateDay', () => {
     expect(alert.mock.calls.some(([msg]) => String(msg).includes('founding'))).toBe(true)
   })
 
-  it('skips institution detection off week boundaries', async () => {
+  it('finds a role founded on an ordinary day, and names it once however often it recurs', async () => {
     const store = memStore()
+    const fishing = (day: number): SimEvent[] => {
+      const t = day * 1440
+      return [
+        ev(1, t + 160, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+        ev(2, t + 161, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+        ev(3, t + 162, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+      ]
+    }
     await narrateDay({
       store,
-      llm: scriptedLlm([4]),
-      events: DAY1,
+      llm: scriptedLlm([1]),
+      events: fishing(4),
       rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
     })
-    expect(store.institutions().length).toBe(0) // day 1 is not a week boundary
+    expect(store.institutions().map((i) => i.name)).toEqual(['the fisher'])
+    await narrateDay({
+      store,
+      llm: scriptedLlm([1]),
+      events: fishing(5),
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(store.institutions().map((i) => i.name)).toEqual(['the fisher'])
   })
 })
 
