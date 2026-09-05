@@ -213,7 +213,7 @@ function Admin({ store, operatorToken }: PageProps) {
         The operator’s page — the one write path in the whole product. A mind never sees it.
       </p>
       {notice !== null && (
-        <p className="laws-notice" role={notice.ok ? undefined : 'alert'}>
+        <p className="laws-notice" role="status" aria-live={notice.ok ? 'polite' : 'assertive'}>
           {notice.words}
         </p>
       )}

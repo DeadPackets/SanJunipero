@@ -120,6 +120,7 @@ export function Paper({
         ref={dimRef}
       />
       <section
+        id="paper"
         className="paper"
         data-open={open ? 'yes' : 'no'}
         role="dialog"
@@ -231,7 +232,13 @@ export function Paper({
             </div>
           </div>
         </header>
-        <div className="paper-sheet" id="paper-sheet" role="tabpanel" tabIndex={-1}>
+        <div
+          className="paper-sheet"
+          id="paper-sheet"
+          role="tabpanel"
+          aria-labelledby={`paper-tab-${current}`}
+          tabIndex={-1}
+        >
           {open ? (
             // Keyed by the page, not the tab: a tab switch must not drop the page's feeds and
             // refetch them, so a caught page clears on the next arm or the next time it is opened.

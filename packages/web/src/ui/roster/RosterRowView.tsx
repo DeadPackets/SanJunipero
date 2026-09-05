@@ -78,6 +78,7 @@ export function RosterRowView({
          something of gets a row with more room in it. */
       data-lived={row.substance >= 0.34 ? 'much' : row.substance > 0 ? 'some' : 'none'}
       aria-expanded={open}
+      aria-controls={open ? `rx-${row.id}` : undefined}
       aria-label={rowLabel(row)}
       onClick={() => {
         onToggle(row.id)

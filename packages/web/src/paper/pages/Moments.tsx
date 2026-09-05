@@ -162,9 +162,9 @@ function PlayerStripView({
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
-      e.key === 'ArrowLeft'
+      e.key === 'ArrowLeft' || e.key === 'ArrowDown'
         ? -1 / span
-        : e.key === 'ArrowRight'
+        : e.key === 'ArrowRight' || e.key === 'ArrowUp'
           ? 1 / span
           : e.key === 'Home'
             ? -1

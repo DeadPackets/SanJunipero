@@ -1,0 +1,11 @@
+dev world: FRESH — the world db was deleted
+dev world: 56 generated terrain tiles, 0 code-painted
+dev world: ingested terrain tiles (56 records, road strip included)
+dev world: ingested production art (26 of 26 assets)
+dev world: ingested library art (61 items, furniture included)
+dev world: map=showcase rings=1 terrain=76x76 structures=11
+dev world: a new day 0 — no town on disk
+stream: this is a new town — SJ_FRESH=1 starts another one over it
+stream: the cast is SCRIPTED and free — SJ_LIVE=1 puts LLM minds behind these bodies
+stream: the town is open at http://localhost:8109/
+stream: the operator's channel is open on 127.0.0.1:8809, and the town serves it at http://localhost:8109/admin/

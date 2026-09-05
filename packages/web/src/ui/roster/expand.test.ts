@@ -170,7 +170,7 @@ describe('becomingOf on a day-0 person', () => {
     expect(b.changed).toEqual([])
     expect(b.lived).toBe(SECTION_EMPTY.lived)
     const html = renderToStaticMarkup(
-      createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+      createElement(RosterExpanded, { id: 'rx-t', becoming: b, onOpenFull: () => {} }),
     )
     for (const k of ALWAYS_SHOWN) {
       if (k === 'lived') continue
@@ -197,7 +197,7 @@ describe('becomingOf on a day-0 person', () => {
   it('`wants` is empty today and its section does not render AT ALL', () => {
     expect(b.wants).toEqual([])
     const html = renderToStaticMarkup(
-      createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+      createElement(RosterExpanded, { id: 'rx-t', becoming: b, onOpenFull: () => {} }),
     )
     expect(html).not.toContain('data-section="wants"')
     expect(html).not.toContain(SECTION_TITLE.wants)
@@ -331,7 +331,7 @@ describe('the rendered expansion', () => {
     }),
   )
   const html = renderToStaticMarkup(
-    createElement(RosterExpanded, { becoming: b, onOpenFull: () => {} }),
+    createElement(RosterExpanded, { id: 'rx-t', becoming: b, onOpenFull: () => {} }),
   )
 
   it('is a labelled group with a keyboard-reachable way into the whole page', () => {

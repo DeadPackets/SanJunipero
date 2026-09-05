@@ -93,9 +93,9 @@ function DayStripView({
 
   const onKey = (e: React.KeyboardEvent): void => {
     const step =
-      e.key === 'ArrowLeft'
+      e.key === 'ArrowLeft' || e.key === 'ArrowDown'
         ? -KEY_STEP_TICKS
-        : e.key === 'ArrowRight'
+        : e.key === 'ArrowRight' || e.key === 'ArrowUp'
           ? KEY_STEP_TICKS
           : e.key === 'PageDown'
             ? -KEY_PAGE_TICKS

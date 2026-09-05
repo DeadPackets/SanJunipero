@@ -1048,6 +1048,19 @@ body {
   position: absolute; width: 1px; height: 1px; margin: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+/* A roll is a canvas graph's only keyboard path, so it holds one button per node. Clipped, it
+   is dozens of tab stops a sighted keyboard user cannot see: focus brings the whole list back. */
+.sr-roll:focus-within {
+  position: static; width: auto; height: auto; overflow: visible;
+  clip-path: none; white-space: normal;
+  display: grid; gap: var(--s-1); padding: var(--s-4) 0 0; list-style: none;
+}
+.sr-roll:focus-within button {
+  width: 100%; min-height: 44px; padding: var(--s-2) var(--s-4);
+  font: inherit; text-align: left; color: var(--ink); cursor: pointer;
+  background: var(--parchment); border: 0; box-shadow: var(--frame-tight);
+}
+.sr-roll:focus-within button:hover { background: var(--sand); }
 
 /* Figures mounts one tab stop per visible person, so the arms are up to forty presses away. */
 .skip {
@@ -1589,8 +1602,10 @@ body {
 
 /* ── the bonds tab: ONE VERTICAL SHEET, never two pictures crammed side by side ──
    The whole town first, then one person's orbit, then the grid every pair has an address in. */
-.bonds-sheet { display: grid; gap: var(--s-8); }
-.bonds-section { display: grid; gap: var(--s-4); align-content: start; }
+/* `minmax(0, 1fr)`, never `auto`: force-graph writes its own canvas width, and an auto track
+   sizes to that canvas rather than the sheet — 480px of graph inside a 326px phone sheet. */
+.bonds-sheet { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+.bonds-section { display: grid; gap: var(--s-4); align-content: start; min-width: 0; }
 .bonds-section-head {
   display: flex; align-items: baseline; justify-content: space-between;
   gap: var(--s-5); flex-wrap: wrap;
@@ -1598,7 +1613,9 @@ body {
 .bonds-section-head .feed-head { margin: 0; }
 .bonds-hint { margin: 0; font-size: var(--f-1); color: var(--ink-quiet); }
 
-.bonds-graph { position: relative; display: flex; flex-direction: column; gap: var(--s-3); }
+.bonds-graph {
+  position: relative; display: flex; flex-direction: column; gap: var(--s-3); min-width: 0;
+}
 /* `overflow: hidden` and a stated height stop force-graph measuring itself bigger every frame;
    the night ground is the CELL's, because force-graph writes the canvas's own background. */
 .bonds-canvas {
