@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { AgentBody } from '@sj/engine/state'
-import type { StakeScore, WorldStore } from '../state/worldStore.js'
+import type { StakeScore } from '@sj/shared'
+import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
 import { tileToScreen } from '../render/iso.js'
 import { rendersOnMap } from '../render/characters.js'

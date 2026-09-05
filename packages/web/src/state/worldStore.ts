@@ -1,6 +1,7 @@
 import {
   SimConfigSchema,
   type AssetRecord,
+  type ServerDirector,
   type ServerMsg,
   type ServerScene,
   type SimConfig,
@@ -28,26 +29,6 @@ type LawChange = { tick: number; path: string; value: unknown }
 /** What a frame the view could not take asks of whoever delivered it: a fresh snapshot, or a
  *  bundle that can read this town at all. */
 type Trouble = 'reload' | 'resnapshot'
-
-// The gateway's own answer to "what is worth watching". Declared here until protocol 8 carries
-// `ServerDirector` in `@sj/shared`; the shape is the frame's, field for field.
-/** One shot the gateway scored: whose it is, how hot, and the sentence that says why. */
-export type StakeScore = {
-  /** the scene the shot is of, or null when the score is a body's own — a death, a birth */
-  sceneId: string | null
-  agentIds: string[]
-  score: number
-  why: string
-}
-export type ServerDirector = {
-  t: 'director'
-  tick: number
-  /** null: nothing has scored, and the viewer's quiet round turns instead */
-  cut: StakeScore | null
-  /** the beat after a peak: the shot holds, and nothing displaces it */
-  quiet: boolean
-  act: 'I' | 'II' | 'III' | null
-}
 
 // Declared as properties, not methods: every reader hands `store.getState` to
 // `useSyncExternalStore` unbound, and the store is closures with no `this`.
@@ -82,7 +63,7 @@ export type WorldStore = {
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
   lawHistory: () => LawChange[]
-  applyServer: (msg: ServerMsg | ServerDirector) => Trouble | null
+  applyServer: (msg: ServerMsg) => Trouble | null
   subscribe: (fn: () => void) => () => void
   onEvents: (fn: (evts: SimEvent[]) => void) => () => void
 }

@@ -1,5 +1,5 @@
 import { sceneCast } from '../render/sceneFraming.js'
-import type { StakeScore } from '../state/worldStore.js'
+import type { StakeScore } from '@sj/shared'
 
 export const CUT_MIN_MS = 8000 // never cut faster — letterboxed TV pacing
 

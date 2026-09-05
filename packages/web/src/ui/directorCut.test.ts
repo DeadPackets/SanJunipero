@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { createWorldStore, type ServerDirector, type StakeScore } from '../state/worldStore.js'
+import type { ServerDirector, StakeScore } from '@sj/shared'
+import { createWorldStore } from '../state/worldStore.js'
 import {
   CUT_MIN_MS,
   QUIET_TURN_TICKS,
