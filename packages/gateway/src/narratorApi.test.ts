@@ -225,6 +225,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
   it('keeps only what the town would remember, in the order it happened', async () => {
     const entries = await chronicle()
     expect(entries.map((e) => [e.tick, e.type])).toEqual([
+      [18, 'scene_closed'],
       [20, 'structure_completed'],
       [30, 'co_slept'],
       [40, 'fire_ignited'],
@@ -533,6 +534,7 @@ describe('narrator-backed observer apis, before a single day is narrated', () =>
     const res = await fetch(`${base}/api/chronicle`)
     const entries = ((await res.json()) as { entries: ChronicleEntry[] }).entries
     expect(entries.map((e) => e.type)).toEqual([
+      'scene_closed',
       'structure_completed',
       'co_slept',
       'fire_ignited',
