@@ -166,7 +166,9 @@ export function wakeReasons(
     // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
     // the re-arm point, so the alarm has to ring again until the body rises.
     if (tick < clock.wakeRetryAtTick) return reasons
-    if (bodyAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
+    // Sleep is the cure for a low energy, not a reason to rise: r20 saw Halim woken by his own
+    // tiredness bell eleven times in one night and drop each time before he was back in bed.
+    if (sleeperAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
     // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
     const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
     const dawn = clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)
@@ -225,8 +227,8 @@ function ringing(cfg: MindConfig, body: AlarmBody): string[] {
   return keys
 }
 
-function bodyAlarmBelow(cfg: MindConfig, body: AlarmBody): boolean {
-  return ringing(cfg, body).length > 0
+function sleeperAlarmBelow(cfg: MindConfig, body: AlarmBody): boolean {
+  return ringing(cfg, body).some((key) => key !== 'energy')
 }
 
 function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alarmArmed']): boolean {

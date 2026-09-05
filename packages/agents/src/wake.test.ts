@@ -331,14 +331,14 @@ describe('decideWake — asleep gate', () => {
     expect(decideWake(cfg, asleepAtNight(['rain_started']), clk(), 10, pln())).toBe(null)
   })
 
-  it('wakes on body_alarm while asleep', () => {
+  it('wakes on body_alarm while asleep, when the need is one a bed cannot mend', () => {
     const packet = {
       ...asleep(),
       self: {
         ...asleep().self,
         body: {
           ...quietMeadowPacket.self.body,
-          needs: { ...quietMeadowPacket.self.body.needs, energy: 9 },
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 9 },
         },
       },
     }
@@ -442,6 +442,11 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
 
   it('a sleeper dying of thirst is woken by its own body', () => {
     expect(decideWake(cfg, sleeping(withThirst(4)), clk(), 900, pln())).toBe('body_alarm')
+  })
+
+  it('★ a sleeper worn to nothing sleeps on: tiredness is what the bed is for', () => {
+    expect(decideWake(cfg, sleeping(withNeeds(60, 4, 71)), clk(), 900, pln())).toBe(null)
+    expect(decideWake(cfg, withNeeds(60, 4, 71), clk(), 900, pln())).toBe('body_alarm')
   })
 
   it('a packet from before thirst existed reads as a full body', () => {
