@@ -61,7 +61,7 @@ function scriptedModel(refuseNaming: boolean, namingCalls: { n: number }): MockL
             : String(m.content),
         )
         .join('\n')
-        .includes('what do you call')
+        .includes('What do you call')
       if (asked) namingCalls.n += 1
       const named = refuseNaming ? { name: '' } : { name: SOCIAL_NAME }
       return {

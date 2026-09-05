@@ -38,7 +38,7 @@ export function arrivalMemory(arrived: AgentArrivedPayload): string {
   const traveller = TRAVELLER_MINDS.find((t) => t.id === arrived.id)
   return (
     traveller?.arrival ??
-    'You came up the valley road today with what you could carry. The town lies up the road ahead of you.'
+    'You came up the valley road today with what you could carry. The town is up the road ahead of you.'
   )
 }
 
