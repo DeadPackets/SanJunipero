@@ -28,6 +28,7 @@ const IRREGULAR_PARTICIPLE: Record<string, string> = {
   go: 'gone',
   hold: 'held',
   leave: 'left',
+  lie: 'lain',
   light: 'lit',
   make: 'made',
   put: 'put',
@@ -70,7 +71,11 @@ export const verbPhrasePast = (verb: string): string => {
   return [pastParticiple(head), ...rest].join(' ')
 }
 
+// -ie takes -ying, not -ieing: lie -> lying. The one shape the -e rule below gets wrong.
+const IRREGULAR_PRESENT_PARTICIPLE: Record<string, string> = { lie: 'lying' }
+
 const presentParticiple = (verb: string): string => {
+  if (Object.hasOwn(IRREGULAR_PRESENT_PARTICIPLE, verb)) return IRREGULAR_PRESENT_PARTICIPLE[verb]!
   if (verb.endsWith('e') && !verb.endsWith('ee')) return `${verb.slice(0, -1)}ing`
   if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ing`
   return `${verb}ing`
