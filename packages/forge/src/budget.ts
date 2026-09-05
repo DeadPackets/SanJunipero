@@ -16,6 +16,10 @@ export class BudgetGuard {
       throw new BudgetExceededError(this.capUsd, this.#total + usd)
     this.#total += usd
   }
+  /** Give back a reservation the provider never billed for. */
+  release(usd: number): void {
+    this.#total = Math.max(0, this.#total - usd)
+  }
   get total(): number {
     return this.#total
   }

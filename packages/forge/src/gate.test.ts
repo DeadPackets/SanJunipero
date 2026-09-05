@@ -29,6 +29,13 @@ describe('mechanicalGate', () => {
     const r = mechanicalGate(img(2, 2, [1, 2, 3, 255]), { w: 2, h: 2, requireAlpha: true })
     expect(r.failures.join()).toMatch(/alpha/)
   })
+  it('fails a near-empty cell — a corner smudge clears every other check', () => {
+    const i = img(64, 64, [0, 0, 0, 0])
+    for (let p = 0; p < 12; p++) i.data.set([1, 2, 3, 255], p * 4)
+    const r = mechanicalGate(i, { w: 64, h: 64, requireAlpha: true })
+    expect(r.ok).toBe(false)
+    expect(r.failures.join()).toMatch(/empty/)
+  })
   it('fails when the cut left nothing opaque', () => {
     const r = mechanicalGate(img(2, 2, [0, 0, 0, 0]), { w: 2, h: 2, requireAlpha: true })
     expect(r.failures.join()).toMatch(/empty/)

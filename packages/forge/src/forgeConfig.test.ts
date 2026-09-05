@@ -50,6 +50,8 @@ describe('forge config', () => {
 
   it('an out-of-range env override fails the schema, not the world', () => {
     expect(() => loadForgeConfig({ FORGE_VISION_MIN_SCORE: '12' })).toThrow()
+    // A retry the codex could not register is refused at the door, not after four paid images.
+    expect(() => loadForgeConfig({ FORGE_VISION_MAX_RETRIES: '3' })).toThrow()
   })
 
   // A gated asset that burns its whole retry budget must still be registrable: the codex

@@ -5,6 +5,7 @@ import { insertLlmCall } from '@sj/llm'
 import {
   PER_ASSET_STOP_USD,
   BudgetGuard,
+  loadForgeConfig,
   loadReferenceSheet,
   type AssetCodex,
   type Forge,
@@ -75,10 +76,16 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
     const client = makeImageClient({
       apiKey,
       budget,
+      onCharge: book,
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
-    const sheet = await (refs ??= loadReferenceSheet())
-    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet })
+    // A rejected sheet must not be memoised: one bad encode would draw nothing ever again.
+    const sheet = await (refs ??= loadReferenceSheet().catch((e: unknown) => {
+      refs = null
+      throw e
+    }))
+    // The eye draws the retry-vs-blocked line, so it reads the operator's config, not the defaults.
+    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet, config: loadForgeConfig() })
     return createForge({
       codex: opts.codex,
       refs: sheet,

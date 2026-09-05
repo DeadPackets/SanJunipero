@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
@@ -18,6 +18,18 @@ import {
 import { FORGE_CALLER, createDiscoveryArt } from './discoveryCommission.js'
 import { ledgerTotalUsd } from './liveWorld.js'
 import { createGateway } from '@sj/gateway'
+
+const refsFail = vi.hoisted(() => ({ value: false }))
+vi.mock('@sj/forge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@sj/forge')>()
+  return {
+    ...actual,
+    loadReferenceSheet: async (): Promise<Buffer[]> => {
+      if (refsFail.value) throw new Error('the reference sheet could not be encoded')
+      return actual.loadReferenceSheet()
+    },
+  }
+})
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 const WATERSKIN = { name: 'stitch a waterskin', makes: ['waterskin'] }
@@ -107,6 +119,7 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     migrateLlmTables(opsDb)
   })
   afterEach(() => {
+    refsFail.value = false
     opsDb.close()
     rmSync(dir, { recursive: true, force: true })
   })
@@ -157,13 +170,13 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
 
   it('★ a balance that cannot pay for the picture AND its eye buys neither', async () => {
     // 0.045 fits on its own; with the eye reserved beside it the pair is 0.0505 and refused,
-    // so no money goes out and the placeholder stands.
+    // so no money goes out — and a spend stop leaves no row, so tomorrow's balance may draw it.
     const art = artFor(0.05)
     art.onDiscovery(WATERSKIN)
     await art.settle()
 
     expect(calls).toEqual([])
-    expect(codex.listSince(0).map((r) => r.status)).toEqual(['placeholder'])
+    expect(codex.listSince(0)).toEqual([])
   }, 30_000)
 
   it('★ two kinds in one breath cannot both spend the last dollar', async () => {
@@ -174,8 +187,34 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     await art.settle()
 
     expect(calls.filter((c) => c === 'image')).toHaveLength(1)
-    expect(codex.listSince(0).filter((r) => r.status === 'ready')).toHaveLength(1)
-    expect(codex.listSince(0).filter((r) => r.status === 'placeholder')).toHaveLength(1)
+    expect(codex.listSince(0).map((r) => r.status)).toEqual(['ready'])
+  }, 30_000)
+
+  it('★ a billed reply that carries no picture is still a row in the minds’ ledger', async () => {
+    // The moderation-refusal shape: HTTP 200, a bill, and no image. No candidate comes back to
+    // book it, so without a row the money is invisible to the daily budget.
+    const noImage: typeof fetch = async () => {
+      calls.push('image')
+      return new Response(JSON.stringify({ usage: { cost: IMAGE_USD } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
+      apiKey: 'not-a-key',
+      fetchFn: noImage,
+      judge,
+    })
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+
+    const images = calls.filter((c) => c === 'image').length
+    expect(images).toBeGreaterThan(0)
+    expect(forgeRows()).toHaveLength(images)
+    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(images * IMAGE_USD, 6)
   }, 30_000)
 
   it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
@@ -203,6 +242,29 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     art.onDiscovery(WATERSKIN)
     await art.settle()
     expect(codex.listSince(0).map((r) => r.kind)).toEqual(['waterskin'])
+  }, 30_000)
+
+  it('a reference sheet that fails once does not disable art for the whole process', async () => {
+    refsFail.value = true
+    const refused: string[] = []
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
+      apiKey: 'not-a-key',
+      fetchFn: fakeFetch,
+      judge,
+      onError: (kind) => refused.push(kind),
+    })
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+    expect(refused).toEqual(['waterskin'])
+    expect(codex.listSince(0)).toEqual([])
+
+    refsFail.value = false
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+    expect(codex.listSince(0).map((r) => [r.kind, r.status])).toEqual([['waterskin', 'ready']])
   }, 30_000)
 
   it('a run with no API key draws nothing at all', () => {
@@ -234,6 +296,16 @@ describe('the commission path is live-only, and it IS wired', () => {
     )
     expect(src).toContain('makeVisionJudge')
     expect(src).not.toContain('makeVlmJudge')
+  })
+
+  it('the eye is built with the forge config the operator set, not the defaults', () => {
+    // `makeVisionJudge` falls back to DEFAULT_FORGE_CONFIG, and it is the eye — not the gate —
+    // that draws the retry-vs-blocked line.
+    const src = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'discoveryCommission.ts'),
+      'utf8',
+    )
+    expect(src).toMatch(/makeVisionJudge\(\{[^}]*config: loadForgeConfig\(\)/)
   })
 
   it('liveWorld commissions on the codification', () => {

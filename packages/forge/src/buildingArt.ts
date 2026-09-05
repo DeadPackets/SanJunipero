@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BuildingManifestSchema, type BuildingManifest } from '@sj/shared'
+import { BuildingManifestSchema, type AssetRecord, type BuildingManifest } from '@sj/shared'
 import type { AssetCodex } from './codex.js'
 
 export const STRUCTURE_FACINGS = ['sw', 'se'] as const
@@ -81,15 +81,6 @@ export function listCommittedBuildings(root: string = BUILDINGS_CONTENT_DIR): Co
 
 export type BuildingIngestEntry = { kind: string; action: 'registered' | 'unchanged'; id: string }
 
-function latestBuilding(codex: AssetCodex, kind: string) {
-  return (
-    codex
-      .listSince(0)
-      .filter((r) => r.status === 'ready' && r.class === 'building' && r.kind === kind)
-      .at(-1) ?? null
-  )
-}
-
 /** Idempotent: unchanged bytes + unchanged manifest register nothing, and a regenerated cell
  *  gets a new record that wins by seq — the renderer's newest-ready law. */
 export function registerCommittedBuildings(
@@ -97,10 +88,14 @@ export function registerCommittedBuildings(
   opts: { root?: string } = {},
 ): BuildingIngestEntry[] {
   const out: BuildingIngestEntry[] = []
+  // One scan for the whole ingest: the last ready record for a kind wins by seq.
+  const latest = new Map<string, AssetRecord>()
+  for (const r of codex.listSince(0))
+    if (r.status === 'ready' && r.class === 'building' && r.kind !== null) latest.set(r.kind, r)
   for (const b of listCommittedBuildings(opts.root)) {
     const meta = JSON.stringify(b.manifest)
-    const existing = latestBuilding(codex, b.codexKind)
-    if (existing !== null && existing.meta === meta) {
+    const existing = latest.get(b.codexKind)
+    if (existing !== undefined && existing.meta === meta) {
       const stored = codex.get(existing.id)
       if (stored?.png.equals(b.png)) {
         out.push({ kind: b.codexKind, action: 'unchanged', id: existing.id })
