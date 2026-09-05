@@ -35,8 +35,20 @@ export const intEnv = (name: string, fallback: number, min: number): number => {
   return fallback
 }
 
-const boolEnv = (name: string, fallback: boolean): boolean =>
-  process.env[name] === undefined ? fallback : process.env[name] !== '0'
+const BOOL_ON: ReadonlySet<string> = new Set(['1', 'true', 'on', 'yes'])
+const BOOL_OFF: ReadonlySet<string> = new Set(['0', 'false', 'off', 'no'])
+
+const boolEnv = (name: string, fallback: boolean): boolean => {
+  const raw = process.env[name]
+  if (raw === undefined) return fallback
+  // Every word an operator writes for off, and a line when it is none of them: `!== '0'` read
+  // `false` and `off` as ON, and said nothing about it.
+  const asked = raw.trim().toLowerCase()
+  if (BOOL_ON.has(asked)) return true
+  if (BOOL_OFF.has(asked)) return false
+  console.log(`world: ${name}=${raw} ignored; using ${fallback ? 'on' : 'off'}`)
+  return fallback
+}
 
 export function parseWorldEnv(): WorldEnv {
   return {
