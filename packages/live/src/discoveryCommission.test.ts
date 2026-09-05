@@ -177,6 +177,33 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(codex.listSince(0).map((r) => r.status)).toEqual(['ready'])
   }, 30_000)
 
+  it('★ a billed reply that carries no picture is still a row in the minds’ ledger', async () => {
+    // The moderation-refusal shape: HTTP 200, a bill, and no image. No candidate comes back to
+    // book it, so without a row the money is invisible to the daily budget.
+    const noImage: typeof fetch = async () => {
+      calls.push('image')
+      return new Response(JSON.stringify({ usage: { cost: IMAGE_USD } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
+      apiKey: 'not-a-key',
+      fetchFn: noImage,
+      judge,
+    })
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+
+    const images = calls.filter((c) => c === 'image').length
+    expect(images).toBeGreaterThan(0)
+    expect(forgeRows()).toHaveLength(images)
+    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(images * IMAGE_USD, 6)
+  }, 30_000)
+
   it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
     const refused: string[] = []
     let budgetUsd = 0

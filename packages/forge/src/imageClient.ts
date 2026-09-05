@@ -31,6 +31,8 @@ export function makeImageClient(opts: {
   apiKey: string
   fetchFn?: typeof fetch
   budget?: BudgetGuard
+  /** A reply that was billed but carried no image: the row no candidate will ever book. */
+  onCharge?: (model: string, costUsd: number) => void
 }): ImageClient {
   const doFetch = opts.fetchFn ?? fetch
 
@@ -60,8 +62,11 @@ export function makeImageClient(opts: {
     if (!res.ok) throw new ImageGenError(model, res.status, await res.text())
     const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
     const b64 = json.data?.[0]?.b64_json
-    if (!b64) throw new ImageGenError(model, res.status, 'no data[0].b64_json in response')
     const costUsd = json.usage?.cost ?? EST_COST_PER_IMAGE
+    if (!b64) {
+      opts.onCharge?.(model, costUsd)
+      throw new ImageGenError(model, res.status, 'no data[0].b64_json in response')
+    }
     // Reconcile upward only: BudgetGuard has no refund, so the reserve stays booked when actual < reserve.
     if (costUsd > EST_COST_PER_IMAGE) opts.budget?.spend(costUsd - EST_COST_PER_IMAGE)
     return { png: Buffer.from(b64, 'base64'), model, costUsd }

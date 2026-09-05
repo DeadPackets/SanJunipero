@@ -76,6 +76,7 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
     const client = makeImageClient({
       apiKey,
       budget,
+      onCharge: book,
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
     const sheet = await (refs ??= loadReferenceSheet())

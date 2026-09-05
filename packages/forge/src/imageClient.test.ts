@@ -116,6 +116,33 @@ describe('makeImageClient', () => {
     expect(calls).toHaveLength(1)
     expect(out[0]!.costUsd).toBe(0.045)
   })
+  it('★ a billed reply that carries no image books its row; a refused request books none', async () => {
+    const billed = fakeFetch(() => ({ status: 200, json: { usage: { cost: 0.045 } } }))
+    const charged: [string, number][] = []
+    await expect(
+      makeImageClient({
+        apiKey: 'k',
+        fetchFn: billed.fn,
+        onCharge: (model, costUsd) => charged.push([model, costUsd]),
+      }).generateCandidates('p', [], 1),
+    ).rejects.toBeInstanceOf(ImageGenError)
+    expect(charged).toEqual([
+      [IMAGE_MODEL_PRIMARY, 0.045],
+      [IMAGE_MODEL_FALLBACKS[0], 0.045],
+      [IMAGE_MODEL_FALLBACKS[1], 0.045],
+    ])
+
+    const refused = fakeFetch(() => ({ status: 429, json: { error: 'slow down' } }))
+    const none: [string, number][] = []
+    await expect(
+      makeImageClient({
+        apiKey: 'k',
+        fetchFn: refused.fn,
+        onCharge: (model, costUsd) => none.push([model, costUsd]),
+      }).generateCandidates('p', [], 1),
+    ).rejects.toBeInstanceOf(ImageGenError)
+    expect(none).toEqual([])
+  })
   it('books the extra when the actual cost exceeds the reserve', async () => {
     const { fn } = fakeFetch(() => ({
       status: 200,
