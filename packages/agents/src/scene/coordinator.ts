@@ -1,4 +1,4 @@
-import { dayPhaseFromTick, MINUTES_PER_DAY, sanitizeSpokenText } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY, sanitizeSpokenText, STAKES_BY_KIND } from '@sj/shared'
 import { LAW_TEXT_MAX, type LawPredicate } from '@sj/engine'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
 import type { LawSeam } from '../runtime/arbiterSeam.js'
@@ -14,7 +14,9 @@ import {
   lawIdOf,
   lineCapOf,
   nextFloor,
+  openQuarrelTie,
   openScene,
+  stakesFor,
   TALKERS_NEEDED,
   tallyCouncil,
   threadFor,
@@ -69,8 +71,8 @@ export type SceneCoordinatorOpts = {
   onError?: (kind: string, detail: string) => void
 }
 
-// A scene opens with everything still to play for, and nothing has told us otherwise yet.
-const OPENING_STAKES = 5
+// A scene opens as a talk and is worth what a talk is worth; the kind it turns into raises it.
+const OPENING_STAKES = STAKES_BY_KIND.talk
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
 // A coordinator with nobody to tell drops what it would have reported.
@@ -117,6 +119,9 @@ export class SceneCoordinator {
   /** The ask now in flight, per scene, as the token it was made under. A late answer to a stale
    *  token is dropped — the floor has already moved on. */
   readonly #asked = new Map<string, number>()
+  /** The kind, stakes and cast last announced per scene. A talk that turns, or grows a voice,
+   *  is a new fact about the same scene, and this is what says whether it is new. */
+  readonly #announced = new Map<string, string>()
   /** When the floor was last handed over, in wall-clock ms. Measured from the hand-off and not
    *  from the ask, because a mouth that never asks is exactly what a stalled talk is made of. */
   readonly #floorSince = new Map<string, { agentId: string; atMs: number }>()
@@ -205,8 +210,10 @@ export class SceneCoordinator {
       stakes: OPENING_STAKES,
     })
     scene.kind = this.#kindAfter(scene, said, tick)
+    scene.stakes = this.#stakesOf(scene)
     if (scene.kind === 'council') this.#propose(scene, agentId, said)
     this.#scenes.set(scene.id, scene)
+    this.#announced.set(scene.id, this.#mark(scene))
     this.#bridge.announce('scene_opened', {
       id: scene.id,
       kind: scene.kind,
@@ -240,6 +247,8 @@ export class SceneCoordinator {
     scene.audience = scene.audience.filter((id) => id !== agentId)
     scene.participants = [...scene.participants, agentId].sort()
     appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
+    scene.stakes = this.#stakesOf(scene)
+    this.#turned(scene)
   }
 
   /** One body out of the talk, and the talk goes on without them. The anchor and the floor both
@@ -254,6 +263,7 @@ export class SceneCoordinator {
     if (scene.floor === agentId) {
       this.#floorTo(scene, scene.participants.length === 0 ? null : scene.anchor)
     }
+    this.#turned(scene)
   }
 
   /** The one turn a scene ever takes. Called by the floor-holder's own runtime, so the cost of
@@ -400,6 +410,7 @@ export class SceneCoordinator {
     const upgraded = this.#kindAfter(scene, text, tick)
     if (upgraded !== scene.kind) {
       scene.kind = upgraded
+      scene.stakes = this.#stakesOf(scene)
       if (upgraded === 'council' && scene.proposal === undefined) {
         this.#propose(scene, agentId, text)
       }
@@ -413,7 +424,36 @@ export class SceneCoordinator {
     const next = this.#floorAfter(scene, agentId, text, to)
     if (next !== null) this.#admit(scene, next, tick)
     this.#floorTo(scene, next)
+    this.#turned(scene)
     this.#bridge.announce('scene_line', { id: scene.id, agentId, text, move })
+  }
+
+  /** What the town has been told about this scene: its kind, what it is worth, and who is in it. */
+  #mark(scene: Scene): string {
+    return `${scene.kind}\n${scene.stakes}\n${scene.participants.join(',')}`
+  }
+
+  /** One event for a talk that became something else, or grew a voice. Without it the viewer's
+   *  frame and the camera's scorer both keep the opening kind and the opening pair. */
+  #turned(scene: Scene): void {
+    if (scene.closedTick !== null) return
+    const mark = this.#mark(scene)
+    if (this.#announced.get(scene.id) === mark) return
+    this.#announced.set(scene.id, mark)
+    this.#bridge.announce('scene_turned', {
+      id: scene.id,
+      kind: scene.kind,
+      participants: [...scene.participants],
+      stakes: scene.stakes,
+    })
+  }
+
+  #stakesOf(scene: Scene): number {
+    return stakesFor(
+      scene.stakes,
+      scene.kind,
+      openQuarrelTie(scene, (id) => this.#mindFor(id)?.ties.open() ?? []),
+    )
   }
 
   #floorAfter(scene: Scene, speakerId: string, text: string, to: string | null): string | null {
@@ -477,6 +517,7 @@ export class SceneCoordinator {
     scene.floor = null
     this.#asked.delete(scene.id)
     this.#floorSince.delete(scene.id)
+    this.#announced.delete(scene.id)
     this.#scenes.delete(scene.id)
     // Everyone who was ever in it gets the memory, not only whoever was left at the end.
     const cast = [...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)])].sort()
@@ -505,6 +546,7 @@ export class SceneCoordinator {
       summary,
       deltas,
       closeReason: reason,
+      participants: cast,
     })
     await this.#settleCouncil(scene, tick)
     if (summary.length === 0) return
@@ -637,7 +679,9 @@ export class SceneCoordinator {
         stakes: INVITATION_STAKES,
       })
       scene.kind = 'invitation'
+      scene.stakes = this.#stakesOf(scene)
       this.#scenes.set(scene.id, scene)
+      this.#announced.set(scene.id, this.#mark(scene))
       this.#bridge.announce('scene_opened', {
         id: scene.id,
         kind: scene.kind,
@@ -646,10 +690,11 @@ export class SceneCoordinator {
         stakes: scene.stakes,
       })
     } else {
+      scene.kind = 'invitation'
       this.#admit(scene, from, tick)
       this.#admit(scene, to, tick)
-      scene.kind = 'invitation'
-      scene.stakes = Math.max(scene.stakes, INVITATION_STAKES)
+      scene.stakes = this.#stakesOf(scene)
+      this.#turned(scene)
     }
     scene.invitation = { verb: fact.verb, from, to, askedTick: tick }
     this.#floorTo(scene, to)
