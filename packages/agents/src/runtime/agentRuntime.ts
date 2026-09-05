@@ -57,6 +57,8 @@ import {
   standingWallsLine,
   stasisLine,
   stillnessAt,
+  stockLine,
+  usefulLine,
   wantLine,
   type Stillness,
   worldDay,
@@ -1146,6 +1148,11 @@ export class AgentRuntime {
     const doorstep = doorstepLine(packet, this.#doorstepSaidTick)
     if (doorstep.length > 0) this.#doorstepSaidTick = tick
     const known = this.#bridge.knownPlaces(this.#agentId)
+    const morning = wake.includes('morning')
+    const topWant = morning || wake.includes('boredom') ? (this.#wants?.top(tick) ?? null) : null
+    // One read for both lines, so the numbers agree, and none at all on a turn that says
+    // neither: counting the town is a walk over every item it holds.
+    const stock = morning || topWant === 'esteem' ? this.#bridge.townStock() : null
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
@@ -1160,7 +1167,11 @@ export class AgentRuntime {
       gatheringLine(packet, tick),
       inTalkLine(this.#talkingWith(packet)),
       roadOutLine(wake.includes('morning') ? this.#roadCause : null),
-      wantLine(wake.includes('morning') ? (this.#wants?.top(tick) ?? null) : null),
+      wantLine(morning && topWant !== 'esteem' ? topWant : null),
+      // The esteem mind reads the same numbers inside its own line; twice in one breath is once
+      // too many.
+      morning && stock !== null && topWant !== 'esteem' ? stockLine(stock) : '',
+      topWant === 'esteem' && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
     ]
       .filter((p) => p.length > 0)
       .join(' ')
