@@ -14,7 +14,7 @@ import {
   type RulingVocabulary,
 } from '@sj/shared'
 import { CANON } from './canon.js'
-import type { AttemptVerdict, VerbCharter } from './charter.js'
+import { isCharterRow, type AttemptVerdict, type VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
 import { namedCustoms } from './constructs.js'
 import { ConstructStore } from './constructStore.js'
@@ -52,12 +52,11 @@ export const SIMILARITY_SHORT_CIRCUIT = 0.92
 export const RETIREMENT_DAYS = 14
 export const RETIRED_REASON = 'unused for fourteen days'
 
-// Impossible classes that depend on who asked (skills, inventory) must never
-// become global precedent; only context-independent classes short-circuit.
-const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set([
-  'physically_impossible',
-  'beyond_adjacency',
-])
+// Impossible classes that depend on who asked (skills, inventory) or on how far the town has
+// climbed must never become global precedent; only context-independent classes short-circuit.
+// `beyond_adjacency` is not one: the codex grows, and the court also reaches for it to say
+// somebody was not standing near enough.
+const CONTEXT_INDEPENDENT_IMPOSSIBLE: ReadonlySet<string> = new Set(['physically_impossible'])
 
 // Invalid LLM verdicts (e.g. a map naming a verb that does not exist) get this
 // many total tries before the diegetic fallback below.
@@ -159,6 +158,10 @@ function impossibleSelfContradicts(v: Verdict): boolean {
   )
 }
 
+// A refusal reporting on the ask rather than on the world. Live ruling 11 of the last rehearsal
+// told a mind a destination could not be resolved to a walk action; these are its words.
+const MACHINE_PROSE = /\bcoordinates?\b|\bparameters?\b|\bresolved to\b|\b\w+ action\b/i
+
 // A refusal is written verbatim into a mind's memory, so it is scanned for directives too.
 // Replaced rather than retried: a retry can end at `FALLBACK_IMPOSSIBLE` and lose the reason.
 // Self-contradiction is not on this list — that one is retried, above.
@@ -166,6 +169,7 @@ function reasonTainted(reason: string, vocabulary?: RulingVocabulary): boolean {
   return (
     FORBIDDEN_FRAMING.test(reason) ||
     MACHINE_TOKEN.test(reason.trim()) ||
+    MACHINE_PROSE.test(reason) ||
     scanRulingForGlassLeak(reason, vocabulary).length > 0
   )
 }
@@ -237,16 +241,32 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const rulings = new RulingsStore(deps.db, deps.embedder)
   const tick = deps.tick ?? (() => 0)
 
+  // The roster is read on every turn of every mind, so a row is read out of its JSON once and
+  // once only; the JSON itself is the key, so a row that changes is read again.
+  const readRows = new Map<string, unknown>()
+  function rowContents(json: string): unknown {
+    const held = readRows.get(json)
+    if (held !== undefined) return held
+    const parsed: unknown = JSON.parse(json)
+    readRows.set(json, parsed)
+    return parsed
+  }
+
   // Restart resilience: the rulebook is durable but the verb registry is
   // in-memory — re-register every active codified verb in deterministic order.
   for (const row of rulebook.allActive()) {
     if (VERBS[row.verb]) continue
-    const parsed: unknown = JSON.parse(row.recipeJson)
-    registerVerb(
-      isExpressiveRow(parsed)
-        ? expressiveVerbFromRuling(parsed.name, parsed)
-        : verbFromCharter(parsed as VerbCharter),
-    )
+    const parsed = rowContents(row.recipeJson)
+    if (isExpressiveRow(parsed)) {
+      registerVerb(expressiveVerbFromRuling(parsed.name, parsed))
+      continue
+    }
+    // A row of an older shape registers a verb that throws at act time, not at boot.
+    if (!isCharterRow(parsed)) {
+      deps.llm.alert('rulebook_row_unreadable', `${row.recipeId} is not a charter this town reads`)
+      continue
+    }
+    registerVerb(verbFromCharter(parsed))
   }
 
   // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
@@ -280,7 +300,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   async function charterTwin(v: { recipe: Recipe; summary: string }): Promise<string | null> {
     const charters = rulebook
       .allActive()
-      .map((row): unknown => JSON.parse(row.recipeJson))
+      .map((row) => rowContents(row.recipeJson))
       .filter((p) => !isExpressiveRow(p)) as VerbCharter[]
     if (charters.length === 0) return null
     const asked = await deps.embedder.embed(`${v.recipe.name}. ${v.summary}`)
@@ -298,7 +318,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
 
   function roster(): RosterEntry[] {
     return rulebook.allActive().map((row) => {
-      const parsed: unknown = JSON.parse(row.recipeJson)
+      const parsed = rowContents(row.recipeJson)
       if (isExpressiveRow(parsed)) {
         return {
           id: parsed.id,
@@ -319,7 +339,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     const knownRecipeIds = new Set<string>()
     for (const row of rulebook.allActive()) {
       knownRecipeIds.add(row.recipeId)
-      const parsed: unknown = JSON.parse(row.recipeJson)
+      const parsed = rowContents(row.recipeJson)
       if (isExpressiveRow(parsed)) continue
       for (const r of (parsed as VerbCharter).outcomes) {
         for (const e of r.effects) if (e.op === 'spawn_item') knownProducts.add(e.kind)
@@ -491,8 +511,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         value = { ...value, reason: CLEAN_IMPOSSIBLE_REASON }
       }
 
-      // An attempt whose recipe canon the codex has not earned is beyond adjacency. The
-      // corrected verdict is what gets recorded, so an exploit never becomes precedent.
+      // An attempt whose recipe canon the codex has not earned is beyond adjacency.
       let verdict: Verdict = value
       if (value.kind === 'attempt' && !codex.withinAdjacency(value.recipe.canon)) {
         // Every attempt rehearsals 6, 7 and 8 ruled died right here — all of them — and the
@@ -509,7 +528,9 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         }
       }
 
-      // Stage 4 — record the ruling as shared precedent.
+      // Stage 4 — record the ruling as shared precedent. A refusal that says the ladder is too
+      // short is returned, never recorded: the rung it wanted may be earned tomorrow.
+      if (verdict.kind === 'impossible' && verdict.class === 'beyond_adjacency') return verdict
       await rulings.record(intent, verdict, tick())
 
       return verdict

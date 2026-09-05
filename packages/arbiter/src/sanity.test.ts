@@ -95,6 +95,25 @@ describe('the codification sanity gate', () => {
     expect(recipeSanityRefusal(rival, vocab)).toMatch(/already makes|second name/)
   })
 
+  it('refuses a building made in the hand', () => {
+    const bridging: Recipe = {
+      ...base,
+      id: 'recipe:bridging',
+      name: 'Bridging',
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'A footbridge spans the water.',
+          effects: [{ op: 'spawn_item', kind: 'weir', qty: 1 }],
+        },
+      ],
+    }
+    expect(recipeSanityRefusal(bridging, vocab)).toMatch(/weir/)
+    // With no table shown there is nothing to check against and the check stands down.
+    expect(recipeSanityRefusal(bridging, { knownProducts: new Set() })).toBeNull()
+  })
+
   it('knows a near-duplicate from two different things', () => {
     expect(nearDuplicate('waterskin', 'waterskins')).toBe(true)
     expect(nearDuplicate('waterskin', 'water_skin')).toBe(true)

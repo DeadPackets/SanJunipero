@@ -15,6 +15,8 @@ export type VerbCharter = {
   unlocks?: { id: string; name: string; prerequisiteId: string }
   inventor: { agentId: string; saying: string }
   skillCheck?: { track: string; difficulty: number }
+  // Work done with the eyes, as every built-in craft is. Absent means yes: a charter is a craft.
+  needsLight?: boolean
   canon: string[]
 }
 
@@ -72,6 +74,17 @@ export function charterFromAttempt(attempt: AttemptVerdict, credit: DiscoveryCre
 }
 
 export function isCharterRow(parsed: unknown): parsed is VerbCharter {
-  const p = parsed as { outcomes?: unknown; inventor?: unknown } | null
-  return Array.isArray(p?.outcomes) && typeof p.inventor === 'object' && p.inventor !== null
+  const p = parsed as {
+    outcomes?: unknown
+    inventor?: unknown
+    reads?: unknown
+    takes?: unknown
+  } | null
+  return (
+    Array.isArray(p?.outcomes) &&
+    typeof p.inventor === 'object' &&
+    p.inventor !== null &&
+    Array.isArray(p.reads) &&
+    typeof p.takes === 'string'
+  )
 }

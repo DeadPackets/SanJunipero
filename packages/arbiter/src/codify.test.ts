@@ -181,6 +181,11 @@ describe('codify', () => {
       expect(def.duration(agentState(), CFG, 'a1', {})).toBe(DURATION_TICKS.minutes)
     })
 
+    it('pays the dark the way the built-in craft does', () => {
+      expect(asVerb(boilSaltRecipe).needsLight).toBe(true)
+      expect(VERBS.craft!.needsLight).toBe(true)
+    })
+
     it('validate rejects a position with no adjacent fire', () => {
       const def = asVerb(boilSaltRecipe)
       expect(def.validate(agentState(), CFG, 'a1', {})).toBe('you need a fire nearby')

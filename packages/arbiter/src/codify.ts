@@ -285,6 +285,7 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
     // What the charter already knew, carried into the engine so registration binds this verb's
     // object as the built-in rows are bound. Every path to a live minted verb comes through here.
     reads: charter.reads,
+    needsLight: charter.needsLight ?? true,
     rngStream: charter.id,
   }
 }

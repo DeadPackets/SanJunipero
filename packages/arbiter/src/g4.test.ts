@@ -73,6 +73,10 @@ function isSpawnPayload(p: unknown): p is { kind: string } {
   return typeof p === 'object' && p !== null && 'kind' in p && typeof p.kind === 'string'
 }
 
+function isDurationPayload(p: unknown): p is { duration: number } {
+  return typeof p === 'object' && p !== null && 'duration' in p && typeof p.duration === 'number'
+}
+
 let seq = 90000
 const ev = (type: string, payload: unknown, tick = 0): SimEvent => ({
   seq: seq++,
@@ -135,12 +139,16 @@ function runTier1(state: WorldState): {
 
   const res = submitIntent(state, CFG, 'a1', 'recipe:boil_salt', {})
   if (!res.ok) throw new Error(res.reason)
+  // Driven for as long as the world says the act takes: this fixture works by an unfuelled
+  // fire, and a craft in the dark is slower.
+  let duration = ticksFor(boilSaltRecipe.takes)
   for (const e of res.events) {
+    if (e.type === 'action_started' && isDurationPayload(e.payload)) duration = e.payload.duration
     state = fold(state, ev(e.type, e.payload), CFG)
     events.push(e)
   }
 
-  for (let i = 0; i < ticksFor(boilSaltRecipe.takes); i++) {
+  for (let i = 0; i < duration; i++) {
     const tick = state.tick + 1
     state = fold(state, ev('tick_advanced', {}, tick), CFG)
     const wt = createWorldTick(CFG, rng)(state)

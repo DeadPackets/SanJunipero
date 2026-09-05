@@ -135,6 +135,29 @@ describe('isExpressive', () => {
   it('refuses an intent with no expression in it at all', () => {
     expect(isExpressive('I boil river water for salt')).toBe(false)
   })
+
+  it('reads a whole word, not the head of a longer one', () => {
+    for (const intent of [
+      'I singe the hide over the coals',
+      'the bowl by the door is cracked',
+      'I am humble about the work',
+      'I waver at the water',
+    ]) {
+      expect(isExpressive(intent), intent).toBe(false)
+    }
+  })
+
+  it('still hears the act however it is said', () => {
+    for (const intent of [
+      'I am humming to the child',
+      'I bowed my head',
+      'she is singing to herself',
+      'I wave to Yusuf across the field',
+      'I offer a prayer for the boy',
+    ]) {
+      expect(isExpressive(intent), intent).toBe(true)
+    }
+  })
 })
 
 describe('the cheap approval', () => {
