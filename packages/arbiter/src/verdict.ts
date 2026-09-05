@@ -146,7 +146,7 @@ type AnyShape = z.ZodObject<Record<string, AnyZod>>
 
 // The ruling model's decoder takes only an object at the root, refuses `oneOf`, and refuses an
 // optional key. Derived, so an op or a field added to the verdict is in the dialect that day.
-function strictly(schema: AnyZod): AnyZod {
+export function strictly(schema: AnyZod): AnyZod {
   const { type } = schema.def
   if (type === 'optional' || type === 'nullable')
     return strictly((schema as z.ZodOptional<AnyZod>).unwrap()).nullable()
@@ -169,7 +169,7 @@ export const StrictVerdictSchema = z.object({ verdict: strictly(VerdictSchema) }
 
 /** Null stood in for absence and comes off here — but only where the town's own schema says the
  *  key may be absent, so a params key answered null stays null. Walks value and schema together. */
-function withoutNulls(value: unknown, schema: AnyZod): unknown {
+export function withoutNulls(value: unknown, schema: AnyZod): unknown {
   const { type } = schema.def
   if (type === 'optional' || type === 'nullable')
     return withoutNulls(value, (schema as z.ZodOptional<AnyZod>).unwrap())

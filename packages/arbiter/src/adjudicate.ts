@@ -14,6 +14,7 @@ import {
   type RulingVocabulary,
 } from '@sj/shared'
 import { CANON } from './canon.js'
+import { makeCouncil, type LawCompileAnswer, type LawCompileAsk } from './council.js'
 import { isCharterRow, type AttemptVerdict, type VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
 import { namedCustoms } from './constructs.js'
@@ -227,6 +228,9 @@ export type Arbiter = {
   noteUsed(verb: string, tick: number): void
   // Retires every minted verb unused for RETIREMENT_DAYS; returns the words that went.
   retireUnused(tick: number): string[]
+  // What of a rule the town just agreed the world can hold them to. One call, at the close of
+  // the talk that passed it, and the answer rides in the event the fold reads.
+  compileLaw(ask: LawCompileAsk): Promise<LawCompileAnswer>
   // Why this recipe may never become a verb, or null. The same gate adjudicate applies,
   // exposed so an operator queue can say what it refused and why.
   sanity(recipe: Recipe, agentCtx: AgentCtx): string | null
@@ -239,6 +243,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const codex = new CodexStore(deps.db)
   const constructs = new ConstructStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
+  const council = makeCouncil({
+    llm: deps.llm,
+    ...(deps.vocabulary === undefined ? {} : { vocabulary: deps.vocabulary }),
+  })
   const tick = deps.tick ?? (() => 0)
 
   // The roster is read on every turn of every mind, so a row is read out of its JSON once and
@@ -567,6 +575,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
         unregisterVerb(row.verb)
       }
       return stale.map((row) => row.verb)
+    },
+
+    compileLaw(ask) {
+      return council(ask)
     },
 
     sanity(recipe, agentCtx) {
