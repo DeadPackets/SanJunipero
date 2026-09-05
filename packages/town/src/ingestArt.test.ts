@@ -46,6 +46,7 @@ import {
   ingestTerrainArt,
 } from './ingestArt.js'
 import { townStructuresFor } from './founders.js'
+import { SHOWCASE_CONFIG } from './devWorld.js'
 
 const dir = mkdtempSync(join(tmpdir(), 'sj-ingest-'))
 afterAll(() => {
@@ -304,7 +305,8 @@ describe('the boot resolves every kind the world will ask for', () => {
   // ★ Only this lane sees both the sim and the catalogue, so only here can the whole question be
   // asked: `seed_pouch` sat in every founder's kit and `torch` in a recipe, neither ever drawn.
   it('★ every kind the sim seeds or crafts is a kind the catalog carries', () => {
-    const world = configItemKinds(DEFAULT_CONFIG, seededItemKinds())
+    // SHOWCASE_CONFIG is the config the town boots; a showcase-only recipe must be covered too.
+    const world = configItemKinds(SHOWCASE_CONFIG, seededItemKinds())
     for (const k of ['seed_pouch', 'torch', 'plank'])
       expect(world, `the walk lost ${k} — the gate would be vacuous`).toContain(k)
     const absent = catalogGap(world)
