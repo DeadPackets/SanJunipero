@@ -256,9 +256,10 @@ export const PINNED_CALLERS: string[] = Object.keys(SETTINGS_BY_CALLER)
 
 const NO_SETTINGS: CallSettings = {}
 
-/** `SJ_FLEET=luna`: the whole town on the ruling model, served by OpenAI, reasoning at xhigh
- *  (max on a ruling took 61 s and overran its ceiling twice in r21). Output ceilings and rails
- *  widen because a reasoning model spends its tokens before the answer. */
+/** `SJ_FLEET=luna`: the whole town on the ruling model, served by OpenAI. A ruling reasons at
+ *  xhigh, a turn or a line at high, a restatement not at all: r21 spent 58% of its bill on
+ *  reasoning tokens. Output ceilings and rails widen because a reasoning model spends its tokens
+ *  before the answer. */
 const FLEET: 'pinned' | 'luna' = process.env.SJ_FLEET === 'luna' ? 'luna' : 'pinned'
 const LUNA_OUTPUT_ROOM = 6000
 // A ruling at max reasoning spent 9,000 tokens thinking and hit a 10,000 ceiling twice in r21.
@@ -281,7 +282,7 @@ function onLuna(caller: string, pinned: CallSettings): CallSettings {
     ...pinned,
     model: RULING_MODEL,
     providerOrder: RULING_PROVIDER_ORDER,
-    reasoning: { effort: LUNA_NO_THOUGHT.includes(caller) ? 'minimal' : 'xhigh' },
+    reasoning: { effort: ruling ? 'xhigh' : LUNA_NO_THOUGHT.includes(caller) ? 'minimal' : 'high' },
     maxOutputTokens:
       (pinned.maxOutputTokens ?? 2000) + (ruling ? LUNA_RULING_ROOM : LUNA_OUTPUT_ROOM),
     minTimeoutMs: Math.max(pinned.minTimeoutMs ?? 0, 90_000),

@@ -321,7 +321,7 @@ it('an unpinned caller keeps the routing it has always had', () => {
   expect(modelFor('nobody-pinned-this')).toBe(MIND_MODEL)
 })
 
-it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh', async () => {
+it('★ SJ_FLEET=luna puts every caller on the ruling model: rulings at xhigh, turns and lines at high, restatements at minimal', async () => {
   vi.stubEnv('SJ_FLEET', 'luna')
   vi.resetModules()
   try {
@@ -329,7 +329,7 @@ it('★ SJ_FLEET=luna puts every caller on the ruling model, reasoning at xhigh'
     for (const caller of ['turn', 'scene', 'reflection', 'narrator', 'nobody']) {
       expect(luna.modelFor(caller)).toBe(RULING_MODEL)
       expect(luna.callSettingsFor(caller).providerOrder).toEqual(RULING_PROVIDER_ORDER)
-      expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'xhigh' })
+      expect(luna.callSettingsFor(caller).reasoning).toEqual({ effort: 'high' })
     }
     for (const caller of ['reflection.gist', 'scene.close', 'semantic']) {
       expect(luna.modelFor(caller)).toBe(RULING_MODEL)
