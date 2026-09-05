@@ -20,30 +20,30 @@ function block1(): string {
 
 describe('SPEECH_RULES', () => {
   it('carries the distilled humanizer rules, diegetically', () => {
-    expect(SPEECH_RULES).toContain('single word')
-    expect(SPEECH_RULES).toContain('fragment')
+    expect(SPEECH_RULES).toContain('plain words')
+    expect(SPEECH_RULES).toContain('Half a sentence is fine')
     expect(SPEECH_RULES).toMatch(/plain/)
   })
 
   // The two deleted sentences are the ones the live transcript obeyed into an 81% talk rate
   // and a forty-line plank loop; silence and the decay ladder are what replaced them.
   it('makes silence the default and gives a repeat somewhere to go', () => {
-    expect(SPEECH_RULES).toMatch(/Most moments you say nothing/)
-    expect(SPEECH_RULES).toMatch(/shorter and wearier/)
+    expect(SPEECH_RULES).toMatch(/Most of the time you say nothing/)
+    expect(SPEECH_RULES).toMatch(/once it is said, it is said/)
     expect(SPEECH_RULES).not.toMatch(/never wasted|words spent on/i)
     expect(SPEECH_RULES).not.toContain('in the words they said it')
   })
 
   it('aims a line at one person, lets it end, and keeps the counting out of it', () => {
-    expect(SPEECH_RULES).toMatch(/one person, by name/)
-    expect(SPEECH_RULES).toMatch(/the talk is allowed to end/)
-    expect(SPEECH_RULES).toMatch(/Numbers are for the tally book/)
+    expect(SPEECH_RULES).toMatch(/one person at a time/)
+    expect(SPEECH_RULES).toMatch(/do not have to get the last word/)
+    expect(SPEECH_RULES).toMatch(/Map coordinates are for your feet/)
   })
 
   // The em dash ran at 35-54% of lines in a corpus produced with the old block already in the
   // prompt, and it was the one humanizer tell nothing here named.
   it('forbids the long dash', () => {
-    expect(SPEECH_RULES).toMatch(/long dash/)
+    expect(SPEECH_RULES).toMatch(/No dashes/)
   })
 
   it('spends no em dash of its own', () => {
@@ -102,7 +102,7 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   it('closes with the invitation, not the old promise of a lesson', () => {
     expect(
       CAPABILITIES.endsWith(
-        'Anything you can name, you may try; the world answers with what it took.',
+        'Anything you can name, you can try; the world tells you what it cost.',
       ),
     ).toBe(true)
     expect(CAPABILITIES).not.toContain('the world will show you')
@@ -287,7 +287,7 @@ describe('word budgets', () => {
       }),
     )
     expect(a.system).toContain(
-      'You usually say about 10 words at a time; when truly moved, up to 40.',
+      'You usually say about 10 words at a time; when it really matters to you, up to 40.',
     )
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -306,7 +306,7 @@ describe('word budgets', () => {
     expect(without.system).not.toContain('words at a time')
     expect(without.system.length).toBeLessThan(withBudget.system.length)
     // The only difference is the appended line: everything before it is identical.
-    const idx = without.system.indexOf('Example lines:')
+    const idx = without.system.indexOf('Example lines,')
     expect(withBudget.system.slice(0, idx)).toBe(without.system.slice(0, idx))
   })
 
@@ -327,8 +327,12 @@ describe('word budgets', () => {
         },
       }),
     )
-    expect(terse.system).toContain('about 4 words at a time; when truly moved, up to 12.')
-    expect(talkative.system).toContain('about 30 words at a time; when truly moved, up to 90.')
+    expect(terse.system).toContain(
+      'about 4 words at a time; when it really matters to you, up to 12.',
+    )
+    expect(talkative.system).toContain(
+      'about 30 words at a time; when it really matters to you, up to 90.',
+    )
     expect(terse.system).not.toBe(talkative.system)
   })
 })

@@ -9,7 +9,31 @@ import {
 import type { LawPredicate } from '@sj/engine'
 import type { Tie } from '../memory/ties.js'
 
-export type Move = 'press' | 'give_way' | 'deflect' | 'tease' | 'none'
+/** What a line is doing. The first five are stances toward what was just said; the rest are
+ *  how a person moves a talk along: news, a real question, a joke, agreement, a new subject. */
+export type Move =
+  | 'press'
+  | 'give_way'
+  | 'deflect'
+  | 'tease'
+  | 'none'
+  | 'tell'
+  | 'ask'
+  | 'joke'
+  | 'agree'
+  | 'shift'
+export const MOVES = [
+  'press',
+  'give_way',
+  'deflect',
+  'tease',
+  'none',
+  'tell',
+  'ask',
+  'joke',
+  'agree',
+  'shift',
+] as const satisfies readonly Move[]
 
 /** Where one mind stands on a rule somebody put to the room. */
 export type Stance = 'for' | 'against' | 'unsure'
@@ -67,7 +91,7 @@ export const SceneTurnSchema = z
      *  the room and lets the anchor answer. */
     to: z.string().nullable(),
     gesture: z.string().nullable(),
-    move: z.enum(['press', 'give_way', 'deflect', 'tease', 'none']),
+    move: z.enum(MOVES),
     stance: z.enum(['for', 'against', 'unsure']).nullable(),
     answer: z.enum(['accept', 'refuse']).nullable(),
     /** An invitation this line puts to whoever it is aimed at. Null in every ordinary line. */
@@ -94,6 +118,8 @@ export type SceneAsk = {
   tick: number
   /** What this body has left in it, 0–100. Said as weariness, never as a number. */
   energy: number
+  /** The last few things this mind said anywhere, newest last, so it does not say them again. */
+  recent: readonly string[]
 }
 
 export const TIE_KINDS = [

@@ -168,14 +168,15 @@ describe('★ the first talk a stranger stands in', () => {
       audience: [],
       ties: [],
       thread: scene.thread,
+      recent: [],
       wrapUp: false,
       tick: NOON,
       energy: 90,
     })
-    const voice = { livingCast: () => [], words: 30 }
+    const voice = { livingCast: () => [], words: 30, usual: 15 }
     expect(sceneBlock(ask(MIRA), voice)).toContain('Nobody here knows you yet')
     const theirs = sceneBlock(ask(NADIA), voice)
-    expect(theirs).toContain('Mira came up the valley road and nobody here knows them')
+    expect(theirs).toContain('Mira just came up the valley road and nobody here knows them')
     expect(theirs).not.toContain('Nobody here knows you yet')
   })
 })

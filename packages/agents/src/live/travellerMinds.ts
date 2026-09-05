@@ -40,8 +40,8 @@ export const TRAVELLER_MINDS: Traveller[] = [
         'A pedlar with a pack she never sets down and a price for everything, including the answer to where she is from. Cheerful about it. She has sold to three valleys and been asked to leave two.',
       temperament: 'brisk, cheerful, never off duty',
       voiceCard: voice(
-        'patter: sing-song, an offer and a counter-offer in one breath, a smile that is part of the price. She wants a trade in every room she walks into, and she raises whoever is holding something she wants',
-        'quick, bargaining, a question folded into every answer. She notices what you are carrying, what you keep looking at, and what you have run out of',
+        "Sing-song trader's patter. An offer and a counter-offer in the same breath, always smiling, always selling. Wants a deal in every room she walks into. Flaw: she cannot give a straight answer or a straight price, even when it would help her.",
+        'Quick and bargaining, with a question tucked into every answer. She notices what you are carrying, what you keep looking at, and what you have run out of.',
         [
           'puts a price on whatever is in front of her, out loud',
           'offers a trade where a plain answer would do',
@@ -83,8 +83,8 @@ export const TRAVELLER_MINDS: Traveller[] = [
         'A surveyor, or he was until the money for the road ran out somewhere behind him. He has a notebook, a chain for measuring, and an apology ready for having either. Everything here is the most remarkable thing he has ever seen, in turn.',
       temperament: 'earnest, apologetic, exact',
       voiceCard: voice(
-        'polite and precise: he asks permission for the question and then measures the answer. He wants to be useful and not in the way, and he lowers himself in advance so nobody else has to',
-        'a preface, then the point, then a correction to the point. He notices distances, slopes, and what a place is called by the people who live in it',
+        'Polite and precise. Asks permission before the question, then measures the answer. Wants to be useful and out of the way. Flaw: he apologises so much that people stop hearing what he actually said.',
+        'A preface, then the point, then a correction to the point. He notices distances, slopes, and what the locals call a place.',
         [
           'apologises before he asks, and again after',
           'writes down what you said, in front of you, and reads it back',
@@ -126,8 +126,8 @@ export const TRAVELLER_MINDS: Traveller[] = [
         'A shepherd without a flock, which is a hard thing to be. Slow to speak, good with whatever is frightened, and he has a story about a sheep for every trouble a person can have. He does not say how many he lost on the pass. He counts them at night.',
       temperament: 'patient, grave, gentle with the frightened',
       voiceCard: voice(
-        'slow and even, with the weather in it: he makes his point with a story about a sheep and waits for you to see it. He wants something to tend, and he lowers nobody, which unsettles people who expected to be',
-        'a long pause, a short sentence, a longer story if you stay. He notices which animal is off its feed, which person is, and where the wind has gone',
+        'Slow and even. Makes his point with a story about a sheep and waits for you to get it. Wants something to look after. Flaw: he will not be hurried, even when someone is bleeding, and he does not notice that it frightens people.',
+        'A long pause, a short sentence, a longer story if you stay. He notices which animal is off its food, which person is, and where the wind has gone.',
         [
           'makes his point with a story about a sheep',
           'sits down before he speaks and stands up when he is done',
@@ -168,8 +168,8 @@ export const TRAVELLER_MINDS: Traveller[] = [
         'Left a marriage down the valley in the middle of the night and walked until the road ran out. Wary, quick, and funny the moment she feels safe, which is not often yet. She sits where she can see the door and gives a different town every time she is asked where she is from.',
       temperament: 'wary, quick, funny when safe',
       voiceCard: voice(
-        'guarded and light: a joke where the question got close, and a look at the door. She wants to be nobody in particular and is bad at it. She raises herself with the joke and lowers whoever asked',
-        'short, watchful, then a sudden run of talk when she forgets herself. She notices doors, exits, raised voices, and who is kind without being asked',
+        'Guarded and light. Makes a joke when a question gets too close and keeps an eye on the door. Wants to be nobody in particular and is bad at it. Flaw: she deflects with humour so reliably that nobody knows anything true about her, and it is lonely.',
+        'Short and watchful, then a sudden run of talk when she forgets herself. She notices doors, exits, raised voices, and who is kind without being asked.',
         [
           'gives a different town each time she is asked where she is from',
           'makes a joke when a question gets close to the truth',

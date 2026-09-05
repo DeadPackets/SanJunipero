@@ -89,14 +89,14 @@ function renderIdentity(id: IdentityCore): string {
     `Age: ${id.age}`,
     `Temperament: ${id.temperament}`,
     `Backstory: ${id.backstory}`,
-    `Voice: ${v.register} — ${v.rhythm}`,
-    `Tics: ${v.tics.join('; ')}`,
+    `Voice: ${v.register} ${v.rhythm}`,
+    `Habits: ${v.tics.join('; ')}`,
     `Never says: ${v.neverSays.join('; ')}`,
-    `Example lines: ${v.exampleLines.join(' | ')}`,
+    `Example lines, to show the voice and not to be reused word for word: ${v.exampleLines.join(' | ')}`,
   ]
   if (v.wordBudget) {
     lines.push(
-      `You usually say about ${v.wordBudget.typical} words at a time; when truly moved, up to ${v.wordBudget.burst}.`,
+      `You usually say about ${v.wordBudget.typical} words at a time; when it really matters to you, up to ${v.wordBudget.burst}.`,
     )
   }
   return lines.join('\n')

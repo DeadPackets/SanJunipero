@@ -57,27 +57,34 @@ export function threadLinesFor(talkers: number): number {
 
 // v1 measured: the median spoken line was 92 characters, which is 16 words. A persona carrying
 // no card of its own speaks at the town's median.
-const DEFAULT_SCENE_WORDS = 16
+const DEFAULT_SCENE_WORDS = 28
 
-/** A scene line is capped at the persona's TYPICAL length, never its burst. The floor is handed
- *  on after every line, so nobody in a scene holds it long enough to earn a burst. */
+/** A scene line may run to the persona's burst: a cap at the typical length made every line an
+ *  epigram. The typical length is said to the mind as guidance, the burst is the ceiling. */
 export function sceneWordCap(voice: IdentityCore['voiceCard']): number {
-  return voice.wordBudget?.typical ?? DEFAULT_SCENE_WORDS
+  return voice.wordBudget?.burst ?? DEFAULT_SCENE_WORDS
+}
+export function sceneWordUsual(voice: IdentityCore['voiceCard']): number {
+  return voice.wordBudget?.typical ?? Math.round(DEFAULT_SCENE_WORDS / 2)
 }
 
 // CAPABILITIES tells every prompt to name an act. A scene line is not an act, and this is the
 // one place that has to say so.
-export const SCENE_ANSWER = `This moment is not an act; it is your turn to speak, and your hands can wait.
+export const SCENE_ANSWER = `Your turn to talk. Your hands are not doing anything right now, so this is not an act.
 
-Leave your speech empty when you have nothing left to add, and the talk ends there. Say that you leave when you walk off mid-word. Put in "to" the one name you are speaking to, out of the people named at the end of this, and leave it empty to speak to whoever is listening. Name your move: press to push your point, give_way to let them have it, deflect to turn it aside, tease to needle them, none for plain talk. Your thought is the one line nobody else hears, and a breath of it is enough.
+Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
 
-To ask the one you speak to, put court, propose or lie_with in "ask"; else leave it empty. Asked such a thing yourself, put accept or refuse in "answer".`
+move says what this line is doing. tell: bring up something new, like news, a plan, or a thing you noticed. ask: a real question you want the answer to. joke: make light of it, even if the moment is not light. agree: you are with them. shift: change the subject. press: push your point. give_way: let them have it. deflect: dodge. tease: needle them. none: plain talk.
+
+To ask the person you are talking to for something, put court, propose or lie_with in "ask"; otherwise leave it empty. If you were asked such a thing, put accept or refuse in "answer".
+
+thought is one short line nobody else hears.`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
-  ended: 'It ended because they had said what there was to say.',
+  ended: 'It ended because they had said what they had to say.',
   left: 'It ended because somebody walked away.',
-  capped: 'It ended still running, with more in it than either of them said.',
-  timeout: 'It ended in a silence neither of them filled.',
+  capped: 'It ended while still going; there was more to say.',
+  timeout: 'It ended in a silence nobody filled.',
 }
 
 function castLaw(living: readonly { name: string }[]): string {
@@ -118,12 +125,12 @@ function renderThread(
 // Both doors, said in one breath. Nothing here sends a mind to bed: the last one to leave a
 // room is a person, and the mind already has `leave` for the other answer.
 const SLEEP_WILL_KEEP =
-  'Sleep will keep. Stay while the talk is worth it, and say that you leave when it is not.'
+  'Sleep can wait. Stay while the conversation is worth it, and leave when it is not.'
 
 // The town's own words for a body running down, from the ordinary turn's ladder.
 const TIREDNESS: readonly [number, string][] = [
   [30, 'Your eyes keep closing.'],
-  [45, 'Weariness drags at your limbs.'],
+  [45, 'You are worn out.'],
 ]
 
 /** The hour, in the register somebody outdoors would tell it. Only after dark, and only through
@@ -131,8 +138,8 @@ const TIREDNESS: readonly [number, string][] = [
 function hourSaid(tick: number): string {
   if (dayPhaseFromTick(tick) !== 'night') return ''
   const { hour } = simTimeFromTick(tick)
-  if (hour >= 21) return 'It is late, and the town has gone quiet around you.'
-  return hour < 3 ? 'It is past midnight.' : 'The night is nearly out.'
+  if (hour >= 21) return 'It is late and the town has gone quiet.'
+  return hour < 3 ? 'It is past midnight.' : 'It is nearly morning.'
 }
 
 /** What a person knows at midnight without being told: the hour and their own weariness. The
@@ -163,13 +170,13 @@ function renderTelling(scene: Scene, agentId: string, nameOf: (id: string) => st
   if (stranger === undefined) return ''
   if (stranger === agentId) {
     return (
-      'Nobody here knows you yet. They will ask where you have come from and what you are' +
-      ' for, and what you say now is what this town will hold you to.'
+      'Nobody here knows you yet. They will want to know where you came from and what you' +
+      ' can do. Whatever you tell them now is what they will remember.'
     )
   }
   return (
-    `${nameOf(stranger)} came up the valley road and nobody here knows them. Find out what` +
-    ' you want to know, and tell them what you want them to know of this place.'
+    `${nameOf(stranger)} just came up the valley road and nobody here knows them. Ask what` +
+    ' you want to know, and tell them what they should know about this place.'
   )
 }
 
@@ -181,13 +188,13 @@ function renderProposal(scene: Scene, agentId: string, nameOf: (id: string) => s
   if (scene.kind !== 'council' || proposal === undefined) return ''
   if (proposal.proposedBy === agentId) {
     return (
-      `You have put a rule to everyone here: "${proposal.lawText}" Hear them out. ` +
-      'It holds if more of them are for it than against, and it holds nobody if nobody answers.'
+      `You have proposed a rule to everyone here: "${proposal.lawText}" Hear them out. ` +
+      'It passes if more are for it than against, and it means nothing if nobody answers.'
     )
   }
   return (
-    `${nameOf(proposal.proposedBy)} has put a rule to everyone here: "${proposal.lawText}" ` +
-    'Say where you stand on it in "stance": for, against, or unsure. The talk ends when ' +
+    `${nameOf(proposal.proposedBy)} has proposed a rule to everyone here: "${proposal.lawText}" ` +
+    'Say where you stand in "stance": for, against, or unsure. The talk ends when ' +
     'everybody has answered.'
   )
 }
@@ -201,6 +208,7 @@ function renderFloor(opts: {
   audience: readonly string[]
   wrapUp: boolean
   words: number
+  usual: number
 }): string {
   // Name one mind rather than say "somebody": whoever has not spoken yet, else the only other.
   const them = opts.silent[0] ?? (opts.others.length === 1 ? opts.others[0]! : 'them')
@@ -209,8 +217,8 @@ function renderFloor(opts: {
       ? `${them} just spoke.`
       : `${opts.lastSpeaker} just spoke.`
   const ask = opts.wrapUp
-    ? 'This has run on. Say the last thing you have to say, and let it end.'
-    : `Answer ${them}, or say nothing at all and let the talk end.`
+    ? 'This has gone on a while. Say your last thing and let it end.'
+    : `Say what you would actually say next, or say nothing and let it end. You do not have to answer what ${them} said; you can ask something, bring up your own thing, or change the subject.`
   return [
     opts.others.length === 0 ? '' : `Standing with you: ${opts.others.join(', ')}.`,
     opts.silent.length === 0 ? '' : `Not a word yet from ${opts.silent.join(', ')}.`,
@@ -218,7 +226,7 @@ function renderFloor(opts: {
       ? ''
       : `Within earshot and not in the talk: ${opts.audience.join(', ')}.`,
     `It is your turn. ${spoke} ${ask}`,
-    `No more than ${opts.words} words. One breath, then stop, and leave ${them} something to answer.`,
+    `About ${opts.usual} words is normal for you; ${opts.words} at the very most. Do not repeat ${them}'s words back, and do not end on a comeback unless that is how you talk.`,
   ]
     .filter((p) => p.length > 0)
     .join('\n')
@@ -227,9 +235,18 @@ function renderFloor(opts: {
 /** The one volatile block a scene turn sends, stable parts first so the cached prefix reaches
  *  as far into it as the provider will take it. The thread only ever grows at its end, so the
  *  roster is the one thing that must stand below it. */
+/** The mind's own last lines, so a phrase it liked does not become its catchphrase. */
+function renderRecent(recent: readonly string[]): string {
+  if (recent.length === 0) return ''
+  return [
+    'Things you said lately. Do not say them again, and do not reuse their phrasing:',
+    ...recent.map((l) => `- "${sanitizeSpokenText(l)}"`),
+  ].join('\n')
+}
+
 export function sceneBlock(
   ask: SceneAsk,
-  voice: Pick<SceneVoice, 'livingCast' | 'want'> & { words: number },
+  voice: Pick<SceneVoice, 'livingCast' | 'want'> & { words: number; usual: number },
 ): string {
   const names = new Map<string, string>()
   for (const p of voice.livingCast()) names.set(p.id, p.name)
@@ -245,6 +262,7 @@ export function sceneBlock(
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
+    renderRecent(ask.recent),
     renderLateness(ask.tick, ask.energy),
     renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
     renderTelling(ask.scene, ask.agentId, nameOf),
@@ -256,6 +274,7 @@ export function sceneBlock(
       audience: ask.audience.map((p) => p.name),
       wrapUp: ask.wrapUp,
       words: voice.words,
+      usual: voice.usual,
     }),
   ]
   return parts.filter((p) => p.length > 0).join('\n\n')
@@ -364,10 +383,11 @@ const estTokens = (text: string): number => Math.ceil(text.length / 4)
 export function makeSceneLlm(client: LlmClient, voice: SceneVoice): SceneLlm {
   const closeClient = client.forCaller('scene.close')
   const words = sceneWordCap(voice.identity.voiceCard)
+  const usual = sceneWordUsual(voice.identity.voiceCard)
   return {
     async line(ask) {
       const system = sceneSystem(voice)
-      const block = sceneBlock(ask, { ...voice, words })
+      const block = sceneBlock(ask, { ...voice, words, usual })
       const bill: CallBill = {
         wakeReason: 'floor',
         blockTokens: { system: estTokens(system), scene: estTokens(block) },

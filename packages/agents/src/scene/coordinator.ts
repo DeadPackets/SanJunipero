@@ -80,6 +80,8 @@ export type SceneCoordinatorOpts = {
 const OPENING_STAKES = STAKES_BY_KIND.talk
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
+// How many of its own last lines a mind is shown before it speaks again.
+const RECENT_LINES_KEPT = 4
 // A coordinator with nobody to tell drops what it would have reported.
 const NO_REPORT = (): void => {
   /* nothing to tell */
@@ -125,6 +127,9 @@ export class SceneCoordinator {
   /** The ask now in flight, per scene, as the token it was made under. A late answer to a stale
    *  token is dropped — the floor has already moved on. */
   readonly #asked = new Map<string, number>()
+  /** The last few lines each mind said, in any scene. Shown back to it so a line it liked does
+   *  not become a catchphrase by the second day. */
+  readonly #recent = new Map<string, string[]>()
   /** The kind, stakes and cast last announced per scene. A talk that turns, or grows a voice,
    *  is a new fact about the same scene, and this is what says whether it is new. */
   readonly #announced = new Map<string, string>()
@@ -302,6 +307,7 @@ export class SceneCoordinator {
         audience: this.#named(scene.audience),
         ties: this.#tiesBetween(mind.ties, scene, agentId),
         thread: threadFor(scene, agentId),
+        recent: this.#recent.get(agentId) ?? [],
         wrapUp: wrapUpDue(scene),
         tick,
         energy: this.#bridge.energyOf(agentId),
@@ -338,6 +344,7 @@ export class SceneCoordinator {
       void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
     }
     this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick, turn.stance)
+    this.#saidLately(agentId, said)
     if (councilDecided(scene)) await this.#close(scene, 'ended', tick)
     else if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
   }
@@ -444,6 +451,13 @@ export class SceneCoordinator {
     this.#floorTo(scene, next)
     this.#turned(scene)
     this.#bridge.announce('scene_line', { id: scene.id, agentId, text, move })
+  }
+
+  #saidLately(agentId: string, said: string): void {
+    const ring = this.#recent.get(agentId) ?? []
+    ring.push(said)
+    if (ring.length > RECENT_LINES_KEPT) ring.shift()
+    this.#recent.set(agentId, ring)
   }
 
   /** What the town has been told about this scene: its kind, what it is worth, and who is in it. */

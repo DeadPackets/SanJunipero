@@ -10,6 +10,7 @@ import {
   makeSceneLlm,
   sceneBlock,
   sceneWordCap,
+  sceneWordUsual,
   threadLinesFor,
   type SceneVoice,
 } from './sceneLlm.js'
@@ -74,6 +75,7 @@ function ask(overrides: Partial<SceneAsk> = {}): SceneAsk {
     audience: [],
     ties: [],
     thread: [line('yusuf', 'Four days of bread, you said.')],
+    recent: [],
     wrapUp: false,
     tick: MORNING,
     energy: 80,
@@ -82,7 +84,11 @@ function ask(overrides: Partial<SceneAsk> = {}): SceneAsk {
 }
 
 const block = (a = ask(), v = voice()): string =>
-  sceneBlock(a, { ...v, words: sceneWordCap(v.identity.voiceCard) })
+  sceneBlock(a, {
+    ...v,
+    words: sceneWordCap(v.identity.voiceCard),
+    usual: sceneWordUsual(v.identity.voiceCard),
+  })
 
 function answering(text: string): { model: MockLanguageModelV4; prompts: string[] } {
   const prompts: string[] = []
@@ -184,7 +190,9 @@ describe('the scene block', () => {
     const text = block(ask({ audience: [{ id: 'nadia', name: 'Nadia' }] }))
     expect(text).toContain('Within earshot and not in the talk: Nadia.')
     expect(text).not.toContain('Standing with you: Nadia')
-    expect(block()).toContain('Put in "to" the one name you are speaking to')
+    expect(block()).toContain(
+      'Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.',
+    )
   })
 
   it('names one silent mind in the run cue rather than asking for somebody', () => {
@@ -198,7 +206,7 @@ describe('the scene block', () => {
       }),
     )
     expect(text).toContain('Not a word yet from Nadia.')
-    expect(text).toContain('Answer Nadia, or say nothing at all')
+    expect(text).toContain('You do not have to answer what Nadia said')
     expect(text).not.toContain('Answer them,')
   })
 
@@ -302,19 +310,19 @@ describe('a join does not throw the cached prefix away', () => {
     expect(text).toContain(`Yusuf: "he said 'four days' and left"`)
   })
 
-  it('caps the line at the persona’s typical length, never its burst', () => {
-    expect(sceneWordCap(CARDED.voiceCard)).toBe(11)
-    expect(block()).toContain('No more than 11 words.')
-    expect(block()).not.toContain('22 words')
+  it('lets a line run to the persona’s burst, and says the typical length as the usual', () => {
+    expect(sceneWordCap(CARDED.voiceCard)).toBe(22)
+    expect(sceneWordUsual(CARDED.voiceCard)).toBe(11)
+    expect(block()).toContain('About 11 words is normal for you; 22 at the very most.')
   })
 
   it('falls back to the town’s median line for a persona with no card', () => {
-    expect(sceneWordCap(tamarIdentity.voiceCard)).toBe(16)
+    expect(sceneWordCap(tamarIdentity.voiceCard)).toBe(28)
   })
 
   it('asks for an answer or a silence, and on the wrap-up cue asks for the last word', () => {
-    expect(block()).toContain('Answer Yusuf, or say nothing at all and let the talk end.')
-    expect(block(ask({ wrapUp: true }))).toContain('Say the last thing you have to say')
+    expect(block()).toContain('You do not have to answer what Yusuf said')
+    expect(block(ask({ wrapUp: true }))).toContain('Say your last thing and let it end.')
   })
 
   it('renders open ties by name, and nothing at all when there are none', () => {
@@ -340,34 +348,34 @@ describe('a join does not throw the cached prefix away', () => {
   })
 
   it('tells the mind this moment is not an act', () => {
-    expect(block()).toContain('This moment is not an act')
+    expect(block()).toContain('this is not an act')
   })
 })
 
 describe('the hour, and the body that has to sit through it', () => {
   it('says nothing at all by day to a body with something left in it', () => {
     const text = block()
-    expect(text).not.toContain('Sleep will keep')
+    expect(text).not.toContain('Sleep can wait')
     expect(text).not.toContain('midnight')
-    expect(text).not.toContain('Weariness')
+    expect(text).not.toContain('worn out')
   })
 
   it('tells the hour after dark, in the words somebody outdoors would use', () => {
-    expect(block(ask({ tick: JUST_DARK }))).toContain('It is late, and the town has gone quiet')
+    expect(block(ask({ tick: JUST_DARK }))).toContain('It is late and the town has gone quiet.')
     expect(block(ask({ tick: PAST_MIDNIGHT }))).toContain('It is past midnight.')
-    expect(block(ask({ tick: SMALL_HOURS }))).toContain('The night is nearly out.')
+    expect(block(ask({ tick: SMALL_HOURS }))).toContain('It is nearly morning.')
   })
 
   it('says the tiredness as weariness and never as a number', () => {
-    expect(block(ask({ energy: 40 }))).toContain('Weariness drags at your limbs.')
+    expect(block(ask({ energy: 40 }))).toContain('You are worn out.')
     expect(block(ask({ energy: 20 }))).toContain('Your eyes keep closing.')
     expect(block(ask({ energy: 20 }))).not.toContain('20')
   })
 
   it('leaves both doors open, and sends nobody to bed', () => {
     const text = block(ask({ tick: PAST_MIDNIGHT, energy: 20 }))
-    expect(text).toContain('Sleep will keep. Stay while the talk is worth it')
-    expect(text).toContain('say that you leave when it is not')
+    expect(text).toContain('Sleep can wait. Stay while the conversation is worth it')
+    expect(text).toContain('leave when it is not')
     // Nothing in it tells a mind to go: a night owl reads the same sentence and stays.
     expect(text).not.toMatch(/go to bed|you should sleep|time to sleep/i)
   })
@@ -433,7 +441,7 @@ describe('the close', () => {
     const llm = makeSceneLlm(client(model), voice())
     await llm.close(closed())
     expect(prompts[0]).toContain('(Yusuf was thinking: she will hold me to it)')
-    expect(prompts[0]).toContain('It ended because they had said what there was to say.')
+    expect(prompts[0]).toContain('It ended because they had said what they had to say.')
     expect(prompts[0]).toContain('Who was there: Tamar, Yusuf.')
   })
 
@@ -565,13 +573,13 @@ describe('a rule put to the room', () => {
 
   it('tells whoever has to answer what was put and how to answer it', () => {
     const said = block(asCouncil())
-    expect(said).toContain(`Yusuf has put a rule to everyone here: "${PROPOSAL}"`)
+    expect(said).toContain(`Yusuf has proposed a rule to everyone here: "${PROPOSAL}"`)
     expect(said).toContain('"stance": for, against, or unsure')
   })
 
   it('tells the one who put it to hear them out instead', () => {
     const said = block(asCouncil('yusuf'))
-    expect(said).toContain('You have put a rule to everyone here')
+    expect(said).toContain('You have proposed a rule to everyone here')
     expect(said).not.toContain('Say where you stand')
   })
 
@@ -585,8 +593,8 @@ describe('a rule put to the room', () => {
 
   it('stands after the thread, so every byte above it stays where it was', () => {
     const said = block(asCouncil())
-    expect(said.indexOf('What has been said')).toBeLessThan(said.indexOf('has put a rule'))
-    expect(said.indexOf('has put a rule')).toBeLessThan(said.indexOf('It is your turn'))
+    expect(said.indexOf('What has been said')).toBeLessThan(said.indexOf('has proposed a rule'))
+    expect(said.indexOf('has proposed a rule')).toBeLessThan(said.indexOf('It is your turn'))
   })
 })
 
