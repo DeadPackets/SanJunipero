@@ -675,7 +675,9 @@ export class LlmClient {
         this.llmCallRow({
           model: served,
           provider,
-          generationId: facts.generationId ?? null,
+          // The refusal carries the generation it came from, and `note` never ran to record it:
+          // without this the 3 rows r13 booked at the ceiling had no id to ask OpenRouter about.
+          generationId: dead?.response?.id ?? facts.generationId ?? null,
           ...tokens,
           costUsd: deadCost,
           estimatedCostUsd: deadCost,

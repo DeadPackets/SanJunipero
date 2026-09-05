@@ -42,6 +42,29 @@ function seedUnattributed(
   db.prepare('UPDATE llm_calls SET ts = ? WHERE ts > ?').run(NOW - 60_000, NOW)
 }
 
+/** A call the schema turned away: the provider answered and billed, and nothing named it. */
+function seedRefused(db: Database.Database, generationId: string, inputTokens: number): void {
+  insertLlmCall(db, {
+    agentId: 'amara',
+    caller: 'semantic',
+    model: 'deepseek/deepseek-v4-flash-0731',
+    provider: null,
+    generationId,
+    inputTokens,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    reasoningTokens: 0,
+    costUsd: 0.0077,
+    estimatedCostUsd: 0.0077,
+    reportedCostUsd: null,
+    latencyMs: 2000,
+    finishReason: 'stop',
+    ok: false,
+    error: 'did not match schema',
+  })
+  db.prepare('UPDATE llm_calls SET ts = ? WHERE ts > ?').run(NOW - 60_000, NOW)
+}
+
 type Row = { provider: string | null; cost_usd: number; estimated_cost_usd: number | null }
 
 const rowOf = (db: Database.Database): Row =>
@@ -87,6 +110,27 @@ describe('★ an unattributed row is asked about, not ceiling-priced for ever', 
     await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW })
 
     expect(alertKinds(db)).toEqual(['llm_price_divergence', 'llm_price_backfilled'])
+  })
+
+  // ★ r13's three dearest unattributed rows were `semantic` schema misses at 17.5k tokens each,
+  // all booked at the ceiling. A refused answer still billed, and the endpoint still knows who
+  // served it — but a call that billed nothing has nothing to re-price.
+  it('★ a refused answer is asked about too, and an unbilled one is left alone', async () => {
+    const db = openDb()
+    seedRefused(db, 'gen-refused', 17_500)
+    seedRefused(db, 'gen-aborted', 0)
+    const fetchFn = answering({ data: { provider_name: 'Baidu', total_cost: 0.0012 } })
+
+    const r = await backfillUnattributed(db, { apiKey: APIKEY, fetchFn, now: NOW })
+
+    expect(r).toEqual({ attempted: 1, backfilled: 1 })
+    const rows = db
+      .prepare('SELECT generation_id AS gen, provider FROM llm_calls ORDER BY id')
+      .all() as { gen: string; provider: string | null }[]
+    expect(rows.map((x) => [x.gen, x.provider])).toEqual([
+      ['gen-refused', 'Baidu'],
+      ['gen-aborted', null],
+    ])
   })
 
   it('leaves the ceiling price standing when the endpoint will not answer', async () => {

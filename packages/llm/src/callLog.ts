@@ -275,7 +275,9 @@ export type UnattributedCall = {
 }
 
 /** Old enough that the provider has written its accounting row, young enough that the provider
- *  still has one. A row outside the band is never asked about again. */
+ *  still has one. A row outside the band is never asked about again. A refused answer counts as
+ *  much as an accepted one: r13's 3 dearest unattributed rows were schema misses, 17.5k tokens
+ *  each and booked at the ceiling. A row that billed nothing has nothing to re-price. */
 export function unattributedCalls(
   db: Database.Database,
   window: { from: number; until: number; limit: number; skip?: readonly string[] },
@@ -291,7 +293,8 @@ export function unattributedCalls(
               input_tokens AS inputTokens, output_tokens AS outputTokens,
               cache_read_tokens AS cacheReadTokens
          FROM llm_calls
-        WHERE provider IS NULL AND generation_id IS NOT NULL AND ok = 1
+        WHERE provider IS NULL AND generation_id IS NOT NULL
+          AND (input_tokens > 0 OR output_tokens > 0)
           AND ts >= ? AND ts <= ? ${notThese}
         ORDER BY id LIMIT ?`,
     )

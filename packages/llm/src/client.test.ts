@@ -1306,6 +1306,25 @@ describe('★ one unified call discipline, the arbiter included', () => {
       (db.prepare('SELECT generation_id AS g FROM llm_calls').get() as { g: string | null }).g,
     ).toBe('gen-abc')
   })
+
+  // ★ An answer the schema turned away still billed, and `note` never ran to record what served
+  // it. r13 booked 3 such `semantic` rows at the ceiling with no id to ask OpenRouter about.
+  it('★ writes it for a refused answer too, which is the row that books at the ceiling', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'not json at all', generationId: 'gen-dead' }])
+    await expect(
+      new LlmClient({ model, db, caller: 'semantic' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow()
+    const row = db.prepare('SELECT generation_id AS g, ok FROM llm_calls').get() as {
+      g: string | null
+      ok: number
+    }
+    expect([row.g, row.ok]).toEqual(['gen-dead', 0])
+  })
 })
 
 describe('a stalled request is bounded (T37b)', () => {
