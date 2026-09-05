@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
 import { openAgentDb } from './memory/schema.js'
-import { MemoryStore, type MemoryRow, type MemoryTags } from './memory/store.js'
+import { MemoryStore, type MemoryKind, type MemoryRow, type MemoryTags } from './memory/store.js'
 import { GIST_MIN_CHARS } from './memory/gist.js'
 import { TieStore } from './memory/ties.js'
 import Sqlite from 'better-sqlite3'
@@ -76,13 +76,13 @@ const TWO_PERSON_DAY = [
 async function seedDay(
   mem: MemoryStore,
   day: number,
-  specs: { text: string; people: string[]; importance: number }[],
+  specs: { text: string; people: string[]; importance: number; kind?: MemoryKind }[],
 ): Promise<MemoryRow[]> {
   let i = 0
   for (const s of specs) {
     await mem.insertMemory({
       tick: day * TICKS_PER_DAY + i,
-      kind: 'perception',
+      kind: s.kind ?? 'perception',
       text: s.text,
       importance: s.importance,
       tags: { ...TAGS, people: s.people },
@@ -91,6 +91,13 @@ async function seedDay(
   }
   return mem.memoriesOfDay(day)
 }
+
+/** What opens the nightly edit: one act at the mark `actImportance` gives a making. Appended,
+ *  so the fixtures' own row order and ids are the ones every other test already reads. */
+const A_DAY_THAT_CHANGED_SOMETHING = [
+  ...TWO_PERSON_DAY,
+  { text: 'You have raised a wall.', people: [], importance: 7, kind: 'action' as const },
+]
 
 /** One the day opened and one it paid off, plus a neighbour who was never in the valley. */
 const LISTED_TIES: Awaited<ReturnType<ReflectionLlm['listTies']>> = [
@@ -202,7 +209,10 @@ describe('runSleepReflection pipeline', () => {
 
   it('runs steps in spec order: facts strictly before any summarize', async () => {
     const { mem, personality } = await makeStores()
-    const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+    const memories = await seedDay(mem, DAY, [
+      ...SINGLE_PERSON_DAY,
+      { text: 'You have raised a wall.', people: [], importance: 7, kind: 'action' as const },
+    ])
     const llm = new ScriptedReflectionLlm(null)
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
@@ -249,6 +259,23 @@ describe('runSleepReflection pipeline', () => {
     expect(res.editApplied).toBe(false)
     expect(res.editRejectedReason).toBeUndefined()
     expect(personality.current().version).toBe(1)
+  })
+
+  // ★ A prefix only stays warm for the call right behind it: r13 put the day summary and every
+  // ledger between the second dump and the third, and 70% of night calls read no cache at all.
+  it('★ the three night dumps go out back to back, before anything else is asked', async () => {
+    const { db, mem, personality } = await makeStores()
+    await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm(null)
+    await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: DAY,
+      ties: { store: new TieStore(db, AGENT), cast: CAST, tick: DAY * TICKS_PER_DAY },
+    })
+
+    expect(llm.calls.slice(0, 3)).toEqual(['extractFacts', 'summarizeScenes', 'listTies'])
   })
 
   it('updates the ledger once per distinct person seen that day, and only those', async () => {
@@ -300,7 +327,7 @@ describe('runSleepReflection pipeline', () => {
 
   it('applies a valid proposed edit -> editApplied true and personality v2', async () => {
     const { mem, personality } = await makeStores()
-    const memories = await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const memories = await seedDay(mem, DAY, A_DAY_THAT_CHANGED_SOMETHING)
     const llm = new ScriptedReflectionLlm({
       op: 'add',
       field: 'values',
@@ -317,7 +344,7 @@ describe('runSleepReflection pipeline', () => {
 
   it('rejects a temperament-shaped proposal -> editApplied false, invalid_edit_shape', async () => {
     const { mem, personality } = await makeStores()
-    const memories = await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const memories = await seedDay(mem, DAY, A_DAY_THAT_CHANGED_SOMETHING)
     const llm = new ScriptedReflectionLlm({
       op: 'add',
       field: 'temperament',
@@ -329,6 +356,48 @@ describe('runSleepReflection pipeline', () => {
     expect(res.editApplied).toBe(false)
     expect(res.editRejectedReason).toBe('invalid_edit_shape')
     expect(personality.current().version).toBe(1)
+  })
+
+  // ★ The edit resends the whole day at 6,598 tokens a call and its own prompt says "most days
+  // hold nothing like that" — over r13 it answered on every one of 35 nights all the same.
+  it('★ a day that changed nothing is not asked what it changed', async () => {
+    const { mem, personality } = await makeStores()
+    await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm({
+      op: 'add',
+      field: 'values',
+      text: 'fairness',
+      evidence: [],
+    })
+    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
+
+    expect(llm.calls).not.toContain('proposeEdit')
+    expect(res.editSkipped).toBe(true)
+    expect(res.fallback, 'a night nobody asked is not a night that failed').toBe(false)
+    expect(personality.current().version).toBe(1)
+  })
+
+  // A quarrel is the one signal the ties carry that the act table cannot: nothing was made,
+  // and the mind still has something new to be about.
+  it('★ a quarrel the day opened is enough to ask', async () => {
+    const { db, mem, personality } = await makeStores()
+    await seedDay(mem, DAY, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.listTies = async () => {
+      llm.calls.push('listTies')
+      return [
+        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+      ]
+    }
+    await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: DAY,
+      ties: { store: new TieStore(db, AGENT), cast: CAST, tick: DAY * TICKS_PER_DAY },
+    })
+
+    expect(llm.calls).toContain('proposeEdit')
   })
 
   it('a "No change" proposal is skipped quietly: no version bump, no alert', async () => {
@@ -818,16 +887,19 @@ describe('makeReflectionLlm prompts', () => {
 
   // ★ System comes first, so a per-call instruction above the dump makes the 126k tokens under
   // it uncacheable for the call that follows.
-  it('★ both night prompts open with the same bytes, and differ only after the day', () => {
+  it('★ all three night prompts open with the same bytes, and differ only after the day', () => {
     const a = extractFactsPrompt(memories)
     const b = summarizeScenesPrompt(memories)
+    const c = listTiesPrompt(memories, ['Nadia'])
     const prefix = (p: { system: string; messages: LlmMessage[] }): string =>
       `${p.system}\n${p.messages[0]!.content}`
     expect(prefix(a)).toBe(prefix(b))
+    expect(prefix(a)).toBe(prefix(c))
     expect(prefix(a).length).toBeGreaterThan(memories[0]!.text.length)
     expect(a.messages[1]!.content).not.toBe(b.messages[1]!.content)
     expect(a.messages[1]!.content).toContain('at most eight')
     expect(b.messages[1]!.content).toContain('list the memories it draws from')
+    expect(c.messages[1]!.content).toContain('Name only these people')
   })
 
   // ★ The per-person slice and the edit's `[id] text` lines are the night's two largest dumps
