@@ -106,14 +106,14 @@ const STREAM_MIND_CONFIG: Partial<MindConfig> = { dozeTicks: 6 }
  *  measured as 15.9 idle hours of a 17.3-hour waking day. Every call the town makes scales
  *  roughly inversely with it. */
 export const DEFAULT_IDLE_GAP_TICKS = 15
-/** The physics a LIVE town runs on, laid down at Day 0 as laws so a replay carries them. The
- *  defaults suit a scripted world; at 0.01 a meal lasts four days and a log burns eight hours, and
- *  r13 measured the result: 25 meals and 5 chops in 37 mind-days. At 0.12 a night's sleep cost a
- *  whole meal and r16 counted 29 collapses in two days. Here a meal lasts a day and a half and a
- *  hearth wants feeding twice a night, so food and wood are work again without a body dropping. */
+/** The physics a LIVE town runs on, laid down at Day 0 as laws so a replay carries them. At 0.12
+ *  r16 counted 29 collapses in two days; at 0.03 with a four-hour log r24 counted 6 collapses in
+ *  three days, 45 meals a day (a third of them herbs worth 3 hunger each) and 3 acts of gathering,
+ *  and the stores were bare by day 3. Hunger did not make work; it made a body drop. Here a meal
+ *  lasts two days and a log a night, so what work there is comes from wanting to be useful. */
 export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
-  'needs.hungerDecayPerTick': 0.03,
-  'light.fuelBurnTicks': 240,
+  'needs.hungerDecayPerTick': 0.02,
+  'light.fuelBurnTicks': 480,
 }
 
 export function idleGapTicks(env: Record<string, string | undefined> = process.env): number {

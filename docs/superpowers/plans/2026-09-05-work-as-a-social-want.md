@@ -176,6 +176,31 @@ reads "the places held movement, speech, and rest". The town's actual lines are 
    narrator tests updated for the digest shape. Byte-size check in a test: a digest for a
    200-event scene serializes under 4,000 characters.
 
+## Task 6: physics that let a town live long enough to want things
+
+Measured on r24 (3.06 sim-days, 12 minds): 6 collapses (4 from energy after skipped nights, 2 from
+hunger), 91 meals of which 33 were herbs worth 3 hunger each (Leyla ate herbs hourly from 20:54 to
+06:09 and dropped at 06:59 with bread six tiles away), 93 stokes of which 70 fell on day 0 across 9
+hearths (a fire already lit takes the log and gains at most the difference), 3 acts of gathering,
+and stores bare by day 3 (wood 30 to 0 by the end of day 1; food gone by the end of day 2). The
+live hunger rate of 0.03 was set so that "food and wood are work again"; it made bodies drop and
+made no work. Work will come from Tasks 1 to 3; this task gives the town time.
+
+Files: `packages/live/src/liveWorld.ts` (LIVE_PHYSICS), `packages/engine/src/verbs/index.ts`
+(eat, stoke), tests beside each.
+
+1. `LIVE_PHYSICS`: `needs.hungerDecayPerTick` 0.02 (a meal of 60 lasts two days; twelve mouths
+   need about six real meals a day, which five fish and two forages cover), `light.fuelBurnTicks`
+   480 (one log a night per hearth; ten hearths want ten logs, five chops). Comment says why.
+2. `eat` validates: a herb may be eaten only by a body that is ill, hurt (hp under max) or carrying
+   an affliction; otherwise the refusal is "a herb is a remedy, not a meal". The self-relief branch
+   in `onComplete` stays. `nutritionOf('herb')` stays as is.
+3. `stoke` validates: when the fire has more than half of `fuelBurnTicks` left, refuse with "the
+   fire needs nothing yet". The fold's `max` stays.
+4. Tests: the LIVE_PHYSICS pair (existing test iterates the table); a well body cannot eat a herb
+   and an afflicted one can (update the "an herb is a remedy" test in `verbs.test.ts` to an ailing
+   eater); stoke refused on a fresh fire and allowed once half burned.
+
 ## Out of scope, noted for later
 
 Talking while working (a scene opening between two bodies at work without stopping the hands),
