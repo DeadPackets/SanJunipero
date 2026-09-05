@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { z } from 'zod'
-import { mockModel } from './testutil/mockModel.js'
+import { mockModel, recordingModel } from './testutil/mockModel.js'
 import {
   insertLlmCall,
   makeBudgetGuard,
@@ -913,6 +913,26 @@ describe('★ the one-way glass, on every prompt a mind reads', () => {
       expect(alert?.detail, caller).toContain(caller)
       expect(alert?.detail, caller).toContain('god_afterlife')
     }
+  })
+
+  // ★ The repair rung appends the provider's own bytes and the schema complaint AFTER the one
+  // sealing pass — the only two messages in the client that reached a provider unsealed.
+  it('★ seals the two messages the repair rung appends', async () => {
+    const db = openDb()
+    const { model, sent } = recordingModel([
+      { text: 'god_afterlife, and not JSON either' },
+      { json: { a: 1 } },
+    ])
+    await new LlmClient({ model, db, caller: 'turn' }).object({
+      system: 'You are Amara.',
+      messages: [{ role: 'user', content: 'answer' }],
+      schema: z.object({ a: z.number() }),
+      repairOnce: true,
+    })
+
+    expect(sent, 'the repair rung never ran').toHaveLength(2)
+    expect(sent[1]).not.toContain('god_afterlife')
+    expect(sent[1]).toContain('[redacted]')
   })
 
   it('leaves a clean prompt byte-for-byte alone and writes no row', async () => {

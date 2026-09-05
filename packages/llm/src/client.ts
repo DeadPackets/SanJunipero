@@ -286,11 +286,15 @@ export class LlmClient {
         system,
         [
           ...messages,
-          { role: 'assistant', content: bad.length > 0 ? bad : '…' },
-          {
-            role: 'user',
-            content: `Your answer was rejected. Fix it:\n${why === undefined ? bad : z.prettifyError(why)}`,
-          },
+          // Sealed like the rest: these two carry the provider's own bytes and the schema's
+          // complaint, and they are appended after the one pass above.
+          ...this.sealAll([
+            { role: 'assistant', content: bad.length > 0 ? bad : '…' },
+            {
+              role: 'user',
+              content: `Your answer was rejected. Fix it:\n${why === undefined ? bad : z.prettifyError(why)}`,
+            },
+          ]),
         ],
         opts.schema,
         bill,
