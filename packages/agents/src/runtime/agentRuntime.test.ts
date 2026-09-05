@@ -194,12 +194,20 @@ const closedAct = (a: unknown): unknown =>
         params: { ...NO_PARAMS, ...(a as { params?: object }).params },
       }
     : a
+// The one act, in the flat shape the strict schema asks for: a verb or words of your own, both
+// keys always present. A plan step stays the closed intent it always was.
+const closedAction = (a: unknown): unknown => {
+  if (a !== null && typeof a === 'object' && 'freeform' in a) {
+    return { verb: null, params: NO_PARAMS, freeform: (a as { freeform: string }).freeform }
+  }
+  return { ...(closedAct(a) as object), freeform: null }
+}
 const askedShape = (r: unknown): unknown => {
   if (r === null || typeof r !== 'object' || !('thought' in r)) return r
   const turn = { ...NOTHING_SAID, ...r } as { action?: unknown; plan?: unknown }
   return {
     ...turn,
-    action: closedAct(turn.action ?? { verb: 'wait' }),
+    action: closedAction(turn.action ?? { verb: 'wait' }),
     plan: Array.isArray(turn.plan) ? turn.plan.map(closedAct) : (turn.plan ?? null),
   }
 }
