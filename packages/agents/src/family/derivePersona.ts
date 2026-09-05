@@ -57,6 +57,14 @@ function meanBudget(parents: Parents): { typical: number; burst: number } | unde
   return { typical: mean((b) => b.typical), burst: mean((b) => b.burst) }
 }
 
+// Early, ordinary, or late. Drawn on a stream of its own so the hours of one person never
+// shift the voice of the next.
+const HABITS: readonly { rise: number; bed: number }[] = [
+  { rise: 6, bed: 21 },
+  { rise: 7, bed: 22 },
+  { rise: 9, bed: 24 },
+]
+
 /** Where a derived person came from: born here, or up the valley road. The two draw on
  *  separate streams, so the same pair of cards never builds the same person twice over. */
 export type Origin = 'born' | 'road'
@@ -104,6 +112,7 @@ export function derivePersona(
     age,
     backstory: origin === 'road' ? road : born,
     temperament,
+    hours: HABITS[RngStream.seed(child.id, 'hours').int(HABITS.length)]!,
     voiceCard: {
       register: voices[registerFrom]!.register,
       rhythm: voices[1 - registerFrom]!.rhythm,

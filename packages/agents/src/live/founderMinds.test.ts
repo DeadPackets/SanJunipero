@@ -118,6 +118,19 @@ describe('★ the streamed cast and the one-way glass', () => {
     expect(FOUNDER_MINDS).toHaveLength(12)
   })
 
+  it('every founder keeps hours, and the town does not rise as one body', () => {
+    for (const m of FOUNDER_MINDS) {
+      const hours = m.identity.hours
+      expect(hours, m.id).toBeDefined()
+      expect(hours!.rise, m.id).toBeGreaterThanOrEqual(5)
+      expect(hours!.bed, m.id).toBeGreaterThan(hours!.rise)
+    }
+    const rises = new Set(FOUNDER_MINDS.map((m) => m.identity.hours!.rise))
+    const beds = new Set(FOUNDER_MINDS.map((m) => m.identity.hours!.bed))
+    expect(rises.size).toBeGreaterThan(1)
+    expect(beds.size).toBeGreaterThan(1)
+  })
+
   it('no two founders share a first initial, so a viewer can tell them apart by name alone', () => {
     const initials = FOUNDER_MINDS.map((m) => m.identity.name[0]!)
     expect(new Set(initials).size).toBe(initials.length)

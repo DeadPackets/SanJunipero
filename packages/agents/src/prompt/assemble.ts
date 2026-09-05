@@ -23,6 +23,9 @@ export type IdentityCore = {
   // Xp by track, read fresh each turn and rendered in buckets: hands that have done nothing
   // render nothing, and a bucket turns over a few times a life, so the block stays cached.
   skills?: Record<string, number>
+  // The hours of the day this body keeps. Absent renders nothing, so a card written before
+  // anybody had hours reads exactly as it always did.
+  hours?: { rise: number; bed: number }
 }
 
 type JournalEntry = { day: number; text: string }
@@ -103,6 +106,9 @@ function renderIdentity(id: IdentityCore): string {
     `Temperament: ${id.temperament}`,
     `Backstory: ${id.backstory}`,
     ...(hands.length === 0 ? [] : [`Your hands: ${hands.join('; ')}.`]),
+    ...(id.hours === undefined
+      ? []
+      : [`Hours: up around ${id.hours.rise}, abed by ${id.hours.bed}.`]),
     `Voice: ${v.register} ${v.rhythm}`,
     `Habits: ${v.tics.join('; ')}`,
     `Never says: ${v.neverSays.join('; ')}`,

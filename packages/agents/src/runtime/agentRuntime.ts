@@ -463,7 +463,11 @@ export class AgentRuntime {
     this.#identity = deps.identity
     this.#personality = deps.personality
     this.#bridge = deps.bridge
-    this.#config = { ...DEFAULT_MIND_CONFIG, ...deps.config }
+    this.#config = {
+      ...DEFAULT_MIND_CONFIG,
+      ...deps.config,
+      ...(deps.identity.hours === undefined ? {} : { riseHour: deps.identity.hours.rise }),
+    }
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null

@@ -1330,6 +1330,18 @@ describe('what a pair of hands has done', () => {
   })
 })
 
+describe('the hours a body keeps', () => {
+  it('says them in plain words, and says nothing for a card that has none', () => {
+    const base = fixtureBlocks()
+    expect(assemblePrompt(base).system).not.toContain('Hours:')
+
+    const identity = { ...base.identity, hours: { rise: 5, bed: 20 } }
+    const system = assemblePrompt({ ...base, identity }).system
+    expect(system).toContain('Hours: up around 5, abed by 20.')
+    expect(assemblePrompt({ ...base, identity }).system).toBe(system)
+  })
+})
+
 describe('blockTokens', () => {
   function commonPrefixLength(a: string, b: string): number {
     let i = 0

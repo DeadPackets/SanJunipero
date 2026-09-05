@@ -62,6 +62,17 @@ describe('derivePersona (T25)', () => {
     expect(JSON.stringify(other)).not.toBe(JSON.stringify(a))
   })
 
+  it('keeps hours drawn off its own id, the same ones every time, and not everybody the same', () => {
+    const hoursOf = (id: string) =>
+      derivePersona({ ...CHILD, id }, [MOTHER, FATHER]).identity.hours!
+    expect(hoursOf('agent_7')).toEqual(hoursOf('agent_7'))
+    expect(hoursOf('agent_7').bed).toBeGreaterThan(hoursOf('agent_7').rise)
+
+    const ids = Array.from({ length: 30 }, (_, i) => `agent_${i}`)
+    const seen = new Set(ids.map((id) => `${hoursOf(id).rise}-${hoursOf(id).bed}`))
+    expect(seen.size).toBe(3)
+  })
+
   it('temperament interleaves traits provably drawn from BOTH parents', () => {
     const { identity, personality } = derivePersona(CHILD, [MOTHER, FATHER])
     const traits = identity.temperament.split(', ')

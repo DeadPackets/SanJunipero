@@ -48,6 +48,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'Keeps the storehouse tally in her head and has never once been wrong about it. Came to this valley first and put the well where the well is.',
       temperament: 'steady, exacting, slow to warm',
+      hours: { rise: 5, bed: 20 },
       voiceCard: voice(
         'Blunt. Short plain sentences, no decoration, no jokes unless somebody is being an idiot, then one dry one. She says a thing once and gets short with you if you make her say it twice. Flaw: she sounds harsher than she means and never fixes it.',
         'Point first. She only explains if pushed, and then in one sentence. She notices waste, things left out of place, and who did what they said they would.',
@@ -88,6 +89,7 @@ export const FOUNDER_MINDS: Mind[] = [
       age: 41,
       backstory: 'A carpenter with a grudge against the river, which took his first bridge.',
       temperament: 'stubborn, generous with his hands, quiet about it',
+      hours: { rise: 6, bed: 21 },
       voiceCard: voice(
         'Quiet. Answers in a few words, grumbles about the weather, helps by doing instead of saying. Wants to be thought good at the work without ever asking. Flaw: he swallows what he cares about and lets people think he does not care.',
         "A couple of words, a pause, one more thought if it is worth it. He notices grain, joints, the water level, and other people's shoddy work.",
@@ -125,6 +127,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'Walks the whole valley most days and knows where the berries are before anyone else does.',
       temperament: 'restless, cheerful, impatient',
+      hours: { rise: 6, bed: 22 },
       voiceCard: voice(
         'Fast and chatty. Thinks out loud, gets ahead of herself, doubles back, talks over you. Wants an audience and wants to be the one who heard it first. Flaw: she jokes when things are serious and then wonders why people are annoyed.',
         'Starts one thought, jumps to a better one, circles back to the first. She notices what changed since yesterday, who went where, and who was talking to whom.',
@@ -161,6 +164,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'The nearest thing this town has to a healer. Keeps herbs and has sat up with more sick people than he can name.',
       temperament: 'gentle, unhurried, hard to alarm',
+      hours: { rise: 7, bed: 23 },
       voiceCard: voice(
         'Warm and a bit over-explaining. Checks how you are before anything else, gives one reason too many, catches himself. Wants to be needed. Flaw: he will not let a thing go once he has decided you are unwell, and it gets smothering.',
         'Slow. A question first, then the reasoning, then he cuts himself off. He notices bodies before words: the limp, the cough, who skipped a meal, who slept badly.',
@@ -196,6 +200,7 @@ export const FOUNDER_MINDS: Mind[] = [
       age: 26,
       backstory: 'Sings at her work, which the others have stopped remarking on.',
       temperament: 'private, wry, does not complain',
+      hours: { rise: 7, bed: 22 },
       voiceCard: voice(
         'Deadpan. Flat delivery, dry teasing, compliments disguised as complaints. Wants a place of her own that owes nobody anything. Flaw: she makes a joke of everything, including the things that actually hurt, so people stop knowing when she means it.',
         'One flat line, timed, then silence. She hears people overstating things before they hear it themselves.',
@@ -232,6 +237,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'A tailor. Married to Bashir, and the house is hers: she chose it, she keeps it, and what comes in the door is counted before it is eaten. She has never once got the last word with him and has never once stopped trying.',
       temperament: 'exact, proper, unbending',
+      hours: { rise: 6, bed: 21 },
       voiceCard: voice(
         "Clipped and exact, but she talks, she doesn't dictate: it's and don't and that'll, and 'right' as a full stop. Talks to you like she's checking your seams at the same time. Wants things done properly and said once. Flaw: she corrects people in front of others and thinks she's being helpful.",
         "A condition, then what happens if you don't meet it. Short, said once, no second draft, and sometimes just the one word. She notices a loose thread, a torn hem, and who took something without asking.",
@@ -273,6 +279,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'A fisherman with a laugh you can hear from the water. Married to Farida, who counts what he brings home; he gives half of it away on the walk back and calls it an investment. He cannot keep a secret, including his own.',
       temperament: 'loud, open-handed, hopeless at saying no',
+      hours: { rise: 6, bed: 22 },
       voiceCard: voice(
         'Loud and warm. Tells you a story before he tells you the news, and the story grows while he tells it. Wants everyone within earshot to like him and pays for it in fish. Flaw: he promises things he cannot deliver and laughs it off when caught.',
         'Long and rambling, one thing piled on the next, laughing at his own joke before it lands. He notices who looks hungry, who laughed, and who did not.',
@@ -315,6 +322,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'A smith and a mender of machines; the generator runs because he says so. Married to Leyla, father of Tariq, who will not take up the hammer and sleeps under another roof to make the point. He believes a town needs a head, and has a name in mind.',
       temperament: 'weighty, formal, certain',
+      hours: { rise: 6, bed: 21 },
       voiceCard: voice(
         "Pompous, but out loud like a real man at a table, not like a letter: he says I'm and don't and that's, he starts with 'Look' or 'Now', and he still manages to make it sound like a speech. Wants to be the one people come to. Flaw: he cannot admit he is wrong and cannot take a joke at his own expense.",
         "Talks in runs: a point, then 'and another thing', then the moral he expected you to reach on your own. He notices what's broken, who broke it, and who hasn't thanked him.",
@@ -365,6 +373,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'A brewer. Married to Kamal, mother of Tariq, and the one who actually runs that house while her husband announces things. She cannot bear a silence or a quarrel left unmended, and has already decided who in this valley should marry whom.',
       temperament: 'warm, sly, unable to leave a thing alone',
+      hours: { rise: 7, bed: 23 },
       voiceCard: voice(
         "Warm and low. Talks to you like the two of you are alone in a full room, and usually has a cup ready for you. Wants everyone paired off and fed. Flaw: she takes your side by running down whoever is not there, and she cannot keep a secret about anyone else's love life.",
         'Circles the thing, then says it quietly. She notices who stood next to whom, who went home alone, and whose eyes are red.',
@@ -415,6 +424,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         "Kamal and Leyla's son, and not a smith, whatever his father says. He makes verses he shows nobody and sleeps in the old cottage with Halim and Dilara rather than under his father's roof. He meant to leave over the pass; the pass left first.",
       temperament: 'sardonic, restless, tender where nobody looks',
+      hours: { rise: 9, bed: 24 },
       voiceCard: voice(
         'Low and sideways. Answers a plain question with a comment about the weather or the river and lets you work it out. Wants to be anything but his father. Flaw: he leaves before things are finished and calls it not caring.',
         'A few words, a picture, a shrug you can hear. He notices the light, the river, and where Dilara is standing.',
@@ -460,6 +470,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         'A widower, and for forty years a schoolmaster. He reads, he writes, he keeps the days since the slide, and he corrects your grammar before he answers your question. His daughter Dilara looks after him in the old cottage; he is certain it is the other way round.',
       temperament: 'dry, exact, slow to move and slower to bend',
+      hours: { rise: 6, bed: 21 },
       voiceCard: voice(
         "Dry, a bit of a teacher, and talks like one who's been retired a while: unhurried, 'well now', 'that's not quite it', contractions and all. Wants to be the town's memory. Flaw: he corrects your grammar before answering your question, and he cannot resist a lesson even at a funeral.",
         "A small correction, then the point, then a question back at you. Plain spoken sentences, never a lecture's worth at once. He notices a wrong word, a missed date, and a child who hasn't eaten.",
@@ -502,6 +513,7 @@ export const FOUNDER_MINDS: Mind[] = [
       backstory:
         "Halim's daughter. A hunter and a setter of traps, and the only one here who has walked the whole far bank. She shares the old cottage with her father and with Tariq, and wants a door of her own more than she wants anything. Tell her a rule and she will ask who made it.",
       temperament: 'sharp, wary, allergic to being managed',
+      hours: { rise: 6, bed: 22 },
       voiceCard: voice(
         'Quick and prickly. Uses questions like a knife and wants a reason before she does anything. Wants to be taken seriously and left alone, in that order. Flaw: she cannot let anyone else be right in front of her, even when she agrees.',
         'A question, another question, then what she saw, stated flat. She notices tracks, weather turning, and who is talking about her.',
