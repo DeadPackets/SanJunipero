@@ -102,6 +102,7 @@ describe('migrateLlmTables', () => {
       estimatedCostUsd: 0.01,
       reportedCostUsd: null,
       latencyMs: 90,
+      finishReason: 'stop',
       ok: true,
       error: null,
     })

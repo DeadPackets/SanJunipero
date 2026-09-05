@@ -267,6 +267,21 @@ describe('dead calls — paid for, and nothing came back', () => {
     expect(classifyFailure(null)).toBe('other')
   })
 
+  // ★ A call the bound cut off is ledgered with no tokens, $0 and no generation id, so no cap
+  // and no backfill can ever see it. Counted under its own name, it is at least a number an
+  // operator can hold against the provider's invoice.
+  it('★ tells a call the bound cut off from any other failure', () => {
+    expect(classifyFailure('The operation was aborted.')).toBe('aborted')
+    expect(classifyFailure('The operation was aborted due to timeout.')).toBe('aborted')
+
+    const db = openDb()
+    fail(db, 'omar', 'The operation was aborted.')
+    fail(db, 'omar', 'fetch failed')
+    expect(deadCallCounts(db)[0]).toMatchObject({ calls: 2, aborted: 1, otherFailures: 1 })
+    reportDeadCalls(db)
+    expect(alerts(db)[0]!.detail).toContain('1 cut off')
+  })
+
   it('counts them per mind per day, beside the calls that mind was billed for', () => {
     const db = openDb()
     seedCall(db, 1, 0.002) // one good turn, no agent named
