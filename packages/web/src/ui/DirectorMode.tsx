@@ -130,6 +130,9 @@ export function DirectorMode({
   const castKey = claim.by === 'cut' || claim.by === 'moment' ? claim.cast.join(' ') : ''
   const followed = claim.by === 'pinned' || claim.by === 'round' ? claim.agentId : null
   const sceneId = claim.by === 'cut' ? (held?.sceneId ?? null) : null
+  // Who the camera is ON, which is not the same question as who it frames TOGETHER: a round
+  // turn is a shot too, and the caption over it has to follow the face it moved to.
+  const shotKey = castKey !== '' ? castKey : (followed ?? '')
 
   // Centre BEFORE the stop changes: the zoom eases about whatever the middle of the screen holds.
   useEffect(() => {
@@ -182,15 +185,15 @@ export function DirectorMode({
     }
   }, [scene, store, claimBy, castKey, followed, awake])
 
-  // Who is in frame, for the marks that follow the shot. Split from the key rather than passed
-  // as the claim's own array: a fresh array every render would re-run this on every tick.
+  // Split from the key rather than passed as the claim's own array: a fresh array every render
+  // would re-run this on every tick of the town.
   useEffect(() => {
-    onShot?.(castKey === '' ? NO_CAST : castKey.split(' '), sceneId)
-  }, [castKey, sceneId, onShot])
+    onShot?.(shotKey === '' ? NO_CAST : shotKey.split(' '), sceneId)
+  }, [shotKey, sceneId, onShot])
 
   // Who the camera is on, for the layers that live in the Pixi closure — the thought gate keeps
   // every wisp of the subject, and on a broadcast nobody has picked anybody.
-  const subject = followed ?? firstOf(castKey)
+  const subject = castKey === '' ? followed : firstOf(castKey)
   useEffect(() => {
     if (scene === null) return
     // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.

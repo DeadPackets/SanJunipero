@@ -230,7 +230,9 @@ describe('★ DirectorMode reads the gateway’s frame, and asks nobody anything
   })
 
   it('★ hands the shot on as a string, so a fresh array cannot re-cut the card every tick', () => {
-    expect(SRC).toMatch(/onShot\?\.\(castKey === '' \? NO_CAST : castKey\.split\(' '\), sceneId\)/)
-    expect(SRC).toMatch(/\}, \[castKey, sceneId, onShot\]\)/)
+    expect(SRC).toMatch(/onShot\?\.\(shotKey === '' \? NO_CAST : shotKey\.split\(' '\), sceneId\)/)
+    expect(SRC).toMatch(/\}, \[shotKey, sceneId, onShot\]\)/)
+    // a round turn is a shot too: the caption follows the face the camera moved to
+    expect(SRC).toContain("const shotKey = castKey !== '' ? castKey : (followed ?? '')")
   })
 })
