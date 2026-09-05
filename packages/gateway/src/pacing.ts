@@ -6,9 +6,10 @@ import { MAX_SPEED, MIN_SPEED, type Clock } from './adminOps.js'
 
 /** Five minutes of nobody. Long enough that a viewer reloading the page never trips it. */
 export const DEFAULT_IDLE_AFTER_MS = 300_000
-/** Quarter speed: a quarter of the turns per wall-clock hour, and a town still visibly alive.
- *  Not a pause — the event log must have no gap for the chronicler to read back. */
-export const DEFAULT_IDLE_SPEED = 0.25
+/** A tenth: the floor the operator's own dial accepts, and a town still visibly alive. Three
+ *  sim-days pass in an unwatched real day, a quarter of the bill the old 0.25 ran up (owner,
+ *  2026-09-05). Not a pause — the event log must have no gap for the chronicler to read back. */
+export const DEFAULT_IDLE_SPEED = 0.1
 
 /** Speed only. Pacing never pauses a town, so `/admin/pause` is never its business. */
 export type PacingOpts = {

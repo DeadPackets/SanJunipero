@@ -99,15 +99,8 @@ it('★ every pinned caller runs on the one fleet model at its one home', () => 
 it('★ three efforts: rulings judge, turns and lines think, restatements do not', () => {
   for (const caller of RULING_CALLERS)
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'xhigh' })
-  for (const caller of [
-    'turn',
-    'scene',
-    'reflection',
-    'reflection.edit',
-    'dream',
-    'preflight',
-    'narrator',
-  ])
+  expect(callSettingsFor('scene').reasoning).toEqual({ effort: 'medium' })
+  for (const caller of ['turn', 'reflection', 'reflection.edit', 'dream', 'preflight', 'narrator'])
     expect(callSettingsFor(caller).reasoning, caller).toEqual({ effort: 'high' })
   for (const caller of [
     'turn.compact',
@@ -139,11 +132,11 @@ it('★ a caller is bounded by the route floor or by its own ceiling, whichever 
   expect(requestTimeoutMsFor('nobody-pinned-this')).toBe(MIN_REQUEST_TIMEOUT_MS)
 })
 
-// The two callers that speak in a persona's own voice sample freely: temperature 1 is what the
-// bake-off measured that voice and its 100% named-object act rate at. Nothing else pins one.
-it('★ the turn and the scene sample at temperature 1, and no other caller pins one', () => {
-  expect(callSettingsFor('turn').temperature).toBe(1)
-  expect(callSettingsFor('scene').temperature).toBe(1)
+// The two callers that speak in a persona's own voice sample freely, the line more than the
+// turn (owner 2026-09-05: 1.0 to 1.2). Nothing else pins one.
+it('★ the turn and the scene sample above temperature 1, and no other caller pins one', () => {
+  expect(callSettingsFor('turn').temperature).toBe(1.1)
+  expect(callSettingsFor('scene').temperature).toBe(1.2)
   for (const caller of ['reflection', 'narrator', 'arbiter', 'preflight', 'semantic'])
     expect(callSettingsFor(caller).temperature, caller).toBeUndefined()
 })

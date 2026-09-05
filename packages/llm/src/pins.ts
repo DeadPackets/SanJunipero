@@ -121,6 +121,8 @@ const ON_LUNA = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs
 // for 2,100 tokens to write 300 and was a third of the whole bill until it stopped.
 const JUDGES: CallSettings = { reasoning: { effort: 'xhigh' } }
 const THINKS: CallSettings = { reasoning: { effort: 'high' } }
+// A spoken line is voice, not planning; the owner asked to hear medium (2026-09-05).
+const SPEAKS: CallSettings = { reasoning: { effort: 'medium' } }
 const RESTATES: CallSettings = { reasoning: { effort: 'minimal' } }
 
 // Rehearsal r3: all 21 refused reflection attempts were 429s, and every one had a mind call
@@ -145,7 +147,7 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
     ...THINKS,
     maxQueueWaitMs: 20_000,
     maxOutputTokens: 7500,
-    temperature: 1,
+    temperature: 1.1,
     dailyUsd: 50,
   },
   // The day log folded short when it outgrows its block, mid-day. Restated, not judged: on the
@@ -183,11 +185,11 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   // 90 s floor timeout, so the call dies before the floor takes the line away.
   scene: {
     ...ON_LUNA,
-    ...THINKS,
+    ...SPEAKS,
     minTimeoutMs: 60_000,
     maxQueueWaitMs: 10_000,
     maxOutputTokens: 2500,
-    temperature: 1,
+    temperature: 1.2,
     dailyUsd: 16,
   },
   // Two sentences and a short list of ties, once per scene: restated, not judged. p99 352.
