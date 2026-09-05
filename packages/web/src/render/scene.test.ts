@@ -99,7 +99,9 @@ describe('the frame culls against the camera it is actually looking through', ()
   const src = readFileSync(join(WEB_SRC, 'render', 'scene.ts'), 'utf8')
 
   it('calls the depth order with a freshly read viewRect, not a stored one', () => {
-    expect(src).toMatch(/applyDepthOrder\(\s*entries,\s*viewRect\(\)\s*\)/)
+    const body = /sortDepth: \(\) => \{[\s\S]*?\n {4}\},/.exec(src)?.[0] ?? ''
+    expect(body).toContain('const view = viewRect()')
+    expect(body).toContain('applyDepthOrder(depthEntries, view)')
   })
 
   it('derives viewRect from the live camera every call', () => {

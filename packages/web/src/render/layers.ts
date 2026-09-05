@@ -70,13 +70,54 @@ export type DepthEntry = { box: DepthBox; node: Container }
  *  a cull nobody can count is a claim, not a measurement. */
 export type DepthCounts = { drawn: number; culled: number }
 
+// Reused across frames: one array per drawable and a fresh Map, sixty times a second, was the
+// sort's own allocation bill. Nothing here outlives the call.
+const boxes: DepthBox[] = []
+const index = new Map<string, number>()
+
+/** Everything the sort reads, flattened, against what it read last time. Every value is
+ *  compared exactly — a hash collision here is a silently wrong painter's order. */
+export function createDepthGate(): (entries: readonly DepthEntry[], view: ViewRect) => boolean {
+  const seen: unknown[] = []
+  return (entries, view) => {
+    let i = 0
+    let moved = seen.length !== entries.length * 11 + 4
+    const put = (v: unknown): void => {
+      if (seen[i] !== v) moved = true
+      seen[i++] = v
+    }
+    put(view.x)
+    put(view.y)
+    put(view.w)
+    put(view.h)
+    for (const e of entries) {
+      const b = e.box
+      put(e.node)
+      put(b.id)
+      put(b.rank)
+      put(b.x0)
+      put(b.y0)
+      put(b.x1)
+      put(b.y1)
+      put(b.sx0)
+      put(b.sy0)
+      put(b.sx1)
+      put(b.sy1)
+    }
+    seen.length = i
+    return moved
+  }
+}
+
 /** The only place a depth is written and a drawable is hidden. The cull runs BEFORE the sort
  *  because `depthOrder` is O(n²) and degrades to seed order above `DEPTH_BUDGET`. */
 export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect): DepthCounts {
   const { drawn, hidden } = cullByBox(entries, view)
   for (const e of hidden) e.node.visible = false
-  const order = depthOrder(drawn.map((e) => e.box))
-  const index = new Map<string, number>()
+  boxes.length = 0
+  for (const e of drawn) boxes.push(e.box)
+  const order = depthOrder(boxes)
+  index.clear()
   for (let i = 0; i < order.length; i++) index.set(order[i]!, i)
   for (const e of drawn) {
     e.node.visible = true
