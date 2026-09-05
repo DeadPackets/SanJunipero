@@ -256,13 +256,11 @@ export function nextFloor(
 const PROPOSAL_PATTERNS = [
   /from now on/i,
   /from this day/i,
-  /call it/i,
-  /we should all/i,
   /let us agree/i,
   /the rule is/i,
   /new rule/i,
   /nobody (?:may|shall|is to)/i,
-  /no longer/i,
+  /no longer (?:ours|holds|stands)|the rule no longer/i,
   /let go of the rule/i,
 ]
 

@@ -273,7 +273,6 @@ describe('what a room sounds like putting a rule to itself', () => {
     'From now on the well is drawn at dawn',
     'From this day the fire is banked before bed',
     'Let us agree the store is shut after dark',
-    'We should all carry back what we take',
     'The rule is one sack each',
     'Nobody may take another’s planks',
     'Nobody shall fish the pool above the ford',
@@ -289,6 +288,9 @@ describe('what a room sounds like putting a rule to itself', () => {
     expect(proposesALaw('I drew water at dawn')).toBe(false)
     expect(proposesALaw('The store was shut when I got there')).toBe(false)
     expect(proposesALaw('Nobody came to the fire tonight')).toBe(false)
+    expect(proposesALaw('We should all carry back what we take')).toBe(false)
+    expect(proposesALaw('I no longer want the soup')).toBe(false)
+    expect(proposesALaw('Let us call it a night')).toBe(false)
   })
 })
 
