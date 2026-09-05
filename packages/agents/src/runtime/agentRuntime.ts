@@ -33,6 +33,7 @@ import {
   OWN_WORDS_SHOWN,
 } from '../prompt/assemble.js'
 import {
+  heardKey,
   heardProse,
   makeablesLine,
   roadLine,
@@ -403,6 +404,9 @@ export class AgentRuntime {
   // Last tick's utterances. The recent window holds one for as long as it is recent, so only a
   // key that was not there a tick ago is a new word rather than the same word again.
   #heardKeys = new Set<string>()
+  // Every utterance this mind has already been told about, on the same reasoning: what the last
+  // turn read is not news on this one.
+  #heardTold = new Set<string>()
   #wasNight = false
   #started = false
   #offTick: ((tick: number) => void) | null = null
@@ -475,6 +479,7 @@ export class AgentRuntime {
     this.#still = null
     this.#company = new Map()
     this.#heardKeys = new Set()
+    this.#heardTold = new Set()
     this.#wasNight = simTimeFromTick(this.#bridge.currentTick()).isNight
     // From here forward only: a mind that resumes must not remember a day it was not there for.
     this.#lastActSeq = this.#bridge.lastSeq()
@@ -723,7 +728,7 @@ export class AgentRuntime {
     for (const a of packet.visible.agents) if (a.id !== this.#agentId) met(a.id, a.name)
     const keys = new Set<string>()
     for (const h of packet.heard) {
-      const key = `${h.speakerId}\u0000${h.text}`
+      const key = heardKey(h)
       keys.add(key)
       const them = met(h.speakerId, h.name)
       // The window holds one utterance for as long as it is recent, so only a key that was not
@@ -1045,7 +1050,9 @@ export class AgentRuntime {
     )
     // The prompt keeps another mouth's bytes out of the narrator's block; this mind's own
     // memory still holds the whole moment.
-    const heard = heardProse(packet)
+    const heard = heardProse(packet, this.#heardTold)
+    // Rebuilt from the window, so a key that has aged out of it is gone from here too.
+    this.#heardTold = new Set(packet.heard.map(heardKey))
     const moment = heard.length > 0 ? `${prose} ${heard}` : prose
     this.#prevMomentSentences = appendMoment(this.#dayLog, this.#prevMomentSentences, moment)
     // Said in the same breath as what the eyes can reach, and NOT into the day log: what these

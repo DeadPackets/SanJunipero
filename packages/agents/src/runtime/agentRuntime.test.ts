@@ -1761,6 +1761,30 @@ describe('arbiter seam (T19)', () => {
     expect(seen).toEqual(['weave reeds into a basket', 'bank the fire with river clay'])
   })
 
+  // The recent window holds an utterance for 66 ticks, so a mind taking a turn every few ticks
+  // was told the same greeting as news three times and wrote it into the day three times.
+  it('tells a mind a word it heard once, not on every turn the word is still in the window', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    bridge.announce('agent_spawned', { id: 'omar', name: 'Omar', x: 3, y: 4, ageDays: 30 })
+    bridge.announce('agent_spoke', { agentId: 'omar', text: 'Rain soon.', x: 3, y: 4 })
+    // The heard block rides its own message, so this is the "happening now" reading of the line
+    // and not the day log's record of the moment it landed in.
+    const hears = (p: CapturedMessage[]): boolean =>
+      p.some((m) => m.text.startsWith('You hear Omar say: "Rain soon."'))
+    await stepUntil(loop, () => prompts.some(hears), 60)
+    const first = prompts.findIndex(hears)
+    expect(first, 'the mind was told at all').toBeGreaterThanOrEqual(0)
+
+    await stepUntil(loop, () => prompts.length >= first + 4, 60)
+    expect(prompts.slice(first + 1).filter(hears)).toEqual([])
+    expect(runtime.dayLogSnapshot().filter((l) => l.includes('Rain soon.'))).toHaveLength(1)
+  })
+
   // One map held both the court's precedents and the sentences the mind already carries, on one
   // sixteen-slot budget: nine ideas spend eighteen slots and the first precedent is gone.
   it('keeps a precedent through the sentences the same acts write down', async () => {
