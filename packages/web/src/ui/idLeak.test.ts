@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import {
   DAYS_PER_YEAR,
   CHRONICLE_TYPES,
@@ -12,6 +14,7 @@ import { chronicleLabel } from './importantFeed.js'
 import { hoverPlate, itemCropDetail } from './interaction.js'
 import { placeOf, structureWords } from './place.js'
 import { thumbLabel } from './momentThumb.js'
+import { PersonLedgerView } from '../paper/pages/Person.js'
 
 // The machine's own words, exactly as the live town writes them: `item_78`,
 // `item_structure_house_44_51_wood`, `structure_farmhouse_63_32`, `fauna_64`, `recipe:drink_rain`.
@@ -155,6 +158,26 @@ describe('no viewer-facing string prints a machine id', () => {
   it('a place is words or nothing, never a tile', () => {
     clean(placeOf(WORLD, 'yusuf').words, 'placeOf')
     clean(placeOf(EMPTY, 'yusuf').words, 'placeOf missing')
+  })
+
+  // The helpers above are only half the surface: a page interpolates its own values into JSX,
+  // and that text is what a viewer actually reads.
+  it('a page’s own JSX prints no kind the town has no word for', () => {
+    const carrier = {
+      ...WORLD.agents.yusuf!,
+      skills: {},
+      activity: null,
+      injuries: [{ kind: 'sprained_ankle', day: 3 }],
+    }
+    const html = renderToStaticMarkup(
+      createElement(PersonLedgerView, {
+        agent: carrier,
+        tick: 10,
+        carrying: [{ id: 'item_78', kind: 'rabbit_meat', qty: 2 }],
+        ledger: [],
+      }),
+    )
+    clean(html.replace(/<[^>]*>/g, ' '), 'PersonLedgerView')
   })
 
   it('a moment card names its cast and never a coordinate', () => {

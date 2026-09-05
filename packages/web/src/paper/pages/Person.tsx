@@ -1,5 +1,13 @@
 import { useSyncExternalStore } from 'react'
-import { DAYS_PER_YEAR, SOMEONE, agentName, bondLevel, bondWarmth, tickToMoment } from '@sj/shared'
+import {
+  DAYS_PER_YEAR,
+  SOMEONE,
+  agentName,
+  bondLevel,
+  bondWarmth,
+  kindWords,
+  tickToMoment,
+} from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
@@ -200,7 +208,9 @@ export function PersonLedgerView({
         <NeedBar label="Company" value={agent.needs.social} />
         <NeedBar label="Health" value={agent.hp} />
         {agent.injuries.length > 0 && (
-          <p>{agent.injuries.map((i) => `${i.kind} injury (day ${i.day})`).join(', ')}</p>
+          <p>
+            {agent.injuries.map((i) => `${kindWords(i.kind)} injury (day ${i.day})`).join(', ')}
+          </p>
         )}
         {/* The page header already prints the state, so this line carries only what the
             header cannot: how long there is left to go. */}
@@ -215,7 +225,7 @@ export function PersonLedgerView({
           <ul>
             {carrying.map((it) => (
               <li key={it.id}>
-                {it.kind} × {it.qty}
+                {kindWords(it.kind)} × {it.qty}
               </li>
             ))}
           </ul>
