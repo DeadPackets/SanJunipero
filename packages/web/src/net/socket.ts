@@ -6,6 +6,10 @@ const STALE_BUNDLE_KEY = 'sj:reloadedForStale'
 const GAP_TICKS = 1440 // more than a missed day → offer the digest
 const BACKOFF_MIN_MS = 1_000
 const BACKOFF_MAX_MS = 30_000
+/** A tab in the background is nobody watching: after this long hidden it lets go of the wire,
+ *  so the town can count it out and slow down (owner, 2026-09-05). Long enough that switching
+ *  tabs and back never drops the view. */
+export const HIDDEN_GRACE_MS = 15_000
 
 export type ObservatoryHandle = {
   scrub(tick: number): void
@@ -25,6 +29,8 @@ export function connectObservatory(opts: {
   let closed = false
   let sock: WebSocket | null = null
   let backoffMs = BACKOFF_MIN_MS
+  let hidden = false
+  let hideTimer: ReturnType<typeof setTimeout> | null = null
   let reqId = 0
   let warnedBadFrame = false
   let status: LinkStatus = 'connecting'
@@ -74,7 +80,7 @@ export function connectObservatory(opts: {
   }
 
   const open = (): void => {
-    if (closed) return
+    if (closed || hidden) return
     sock = new WebSocket(opts.url)
     sock.onopen = () => {
       backoffMs = BACKOFF_MIN_MS
@@ -118,7 +124,7 @@ export function connectObservatory(opts: {
         writeLastSeen(msg.tick)
     }
     sock.onclose = (e: CloseEvent) => {
-      if (closed) return
+      if (closed || hidden) return
       // The server refuses a hello it does not recognise: reconnecting with the same one loops
       // forever, and only a reload fetches a viewer this town speaks to.
       if (e.code === CLOSE_BAD_HELLO && reloadOnce()) return
@@ -127,6 +133,28 @@ export function connectObservatory(opts: {
       backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS)
     }
   }
+  // The wire is let go while the tab is hidden and picked up again the moment it is seen: a
+  // page open behind another counts as nobody watching, and reopens onto a fresh snapshot.
+  const onVisibility = (): void => {
+    if (document.visibilityState === 'hidden') {
+      hideTimer ??= setTimeout(() => {
+        hideTimer = null
+        hidden = true
+        setStatus('reconnecting')
+        sock?.close()
+        sock = null
+      }, HIDDEN_GRACE_MS)
+      return
+    }
+    if (hideTimer !== null) clearTimeout(hideTimer)
+    hideTimer = null
+    if (!hidden) return
+    hidden = false
+    backoffMs = BACKOFF_MIN_MS
+    open()
+  }
+  const doc = typeof document === 'undefined' ? null : document
+  doc?.addEventListener('visibilitychange', onVisibility)
   open()
   opts.onStatus?.(status)
 
@@ -146,6 +174,8 @@ export function connectObservatory(opts: {
     },
     close() {
       closed = true
+      if (hideTimer !== null) clearTimeout(hideTimer)
+      doc?.removeEventListener('visibilitychange', onVisibility)
       sock?.close()
     },
   }

@@ -7,7 +7,12 @@ import { DEFAULT_CONFIG, PROTOCOL_VERSION } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { MAX_SPEED, MIN_SPEED } from './adminOps.js'
-import { DEFAULT_IDLE_AFTER_MS, DEFAULT_IDLE_SPEED, createPacing } from './pacing.js'
+import {
+  DEFAULT_IDLE_AFTER_MS,
+  DEFAULT_IDLE_SPEED,
+  DEFAULT_NIGHT_FACTOR,
+  createPacing,
+} from './pacing.js'
 import { createGateway, type Gateway } from './server.js'
 import { connect, until } from './testutil.js'
 
@@ -144,6 +149,49 @@ describe('viewer-aware pacing', () => {
     expect(vi.getTimerCount()).toBe(1)
     p.stop()
     expect(vi.getTimerCount()).toBe(0)
+  })
+
+  // Nobody turns while asleep, so a night costs nothing and only takes time: a sleeping town
+  // runs faster whether it is watched or idle, and slows the moment the first body is up.
+  it('★ a sleeping town runs at the night factor over whatever it would otherwise run at', () => {
+    const { d, p } = paced()
+    p.night(true)
+    expect(d.speed).toBe(DEFAULT_NIGHT_FACTOR)
+    p.night(true)
+    expect(d.log).toEqual([DEFAULT_NIGHT_FACTOR])
+    p.night(false)
+    expect(d.speed).toBe(1)
+    p.viewers(0)
+    vi.advanceTimersByTime(DEFAULT_IDLE_AFTER_MS)
+    expect(d.speed).toBe(DEFAULT_IDLE_SPEED)
+    p.night(true)
+    expect(d.speed).toBeCloseTo(DEFAULT_IDLE_SPEED * DEFAULT_NIGHT_FACTOR, 10)
+    p.viewers(1)
+    expect(d.speed).toBe(DEFAULT_NIGHT_FACTOR)
+    p.night(false)
+    expect(d.speed).toBe(1)
+  })
+
+  it('night never puts the dial past the ceiling the operator endpoint accepts', () => {
+    const d = dial(MAX_SPEED / 2)
+    const p = createPacing({ clock: d, env: {} })
+    p.night(true)
+    expect(d.speed).toBe(MAX_SPEED)
+    p.stop()
+  })
+
+  it('night leaves a speed an operator set alone', () => {
+    const { d, p } = paced()
+    d.admin(3)
+    p.night(true)
+    expect(d.speed).toBe(3)
+    expect(d.log).toEqual([])
+  })
+
+  it('SJ_IDLE_PACING=0 switches the night off with the rest', () => {
+    const { d, p } = paced({ SJ_IDLE_PACING: '0' })
+    p.night(true)
+    expect(d.speed).toBe(1)
   })
 })
 

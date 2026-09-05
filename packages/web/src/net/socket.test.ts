@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLOSE_BAD_HELLO, DEFAULT_CONFIG } from '@sj/shared'
-import { connectObservatory } from './socket.js'
+import { HIDDEN_GRACE_MS, connectObservatory } from './socket.js'
 import { createWorldStore } from '../state/worldStore.js'
 
 class FakeWebSocket {
@@ -110,6 +110,67 @@ describe('connectObservatory link status', () => {
 
   /** No protocol version bump, so a tab from before a frame changed keeps its socket. It must
    *  ignore what it cannot read rather than throw out of onmessage. */
+  // A page left open behind another tab was counted as a watcher, and the town never slowed.
+  it('★ lets go of the wire once the tab has been hidden a while, and takes it up when seen', () => {
+    let visibility: 'visible' | 'hidden' = 'visible'
+    const listeners: (() => void)[] = []
+    vi.stubGlobal('document', {
+      get visibilityState() {
+        return visibility
+      },
+      addEventListener: (_: string, fn: () => void) => void listeners.push(fn),
+      removeEventListener: () => undefined,
+    })
+    const statuses: string[] = []
+    const h = connectObservatory({
+      url: 'ws://x',
+      store: createWorldStore(),
+      onStatus: (s) => void statuses.push(s),
+    })
+    FakeWebSocket.instances[0]!.open()
+    expect(statuses).toEqual(['connecting', 'online'])
+
+    visibility = 'hidden'
+    for (const fn of listeners) fn()
+    vi.advanceTimersByTime(HIDDEN_GRACE_MS - 1)
+    expect(FakeWebSocket.instances[0]!.readyState, 'a tab switch dropped the view').toBe(1)
+    vi.advanceTimersByTime(1)
+    expect(FakeWebSocket.instances[0]!.readyState).toBe(3)
+    // Hidden is not a drop: no reconnect loop runs behind a tab nobody is looking at.
+    vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+
+    visibility = 'visible'
+    for (const fn of listeners) fn()
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    FakeWebSocket.instances[1]!.open()
+    expect(statuses.at(-1)).toBe('online')
+    h.close()
+  })
+
+  it('a tab hidden and shown again inside the grace keeps its wire', () => {
+    let visibility: 'visible' | 'hidden' = 'visible'
+    const listeners: (() => void)[] = []
+    vi.stubGlobal('document', {
+      get visibilityState() {
+        return visibility
+      },
+      addEventListener: (_: string, fn: () => void) => void listeners.push(fn),
+      removeEventListener: () => undefined,
+    })
+    const h = connectObservatory({ url: 'ws://x', store: createWorldStore() })
+    FakeWebSocket.instances[0]!.open()
+    visibility = 'hidden'
+    for (const fn of listeners) fn()
+    vi.advanceTimersByTime(HIDDEN_GRACE_MS / 2)
+    visibility = 'visible'
+    for (const fn of listeners) fn()
+    vi.advanceTimersByTime(HIDDEN_GRACE_MS)
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(FakeWebSocket.instances[0]!.readyState).toBe(1)
+    h.close()
+  })
+
   it('★ ignores a frame it cannot read instead of taking the viewer down', () => {
     const store = createWorldStore()
     connectObservatory({ url: 'ws://test/ws', store })

@@ -20,8 +20,15 @@ export type PacingOpts = {
 export type Pacing = {
   /** Called with the live count as a viewer joins and as one leaves — never polled. */
   viewers(count: number): void
+  /** Called once a tick with whether every living body in town is asleep. A sleeping town
+   *  runs faster, watched or not, until the first one rises (owner, 2026-09-05): nobody turns
+   *  while asleep, so the hours cost nothing and only take time. */
+  night(allAsleep: boolean): void
   stop(): void
 }
+
+/** Four times whatever the town would otherwise run at, capped at the operator's own ceiling. */
+export const DEFAULT_NIGHT_FACTOR = 4
 
 const noop = (): void => undefined
 
@@ -44,33 +51,42 @@ export function createPacing(opts: PacingOpts): Pacing {
   const env = opts.env ?? process.env
   // Rehearsals and probes measure the town at one speed; a clock that moves under them is a
   // measurement of nothing. Off means off — no timer, no transition, no log line.
-  if (env.SJ_IDLE_PACING === '0') return { viewers: noop, stop: noop }
-
+  if (env.SJ_IDLE_PACING === '0') return { viewers: noop, night: noop, stop: noop }
   const afterMs = numEnv(env, 'SJ_IDLE_AFTER_MS', DEFAULT_IDLE_AFTER_MS, 1)
   // Bounded by what the operator's own endpoint accepts: pacing must never put the clock
   // somewhere a person could not have put it by hand.
   const idleSpeed = numEnv(env, 'SJ_IDLE_SPEED', DEFAULT_IDLE_SPEED, MIN_SPEED, MAX_SPEED)
-
+  const nightFactor = numEnv(env, 'SJ_NIGHT_FACTOR', DEFAULT_NIGHT_FACTOR, 1, MAX_SPEED)
   let timer: ReturnType<typeof setTimeout> | null = null
   // ★ THE OWNER'S HAND WINS: pacing owns one full speed — the one the town started at — and
   // a dial reading anything pacing did not write means an operator moved it; leave it alone.
   const full = opts.clock.speed
   let idled = false
-
+  let night = false
+  // What pacing itself last wrote. The dial reading anything else is a hand pacing must not
+  // fight; it re-takes the dial only once the reading is its own again.
+  let wrote = full
+  const target = (): number =>
+    Math.min(MAX_SPEED, (idled ? idleSpeed : full) * (night ? nightFactor : 1))
+  const apply = (why: string): void => {
+    const now = opts.clock.speed
+    if (now !== wrote) return
+    const next = target()
+    if (next === now) return
+    wrote = next
+    opts.clock.setSpeed(next)
+    console.error(`pacing: ${why}, speed ${now} -> ${next}`)
+  }
   const cancel = (): void => {
     if (timer !== null) clearTimeout(timer)
     timer = null
   }
-
   const goIdle = (): void => {
     timer = null
-    const now = opts.clock.speed
-    if (idled || now !== full || now === idleSpeed) return
+    if (idled) return
     idled = true
-    opts.clock.setSpeed(idleSpeed)
-    console.error(`pacing: idle after ${Math.round(afterMs / 1000)}s, speed ${now} -> ${idleSpeed}`)
+    apply(`idle after ${Math.round(afterMs / 1000)}s`)
   }
-
   return {
     viewers(count: number): void {
       if (count <= 0) {
@@ -79,10 +95,14 @@ export function createPacing(opts: PacingOpts): Pacing {
         return
       }
       cancel()
-      if (!idled || opts.clock.speed !== idleSpeed) return
+      if (!idled) return
       idled = false
-      opts.clock.setSpeed(full)
-      console.error(`pacing: viewer connected, speed -> ${full}`)
+      apply('viewer connected')
+    },
+    night(allAsleep: boolean): void {
+      if (allAsleep === night) return
+      night = allAsleep
+      apply(allAsleep ? 'the town sleeps' : 'somebody is up')
     },
     stop: cancel,
   }

@@ -19,6 +19,7 @@ import {
   type LawQueue,
   type TickHandler,
   type TileId,
+  type WorldState,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
 import {
@@ -100,6 +101,12 @@ export type DevWorld = {
   /** Lands as one `config_changed` at the next tick boundary, replayed like every other fact. */
   submitLaw: (path: string, value: unknown) => void
   stop(): Promise<void>
+}
+
+/** Every body still in town and alive is asleep. An empty town is not a sleeping one. */
+function townAsleep(state: WorldState): boolean {
+  const here = Object.values(state.agents).filter((a) => a.alive && a.departed === undefined)
+  return here.length > 0 && here.every((a) => a.asleep)
 }
 
 /** Agent memory is a separate `<id>.db` per mind, so world and mind are wiped as ONE unit.
@@ -332,6 +339,7 @@ export async function startDevWorld(
   const lastVerb = new Map<string, string>()
   const tickOnce = (): void => {
     loop.step()
+    pacing.night(townAsleep(loop.state))
     if (cast !== null) return
     for (const ev of store.readFrom(lastSeq)) {
       lastSeq = ev.seq
