@@ -633,6 +633,35 @@ describe('★ the money, inside the served world', () => {
     expect(eventsOf(dir, 'agent_spoke').length).toBe(atStop)
   }, 40_000)
 
+  // ★ 25 unclaimed rows at a 10 s fetch each is four minutes in front of the run's three reports,
+  // inside a 20 s stop grace: the container SIGKILLs the process and the reports never run.
+  it('★ closes inside the container’s grace when the price sweep will not answer', async () => {
+    vi.stubEnv('OPENROUTER_API_KEY', 'a-key-for-a-sweep-that-hangs')
+    vi.stubGlobal('fetch', () => new Promise(() => {}))
+    try {
+      const dir = tmp()
+      const { world, opsDb } = await liveWorld({ dir })
+      await run(world, 2)
+      opsDb
+        .prepare(
+          `INSERT INTO llm_calls
+         (ts, agent_id, caller, model, input_tokens, output_tokens, cache_read_tokens,
+          reasoning_tokens, cost_usd, latency_ms, ok, error, provider, generation_id)
+         VALUES (?, NULL, 'turn', 'm', 10, 10, 0, 0, 0.001, 5, 1, NULL, NULL, 'gen-unanswered')`,
+        )
+        .run(Date.now() - 60_000)
+
+      const started = Date.now()
+      await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+      expect(Date.now() - started, 'the sweep held the close open past the grace').toBeLessThan(
+        15_000,
+      )
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
+  }, 60_000)
+
   it('refuses a boot that is already over the day, before the pre-flight spends a cent', async () => {
     const dir = tmp()
     const { world, opsDb } = await liveWorld({ dir, spendDailyUsd: 0.25 })

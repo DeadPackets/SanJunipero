@@ -232,6 +232,9 @@ const LIVE_RATE_WINDOW_REAL_MINUTES = 15
 /** How often the operator hears a projected burn. Well under every hard stop, so a leak is on
  *  the ops surface with an hour left to look at it. */
 const LIVE_SPEND_ALERT_REAL_MINUTES = 60
+/** How long the close may spend asking who served the rows nobody claimed. The container allows
+ *  20 s for the whole shutdown, and the three reports after this one need the rest of it. */
+const STOP_SWEEP_MS = 3_000
 /** How often unattributed rows are asked about. One sweep drains far more than any town
  *  produces in a minute, and the endpoint is never asked twice inside one. */
 const LIVE_BACKFILL_REAL_SECONDS = 60
@@ -983,8 +986,19 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       arbiterDb?.close()
       narratorDb?.close()
       // Before every report, not between them: a row still booked at the ceiling makes both
-      // the provider table and the reconciliation ratio a lie.
-      await sweepUnattributed()
+      // the provider table and the reconciliation ratio a lie. Bounded, because 25 rows at a 10 s
+      // fetch each would sit out the container's whole stop grace and take the reports with it.
+      let sweeping = true
+      void sweepUnattributed()
+        .catch(() => {
+          /* a price nobody answered for is the ceiling, which is where it already sits */
+        })
+        .finally(() => {
+          sweeping = false
+        })
+      if (!(await settle(() => sweeping, STOP_SWEEP_MS))) {
+        log('stream: the last unclaimed prices went unasked — the town closed first')
+      }
       // Each of these says nothing about a run with nothing to say, so a quiet ops surface
       // still means a quiet run.
       for (const row of reportDeadCalls(opsDb)) {
