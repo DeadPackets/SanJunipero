@@ -29,6 +29,8 @@ export function describeEvent(ev: SimEvent, state: WorldState | null): string | 
     case 'fauna_killed':
     case 'agent_expressed':
     case 'discovery_made':
+    case 'scene_closed':
+    case 'agent_spawned':
       return chronicleLine(ev, {
         agentName: (id) => name(id),
         structureKind: (id) => structureKind(id),

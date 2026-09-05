@@ -11,6 +11,8 @@ import {
   NOT_CHRONICLED,
   UNNAMED_CONSTRUCT_COPY,
   CHRONICLE_CAST_MAX,
+  FOUNDING_TICK,
+  SAYING_MAX,
   chronicleCast,
   chronicleIcon,
   chronicleLine,
@@ -637,6 +639,132 @@ describe('a discovery, in the town’s own words', () => {
   it('keeps the machinery out of both sentences', () => {
     for (const line of [chronicleLine(craft, look), chronicleLine(word, look)]) {
       expect(line).not.toMatch(/\b(ai|llm|model|prompt|token|agent|recipe|verb)\b/i)
+    }
+  })
+})
+
+// Task 17: the feed carries what people SAID to each other, not only what happened to them.
+describe('a scene reaches the feed as the summary it closed on', () => {
+  const SUMMARY =
+    'Rahel promised Tomas four fish for tomorrow, then conceded the fifth; Tomas fixed the count and named himself its keeper.'
+  const closed = ev('scene_closed', {
+    id: 'scene_7',
+    summary: SUMMARY,
+    participants: ['a1', 'a2'],
+    deltas: [],
+    closeReason: 'ended',
+  })
+
+  it('is weighted over a rule let go and under a parting, with a spark of its own', () => {
+    expect(CHRONICLE_WEIGHTS.scene_closed).toBe(14)
+    expect(CHRONICLE_WEIGHTS.scene_closed!).toBeGreaterThan(CHRONICLE_WEIGHTS.law_repealed!)
+    expect(CHRONICLE_WEIGHTS.scene_closed!).toBeLessThan(CHRONICLE_WEIGHTS.partnership_dissolved!)
+    expect(chronicleIcon('scene_closed')).toBe('spark')
+    expect(NOT_CHRONICLED.has('scene_closed')).toBe(false)
+  })
+
+  it('prints the summary as the line, and nothing at all for a scene that said nothing', () => {
+    expect(chronicleLine(closed, look)).toBe(SUMMARY)
+    expect(chronicleLine(ev('scene_closed', { id: 'scene_8', summary: '  ' }), look)).toBeNull()
+  })
+
+  it('frames the cast the scene carried, and nobody when it carried none', () => {
+    const isAgent = (id: string): boolean => id in NAMES
+    expect(chronicleCast(closed, isAgent)).toEqual(['a1', 'a2'])
+    expect(chronicleCast(ev('scene_closed', { id: 'scene_8', summary: 'x' }), isAgent)).toEqual([])
+  })
+})
+
+describe('somebody walking into the town', () => {
+  const spawn = (tick: number): SimEvent =>
+    ev('agent_spawned', { id: 'a1', name: 'Rahel', x: 1, y: 1, ageDays: 7000 }, tick)
+
+  // founders.ts:613 and scripted.ts:209 both stand the whole cast up on tick 1, so `tick > 0`
+  // would have read day 0 as twelve strangers walking in.
+  it('says nothing of the founding — the town began with those people', () => {
+    expect(chronicleLine(spawn(0), look)).toBeNull()
+    expect(chronicleLine(spawn(FOUNDING_TICK), look)).toBeNull()
+    expect(FOUNDING_TICK).toBe(1)
+  })
+
+  it('reads as an arrival on any tick after it, by name and never by id', () => {
+    const line = chronicleLine(spawn(900), look)!
+    expect(line).toBe('Rahel came to the town.')
+    expect(line).not.toMatch(/a1|_/)
+    expect(CHRONICLE_WEIGHTS.agent_spawned).toBe(12)
+    expect(chronicleIcon('agent_spawned')).toBe('star')
+    expect(NOT_CHRONICLED.has('agent_spawned')).toBe(false)
+  })
+})
+
+describe('a discovery says why, in the words it was said in', () => {
+  const made = (payload: Record<string, unknown>): SimEvent =>
+    ev('discovery_made', {
+      recipeId: 'recipe:pegs',
+      name: 'shape wooden pegs',
+      kind: 'craft',
+      byId: 'a1',
+      intent: 'shape the dry wood into pegs',
+      ...payload,
+    })
+
+  it('appends the spoken reason when there is one, and reads as today when there is not', () => {
+    expect(chronicleLine(made({ saying: 'The roof will not hold without them.' }), look)).toBe(
+      'Rahel found the way of it — shape wooden pegs. “The roof will not hold without them.”',
+    )
+    expect(chronicleLine(made({}), look)).toBe('Rahel found the way of it — shape wooden pegs.')
+  })
+
+  it('clips a reason that runs on, so a feed line stays a line', () => {
+    const long = `${'the grain runs long and the wood is dry '.repeat(6)}end`
+    const line = chronicleLine(made({ saying: long }), look)!
+    expect(line).toContain('…”')
+    expect(line.slice(line.indexOf('“') + 1, -1).length).toBe(SAYING_MAX)
+    expect(line).not.toContain('end')
+  })
+})
+
+describe('every weighted type has words to print', () => {
+  const PAYLOADS: Record<string, unknown> = {
+    agent_died: { agentId: 'a1', cause: 'hunger' },
+    discovery_made: { name: 'a thing', kind: 'craft', byId: 'a1' },
+    agent_born: { id: 'a3', name: 'Mira', motherId: 'a1' },
+    law_ratified: { lawId: 'l1', agentId: 'a1', text: 'no fires indoors' },
+    partnership_formed: { aId: 'a1', bId: 'a2' },
+    world_grown: {},
+    partnership_dissolved: { aId: 'a1', bId: 'a2', byId: 'a1' },
+    scene_closed: { id: 's', summary: 'They settled it.' },
+    law_repealed: { lawId: 'l1', agentId: 'a1', text: 'no fires indoors' },
+    grave_placed: { name: 'Rahel' },
+    invitation_accepted: { byId: 'a1', agentId: 'a2', verb: 'court' },
+    agent_spawned: { id: 'a1', name: 'Rahel' },
+    structure_completed: { id: 's1' },
+    invitation_refused: { byId: 'a1', agentId: 'a2', verb: 'propose' },
+    fire_ignited: { structureId: 's1' },
+    fire_extinguished: { structureId: 's1', cause: 'doused', agentId: 'a1' },
+    agent_harmed: { agentId: 'a1' },
+    agent_afflicted: { agentId: 'a1', kind: 'illness' },
+    invited: { byId: 'a1', agentId: 'a2', verb: 'court' },
+    law_broken: { lawId: 'l1', agentId: 'a1', verb: 'chop', witnesses: [] },
+    fire_spread: { toId: 's2' },
+    law_proposed: { agentId: 'a1', text: 'no fires indoors' },
+    structure_inscribed: { structureId: 's1' },
+    affliction_recovered: { agentId: 'a1' },
+    affliction_worsened: { agentId: 'a1' },
+    agent_tended: { agentId: 'a1', tenderId: 'a2' },
+    fauna_killed: { byId: 'a1', kind: 'deer' },
+    mystery_event: { kind: 'far_bell' },
+    tile_changed: { byId: 'a1', reason: 'paved' },
+    co_slept: { aId: 'a1', bId: 'a2', day: 2 },
+    agent_expressed: { agentId: 'a1', verb: 'express:dance', sense: 'sound' },
+  }
+
+  it('has a payload and a sentence for every type the feed selects on', () => {
+    expect(Object.keys(PAYLOADS).sort()).toEqual([...CHRONICLE_TYPES].sort())
+    for (const type of CHRONICLE_TYPES) {
+      const line = chronicleLine(ev(type, PAYLOADS[type], 900), look)
+      expect(line, `${type} has no line`).not.toBeNull()
+      expect(line, type).not.toMatch(/\ba[0-9]\b|_/)
     }
   })
 })
