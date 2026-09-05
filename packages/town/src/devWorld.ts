@@ -384,7 +384,11 @@ export async function startDevWorld(
     }
     arm()
   }
+  // A beat already fired when stop() runs is past clearTimeout's reach and would arm the next:
+  // r20's town ticked on for twenty minutes after its own close and had to be killed.
+  let stopped = false
   const arm = (): void => {
+    if (stopped) return
     timer = setTimeout(beat, beatMs / loop.speed)
   }
   let timer: ReturnType<typeof setTimeout>
@@ -402,6 +406,7 @@ export async function startDevWorld(
       applyLaw(lawQueue, path, value)
     },
     stop: async () => {
+      stopped = true
       pacing.stop()
       clearTimeout(timer)
       // The cast first: a mind holding a promise on an intent the loop will never step never returns.

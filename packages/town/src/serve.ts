@@ -8,6 +8,8 @@ import { adminChannelPort, adminOpsRoutes, createLawsAdmin, type LiveCast } from
 import { DEV_DB_PATH, SHOWCASE_CONFIG, startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
 
+const STOP_GRACE_MS = 19_000
+
 export const STREAM_PORT = 8080
 export const STREAM_LAMPS = 8
 /** Per-mind memory, beside the world db so one volume and one `SJ_FRESH=1` cover both. */
@@ -178,6 +180,12 @@ export async function main(): Promise<void> {
     stopping = true
     console.log(`stream: ${signal} — closing the town`)
     admin?.close()
+    // The container's stop grace is 20 s; a close that overruns it is killed mid-write anyway,
+    // so leave on our own terms just inside it.
+    setTimeout(() => {
+      console.log('stream: the close overran its grace — leaving')
+      process.exit(0)
+    }, STOP_GRACE_MS).unref()
     void running.stop().then(() => process.exit(0))
   }
   process.on('SIGTERM', () => {

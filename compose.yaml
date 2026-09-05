@@ -42,6 +42,8 @@ services:
       # Sim-minutes a mind waits between turns with nothing happening to it. Every call the town
       # makes scales roughly inversely with it, so this is the dial that trades money for life.
       - SJ_IDLE_GAP
+      - SJ_FLEET
+      - SJ_FLOOR_TIMEOUT_MS
       - SJ_PUBLIC_ORIGIN
       # The channel listens on loopback INSIDE the container; the served origin proxies
       # `/admin/*` to it behind the bearer token, so the operator's page reaches it (ruling 10).
