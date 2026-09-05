@@ -61,6 +61,7 @@ import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
+  BODY_NOOPS,
   isBlankAnswer,
   parseTurnWithRepair,
   StrictTurnSchema,
@@ -144,21 +145,6 @@ export const CRAFT_HINT = ' — perhaps someone nearby knows the craft.'
 // Engine-side words: a parameter schema spelled out in braces, or a registry name. Every
 // other engine reason is the town's own sentence now and reaches the mind whole.
 const MACHINE_REASON = /\{[^}]*\}|^(?:unknown verb:|no such agent)/
-
-// Words for standing still. The body was already doing it, so the moment is a quiet beat: no
-// refusal to remember, and nothing for a god to rule on.
-const BODY_NOOPS = new Set([
-  'stand',
-  'sit',
-  'wait',
-  'rest',
-  'look',
-  'think',
-  'none',
-  'nothing',
-  'pause',
-  'stay',
-])
 
 // A word for standing still, or one of the turn's own field names read off the list it was
 // asked in: `plan` is a thing a mind writes, never a thing a body does.
