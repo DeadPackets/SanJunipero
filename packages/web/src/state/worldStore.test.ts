@@ -181,12 +181,18 @@ describe('worldStore', () => {
 
   it('thoughts feed latestThought and a 200-entry capped log', () => {
     const store = createWorldStore()
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 3, text: 'First.' })
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 4, text: 'Second.' })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 3, text: 'First.', importance: 5 })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 4, text: 'Second.', importance: 5 })
     expect(store.latestThought('walker')).toEqual({ tick: 4, text: 'Second.' })
     expect(store.latestThought('nobody')).toBeNull()
     for (let i = 0; i < 205; i++)
-      store.applyServer({ t: 'thought', agentId: 'other', tick: 5 + i, text: `t${i}` })
+      store.applyServer({
+        t: 'thought',
+        agentId: 'other',
+        tick: 5 + i,
+        text: `t${i}`,
+        importance: 5,
+      })
     expect(store.thoughtsLog()).toHaveLength(200)
     expect(store.thoughtsLog()[0]!.text).toBe('t5') // oldest 7 dropped (2 walker + t0..t4)
   })
@@ -196,7 +202,7 @@ describe('worldStore', () => {
   it('★ keeps counting thoughts past the cap the log holds', () => {
     const store = createWorldStore()
     for (let i = 0; i < 205; i++)
-      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}` })
+      store.applyServer({ t: 'thought', agentId: 'a', tick: i, text: `t${i}`, importance: 5 })
     expect(store.thoughtsSeq()).toBe(205)
     expect(store.thoughtsLog()).toHaveLength(200)
   })
@@ -285,7 +291,7 @@ describe('worldStore', () => {
     store.applyServer(makeSnapshot())
     expect(n).toBe(1)
     off()
-    store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: 'x' })
+    store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: 'x', importance: 5 })
     expect(n).toBe(1)
   })
 
@@ -304,14 +310,14 @@ describe('worldStore', () => {
       store.subscribe(() => n++)
       store.applyServer(makeSnapshot())
       for (let i = 0; i < 40; i++) {
-        store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: `t${i}` })
+        store.applyServer({ t: 'thought', agentId: 'a', tick: 1, text: `t${i}`, importance: 5 })
       }
       expect(n).toBe(0) // nothing has been drawn yet
       expect(frames).toHaveLength(1) // one frame asked for, not forty-one
       frames.pop()!()
       expect(n).toBe(1)
       expect(store.thoughtsLog()).toHaveLength(40) // every message still applied
-      store.applyServer({ t: 'thought', agentId: 'a', tick: 2, text: 'next' })
+      store.applyServer({ t: 'thought', agentId: 'a', tick: 2, text: 'next', importance: 5 })
       expect(frames).toHaveLength(1) // the next burst asks for the next frame
     } finally {
       if (had) g.requestAnimationFrame = prev
@@ -329,7 +335,7 @@ describe('onFirstSnapshot', () => {
     expect(ran).toBe(0)
     store.applyServer(makeSnapshot())
     expect(ran).toBe(1)
-    store.applyServer({ t: 'thought', agentId: 'walker', tick: 2, text: 'again' })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 2, text: 'again', importance: 5 })
     expect(ran).toBe(1)
   })
 

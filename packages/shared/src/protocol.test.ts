@@ -73,8 +73,18 @@ describe('protocol', () => {
     expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, kind: 'gossip' } })).toThrow()
     expect(() => ServerMsg.parse({ ...open, scene: { ...open.scene, stakes: 11 } })).toThrow()
   })
-  it('is at version 6: a v5 viewer folds a replay stream into the live edge', () => {
-    expect(PROTOCOL_VERSION).toBe(6)
+  it('★ a thought travels with the weight the mind gave it, so the viewer can gate on it', () => {
+    const msg = { t: 'thought', agentId: 'omar', tick: 400, text: 'The wall leans.', importance: 7 }
+    expect(ServerMsg.parse(msg)).toEqual(msg)
+    // Unweighed is not a thought this protocol carries: the gate would have nothing to read.
+    const { importance: _i, ...noWeight } = msg
+    expect(() => ServerMsg.parse(noWeight)).toThrow()
+    expect(() => ServerMsg.parse({ ...msg, importance: 0 })).toThrow()
+    expect(() => ServerMsg.parse({ ...msg, importance: 11 })).toThrow()
+  })
+
+  it('is at version 7: a v6 viewer reads a thought that has no weight to gate on', () => {
+    expect(PROTOCOL_VERSION).toBe(7)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })

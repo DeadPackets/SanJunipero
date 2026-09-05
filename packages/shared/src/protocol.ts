@@ -3,7 +3,7 @@ import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 6 // 6: the replay frames — a v5 viewer folds their deltas into the live edge
+export const PROTOCOL_VERSION = 7 // 7: a thought carries its weight — a v6 viewer has nothing to gate the wisps on
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -77,8 +77,16 @@ export const ServerReplaying = z
     state: z.unknown(),
   })
   .strict()
+// `importance` is the mind's own 1–10 weight for the turn. Every thought is sent and stored;
+// the viewer decides which ones are worth a wisp over a head.
 export const ServerThought = z
-  .object({ t: z.literal('thought'), agentId: z.string().min(1), tick, text: z.string() })
+  .object({
+    t: z.literal('thought'),
+    agentId: z.string().min(1),
+    tick,
+    text: z.string(),
+    importance: z.number().int().min(1).max(10),
+  })
   .strict()
 // An ARRAY, because a greeted socket is handed the whole codex: one frame per record was 189
 // sends per viewer on the thread that ticks the town. The png travels over HTTP, never the socket.

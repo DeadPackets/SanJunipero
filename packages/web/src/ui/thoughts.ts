@@ -33,3 +33,21 @@ export function rememberThoughts(
 export function thoughtsHidden(graveTone: boolean, viewer: ThoughtsSetting): boolean {
   return graveTone || viewer === 'hidden'
 }
+
+/** The weight, on the mind's own 1–10 scale, at which a thought is worth a wisp to a stranger. */
+export const BUBBLE_IMPORTANCE = 6
+
+/** ★ Twelve minds thinking every turn is twelve wisps, which is the opposite of easy to follow.
+ *  Every thought is still stored and still reaches the Person page; this decides which ones are
+ *  drawn over a head: the ones that matter, the one the camera is on, and the room being held. */
+export function shouldBubble(
+  thought: { agentId: string; importance: number },
+  subjectId: string | null,
+  sceneMembers: readonly string[],
+): boolean {
+  return (
+    thought.importance >= BUBBLE_IMPORTANCE ||
+    thought.agentId === subjectId ||
+    sceneMembers.includes(thought.agentId)
+  )
+}

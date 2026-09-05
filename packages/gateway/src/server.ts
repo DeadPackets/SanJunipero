@@ -489,7 +489,13 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       for (const t of thoughtsSince(db, lastThoughtId)) {
         lastThoughtId = t.id
         hub.broadcast(
-          JSON.stringify({ t: 'thought', agentId: t.agentId, tick: t.tick, text: t.text }),
+          JSON.stringify({
+            t: 'thought',
+            agentId: t.agentId,
+            tick: t.tick,
+            text: t.text,
+            importance: t.importance,
+          }),
         )
       }
     }

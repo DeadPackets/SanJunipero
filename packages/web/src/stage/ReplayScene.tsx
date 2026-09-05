@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { agentName } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { captionFor, chapterIndex, type Chapter } from '../ui/chapterCaption.js'
-import { usePolled } from '../ui/useEndpoint.js'
+import { chaptersFeed } from '../ui/feeds.js'
+import { useFeed } from '../ui/useEndpoint.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 import {
   TITLE_CARD_MS,
@@ -43,7 +44,7 @@ const NO_CHAPTERS: Chapter[] = []
 /** The narrator's own paragraph for whatever just happened, held until the next one lands.
  *  Nothing is fetched for a replay: the chapters are already on the wire for the Chapters tab. */
 function useNarratorCaption(store: WorldStore, play: MomentPlay | null): string | null {
-  const chapters = usePolled<Chapter[]>(play === null ? null : '/api/chapters').data ?? NO_CHAPTERS
+  const chapters = useFeed(chaptersFeed).data ?? NO_CHAPTERS
   const index = useMemo(() => chapterIndex(chapters), [chapters])
   // Kept WITH the moment it belongs to, so leaving one clears its caption by derivation rather
   // than by a second write — a setState in an effect body is a cascading render.

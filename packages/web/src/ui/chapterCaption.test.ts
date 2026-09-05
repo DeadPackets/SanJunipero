@@ -51,7 +51,7 @@ describe('★ the caption is the narrator’s own voice, at zero calls', () => {
     const scene = src('../stage/ReplayScene.tsx')
     expect(scene).not.toMatch(/generate|complete|llm|prompt/i)
     // the chapters are already on the wire for the Chapters tab; the replay reads the same feed
-    expect(scene).toContain("'/api/chapters'")
+    expect(scene).toContain('useFeed(chaptersFeed)')
   })
 
   it('★ the footnotes that carry the mapping are never rendered to a reader', () => {

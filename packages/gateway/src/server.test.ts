@@ -111,6 +111,7 @@ describe('gateway server', () => {
       tick: loop.state.tick,
       agentId: 'walker',
       text: 'The path is clear enough.',
+      importance: 7,
     })
     gw.pump()
     await wait(80)
@@ -118,7 +119,12 @@ describe('gateway server', () => {
       .map((f) => ServerMsg.parse(JSON.parse(f)))
       .filter((m) => m.t === 'thought')
     expect(thoughts).toHaveLength(1)
-    expect(thoughts[0]).toMatchObject({ agentId: 'walker', text: 'The path is clear enough.' })
+    // ★ The weight travels: the viewer gates the wisps on it and cannot ask the town for it.
+    expect(thoughts[0]).toMatchObject({
+      agentId: 'walker',
+      text: 'The path is clear enough.',
+      importance: 7,
+    })
 
     // asset push (record only — png stays on HTTP)
     const codex = new AssetCodex(db)

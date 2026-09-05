@@ -390,7 +390,7 @@ async function setup(opts: {
   embedder?: { embed(t: string): Promise<Float32Array> }
   maxRetries?: number
   simConfig?: SimConfig
-  onThought?: (t: { tick: number; agentId: string; text: string }) => void
+  onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
@@ -1677,8 +1677,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(alertKinds(agentDb).filter((k) => k === 'turn_crash')).toHaveLength(1)
   })
 
-  it('fires the optional onThought hook once per turn with tick, agentId, and the turn thought', async () => {
-    const seen: { tick: number; agentId: string; text: string }[] = []
+  it('fires the optional onThought hook once per turn with tick, agentId, the turn thought and its weight', async () => {
+    const seen: { tick: number; agentId: string; text: string; importance: number }[] = []
     const { loop, runtime } = await setup({
       model: turnModel([BENIGN_TURN]),
       mindConfig: FAST_MIND,
@@ -1686,7 +1686,13 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => seen.length >= 1, 100)
     expect(runtime.stats().turns).toBeGreaterThanOrEqual(1)
-    expect(seen[0]).toEqual({ tick: expect.any(Number) as number, agentId: AGENT, text: 'I rest.' })
+    // ★ The weight rides with the thought: a viewer that has to gate on it cannot ask the mind.
+    expect(seen[0]).toEqual({
+      tick: expect.any(Number) as number,
+      agentId: AGENT,
+      text: 'I rest.',
+      importance: 1,
+    })
     expect(seen[0]!.tick).toBeGreaterThan(0)
   })
 })

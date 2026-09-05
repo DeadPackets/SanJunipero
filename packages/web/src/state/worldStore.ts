@@ -17,7 +17,7 @@ const RECENT_EVENTS_CAP = 400
 /** Three states, not two: LIVE, a STILL scrub pinned to one minute, and a REPLAY walking the
  *  past forward. A replay is not live — it never moves the live watermark — but its time moves. */
 type ViewMode = { live: true } | { live: false; replaying: boolean; tick: number }
-type Thought = { agentId: string; tick: number; text: string }
+type Thought = { agentId: string; tick: number; text: string; importance: number }
 /** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
  *  which is the Pixi handle and has nothing to do with this. */
 export type TownScene = ServerScene['scene']
@@ -183,7 +183,12 @@ export function createWorldStore(): WorldStore {
           break
         case 'thought':
           thoughtsSeq++
-          thoughts.push({ agentId: msg.agentId, tick: msg.tick, text: msg.text })
+          thoughts.push({
+            agentId: msg.agentId,
+            tick: msg.tick,
+            text: msg.text,
+            importance: msg.importance,
+          })
           if (thoughts.length > THOUGHT_LOG_CAP)
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
           latest.set(msg.agentId, { tick: msg.tick, text: msg.text })

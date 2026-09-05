@@ -21,7 +21,11 @@ import { createVignette, type Vignette } from './vignette.js'
 import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
+import { shouldBubble } from '../ui/thoughts.js'
 import { createToponymLayer, type ToponymLayer } from './toponyms.js'
+
+/** Nobody is in a room the town is not holding open. */
+const NOBODY: readonly string[] = []
 
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({
@@ -235,8 +239,10 @@ export function StageMount({
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
           if (said > seenThoughts) {
+            const held = store.getScene()
+            const inTheRoom = held !== null && held.open ? held.participants : NOBODY
             for (const t of store.thoughtsLog().slice(seenThoughts - said))
-              bubbles?.spawnThought(t.agentId, t.text)
+              if (shouldBubble(t, s.pickedId, inTheRoom)) bubbles?.spawnThought(t.agentId, t.text)
             seenThoughts = said
           }
         }
