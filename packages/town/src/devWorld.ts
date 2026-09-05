@@ -209,11 +209,7 @@ export async function startDevWorld(
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
     try {
       const entries = ingestProductionArt(forgeDb)
-      const gone = entries.filter((e) => e.action === 'missing')
-      console.log(
-        `dev world: ingested production art (${entries.length - gone.length} of ${entries.length} assets)`,
-      )
-      for (const e of gone) console.log(`dev world:   NO ART for ${e.kind} — ${e.detail ?? ''}`)
+      console.log(`dev world: ingested production art (${entries.length} assets)`)
     } catch (e) {
       console.log(
         `dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`,
