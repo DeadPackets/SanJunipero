@@ -47,6 +47,8 @@ const MindClockZ = z
     gatheringDay: z.number().nullable().default(null),
     wakeRetryAtTick: z.number(),
     prevVisibleIds: z.array(z.string()),
+    // Optional the way the clock's own field is: a checkpoint from before the felt latch resumes.
+    feltSeen: z.array(z.string()).optional(),
   })
   .strict()
 const MindSnapshot = z

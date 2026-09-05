@@ -224,6 +224,25 @@ describe('the default perception window outlasts the gap between turns (D-28-6)'
     expect(read[0]!.rows.every((ev) => ev.tick > cutoff)).toBe(true)
   })
 
+  it('reads the log once a tick, however often the minds look', () => {
+    const { bridge, store, step } = ownedWorld()
+    step()
+    bridge.perception(AGENT)
+    let reads = 0
+    const inner = store.readFrom.bind(store)
+    store.readFrom = (from: number) => {
+      reads += 1
+      return inner(from)
+    }
+    bridge.perception(AGENT)
+    bridge.perception(AGENT)
+    expect(reads).toBe(0)
+    step()
+    bridge.perception(AGENT)
+    bridge.perception(AGENT)
+    expect(reads).toBe(1)
+  })
+
   it('a bridge built moments after the event still carries it', () => {
     const { config, loop, store, step } = ownedWorld()
     step() // Cass lifts Bex's plank at tick 1, in Tamar's sight

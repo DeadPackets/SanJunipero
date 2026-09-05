@@ -154,6 +154,7 @@ export class EngineBridge {
   #announcements: { type: string; payload: Record<string, unknown> }[] = []
   #tickCallbacks: ((tick: number) => void)[] = []
   #window: SimEvent[] = []
+  #windowTick: number | null = null
   #lastSeq = 0
 
   constructor(opts: {
@@ -590,12 +591,16 @@ export class EngineBridge {
     return done
   }
 
+  // The log is appended to inside the tick, and every reader of the window runs after it: a
+  // dozen minds looking twice apiece at one tick all see what the first look already read.
   #recentEvents(): SimEvent[] {
+    if (this.#windowTick === this.#loop.tick) return this.#window
     const cutoff = this.#loop.tick - this.#recentWindowTicks
     const fresh = this.#store.readFrom(this.#lastSeq)
     this.#lastSeq = this.#store.lastSeq()
     if (fresh.length > 0) this.#window.push(...fresh)
     this.#window = this.#window.filter((ev) => ev.tick > cutoff)
+    this.#windowTick = this.#loop.tick
     return this.#window
   }
 }
