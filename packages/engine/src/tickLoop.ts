@@ -2,7 +2,9 @@ import { DEFAULT_CONFIG, TICK_REAL_MS, type SimConfig } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
 import type { WorldState } from './state.js'
 import { fold } from './fold.js'
-import type { RngStreams } from './rng.js'
+import type { RngState, RngStreams } from './rng.js'
+
+type Snapshot = { seq: number; state: WorldState; rng: Record<string, RngState> }
 
 export type TickHandler = (ctx: {
   tick: number
@@ -101,7 +103,7 @@ export class TickLoop {
   }
 
   #doStep(): void {
-    this.#store.transaction(() => {
+    const snapshot = this.#store.transaction((): Snapshot | null => {
       const apply = (type: string, payload: unknown): WorldState => {
         const ev = this.#store.append(this.#tick, type, payload)
         this.#state = fold(this.#state, ev, this.#config)
@@ -109,16 +111,18 @@ export class TickLoop {
       }
       apply('tick_advanced', {})
       this.#onTick({ tick: this.#tick, emit: apply, apply })
-      if (this.#tick % this.#snapEvery === 0) {
-        this.#store.saveSnapshot(
-          this.#tick,
-          this.#store.lastSeq(),
-          this.#state,
-          this.#rng.snapshot(),
-        )
-      }
+      const due = this.#tick % this.#snapEvery === 0
+      const snap = due
+        ? { seq: this.#store.lastSeq(), state: this.#state, rng: this.#rng.snapshot() }
+        : null
       this.#store.saveRngState(this.#tick, this.#rng.snapshot())
+      return snap
     })
+    // The state is immutable, so the picture of it is written after the tick has committed:
+    // a tick that holds a 60 KB write open holds every reader of the log open with it.
+    if (snapshot !== null) {
+      this.#store.saveSnapshot(this.#tick, snapshot.seq, snapshot.state, snapshot.rng)
+    }
   }
 
   start(): void {
