@@ -13,7 +13,11 @@ import { submitIntent, type IntentResult } from './intent.js'
 import { RngStream, RngStreams } from './rng.js'
 import { genesisState, type WorldState } from './state.js'
 import { createWorldTick } from './worldTick.js'
-import type { PendingEvent } from './verbs/index.js'
+import {
+  WALK_OUTS_BEFORE_PROPOSAL,
+  walkOutsBeforeProposal,
+  type PendingEvent,
+} from './verbs/index.js'
 import { ev, grid } from './testutil/world.js'
 
 // A relationship is two intents in the log. Every row here is about which two, and when.
@@ -95,6 +99,15 @@ const ask = (s: WorldState, id: string, verb: string, targetId = id === 'a1' ? '
 
 const refusal = (r: IntentResult): string => (r.ok ? 'not refused' : r.reason)
 
+/** A pair that has walked out together often enough for a proposal to be more than too soon. */
+const wooed = (s: WorldState, a = 'a1', b = 'a2'): WorldState => ({
+  ...s,
+  agents: {
+    ...s.agents,
+    [a]: { ...s.agents[a]!, walkOuts: { [b]: WALK_OUTS_BEFORE_PROPOSAL.most } },
+    [b]: { ...s.agents[b]!, walkOuts: { [a]: WALK_OUTS_BEFORE_PROPOSAL.most } },
+  },
+})
 /** The ask landed and folded — the state a second consent is judged against. */
 function asked(s: WorldState, id = 'a1', verb = 'court', targetId?: string): WorldState {
   const r = targetId === undefined ? ask(s, id, verb) : ask(s, id, verb, targetId)
@@ -229,7 +242,7 @@ describe('what the town will not let you ask', () => {
 
 describe('the answer', () => {
   it('the same verb aimed back is the acceptance, and a partnership is formed by it', () => {
-    let s = at(outside(), 100)
+    let s = wooed(at(outside(), 100))
     s = asked(s, 'a1', 'propose')
     const back = ask(s, 'a2', 'propose')
     expect(back.ok && back.events).toEqual([
@@ -243,7 +256,7 @@ describe('the answer', () => {
   })
 
   it('sorts the pair, whoever asked first', () => {
-    let s = at(outside(), 100)
+    let s = wooed(at(outside(), 100))
     s = asked(s, 'a2', 'propose')
     const back = ask(s, 'a1', 'propose')
     expect(back.ok && back.events[1]).toEqual({
@@ -271,13 +284,54 @@ describe('the answer', () => {
     expect(s.agents.a2!.courted).toEqual({ withId: 'a1', day: 0 })
     expect(refusal(ask(at(s, 900), 'a1', 'court'))).toBe('you walked out together already today')
     expect(refusal(ask(at(s, 900), 'a2', 'court'))).toBe('you walked out together already today')
-    // the next morning it is an ask again, and a proposal was never held back by it
+    // the next morning it is an ask again
     expect(ask(at(s, 1500), 'a1', 'court').ok).toBe(true)
-    expect(ask(at(s, 900), 'a1', 'propose').ok).toBe(true)
+  })
+
+  // Rehearsal 12: partners on day 2. The owner's ruling: a courtship is a week of town time at
+  // the median, and it varies from couple to couple.
+  it('★ a proposal is too soon until the pair has walked out on enough separate days', () => {
+    let s = at(outside(), 100)
+    expect(refusal(ask(s, 'a1', 'propose'))).toBe('too soon: you have never walked out together')
+    const walkOut = (state: WorldState, tick: number): WorldState => {
+      const t = at(state, tick)
+      const first = asked(t, 'a1', 'court')
+      const back = ask(first, 'a2', 'court')
+      return apply(first, back.ok ? back.events : [])
+    }
+    s = walkOut(s, 100)
+    expect(s.agents.a1!.walkOuts).toEqual({ a2: 1 })
+    expect(refusal(ask(s, 'a1', 'propose'))).toBe(
+      'too soon: you have only walked out together 1 day',
+    )
+    const needed = walkOutsBeforeProposal('a1', 'a2')
+    expect(needed).toBeGreaterThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.least)
+    expect(needed).toBeLessThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.most)
+    for (let day = 1; day < needed; day++) s = walkOut(s, day * MINUTES_PER_DAY + 100)
+    expect(s.agents.a2!.walkOuts).toEqual({ a1: needed })
+    expect(ask(s, 'a1', 'propose').ok).toBe(true)
+    expect(ask(s, 'a2', 'propose').ok).toBe(true)
+  })
+
+  it('every couple has its own number, the same whichever of them asks', () => {
+    const seen = new Set<number>()
+    for (const pair of [
+      ['amara', 'nadia'],
+      ['kamal', 'leyla'],
+      ['bashir', 'farida'],
+      ['omar', 'salma'],
+      ['tariq', 'dilara'],
+      ['halim', 'yusuf'],
+    ]) {
+      const n = walkOutsBeforeProposal(pair[0]!, pair[1]!)
+      expect(n).toBe(walkOutsBeforeProposal(pair[1]!, pair[0]!))
+      seen.add(n)
+    }
+    expect(seen.size).toBeGreaterThan(1)
   })
 
   it('a stale ask is a fresh ask, not an answer', () => {
-    let s = at(outside(), 100)
+    let s = wooed(at(outside(), 100))
     s = asked(s, 'a1', 'propose')
     const inTime = ask(at(s, 100 + INVITATION_STANDS_TICKS), 'a2', 'propose')
     expect(inTime.ok && inTime.events[0]!.type).toBe('invitation_accepted')
@@ -288,7 +342,7 @@ describe('the answer', () => {
   })
 
   it('another verb aimed back is a new ask, not an answer', () => {
-    const s = asked(at(outside(), 100), 'a1', 'court')
+    const s = asked(wooed(at(outside(), 100)), 'a1', 'court')
     const other = ask(s, 'a2', 'propose')
     expect(other.ok && other.events).toEqual([
       { type: 'invited', payload: { agentId: 'a1', byId: 'a2', verb: 'propose' } },
@@ -500,7 +554,7 @@ describe('leaving', () => {
   it('opens the way to remarry', () => {
     let s = partnered()
     s = apply(s, [{ type: 'partnership_dissolved', payload: { aId: 'a1', bId: 'a2', byId: 'a1' } }])
-    s = at(s, 50)
+    s = wooed(at(s, 50), 'a1', 'a3')
     s = asked(s, 'a1', 'propose', 'a3')
     const back = ask(s, 'a3', 'propose', 'a1')
     expect(back.ok && back.events[1]).toEqual({
@@ -541,7 +595,7 @@ describe('the partnership fold', () => {
 
 describe('a day of it, replayed', () => {
   it('lands the live run and its replay on the same state', () => {
-    let s = at(indoors(), MINUTES_PER_DAY / 2)
+    let s = wooed(at(indoors(), MINUTES_PER_DAY / 2))
     const script: [string, string, string][] = [
       ['a1', 'court', 'a2'],
       ['a2', 'court', 'a1'],
@@ -560,7 +614,7 @@ describe('a day of it, replayed', () => {
     }
     const replayed = log.reduce(
       (acc, e) => fold(acc, ev(e.type, e.payload, e.tick), CFG),
-      at(indoors(), MINUTES_PER_DAY / 2),
+      wooed(at(indoors(), MINUTES_PER_DAY / 2)),
     )
     expect(stateHash(replayed)).toBe(stateHash(at(s, MINUTES_PER_DAY / 2)))
   })

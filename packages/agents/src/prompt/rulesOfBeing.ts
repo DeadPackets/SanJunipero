@@ -53,7 +53,7 @@ douse: name it douse; give x and y as two numbers for the burning thing beside y
 extinguish: name it extinguish; give structureId, the mark of the burning thing
 attack: name it attack; give targetId, the mark of the person you strike
 court: name it court; give targetId, the person at your side you would walk out with. They answer in their own time, and whoever is near may hear the answer
-propose: name it propose; give targetId, the person at your side you would take as your partner for good. Only they can say yes
+propose: name it propose; give targetId, the person at your side you would take as your partner for good. Only they can say yes, and only after the two of you have walked out together on enough separate days
 lie_with: name it lie_with; give targetId, the person beside you, under a roof that is yours or theirs, and only if they say yes. A child may come of it
 leave_partner: name it leave_partner; give targetId, the partner you are leaving. It needs no answer, and it is not forgotten
 leave_town: name it leave_town when you mean to go down the valley road for good; nothing more is needed. Your legs carry you to the valley's edge, and then out of it with whatever you hold. Nobody's leave is asked and there is no walking back

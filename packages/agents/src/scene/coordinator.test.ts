@@ -103,7 +103,7 @@ const HOUSE = 'structure_1'
 
 type Who = { id: string; name: string; x: number; ageDays?: number; inside?: boolean }
 
-function buildWorld(who: readonly Who[]) {
+function buildWorld(who: readonly Who[], wooed = false) {
   const config = simConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -132,6 +132,21 @@ function buildWorld(who: readonly Who[]) {
     emit('agent_spawned', { id: w.id, name: w.name, x: w.x, y: 3, ageDays: w.ageDays ?? 30 })
     if (w.inside === true) emit('agent_entered', { agentId: w.id, structureId: HOUSE })
   }
+  // Every pair has walked out enough for a proposal where a test asks one: the pace of a
+  // courtship is the engine's own test, and these are about what the talk does with an answer.
+  if (wooed)
+    state = {
+      ...state,
+      agents: Object.fromEntries(
+        Object.values(state.agents).map((a) => [
+          a.id,
+          {
+            ...a,
+            walkOuts: Object.fromEntries(who.filter((o) => o.id !== a.id).map((o) => [o.id, 8])),
+          },
+        ]),
+      ),
+    }
   const loop = new TickLoop({
     store,
     state,
@@ -156,6 +171,7 @@ function buildWorld(who: readonly Who[]) {
 type Harness = ReturnType<typeof harness>
 
 function harness(opts: {
+  wooed?: boolean
   who?: readonly Who[]
   script?: (agentId: string) => (ask: SceneAsk, nth: number) => SceneTurn | 'stall' | 'hold'
   closer?: () => SceneClose
@@ -168,7 +184,7 @@ function harness(opts: {
     { id: NADIA, name: 'Nadia', x: 3 },
     { id: OMAR, name: 'Omar', x: 4 },
   ]
-  const world = buildWorld(who)
+  const world = buildWorld(who, opts.wooed === true)
   const calls = new Map<string, number>()
   const remembered: { agentId: string; text: string; importance: number }[] = []
   const fed: { agentId: string; occasion: string }[] = []
@@ -1246,6 +1262,7 @@ describe('an ask opens a scene of its own', () => {
 
   it('takes over the talk two people are already in rather than opening a second', async () => {
     const h = harness({
+      wooed: true,
       who: ADULTS,
       script: (id) => (_a, n) =>
         fromCorpus(n, { leave: false, ask: id === NADIA ? 'propose' : null, to: 'Omar' }),
@@ -1320,7 +1337,7 @@ describe('a yes is the same verb aimed back', () => {
   })
 
   it('proposing: the world holds the partnership and both books say so', async () => {
-    const h = harness({ who: ADULTS, script: answering('accept') })
+    const h = harness({ wooed: true, who: ADULTS, script: answering('accept') })
     await act(h, NADIA, 'propose', OMAR)
     await h.coordinator.takeFloor(OMAR, h.loop.tick)
     await turnOfTheWorld(h)
@@ -1368,7 +1385,7 @@ describe('a yes is the same verb aimed back', () => {
   })
 
   it('writes no secret between two who are already partners', async () => {
-    const h = harness({ who: INDOORS, script: answering('accept') })
+    const h = harness({ wooed: true, who: INDOORS, script: answering('accept') })
     await act(h, NADIA, 'propose', OMAR)
     await h.coordinator.takeFloor(OMAR, h.loop.tick)
     await turnOfTheWorld(h)
@@ -1469,7 +1486,7 @@ describe('an ask nobody ever answered', () => {
 
 describe('a partner left', () => {
   it('settles the kin tie, opens a grudge, and tells them both, with no scene in it', async () => {
-    const h = harness({ who: ADULTS, script: answering('accept') })
+    const h = harness({ wooed: true, who: ADULTS, script: answering('accept') })
     await act(h, NADIA, 'propose', OMAR)
     await h.coordinator.takeFloor(OMAR, h.loop.tick)
     await turnOfTheWorld(h)
@@ -1491,7 +1508,7 @@ describe('a partner left', () => {
   })
 
   it('makes the next talk that names the leaver a quarrel', async () => {
-    const h = harness({ who: ADULTS, script: answering('accept') })
+    const h = harness({ wooed: true, who: ADULTS, script: answering('accept') })
     await act(h, NADIA, 'propose', OMAR)
     await h.coordinator.takeFloor(OMAR, h.loop.tick)
     await turnOfTheWorld(h)

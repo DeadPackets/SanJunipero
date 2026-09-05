@@ -2519,6 +2519,16 @@ function bloodKin(a: AgentBody, b: AgentBody): boolean {
     : false
 }
 
+/** Five to eight separate days walked out together before a proposal can be said yes to. Drawn
+ *  from the pair's names, so every couple has its own number and the median sits near a week. */
+export const WALK_OUTS_BEFORE_PROPOSAL = { least: 5, most: 8 } as const
+export function walkOutsBeforeProposal(aId: string, bId: string): number {
+  let h = 2166136261
+  for (const ch of [aId, bId].sort().join('+')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  const span = WALK_OUTS_BEFORE_PROPOSAL.most - WALK_OUTS_BEFORE_PROPOSAL.least + 1
+  return WALK_OUTS_BEFORE_PROPOSAL.least + ((h >>> 0) % span)
+}
+
 /** Everything the three invitation verbs refuse for, in one order, said in the town's words. */
 function askable(
   state: WorldState,
@@ -2551,6 +2561,11 @@ function askable(
   if (verb === 'propose') {
     if (me.partnerId !== undefined) return 'you already have a partner'
     if (target.partnerId !== undefined) return 'they already have a partner'
+    const together = me.walkOuts?.[target.id] ?? 0
+    if (together < walkOutsBeforeProposal(agentId, target.id))
+      return together === 0
+        ? 'too soon: you have never walked out together'
+        : `too soon: you have only walked out together ${together} ${together === 1 ? 'day' : 'days'}`
     return null
   }
   // lie_with, the only ask left

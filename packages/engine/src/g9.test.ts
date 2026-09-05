@@ -137,7 +137,16 @@ describe('G9a-1: a partnership is two consents in the log, and nights under one 
   })
 
   it('a proposal answered by the same word makes the pair, and leaving unmakes it', () => {
-    let s = { ...couple(CFG, true), tick: 12 * 60 }
+    const pair = couple(CFG, true)
+    let s: WorldState = {
+      ...pair,
+      tick: 12 * 60,
+      agents: {
+        ...pair.agents,
+        ada: { ...pair.agents.ada!, walkOuts: { bex: 8 } },
+        bex: { ...pair.agents.bex!, walkOuts: { ada: 8 } },
+      },
+    }
     for (const [id, other] of [
       ['ada', 'bex'],
       ['bex', 'ada'],

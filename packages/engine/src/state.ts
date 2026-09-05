@@ -77,6 +77,9 @@ export type AgentBody = {
   asked?: { byId: string; verb: InvitationVerb; tick: number }
   // The last walk out together: one a day per pair, or the same two ask each other all day.
   courted?: { withId: string; day: number }
+  // How many separate days this body has walked out with each person. A proposal is refused
+  // until the pair has enough of them, so a partnership is weeks of evenings, not one ask.
+  walkOuts?: Record<string, number>
   // Who this body is partnered to. Set both ways at once, absent until the first partnership,
   // so every log before the town's first one hashes as it always did.
   partnerId?: string

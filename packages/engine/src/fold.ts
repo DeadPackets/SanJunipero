@@ -855,12 +855,25 @@ export function fold(
       const asker = state.agents[p.byId]
       if (!asker) throw new Error(`invitation_accepted for unknown agent ${p.byId}`)
       const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      const walked = (body: AgentBody, withId: string): Record<string, number> => {
+        const before = body.walkOuts?.[withId] ?? 0
+        const again = body.courted?.withId === withId && body.courted.day === day
+        return { ...body.walkOuts, [withId]: again ? before : before + 1 }
+      }
       return {
         ...state,
         agents: {
           ...state.agents,
-          [p.agentId]: { ...next, courted: { withId: p.byId, day } },
-          [p.byId]: { ...asker, courted: { withId: p.agentId, day } },
+          [p.agentId]: {
+            ...next,
+            courted: { withId: p.byId, day },
+            walkOuts: walked(invitee, p.byId),
+          },
+          [p.byId]: {
+            ...asker,
+            courted: { withId: p.agentId, day },
+            walkOuts: walked(asker, p.agentId),
+          },
         },
       }
     }
