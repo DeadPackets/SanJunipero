@@ -22,7 +22,7 @@ import { createVignette, type Vignette } from './vignette.js'
 import { advanceWind } from './wind.js'
 import { createInteriorScene, type InteriorScene } from './interiorScene.js'
 import { createLandmarkLayer, type LandmarkLayer } from './landmarks.js'
-import { shouldBubble } from '../ui/thoughts.js'
+import { bubbleSubject, shouldBubble } from '../ui/thoughts.js'
 import { createToponymLayer, type ToponymLayer } from './toponyms.js'
 
 /** Nobody is in a room the town is not holding open. */
@@ -247,7 +247,8 @@ export function StageMount({
             const held = store.getScene()
             const inTheRoom = held !== null && held.open ? held.participants : NOBODY
             for (const t of store.thoughtsLog().slice(seenThoughts - said))
-              if (shouldBubble(t, s.pickedId, inTheRoom)) bubbles?.spawnThought(t.agentId, t.text)
+              if (shouldBubble(t, bubbleSubject(s), inTheRoom))
+                bubbles?.spawnThought(t.agentId, t.text)
             seenThoughts = said
           }
         }

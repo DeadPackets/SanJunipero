@@ -204,6 +204,14 @@ export function DirectorMode({
     }
   }, [scene, store, claimBy, castKey, followed, awake])
 
+  // Who the camera is on, for the layers that live in the Pixi closure — the thought gate keeps
+  // every wisp of the subject, and on a broadcast nobody has picked anybody.
+  useEffect(() => {
+    if (scene === null) return
+    // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
+    scene.cameraSubject = followed
+  }, [scene, followed])
+
   const name = followed === null ? null : agentName(state?.agents, followed)
   useEffect(() => {
     onCue?.(name === null ? null : `${pinned === null ? 'DIRECTOR' : 'FOLLOWING'} · ${name}`)
