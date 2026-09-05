@@ -119,24 +119,48 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
-// `provider.order` is only an allow-list with `allow_fallbacks:false`, the default here: 8 of the
-// 30 endpoints serving MIND_MODEL cannot do structured output, so a hop to one is a hard failure.
+/** What one caller sends OpenRouter over and above the prompt: which models may answer, which
+ *  back ends may serve, and which mind is asking. */
+export type RequestBody = {
+  models: string[]
+  provider: {
+    only?: string[]
+    order?: string[]
+    allow_fallbacks: boolean
+    require_parameters: boolean
+  }
+  reasoning?: ReasoningSetting
+  session_id?: string
+}
+
+// The pinned back ends are an allow-list either way with `allow_fallbacks:false`, the default
+// here: 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so a hop to one is
+// a hard failure. The mind route names them under `only` and every other route under `order`,
+// because OpenRouter drops sticky routing the moment an order is named, and the mind is the one
+// route with a per-mind prefix worth keeping warm. `require_parameters` narrows to the endpoints
+// that can serve what the request asks for; it cannot REPLACE the allow-list, which bans back
+// ends that answer well-formed JSON with no act inside it — no capability flag reports that.
 export function defaultExtraBody(
   fallbackModels: string[] = FALLBACK_MODELS,
   providerOrder: string[] = PROVIDER_ORDER,
   allowFallbacks = false,
   reasoning?: ReasoningSetting,
   model: string = MIND_MODEL,
-): {
-  models: string[]
-  provider: { order: string[]; allow_fallbacks: boolean }
-  reasoning?: ReasoningSetting
-} {
+  sessionId?: string,
+): RequestBody {
+  const homes = model === MIND_MODEL ? { only: providerOrder } : { order: providerOrder }
   return {
     models: [model, ...fallbackModels],
-    provider: { order: providerOrder, allow_fallbacks: allowFallbacks },
+    provider: { ...homes, allow_fallbacks: allowFallbacks, require_parameters: true },
     ...(reasoning === undefined ? {} : { reasoning }),
+    ...(sessionId === undefined ? {} : { session_id: sessionId }),
   }
+}
+
+/** OpenRouter's sticky-routing key, sent top level. One per mind and not per caller, so a mind's
+ *  turn and its scene line land on the same back end and share the one prefix they both carry. */
+export function sessionIdFor(agentId: string | null): string | undefined {
+  return agentId === null ? undefined : `sj-${agentId}`
 }
 
 // OpenRouter names the back end in its own metadata and again in the raw body; neither is
@@ -666,13 +690,14 @@ export class LlmClient {
   }
 
   /** Public so a test can prove what a live call sends without making one. */
-  requestBody(): ReturnType<typeof defaultExtraBody> {
+  requestBody(): RequestBody {
     return defaultExtraBody(
       FALLBACK_MODELS,
       this.providerOrder,
       this.allowProviderFallbacks,
       this.reasoning ?? undefined,
       this.modelId,
+      sessionIdFor(this.agentId),
     )
   }
 

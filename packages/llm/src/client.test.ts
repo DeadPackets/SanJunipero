@@ -23,6 +23,7 @@ import {
   defaultExtraBody,
   retryBackoffMs,
   servedProvider,
+  type RequestBody,
 } from './client.js'
 import { DEFAULT_MAX_CONCURRENCY, limiterFor, resetLimiters } from './rateLimiter.js'
 import {
@@ -985,12 +986,51 @@ describe('default OpenRouter path extraBody', () => {
   it('builds models + provider pinning from pins.ts', () => {
     expect(defaultExtraBody()).toEqual({
       models: [MIND_MODEL, ...FALLBACK_MODELS],
-      provider: { order: PROVIDER_ORDER, allow_fallbacks: false },
+      provider: { only: PROVIDER_ORDER, allow_fallbacks: false, require_parameters: true },
     })
     expect(defaultExtraBody(['x/y'], ['P'])).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: false },
+      provider: { only: ['P'], allow_fallbacks: false, require_parameters: true },
     })
+  })
+
+  // Naming an order is what turns OpenRouter's stickiness off, so the mind route may never send
+  // one: its 594-token per-mind prefix cached 0 times in r13 while `provider.order` was set.
+  it('★ the mind route sends `only`, every other route keeps its ordered preference', () => {
+    const db = openDb()
+    const provider = (caller: string): RequestBody['provider'] =>
+      new LlmClient({ db, caller }).requestBody().provider
+    expect(provider('turn').only).toEqual(PROVIDER_ORDER)
+    expect(provider('turn').order).toBeUndefined()
+    expect(provider('scene').only).toEqual(PROVIDER_ORDER)
+    expect(provider('narrator').order).toEqual(PROSE_PROVIDER_ORDER)
+    expect(provider('narrator').only).toBeUndefined()
+    expect(provider('arbiter').order).toEqual(RULING_PROVIDER_ORDER)
+  })
+
+  // Sticky routing keys off this and nothing else. One per mind, not per caller: the turn and
+  // the scene line carry the same identity block and want the same warm back end.
+  it('★ names the mind asking, so its next call lands on the back end holding its prefix', () => {
+    const db = openDb()
+    expect(new LlmClient({ db, caller: 'turn', agentId: 'nadia' }).requestBody().session_id).toBe(
+      'sj-nadia',
+    )
+    expect(new LlmClient({ db, caller: 'scene', agentId: 'nadia' }).requestBody().session_id).toBe(
+      'sj-nadia',
+    )
+    // Nobody's call: the narrator and the court have no prefix of their own to keep warm.
+    expect(new LlmClient({ db, caller: 'narrator' }).requestBody()).not.toHaveProperty('session_id')
+  })
+
+  // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output. The allow-list still
+  // carries the bans no flag reports; this drops the endpoints that cannot do the ask.
+  it('★ asks for the parameters the request uses, on every route', () => {
+    const db = openDb()
+    for (const caller of ['turn', 'scene', 'reflection', 'narrator', 'arbiter']) {
+      expect(new LlmClient({ db, caller }).requestBody().provider.require_parameters, caller).toBe(
+        true,
+      )
+    }
   })
 
   // A live town pins the provider as an allow-list: 9 of 309 rehearsal-3 calls hopped to
@@ -1009,15 +1049,15 @@ describe('default OpenRouter path extraBody', () => {
   // or a GLM caller's json_schema lands on a back end that answers with a thought and no act.
   it('★ each caller sends its own fleet row, model and back end together', () => {
     const db = openDb()
-    const body = (caller: string): { models: string[]; order: string[] } => {
+    const body = (caller: string): { models: string[]; homes: string[] | undefined } => {
       const b = new LlmClient({ db, caller }).requestBody()
-      return { models: b.models, order: b.provider.order }
+      return { models: b.models, homes: b.provider.only ?? b.provider.order }
     }
-    expect(body('turn')).toEqual({ models: [MIND_MODEL], order: PROVIDER_ORDER })
+    expect(body('turn')).toEqual({ models: [MIND_MODEL], homes: PROVIDER_ORDER })
     expect(body('preflight')).toEqual(body('turn'))
-    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], order: PROSE_PROVIDER_ORDER })
+    expect(body('narrator')).toEqual({ models: [PROSE_MODEL], homes: PROSE_PROVIDER_ORDER })
     // The court is the one caller off the fleet's two models: what it writes is permanent.
-    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], order: RULING_PROVIDER_ORDER })
+    expect(body('arbiter')).toEqual({ models: [RULING_MODEL], homes: RULING_PROVIDER_ORDER })
   })
 
   // A closed allow-list: a name outside it is a hard failure, and a refusal inside it lands on
@@ -1025,8 +1065,9 @@ describe('default OpenRouter path extraBody', () => {
   it('★ the request body carries exactly the pinned allow-list', () => {
     expect(PROVIDER_ORDER).toEqual(['Wafer', 'DeepInfra'])
     expect(new LlmClient({ db: openDb(), caller: 'turn' }).requestBody().provider).toEqual({
-      order: PROVIDER_ORDER,
+      only: PROVIDER_ORDER,
       allow_fallbacks: false,
+      require_parameters: true,
     })
   })
 
@@ -1050,7 +1091,11 @@ describe('default OpenRouter path extraBody', () => {
     expect(all, 'the default is one retry, not two').toHaveLength(2)
     expect(all[0]!.ok).toBe(0)
     expect(all[1]!.ok).toBe(1)
-    expect(client.requestBody().provider).toEqual({ order: PROVIDER_ORDER, allow_fallbacks: false })
+    expect(client.requestBody().provider).toEqual({
+      only: PROVIDER_ORDER,
+      allow_fallbacks: false,
+      require_parameters: true,
+    })
   })
 
   // 8 of the 30 endpoints serving MIND_MODEL cannot do structured output, so leaving the
@@ -1058,7 +1103,7 @@ describe('default OpenRouter path extraBody', () => {
   it('opting back into provider fallbacks is possible, and says so in the body', () => {
     expect(defaultExtraBody(['x/y'], ['P'], true)).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: true },
+      provider: { only: ['P'], allow_fallbacks: true, require_parameters: true },
     })
   })
 
@@ -1067,7 +1112,7 @@ describe('default OpenRouter path extraBody', () => {
   it('carries a reasoning setting into the body, and sends none when none is asked for', () => {
     expect(defaultExtraBody(['x/y'], ['P'], true, { enabled: false })).toEqual({
       models: [MIND_MODEL, 'x/y'],
-      provider: { order: ['P'], allow_fallbacks: true },
+      provider: { only: ['P'], allow_fallbacks: true, require_parameters: true },
       reasoning: { enabled: false },
     })
     expect(defaultExtraBody(['x/y'], ['P'], true, { effort: 'low' }).reasoning).toEqual({

@@ -6,7 +6,9 @@ export const MIND_MODEL = 'z-ai/glm-5.3-flash' as const
 // with no 429; every other GLM endpoint rate-limited, emptied, or failed the act schema.
 // The order of these two buys nothing: with `allow_fallbacks:false` this list is an ALLOW-LIST
 // and OpenRouter picks inside it. Flipping it 2026-09-03 changed no routing at all — 72 of 72
-// mind calls still went to Wafer — so a real preference needs `only` plus `sort`, not a reorder.
+// mind calls still went to Wafer — so the mind route now sends the pair as `provider.only`,
+// which naming an order would have disabled: OpenRouter drops sticky routing whenever one is
+// named, and without stickiness a mind's 594-token identity prefix never cached once in r13.
 // Worth doing, and measured: over 2.96 sim-days DeepInfra answered 610 calls at $0.0000857 each
 // and failed none, while Wafer answered 502 at $0.000350 — 4.1x — and refused 155 more upstream.
 // A refusal also dozes the mind six ticks, and 21 landed on scene lines, stopping a conversation
