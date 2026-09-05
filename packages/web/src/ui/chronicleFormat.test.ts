@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, type SimEvent, agentName, chronicleLine } from '@sj/shared'
 import { genesisState, type WorldState } from '@sj/engine/state'
 import { describeEvent, isNarratable } from './chronicleFormat.js'
 
@@ -161,5 +161,51 @@ describe('a discovery in the live feed', () => {
 
   it('never leaks the mind’s own words into the ticker', () => {
     expect(describeEvent(ev, null)).not.toContain('i want to')
+  })
+})
+
+// Task 17: the Today ring and the Chronicle read the same sentence for a scene and an arrival,
+// or the same tick reads two ways depending on which panel is open.
+describe('the ticker and the chronicle agree about a scene and an arrival', () => {
+  const state = {
+    agents: { a1: { name: 'Maret' }, a2: { name: 'Yusuf' } },
+    structures: {},
+  } as never
+  const look = {
+    agentName: (id: string) => agentName({ a1: { name: 'Maret' }, a2: { name: 'Yusuf' } }, id),
+    structureKind: () => 'building',
+    mysteryProse: () => null,
+  }
+  const closed: SimEvent = {
+    seq: 3,
+    tick: 900,
+    type: 'scene_closed',
+    payload: {
+      id: 'scene_1',
+      summary: 'Maret and Yusuf settled the count of fish at five.',
+      participants: ['a1', 'a2'],
+      deltas: [],
+      closeReason: 'ended',
+    },
+  }
+  const arrival: SimEvent = {
+    seq: 4,
+    tick: 900,
+    type: 'agent_spawned',
+    payload: { id: 'a2', name: 'Yusuf', x: 1, y: 1, ageDays: 7000 },
+  }
+
+  it('prints the scene summary and the arrival, word for word as the chronicle does', () => {
+    for (const e of [closed, arrival]) {
+      expect(describeEvent(e, state), e.type).toBe(chronicleLine(e, look))
+    }
+    expect(describeEvent(closed, state)).toBe('Maret and Yusuf settled the count of fish at five.')
+    expect(describeEvent(arrival, state)).toBe('Yusuf came to the town.')
+  })
+
+  it('keeps the founding out of the ring, so day 0 is not twelve arrivals', () => {
+    expect(describeEvent({ ...arrival, tick: 0 }, state)).toBeNull()
+    expect(isNarratable({ ...arrival, tick: 0 })).toBe(false)
+    expect(isNarratable(arrival)).toBe(true)
   })
 })
