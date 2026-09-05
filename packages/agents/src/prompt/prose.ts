@@ -36,6 +36,7 @@ type PerceptionItem = {
 // world's unexplained happenings close enough to see.
 type PerceptionSeen =
   | { kind: 'item_taken'; takerName: string; ownerName: string; itemKind: string }
+  | { kind: 'law_broken'; breakerName: string; lawText: string; self: boolean }
   | { kind: 'mystery'; mystery: string; prose: string }
   | {
       kind: 'expression'
@@ -1147,6 +1148,12 @@ export function perceptionToProse(
       // The saying is the inventor's own words for the attempt, reported: "he said he would…".
       const why = s.saying === undefined ? '' : `: ${s.pronoun} said ${s.pronoun} would ${s.saying}`
       lines.push(`${s.inventorName} has worked out ${s.name}${why}.`)
+    } else if (s.kind === 'law_broken') {
+      lines.push(
+        s.self
+          ? `You did what the town agreed against: "${s.lawText}", and it was seen.`
+          : `You watch ${s.breakerName} do what the town agreed against: "${s.lawText}".`,
+      )
     } else lines.push(s.prose)
   }
 

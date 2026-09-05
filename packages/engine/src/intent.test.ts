@@ -343,13 +343,13 @@ describe('★ ONE INTERRUPT POLICY, AND IT IS NOT THE VERB’S TO DECLARE', () =
     ])
 
   // The policy is about the HANDS. `speak` declares `atOnce`, because a body with an axe in its
-  // hands can still answer when it is spoken to; `stop` is what puts the axe down. Widening this
-  // set is a visible edit.
-  it('★ the mouth and the setting-down are the only things that do not wait for the hands', () => {
+  // hands can still answer when it is spoken to; `stop` is what puts the axe down; an ask and a
+  // parting are words too. Widening this set is a visible edit.
+  it('★ the mouth, the setting-down and the asking are the only things that do not wait for the hands', () => {
     const exempt = Object.keys(VERBS)
       .filter((k) => VERBS[k]!.atOnce !== undefined)
       .sort()
-    expect(exempt).toEqual(['speak', 'stop'])
+    expect(exempt).toEqual(['court', 'leave_partner', 'lie_with', 'propose', 'speak', 'stop'])
     const r = submitIntent(busyWith('build'), CFG, 'a1', 'speak', { text: 'over here' })
     expect(r.ok).toBe(true)
     expect(r.ok && r.events.some((e) => e.type === 'action_started'), 'a word took the slot').toBe(
