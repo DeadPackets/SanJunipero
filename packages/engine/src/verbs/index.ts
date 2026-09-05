@@ -906,6 +906,14 @@ function swallowEvents(
   ]
 }
 
+// Ill, hurt or afflicted: the one body a herb is a meal for. r24 watched a well body eat herbs
+// hourly through a night, three hunger a time, with bread six tiles off.
+function ailing(state: WorldState, config: SimConfig, agentId: string): boolean {
+  const a = state.agents[agentId]
+  if (a === undefined) return false
+  return a.ill || a.hp < config.health.maxHp || (a.afflictions?.length ?? 0) > 0
+}
+
 /** The word back to whoever made the thing. Nothing when the maker is unknown, and nothing
  *  when the maker is the one using it: thanking yourself is not being relied on. */
 function usedByAnother(
@@ -942,6 +950,8 @@ const eat: VerbDef = makeVerb({
       return 'not holding that — go and stand beside it first'
     }
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
+    if (item.kind === HERB_KIND && !ailing(state, config, agentId))
+      return 'a herb is a remedy, not a meal'
     return null
   },
   // The kind rides `action_completed`, which is what the fold counts the window by. It is
@@ -1267,6 +1277,9 @@ const stoke: VerbDef = makeVerb({
     if (s.stage !== 'complete') return 'it is not finished'
     if (!atTheFire(state, agentId, s)) return 'not close enough to the fire'
     if (heldQty(state, agentId, FUEL_KIND) < 1) return shortOf(FUEL_KIND)
+    // r24: 70 stokes on nine hearths in a day, most of them a log onto a fire already lit.
+    if ((s.fueledUntilTick ?? 0) - state.tick > config.light.fuelBurnTicks / 2)
+      return 'the fire needs nothing yet'
     return null
   },
   onComplete(state, config, agentId, params) {

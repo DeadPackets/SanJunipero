@@ -1190,9 +1190,17 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
     expect(flat.restored).toBe(FULL)
   })
 
-  it('an herb is a remedy, not a meal: it restores a token and nothing like a dinner', () => {
+  it('an herb is a remedy, not a meal: a well body is refused it, a hurt one gets a token', () => {
+    const well = larder(['herb'])
+    const params = { itemId: heldIdOf(well, 'herb') }
+    expect(VERBS.eat!.validate(well, CFG, 'a1', params)).toBe('a herb is a remedy, not a meal')
+    const hurt = {
+      ...well,
+      agents: { ...well.agents, a1: { ...well.agents.a1!, hp: CFG.health.maxHp - 1 } },
+    }
+    expect(VERBS.eat!.validate(hurt, CFG, 'a1', params)).toBe(null)
     expect(nutritionOf(CFG, 'herb')).toBeLessThan(0.2)
-    const herb = eatOne(larder(['herb']), 'herb').restored
+    const herb = eatOne(hurt, 'herb').restored
     expect(herb).toBe(FULL * nutritionOf(CFG, 'herb'))
     expect(herb).toBeLessThan((FULL * nutritionOf(CFG, 'bread')) / 4)
   })

@@ -397,17 +397,23 @@ describe('a fed fire never burns for less time than it already had', () => {
     expect(s.structures.house_1!.fueledUntilTick).toBe(T + 300)
   })
 
-  // An armful is a window from when you feed it, not a bank you pay into: a roofed fire stoked
-  // twice in an hour is lit for one armful from the second feed, never two stacked end to end.
-  it('the verb itself is monotonic, so the guard changes no stoke a mind can make', () => {
+  // A fire is fed when it is half down, not every time a cold body walks in: r24 stoked nine
+  // hearths 70 times in a day, and an armful on a lit fire bought only the difference.
+  it('a fire with more than half an armful left takes no log; after that the window moves', () => {
     let s = indoors(holding(holding(houseAndBody(T), 'w1', 'wood'), 'w2', 'wood'))
     s = apply(s, 'stoke', { structureId: 'house_1' })
     const first = s.structures.house_1!.fueledUntilTick!
     expect(first).toBe(T + FUEL)
 
-    // An hour on, with the first armful still burning: the window moves with the feeding.
     s = fold(s, ev('tick_advanced', {}, T + 60), CFG)
+    expect(submitIntent(s, CFG, 'a1', 'stoke', { structureId: 'house_1' })).toMatchObject({
+      ok: false,
+      reason: 'the fire needs nothing yet',
+    })
+
+    const later = T + FUEL / 2 + 1
+    s = fold(s, ev('tick_advanced', {}, later), CFG)
     s = apply(s, 'stoke', { structureId: 'house_1' })
-    expect(s.structures.house_1!.fueledUntilTick).toBe(first + 60)
+    expect(s.structures.house_1!.fueledUntilTick).toBe(later + FUEL)
   })
 })
