@@ -77,6 +77,49 @@ export type CharacterGenerate = (req: {
   reserveUsd: number
 }) => Promise<CharacterImage>
 
+export const CHARACTER_MODEL = 'google/gemini-3.1-flash-image'
+const CHARACTER_ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
+/** A hung provider must not hold up every later commission. */
+const CHARACTER_TIMEOUT_MS = 120_000
+
+/** One 2048² generation off OpenRouter. `imageClient.ts` cannot serve this: it is pinned to a
+ *  512 px item sprite, and a character cell is cut on a whole factor of 2048. */
+export function characterImageClient(opts: {
+  apiKey: string
+  fetchFn?: typeof fetch
+  model?: string
+  /** Every billed reply, image or not — the row no candidate will ever book. */
+  onCharge?: (model: string, costUsd: number) => void
+}): CharacterGenerate {
+  const doFetch = opts.fetchFn ?? fetch
+  const model = opts.model ?? CHARACTER_MODEL
+  return async ({ prompt, refs, size, reserveUsd }) => {
+    const res = await doFetch(CHARACTER_ENDPOINT, {
+      method: 'POST',
+      signal: AbortSignal.timeout(CHARACTER_TIMEOUT_MS),
+      headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt,
+        size,
+        response_format: 'b64_json',
+        input_references: refs.map((r) => ({
+          type: 'image_url',
+          image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+        })),
+        usage: { include: true },
+      }),
+    })
+    if (!res.ok) throw new Error(`${model} HTTP ${res.status}: ${await res.text()}`)
+    const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
+    const costUsd = json.usage?.cost ?? reserveUsd
+    opts.onCharge?.(model, costUsd)
+    const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
+    if (b64 === undefined) throw new Error(`${model}: no b64_json`)
+    return { png: Buffer.from(b64, 'base64'), model, costUsd }
+  }
+}
+
 export type CharacterDeps = {
   generate: CharacterGenerate
   attempts?: number

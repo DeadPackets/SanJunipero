@@ -143,7 +143,10 @@ describe('the valley road counts both ways', () => {
   })
 
   it('fires the first coming and the first going once each, naming the body', () => {
-    const firsts = detectFirsts([arrived, arrived, departed, departed], { seenKinds: [] })
+    const firsts = detectFirsts([arrived, arrived, departed, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })
     expect(firsts.filter((m) => m.kind === 'first_arrival')).toHaveLength(1)
     expect(firsts.filter((m) => m.kind === 'first_leaving')).toHaveLength(1)
     expect(firsts.find((m) => m.kind === 'first_arrival')?.agentIds).toEqual(['mira'])
@@ -151,7 +154,10 @@ describe('the valley road counts both ways', () => {
   })
 
   it('and neither label names a number or a machine', () => {
-    for (const m of detectFirsts([arrived, departed], { seenKinds: [] })) {
+    for (const m of detectFirsts([arrived, departed], {
+      seenKinds: new Set<string>(),
+      rulebookCount: 0,
+    })) {
       expect(m.label).not.toMatch(/\d/)
       expect(m.label).not.toMatch(/\b(agent|id|event|model)\b/i)
     }

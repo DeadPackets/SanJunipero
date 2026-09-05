@@ -12,10 +12,11 @@ import { CAST_CONTENT_DIR } from '../src/castArt.js'
 import { CAST_V5, PROPORTION_ANCHOR_ID, type CastLook } from '../src/castLooks.js'
 import {
   CHARACTER_ATTEMPTS,
+  CHARACTER_MODEL,
+  characterImageClient,
   commissionCharacter,
   committedProportionRef,
   onMagenta,
-  type CharacterImage,
 } from '../src/characterCommission.js'
 import { scratch } from './scratch.js'
 
@@ -39,46 +40,20 @@ const RUN = CAST_V5.filter((c) => FILTER.includes(c.id)).sort(
 if (RUN.length === 0) throw new Error(`CAST=${process.env.CAST} matches no cast member`)
 
 const S = scratch('ar')
-const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
-const MODEL = 'google/gemini-3.1-flash-image'
 const ATTEMPTS = Math.max(1, Number(process.env.CAST_ATTEMPTS ?? String(CHARACTER_ATTEMPTS)))
 
 const budget = new BudgetGuard(CAP)
 const ledger = new SpendLedger(`${S}/spend.json`)
-
-async function generate(
-  prompt: string,
-  refs: Buffer[],
-  size: string,
-  reserve: number,
-  assetId: string,
-): Promise<CharacterImage> {
-  if (budget.total + reserve > CAP) throw new BudgetExceededError(CAP, budget.total + reserve)
-  const res = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      prompt,
-      size,
-      response_format: 'b64_json',
-      input_references: refs.map((r) => ({
-        type: 'image_url',
-        image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
-      })),
-      usage: { include: true },
-    }),
-  })
-  if (!res.ok) throw new Error(`${MODEL} HTTP ${res.status}: ${await res.text()}`)
-  const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-  const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
-  if (!b64) throw new Error(`${MODEL}: no b64_json`)
-  const costUsd = json.usage?.cost ?? reserve
-  budget.spend(costUsd)
-  ledger.append({ assetId, kind: 'image_gen', model: MODEL, usd: costUsd }) // $5 anomaly stop
-  ledger.flush()
-  return { png: Buffer.from(b64, 'base64'), model: MODEL, costUsd }
-}
+// Whose character it is changes per run, so the ledger's asset id is set beside the call.
+let assetId = ''
+const client = characterImageClient({
+  apiKey: KEY,
+  onCharge: (model, usd) => {
+    budget.spend(usd)
+    ledger.append({ assetId, kind: 'image_gen', model, usd }) // $5 anomaly stop
+    ledger.flush()
+  },
+})
 
 const summary: string[] = []
 let proportionRef: Buffer | null = RUN.some((c) => c.id === PROPORTION_ANCHOR_ID)
@@ -92,7 +67,7 @@ if (proportionRef !== null) {
 async function runCharacter(m: CastLook): Promise<void> {
   const DIR = `${S}/cast/${m.id}`
   for (const d of [`${DIR}/raws`, `${DIR}/cells`]) mkdirSync(d, { recursive: true })
-  const assetId = `cast:${m.id}`
+  assetId = `cast:${m.id}`
   const spentBefore = ledger.totalFor(assetId)
   const report: string[] = []
   let refused: string | null = null
@@ -112,17 +87,20 @@ async function runCharacter(m: CastLook): Promise<void> {
       },
       // The raws cache is the script's, not the pipeline's: a re-run of a character re-reads the
       // candidates it already paid for instead of buying them again.
-      generate: async ({ key, prompt, refs, size, reserveUsd }) => {
-        const path = `${DIR}/raws/${key}.png`
+      generate: async (req) => {
+        const path = `${DIR}/raws/${req.key}.png`
         if (existsSync(path)) {
-          console.log(`  ${key}: cached`)
-          return { png: readFileSync(path), model: MODEL, costUsd: 0 }
+          console.log(`  ${req.key}: cached`)
+          return { png: readFileSync(path), model: CHARACTER_MODEL, costUsd: 0 }
         }
         if (DRY) throw new BudgetExceededError(CAP, budget.total)
-        const r = await generate(prompt, refs, size, reserveUsd, assetId)
+        // Reserved BEFORE the call, so a cap the pair cannot clear refuses before the picture.
+        if (budget.total + req.reserveUsd > CAP)
+          throw new BudgetExceededError(CAP, budget.total + req.reserveUsd)
+        const r = await client(req)
         writeFileSync(path, r.png)
         console.log(
-          `  ${key}: generated $${r.costUsd.toFixed(4)} (total $${budget.total.toFixed(4)})`,
+          `  ${req.key}: generated $${r.costUsd.toFixed(4)} (total $${budget.total.toFixed(4)})`,
         )
         return r
       },
