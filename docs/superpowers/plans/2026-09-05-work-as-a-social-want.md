@@ -129,6 +129,53 @@ Files: `packages/agents/src/prompt/assemble.ts` (IdentityCore), `packages/agents
    woken at 06:00 and is at 09:00; identity renders the hours line and is stable; founders each
    have hours; the persona derivation is deterministic.
 
+## Task 5: the chronicle reads what was said, not how many times a type happened
+
+Files: `packages/narrator/src/types.ts` (SceneDigest), `packages/narrator/src/chronicle.ts`
+(sceneDigests), a new `packages/narrator/src/moments.ts`, `packages/narrator/src/narrate.ts`,
+`packages/narrator/src/llm/narratorLlm.ts` (summarizeChapter prompt), `packages/narrator/src/voice.ts`
+(chronicler chapter voice), `packages/narrator/src/publications.ts`, tests beside each.
+
+Measured on r23 and r24: the chapter call sends about 40k input tokens a day, of which the
+`eventIds` arrays are nearly all (137k to 153k characters of numbers per day over 6 scenes), and
+the model sees nothing else of the day but `typeCounts`, names and a place. The paper therefore
+reads "the places held movement, speech, and rest". The town's actual lines are good (see
+`agent_spoke` and `scene_line` texts) and the paper never quotes one.
+
+1. `SceneDigest` loses `eventIds` and `typeCounts` and gains `moments: { n: number; text: string }[]`
+   where `n` is the event seq (the number the model may cite) and `text` is one plain line. The
+   citation validity set in `renderChapter` stays the scene's full `eventIds` (unchanged), so
+   dropping the ids from the prompt costs nothing in verification.
+2. `moments.ts` exports `pickMoments(evs: SimEvent[], nameOf, cap = 10): { n; text }[]`,
+   deterministic, in seq order after selection. Take, in this priority until `cap`:
+   a. `scene_closed` with a non-empty `summary` (text: the summary, at most 200 chars);
+   b. `agent_died`, `agent_injured`, `agent_collapsed`, `agent_recovered`, `structure_completed`,
+      `crop_harvested` (text: `${name} was wounded.` style, use `publicRecordText` where it
+      already has the words);
+   c. spoken lines from `agent_spoke` and `scene_line`: `sanitizeSpokenText`, keep lines of 30 to
+      180 characters, prefer lines that contain a question mark, an exclamation mark, or another
+      cast member's name; at most 2 per speaker per scene; text: `${name} said: "${line}"`;
+   d. the first `action_completed` per verb among fish, chop, forage, harvest, cook, build,
+      plant, mend, carve, teach (text: `${name} was seen to ${verbPhrase(verb)}.`); never walk,
+      enter, fill, take, drop, stoke, eat, drink, sleep.
+   A day cap of 60 moments across scenes, trimmed from the coolest scenes first (lowest heat).
+3. `sceneDigests(scenes, look, events)` builds `moments` from the scene's events via
+   `pickMoments`; `narrate.ts` passes `events` through; the `typeCounts` closure in `narrate.ts`
+   is removed with its parameter if nothing else uses it.
+4. Prompt (`summarizeChapter`): "Each scene lists moments with their numbers. Quote at most one
+   line per person, word for word, inside double quotes, and say who said it. Write what
+   changed between people, not that people moved and spoke." Chronicler `chapter` voice adds:
+   "Quote a line where one is given; a person's own words beat a summary of them." Keep the
+   footnote rule and the cast law as they are.
+5. `renderNewspaper`: the "Seen in the thick of it" line drops any name that resolved to
+   `SOMEONE` (r24 day 0 printed "someone" in the list); if fewer than 2 names remain, omit the
+   line.
+6. Tests: `pickMoments` priority and caps on a fixture (a death outranks a line; 2 per speaker;
+   chores excluded; seq order; day cap trims the coolest scene); the digest has no `eventIds`;
+   the prompt text carries the quote instruction; `renderNewspaper` omits `someone`; existing
+   narrator tests updated for the digest shape. Byte-size check in a test: a digest for a
+   200-event scene serializes under 4,000 characters.
+
 ## Out of scope, noted for later
 
 Talking while working (a scene opening between two bodies at work without stopping the hands),
