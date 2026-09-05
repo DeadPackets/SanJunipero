@@ -244,7 +244,16 @@ export class SceneCoordinator {
       stakes: scene.stakes,
     })
     this.#recordLine(scene, agentId, said, '', 'none', null, tick)
+    for (const id of scene.participants) this.#standStill(id)
     return scene
+  }
+
+  /** Talking to somebody stops your legs, and being talked to stops theirs. Without this a mind
+   *  spoken to mid-walk kept walking, left earshot before its turn to answer came, and the talk
+   *  died at one line: a quarter of all of them, in rehearsal 12. Hands at work are left alone. */
+  #standStill(agentId: string): void {
+    if (this.#bridge.perception(agentId).self.activity !== 'walk') return
+    void this.#bridge.submit(agentId, { verb: 'stop', params: {} }).catch(this.#sink)
   }
 
   /** One invariant: a say inside an open scene's earshot is a line of that scene. So no second
@@ -269,6 +278,7 @@ export class SceneCoordinator {
     scene.audience = scene.audience.filter((id) => id !== agentId)
     scene.participants = [...scene.participants, agentId].sort()
     this.#tellingIfStranger(scene)
+    this.#standStill(agentId)
     appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
     scene.stakes = this.#stakesOf(scene)
     this.#turned(scene)

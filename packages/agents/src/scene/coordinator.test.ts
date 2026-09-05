@@ -1506,3 +1506,31 @@ describe('a partner left', () => {
     )
   })
 })
+
+describe('being spoken to stops your legs', () => {
+  // Rehearsal 12: 37 of 145 talks were one line long because the person spoken to kept walking
+  // and left earshot before their turn to answer arrived.
+  it('★ stops the one spoken to mid-walk, and leaves the one already standing alone', async () => {
+    // On open ground, well clear of the house the default cast stands on.
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 12 },
+        { id: OMAR, name: 'Omar', x: 13 },
+      ],
+    })
+    h.emitNext('action_started', {
+      agentId: OMAR,
+      verb: 'walk',
+      params: { x: 20, y: 3 },
+      duration: 40,
+    })
+    h.loop.step()
+    expect(h.loop.state.agents[OMAR]!.activity?.verb).toBe('walk')
+    expect(h.coordinator.noteSpoken(NADIA, 'Omar, hang on a second.', NOON)).not.toBeNull()
+    h.loop.step()
+    await flush()
+    h.loop.step()
+    expect(h.loop.state.agents[OMAR]!.activity).toBeNull()
+    expect(h.coordinator.open()).toHaveLength(1)
+  })
+})
