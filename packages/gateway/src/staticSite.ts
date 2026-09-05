@@ -1,4 +1,4 @@
-import { createReadStream, readFileSync, statSync } from 'node:fs'
+import { createReadStream, readFileSync, realpathSync, statSync } from 'node:fs'
 import { join, normalize, resolve, sep } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { CARD_HEIGHT, CARD_WIDTH } from './agentCard.js'
@@ -31,7 +31,8 @@ const typeOf = (path: string): string =>
   TYPES[path.slice(path.lastIndexOf('.') + 1).toLowerCase()] ?? OCTET
 
 /** The file a URL path names inside `root`, or null. Traversal is refused on the RESOLVED path
- *  rather than by pattern: `%2e%2e%2f`, `..%5c` and a symlink arrive as three different strings. */
+ *  rather than by pattern — `%2e%2e%2f` and `..%5c` are two spellings of one walk — and on the
+ *  REAL path after that, because a symlink is a walk no string test can see. */
 export function resolveInRoot(root: string, urlPath: string): string | null {
   let decoded: string
   try {
@@ -43,7 +44,21 @@ export function resolveInRoot(root: string, urlPath: string): string | null {
   const base = resolve(root)
   const full = resolve(base, `.${normalize(decoded.startsWith('/') ? decoded : `/${decoded}`)}`)
   if (full !== base && !full.startsWith(base + sep)) return null
-  return full
+  // `resolve` is lexical and never touches the disk, so a symlink INSIDE the root passes the
+  // test above and is then read from wherever it points. A name with no file is nothing to
+  // follow, and answers 404 further down.
+  const real = realOrNull(full)
+  if (real === null) return full
+  const realBase = realOrNull(base) ?? base
+  return real === realBase || real.startsWith(realBase + sep) ? full : null
+}
+
+const realOrNull = (path: string): string | null => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return null
+  }
 }
 
 export type StaticSite = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean
