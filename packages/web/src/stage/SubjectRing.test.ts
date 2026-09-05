@@ -29,7 +29,16 @@ const storeOf = (...standing: Structure[]): WorldStore =>
       ({ structures: Object.fromEntries(standing.map((s) => [s.id, s])) }) as WorldState,
   }) as unknown as WorldStore
 
-const markup = (subject: Subject | null, store: WorldStore = storeOf()): string =>
+/** Amara owns a house, so her ring draws all four arms. A person who owns none is not
+ *  offered Home — see the arm-gating test below. */
+const owned = (id: string, ownerId: string): Structure => ({
+  ...place(id, 'house'),
+  owner: ownerId,
+})
+
+const HOUSED = storeOf(owned('h1', 'a1'))
+
+const markup = (subject: Subject | null, store: WorldStore = HOUSED): string =>
   renderToStaticMarkup(
     createElement(SubjectRing, {
       subject,
@@ -117,6 +126,14 @@ describe('★ a building is asked what a building can answer', () => {
   it('★ offers a person the four person verbs, and nothing else', () => {
     expect(ringVerbsFor('agent', false)).toEqual([...PERSON_VERBS])
     expect(ringVerbsFor('agent', true)).toEqual([...PERSON_VERBS])
+  })
+
+  // The same rule the well taught, turned on a person: App returns without a word when the
+  // owner of no building presses Home, so the arm may not be drawn.
+  it('★ does not offer Home to somebody who owns no building', () => {
+    expect(ringVerbsFor('agent', false, false)).toEqual(['follow', 'story', 'bonds'])
+    expect(markup(AMARA, storeOf())).not.toContain('>Home<')
+    expect(markup(AMARA)).toContain('>Home<')
   })
 
   it('★ offers a roofed building its story and its way in — and a monument only its story', () => {

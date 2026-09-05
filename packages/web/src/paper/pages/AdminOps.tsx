@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
 
 /** The admin channel is a loopback server the browser cannot call directly; the gateway carries
@@ -51,11 +52,16 @@ async function ask<T>(
     const body: unknown = await res.json()
     if (!res.ok) {
       const said = (body as { error?: unknown }).error
-      return { error: typeof said === 'string' ? said : `the channel answered ${res.status}` }
+      const because =
+        res.status === 401 || res.status === 403
+          ? 'the key was refused — check the operator token'
+          : `the channel refused this (${res.status}) — try again`
+      return { error: typeof said === 'string' ? said : because }
     }
     return body as T
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
+  } catch {
+    // `Failed to fetch` names neither the problem nor the way back.
+    return { error: 'the operator channel did not answer — check it is running, then try again' }
   }
 }
 
@@ -64,12 +70,21 @@ const failed = (r: unknown): r is { error: string } =>
 
 /** One read of the operator's channel, re-taken on `READ_EVERY_MS` and after every write. The
  *  refetch goes through a ref, not through the effect's deps: a write must not re-time the beat. */
-function useAdminRead<T>(token: string, path: string): [T | null, () => void] {
+function useAdminRead<T>(token: string, path: string): [T | null, () => void, boolean] {
   const [data, setData] = useState<T | null>(null)
+  // A dropped read used to leave `data` null forever, so a broken channel wore the loading
+  // sentence and never stopped saying it. The refusal is now its own answer.
+  const [down, setDown] = useState(false)
   const alive = useRef(true)
   const read = useCallback(() => {
     void ask<T>(fetch, token, path).then((r) => {
-      if (alive.current && !failed(r)) setData(r)
+      if (!alive.current) return
+      if (failed(r)) {
+        setDown(true)
+        return
+      }
+      setDown(false)
+      setData(r)
     })
   }, [token, path])
   useEffect(() => {
@@ -81,7 +96,7 @@ function useAdminRead<T>(token: string, path: string): [T | null, () => void] {
       clearInterval(timer)
     }
   }, [read])
-  return [data, read]
+  return [data, read, down]
 }
 
 export function ClockView({
@@ -141,8 +156,14 @@ export function ClockSection({
   token: string
   onNotice: (s: string) => void
 }) {
-  const [clock, reread] = useAdminRead<ClockState>(token, '/admin/clock')
-  if (clock === null) return <p className="feed-empty">Asking the town for its clock…</p>
+  const [clock, reread, down] = useAdminRead<ClockState>(token, '/admin/clock')
+  if (clock === null && down) return <OutOfReach onRetry={reread} />
+  if (clock === null)
+    return (
+      <p className="feed-empty" role="status" aria-busy="true">
+        Asking the town for its clock…
+      </p>
+    )
   return (
     <ClockView
       clock={clock}
@@ -260,8 +281,14 @@ export function SpendView({ cost }: { cost: CostReport }) {
 }
 
 export function SpendSection({ token }: { token: string }) {
-  const [cost] = useAdminRead<CostReport>(token, '/admin/cost')
-  if (cost === null) return <p className="feed-empty">Reading the ledger…</p>
+  const [cost, reread, down] = useAdminRead<CostReport>(token, '/admin/cost')
+  if (cost === null && down) return <OutOfReach onRetry={reread} />
+  if (cost === null)
+    return (
+      <p className="feed-empty" role="status" aria-busy="true">
+        Reading the ledger…
+      </p>
+    )
   return <SpendView cost={cost} />
 }
 
@@ -339,11 +366,17 @@ export function RulingsSection({
   token: string
   onNotice: (s: string) => void
 }) {
-  const [queue, reread] = useAdminRead<{ pending: PendingRuling[] }>(
+  const [queue, reread, down] = useAdminRead<{ pending: PendingRuling[] }>(
     token,
     '/admin/rulings/pending',
   )
-  if (queue === null) return <p className="feed-empty">Reading the queue…</p>
+  if (queue === null && down) return <OutOfReach onRetry={reread} />
+  if (queue === null)
+    return (
+      <p className="feed-empty" role="status" aria-busy="true">
+        Reading the queue…
+      </p>
+    )
   return (
     <RulingsView
       pending={queue.pending}

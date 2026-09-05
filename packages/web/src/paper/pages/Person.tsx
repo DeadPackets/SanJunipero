@@ -4,7 +4,7 @@ import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
-import { useFeed, usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { CONDITION_WORD, conditionsOf, stateWord, type AgentView } from '../../ui/status.js'
 import {
   CHANGE_EMPTY,
@@ -17,11 +17,14 @@ import {
 } from '../../ui/becoming.js'
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 const NEED_LOW = 30
+const NOOP = (): void => undefined
+const NO_FAILURE = { journal: false, changes: false }
 export type LedgerRow = { personId: string; doc: string; updatedDay: number }
 export type JournalRow = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
 
@@ -73,12 +76,18 @@ export function PersonStoryView({
   thought,
   journal,
   changes,
+  down = NO_FAILURE,
+  onRetry = NOOP,
   biography = null,
 }: {
   thought: { text: string } | null
   /** `null` while the read is still out — which is not the same thing as an empty journal */
   journal: readonly JournalRow[] | null
   changes: readonly ChangeEntry[] | null
+  /** A refused read, so a dropped wire never prints "nobody has written of them" as a fact
+   *  about the town. */
+  down?: { journal: boolean; changes: boolean }
+  onRetry?: () => void
   /** The chronicler's write-up, from the PUBLIC record alone. Null until one is written. */
   biography?: { day: number; title: string; body: string } | null
 }) {
@@ -91,7 +100,9 @@ export function PersonStoryView({
 
       <section className="block">
         <h3 className="feed-head">Journal</h3>
-        {journal === null ? (
+        {journal === null && down.journal ? (
+          <OutOfReach onRetry={onRetry} />
+        ) : journal === null ? (
           <Skeleton />
         ) : journal.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.written}</p>
@@ -124,7 +135,9 @@ export function PersonStoryView({
           has moved nothing yet and is told so, rather than handed v1 as a character sheet. */}
       <section className="block">
         <h3 className="feed-head">How they have changed</h3>
-        {changes === null ? (
+        {changes === null && down.changes ? (
+          <OutOfReach onRetry={onRetry} />
+        ) : changes === null ? (
           <Skeleton />
         ) : !hasChanged(changes) ? (
           <p className="doc">{CHANGE_EMPTY}</p>
@@ -161,12 +174,16 @@ export function PersonLedgerView({
   tick,
   carrying,
   ledger,
+  down = false,
+  onRetry = NOOP,
   nameOf = () => SOMEONE,
 }: {
   agent: LedgerAgent
   tick: number
   carrying: readonly { id: string; kind: string; qty: number }[]
   ledger: readonly LedgerRow[] | null
+  down?: boolean
+  onRetry?: () => void
   nameOf?: (id: string) => string
 }) {
   return (
@@ -218,7 +235,9 @@ export function PersonLedgerView({
 
       <section className="block">
         <h3 className="feed-head">What they make of people</h3>
-        {ledger === null ? (
+        {ledger === null && down ? (
+          <OutOfReach onRetry={onRetry} />
+        ) : ledger === null ? (
           <Skeleton />
         ) : ledger.length === 0 ? (
           <p className="feed-empty">{EMPTY_COPY.written}</p>
@@ -243,9 +262,15 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   // A changed URL is a new read, so the page can never show the previous person's documents,
   // and a tab nobody opened reads `null` — the endpoint layer's own "do not read".
   const story = tab !== 'Bonds' && tab !== 'Ledger'
-  const journal = usePolled(story ? docUrl(agentId, 'journal') : null, journalRows)
-  const personality = usePolled(story ? docUrl(agentId, 'personality') : null, changeRows)
-  const ledger = usePolled(tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null, ledgerRows)
+  const journalFeed = useEndpointFor(story ? docUrl(agentId, 'journal') : null, journalRows)
+  const changeFeed = useEndpointFor(story ? docUrl(agentId, 'personality') : null, changeRows)
+  const ledgerFeed = useEndpointFor(
+    tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null,
+    ledgerRows,
+  )
+  const journal = useFeed(journalFeed)
+  const personality = useFeed(changeFeed)
+  const ledger = useFeed(ledgerFeed)
 
   const a = agentId === null ? undefined : state?.agents[agentId]
   if (a === undefined) return <p className="feed-empty">{EMPTY_COPY.noPerson}</p>
@@ -289,6 +314,8 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           tick={tick}
           carrying={carrying}
           ledger={ledger.data}
+          down={ledger.failed}
+          onRetry={ledgerFeed.retry}
           nameOf={(id) => agentName(state?.agents, id)}
         />
       ) : (
@@ -296,6 +323,11 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           thought={store.latestThought(a.id)}
           journal={journal.data}
           changes={personality.data === null ? null : changeLog(personality.data)}
+          down={{ journal: journal.failed, changes: personality.failed }}
+          onRetry={() => {
+            journalFeed.retry()
+            changeFeed.retry()
+          }}
           biography={biographyOf(dispatches ?? EMPTY_DISPATCHES, a.id)}
         />
       )}

@@ -120,8 +120,8 @@ export function Paper({
         ref={dimRef}
       />
       <section
-        id="paper"
         className="paper"
+        id="paper"
         data-open={open ? 'yes' : 'no'}
         role="dialog"
         aria-modal="false"

@@ -69,6 +69,7 @@ function DayStripView({
   viewTick,
   live,
   marks,
+  marksDown,
   onScrub,
   onLive,
 }: {
@@ -76,6 +77,7 @@ function DayStripView({
   viewTick: number
   live: boolean
   marks: readonly Mark[]
+  marksDown: boolean
   onScrub: (tick: number) => void
   onLive: () => void
 }) {
@@ -121,6 +123,13 @@ function DayStripView({
       <p className="sheet-note">
         Drag the strip to replay a day. The stamp reads REPLAY until you come back to now.
       </p>
+      {/* The strip scrubs without its marks, so this is a note beside a working control rather
+          than a page-wide refusal — but a bare strip must not read as a town with no days. */}
+      {marksDown && (
+        <p className="sheet-note" role="status">
+          The marks along the strip could not be read. Scrubbing still works.
+        </p>
+      )}
       <div className="day-marks">
         {marks.map((mk) => {
           const at = tickToMoment(mk.tick)
@@ -128,7 +137,8 @@ function DayStripView({
             <button
               key={`${mk.kind}-${mk.tick}`}
               type="button"
-              className={`mark ${mk.kind}`}
+              className="mark"
+              data-kind={mk.kind}
               style={{ left: markLeft(mk.tick, span) }}
               aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Go to this moment.`}
               onClick={() => {
@@ -190,8 +200,8 @@ export function Days({ store, onJump, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
-  const sources =
-    usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS).data ?? EMPTY_SOURCES
+  const marksRead = usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS)
+  const sources = marksRead.data ?? EMPTY_SOURCES
   const firsts = useFeed(milestonesFeed).data ?? NO_FIRSTS
 
   const edge = Math.max(liveEdge, 1)
@@ -210,6 +220,7 @@ export function Days({ store, onJump, onLive }: PageProps) {
       viewTick={viewTick}
       live={mode.live}
       marks={marks}
+      marksDown={marksRead.failed && marksRead.data === null}
       onScrub={(tick) => {
         onJump(Math.max(0, Math.min(edge, Math.round(tick))))
       }}

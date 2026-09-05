@@ -15,6 +15,7 @@ import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
+import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
 /** Row by row on purpose: the schema wants a title of at least one character, and one untitled
@@ -316,11 +317,15 @@ export function Moments({ store, momentId, onJump, onLive, onMoment }: PageProps
     <>
       {read.failed && moments === null ? (
         <OutOfReach onRetry={record.retry} />
-      ) : moments !== null && moments.length === 0 ? (
+      ) : moments === null ? (
+        // An empty list is a town with no kept days; the read is still out, and the two are
+        // not the same sentence.
+        <Skeleton rows={3} />
+      ) : moments.length === 0 ? (
         <p className="feed-empty">{EMPTY_COPY.moments}</p>
       ) : (
         <ol className="strip-list" aria-label="The days the town kept">
-          {(moments ?? []).map((m) => (
+          {moments.map((m) => (
             <MomentCardView
               key={m.id}
               moment={m}
