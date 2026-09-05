@@ -275,13 +275,24 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     expect(scene, 'a sentence is body text, never a balanced heading').toContain(
       'text-wrap: pretty',
     )
-    // a WIDTH: `left: 50%` with no `right` leaves shrink-to-fit only half the stage
+    // a WIDTH: shrink-to-fit would equalise the chyron's lines instead of ranging them left
     expect(scene).toMatch(/width: calc\(100% - 2 \* var\(--mark-inset\)\)/)
     expect(scene, 'the stamp sits on the sentence’s first line').toContain('align-items: baseline')
     // and the cap that keeps it off the signpost still composes with that width
     expect(CSS).toMatch(
       /@media \(min-width: 700px\) \{ \.stage-cue \{ max-width: min\(calc\(60ch \+ var\(--cue-aside\)\), calc\(100% - 320px\)\)/,
     )
+  })
+
+  // A WIDTH, not only a cap: `left: 50%` with no `right` leaves shrink-to-fit half the stage to
+  // work in, and every plate on the centre line is the same shape.
+  it('★ gives every centred plate a width, not only a cap', () => {
+    const CSS = src('./chrome.css').replace(/\s+/g, ' ')
+    for (const sel of ['.stage-cue', '.replay-card']) {
+      const body = new RegExp(`\\${sel} \\{([^}]*)\\}`).exec(CSS)?.[1] ?? ''
+      expect(body, sel).not.toContain('left: 50%')
+      expect(body, sel).toMatch(/(?:^|;) ?width: /)
+    }
   })
 
   it('★ the stamp is the sheet’s own slab, and survives forced colours', () => {
