@@ -149,7 +149,8 @@ export type PerceptionPacket = {
     // Where the legs are already going. Absent when they are not.
     activityToward?: { x: number; y: number }
     // The roof overhead. Absent under open sky, so an outdoor packet reads as it always did.
-    inside?: { id: string; kind: string }
+    // Whose it is rides with it; both absent on walls nobody owns.
+    inside?: { id: string; kind: string; yours?: true; ownerName?: string }
     inventory: PerceptionItem[]
     // Your own things heaped on the ground by your own wall. Absent on a tidy doorstep.
     doorstep?: { kind: string; qty: number }[]
@@ -631,6 +632,15 @@ export type KnownPlace = {
 // One spelling of a place for the whole prompt: a named one is called by its name, an unnamed
 // one is only ever pointed at. `words` keeps a lamp_post from reaching a mind with the underscore.
 const placeSaid = (p: { kind: string; name?: string }): string => p.name ?? `a ${words(p.kind)}`
+
+// Whose roof this is, said where the body is standing under it: courting takes a private roof of
+// your own or theirs, and 31 of rehearsal 13's 42 ask refusals were that rule going unsaid.
+const roofSaid = (i: { kind: string; yours?: true; ownerName?: string }): string =>
+  i.ownerName !== undefined
+    ? `${i.ownerName}'s ${words(i.kind)}`
+    : i.yours === true
+      ? `your own ${words(i.kind)}`
+      : `the ${words(i.kind)}`
 const opening = (said: string): string => `${said.charAt(0).toUpperCase()}${said.slice(1)}`
 
 // Map frame, which is the frame a body walks in: the smaller y is the further north.
@@ -998,7 +1008,7 @@ function affordanceLines(packet: PerceptionPacket): string[] {
         ? 'you can see no way back out'
         : `the doorway at (${door.x}, ${door.y}) is the way back out`
     lines.push(
-      `You are inside the ${inside.kind} (${inside.id}). While you are in here you cannot walk anywhere or enter anything, and ${out}.`,
+      `You are inside ${roofSaid(inside)} (${inside.id}). While you are in here you cannot walk anywhere or enter anything, and ${out}.`,
     )
   }
 
@@ -1060,7 +1070,7 @@ export function perceptionToProse(
 
   lines.push(calendarLine(packet.time))
   const inside = packet.self.inside
-  const where = inside === undefined ? '' : ` inside the ${inside.kind} (${inside.id})`
+  const where = inside === undefined ? '' : ` inside ${roofSaid(inside)} (${inside.id})`
   lines.push(
     `You ${packet.self.asleep ? 'sleep' : packet.self.collapsed ? 'lie' : 'stand'}${where} at (${x}, ${y}).`,
   )

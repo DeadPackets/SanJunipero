@@ -351,6 +351,15 @@ describe('CAPABILITIES — the four acts that need another person to agree', () 
     expect(CAPABILITIES).toMatch(/leave_partner: [^\n]*needs no answer/)
   })
 
+  // The roof gate is the whole of it: 31 of rehearsal 13's 42 ask refusals read "not under a
+  // roof of your own", and the line never said the rule before the mind spent the turn.
+  it('says the roof rule on the line it gates, before the ask', () => {
+    expect(CAPABILITIES).toMatch(
+      /lie_with: [^\n]*a house that is yours or theirs, with the two of you inside it/,
+    )
+    expect(CAPABILITIES).toMatch(/lie_with: [^\n]*neither will standing outside one/)
+  })
+
   it('warns that a child may come of one of them, and names no dial behind it', () => {
     expect(CAPABILITIES).toContain('A child may come of it')
     expect(CAPABILITIES).not.toMatch(/chance|roll|percent|1 in /i)

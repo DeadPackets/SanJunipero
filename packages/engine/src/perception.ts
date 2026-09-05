@@ -220,8 +220,9 @@ export type SeenEvent =
 export type PerceivedGround = { wellTravelled: true }
 
 // The roof the body is standing under. Absent under open sky, so a packet from a town that
-// never went in reads exactly as it always did.
-export type PerceivedInterior = { id: string; kind: string }
+// never went in reads exactly as it always did. Whose it is rides with it: courting is gated on
+// standing under a private roof of your own or theirs, and nothing else said whose this was.
+export type PerceivedInterior = { id: string; kind: string; yours?: true; ownerName?: string }
 
 // What the hands and the feet can act on from where the body stands, read off the verbs' own
 // tests so the prose and a refusal can never disagree about the same body.
@@ -689,6 +690,18 @@ function perceiveStores(lens: Lens, yours: Structure[]): PerceivedStore[] {
   return stores.sort((a, b) => Number(b.yours ?? false) - Number(a.yours ?? false))
 }
 
+/** The roof underfoot and whose it is, read off the owner the `lie_with` gate reads. Unowned
+ *  walls are nobody's and say nothing, which is what they are. */
+function whoseRoof(lens: Lens, roof: Structure): PerceivedInterior {
+  const owner = roof.owner
+  return {
+    id: roof.id,
+    kind: roof.kind,
+    ...(owner === lens.self.id ? { yours: true as const } : {}),
+    ...(owner === undefined || owner === lens.self.id ? {} : { ownerName: lens.nameOf(owner) }),
+  }
+}
+
 function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
   const { state, config, self } = lens
   const heard: HeardSpeech[] = []
@@ -926,7 +939,7 @@ export function composePerception(
       y: self.y,
       activity: self.activity?.verb ?? null,
       ...(toward === undefined ? {} : { activityToward: toward }),
-      ...(roof === undefined ? {} : { inside: { id: roof.id, kind: roof.kind } }),
+      ...(roof === undefined ? {} : { inside: whoseRoof(lens, roof) }),
       inventory: perceiveInventory(lens),
       ...(doorstep === undefined ? {} : { doorstep }),
     },
