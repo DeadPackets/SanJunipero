@@ -297,6 +297,51 @@ const ROAD_RING = ['..............', 'R............R', 'R............R', 'RRRRRR
 const costOf = (s: WorldState, path: [number, number][], config: SimConfig): number =>
   path.reduce((sum, [x, y]) => sum + stepCostAt(s, x, y, config), 0)
 
+describe('the search memo', () => {
+  const s = world(WALL_MAP)
+  const A = { x: 1, y: 1 }
+  const B = { x: 5, y: 1 }
+
+  it('serves the same ground and the same buildings, however else the world has moved on', () => {
+    const first = searchPath(s, A, B, DEFAULT_CONFIG)
+    expect(first).not.toBeNull()
+    const spawned = fold(
+      s,
+      ev(1, 'agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 1, ageDays: ADULT_AGE_DAYS }),
+      DEFAULT_CONFIG,
+    )
+    // A different world object, the same ground: the answer is the very one already found.
+    expect(searchPath(spawned, A, B, DEFAULT_CONFIG)).toBe(first)
+    expect(searchPath(s, A, B, DEFAULT_CONFIG)).toBe(first)
+  })
+
+  it('is thrown away the moment the ground or a building could have moved a route', () => {
+    const first = searchPath(s, A, B, DEFAULT_CONFIG)
+    const built = fold(
+      s,
+      ev(1, 'structure_planned', {
+        id: 'shed_1',
+        kind: 'shed',
+        x: 5,
+        y: 5,
+        w: 1,
+        h: 1,
+        maxHp: 20,
+        flammable: true,
+        builderId: 'script',
+      }),
+      DEFAULT_CONFIG,
+    )
+    expect(searchPath(built, A, B, DEFAULT_CONFIG)).not.toBe(first)
+    const paved = fold(
+      s,
+      ev(1, 'tile_changed', { x: 0, y: 0, from: 0, to: 7, reason: 'paved' }),
+      DEFAULT_CONFIG,
+    )
+    expect(searchPath(paved, A, B, DEFAULT_CONFIG)).not.toBe(first)
+  })
+})
+
 describe('the A* heuristic is admissible (Task 37a)', () => {
   it('never over-estimates, so the cheapest route wins even when it is the longest', () => {
     const s = world(ROAD_RING)
