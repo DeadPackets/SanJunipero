@@ -157,13 +157,13 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
 
   it('★ a balance that cannot pay for the picture AND its eye buys neither', async () => {
     // 0.045 fits on its own; with the eye reserved beside it the pair is 0.0505 and refused,
-    // so no money goes out and the placeholder stands.
+    // so no money goes out — and a spend stop leaves no row, so tomorrow's balance may draw it.
     const art = artFor(0.05)
     art.onDiscovery(WATERSKIN)
     await art.settle()
 
     expect(calls).toEqual([])
-    expect(codex.listSince(0).map((r) => r.status)).toEqual(['placeholder'])
+    expect(codex.listSince(0)).toEqual([])
   }, 30_000)
 
   it('★ two kinds in one breath cannot both spend the last dollar', async () => {
@@ -174,8 +174,7 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     await art.settle()
 
     expect(calls.filter((c) => c === 'image')).toHaveLength(1)
-    expect(codex.listSince(0).filter((r) => r.status === 'ready')).toHaveLength(1)
-    expect(codex.listSince(0).filter((r) => r.status === 'placeholder')).toHaveLength(1)
+    expect(codex.listSince(0).map((r) => r.status)).toEqual(['ready'])
   }, 30_000)
 
   it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
