@@ -8,6 +8,7 @@ import {
   ARBITER_DB_FILE,
   DISCOVERY_EVENT,
   MINUTES_PER_DAY,
+  POPULATION_MAX_DEFAULT,
   REFLECTION_SETTLE_MS,
   type SimEvent,
 } from '@sj/shared'
@@ -22,6 +23,9 @@ import {
   preflightRefusal,
   runPreflight,
   wireBirths,
+  wireArrivals,
+  ensureArrivals,
+  needsArrival,
   resolveCast,
   FOUNDER_MINDS,
   type BootedMinds,
@@ -243,10 +247,6 @@ const LIVE_BACKFILL_REAL_SECONDS = 60
  *  hop costs a cold prefix and an unpriced route. `PROVIDER_ORDER` is the way to serve it anyway. */
 export const LIVE_ALLOW_PROVIDER_FALLBACKS = false
 
-/** The population ceiling: nothing else in the world stops the town growing, and every mind is
- *  another live bill. Twelve founders, four travellers, four births. `SJ_MAX_MINDS`. */
-const LIVE_MAX_MINDS = 20
-
 function rateStopMessage(rate: number, ceiling: number, minds: number, calls: number): string {
   return [
     `STREAM STOPPED: each of the ${minds} live mind(s) is making ${rate.toFixed(1)} calls a` +
@@ -382,7 +382,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       console.log(line)
     })
   const founders = opts.minds ?? FOUNDER_MINDS
-  const maxMinds = Math.max(opts.maxMinds ?? LIVE_MAX_MINDS, founders.length)
+  // The world's own ceiling is announced from here at attach; this is the runtime's last line.
+  const maxMinds = Math.max(opts.maxMinds ?? POPULATION_MAX_DEFAULT, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD
   const dailyBudget = opts.spendDailyUsd ?? LIVE_SPEND_DAILY_USD
   mkdirSync(opts.agentDbDir, { recursive: true })
@@ -497,11 +498,13 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
   let stopBirths: (() => void) | null = null
+  let stopArrivals: (() => void) | null = null
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
     stopBirths?.()
+    stopArrivals?.()
     booted?.stop()
     bridge?.drain('the moment passes')
   }
@@ -540,6 +543,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
+      // The ceiling as a world law, not a runtime opinion: the engine refuses a conception at
+      // it, and a replay of this log reaches the same town. Announced only when it moved.
+      if (loop.state.laws?.['population.maxMinds'] !== maxMinds)
+        bridge.announce('config_changed', { path: 'population.maxMinds', value: maxMinds })
       const restoring = new Map<string, RuntimeSnapshot>()
       for (const m of cast) {
         const row = dbFor(m.id)
@@ -605,7 +612,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       // A child still owed its household comes up the way a live birth does — household
       // first, then the mind — so `ensureChildren` below is what boots it.
       booted = bootMinds({
-        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id))),
+        minds: cast.filter((m) => !needsHousehold(m, dbFor(m.id)) && !needsArrival(m, dbFor(m.id))),
         bridge,
         embedder,
         dbFor,
@@ -648,6 +655,33 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         embedder,
         opsDb,
         namingLlm: makeClient('naming'),
+        maxMinds,
+        log,
+      })
+      // The road's own repair, beside the birth one: a walker whose first memory a crash cut
+      // short is booted here, not left with a mind and no reason to be in the valley.
+      void ensureArrivals({
+        cast: new Map(cast.map((m) => [m.id, m])),
+        store,
+        dbFor,
+        embedder,
+        boot: (spec) => {
+          booted?.add(spec)
+        },
+      }).catch((err: unknown) => {
+        insertAlert(opsDb, {
+          agentId: null,
+          kind: 'arrival_failed',
+          detail: err instanceof Error ? err.message : String(err),
+        })
+      })
+      stopArrivals = wireArrivals({
+        booted,
+        bridge,
+        store,
+        dbFor,
+        embedder,
+        opsDb,
         maxMinds,
         log,
       })

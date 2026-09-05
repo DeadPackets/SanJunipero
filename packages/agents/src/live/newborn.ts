@@ -1,13 +1,13 @@
 import type Database from 'better-sqlite3'
 import type { EventStore } from '@sj/engine/store'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { MINUTES_PER_DAY, SPAWN_AGE_YEARS } from '@sj/shared'
 import { personaOf } from '../family/derivePersona.js'
 import { captureSocialName, hasSocialName, migrateFamilyTables } from '../family/socialName.js'
 import { watchBirths, type AgentBornPayload } from '../family/watchBirths.js'
 import { insertAlert, type LlmClient } from '@sj/llm'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { ensureHousehold } from './ensureChild.js'
-import type { BootedMinds } from './liveMinds.js'
+import type { BootedMinds, NewPerson } from './liveMinds.js'
 import { childSpec } from './resolveCast.js'
 
 export type BirthsOpts = {
@@ -22,6 +22,8 @@ export type BirthsOpts = {
   namingLlm: LlmClient
   /** Past this many minds a birth gets a body and no mind: every mind is another live bill. */
   maxMinds: number
+  /** Someone the town has gained. Off the log and off the tick: art is not world state. */
+  onPerson?: (person: NewPerson) => void
   log?: (line: string) => void
 }
 
@@ -67,6 +69,13 @@ export function wireBirths(opts: BirthsOpts): () => void {
     void (async () => {
       await ensureHousehold({ store: opts.store, db, embedder: opts.embedder }, born, birth)
       opts.booted.add(spec)
+      opts.onPerson?.({
+        id: born.id,
+        name: born.name,
+        sex: born.sex,
+        ageYears: SPAWN_AGE_YEARS,
+        parents: [born.motherId, born.fatherId],
+      })
       opts.log?.(`stream: ${born.name} was born, and has a mind and a memory of ${born.id}.db`)
       if (!hasSocialName(opts.opsDb, born.id))
         await captureSocialName(opts.namingLlm, opts.opsDb, {

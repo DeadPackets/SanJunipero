@@ -57,15 +57,26 @@ function meanBudget(parents: Parents): { typical: number; burst: number } | unde
   return { typical: mean((b) => b.typical), burst: mean((b) => b.burst) }
 }
 
-// A child mind is not authored: it is derived, and derived the same way every
-// time, so a replay of the same birth builds the same person.
+/** Where a derived person came from: born here, or up the valley road. The two draw on
+ *  separate streams, so the same pair of cards never builds the same person twice over. */
+export type Origin = 'born' | 'road'
+
+const STREAM: Readonly<Record<Origin, string>> = {
+  born: 'child-persona',
+  road: 'road-persona',
+}
+
+// A derived mind is not authored: it is derived, and derived the same way every
+// time, so a replay of the same birth or the same arrival builds the same person.
 export function derivePersona(
-  child: { id: string; name: string; sex: 'f' | 'm' },
+  child: { id: string; name: string; sex: 'f' | 'm'; ageYears?: number },
   parents: Parents,
+  origin: Origin = 'born',
 ): { identity: IdentityCore; personality: PersonalityDoc } {
-  const rng = RngStream.seed(child.id, 'child-persona')
+  const rng = RngStream.seed(child.id, STREAM[origin])
   const [mother, father] = parents
   const pn = PRONOUNS[child.sex]
+  const age = origin === 'road' ? (child.ageYears ?? SPAWN_AGE_YEARS) : SPAWN_AGE_YEARS
 
   const temperament = interleave(
     traitsOf(mother.identity.temperament),
@@ -77,13 +88,21 @@ export function derivePersona(
   const voices = [mother.identity.voiceCard, father.identity.voiceCard] as const
   const wordBudget = meanBudget(parents)
 
+  const born = [
+    `Born in this town to ${mother.identity.name} and ${father.identity.name}, and ${SPAWN_AGE_YEARS} years old from the first breath, as everyone here is.`,
+    `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the house ${pn.subject} was born in, the two faces over it, and almost nothing else yet.`,
+  ].join(' ')
+  // No parents to name: a walker's history is a road, and the two cards behind them are only
+  // where the voice came from. What lies down the valley is theirs to say and nobody else's.
+  const road = [
+    `Came up the valley road at ${age}, with what would go in a pack and no plan past the first roof.`,
+    `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the road behind ${pn.object} and nothing of this town yet.`,
+  ].join(' ')
+
   const identity: IdentityCore = {
     name: child.name,
-    age: SPAWN_AGE_YEARS,
-    backstory: [
-      `Born in this town to ${mother.identity.name} and ${father.identity.name}, and ${SPAWN_AGE_YEARS} years old from the first breath, as everyone here is.`,
-      `${pn.subject[0]!.toUpperCase()}${pn.subject.slice(1)} knows the house ${pn.subject} was born in, the two faces over it, and almost nothing else yet.`,
-    ].join(' '),
+    age,
+    backstory: origin === 'road' ? road : born,
     temperament,
     voiceCard: {
       register: voices[registerFrom]!.register,
@@ -99,11 +118,18 @@ export function derivePersona(
     temperament,
     values: sample(rng, [...mother.personality.values, ...father.personality.values], 2),
     beliefs: sample(rng, [...mother.personality.beliefs, ...father.personality.beliefs], 2),
-    current: {
-      mood: 'new to all of it',
-      worries: [],
-      goals: ['learn what this place is', 'find out what your hands are good for'],
-    },
+    current:
+      origin === 'road'
+        ? {
+            mood: 'road-worn and looking around',
+            worries: ['whether this town has room for one more'],
+            goals: ['find out what this place is', 'find out who here would have you'],
+          }
+        : {
+            mood: 'new to all of it',
+            worries: [],
+            goals: ['learn what this place is', 'find out what your hands are good for'],
+          },
   }
 
   return { identity, personality }
