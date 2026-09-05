@@ -851,7 +851,18 @@ export function fold(
       if (!invitee?.asked) return state
       const next = { ...invitee }
       delete next.asked
-      return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+      if (p.verb !== 'court') return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+      const asker = state.agents[p.byId]
+      if (!asker) throw new Error(`invitation_accepted for unknown agent ${p.byId}`)
+      const day = Math.floor(event.tick / MINUTES_PER_DAY)
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.agentId]: { ...next, courted: { withId: p.byId, day } },
+          [p.byId]: { ...asker, courted: { withId: p.agentId, day } },
+        },
+      }
     }
     // Only the ask that was refused is cleared: a stale one from a third party still stands.
     case 'invitation_refused': {

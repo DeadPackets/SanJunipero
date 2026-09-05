@@ -2542,6 +2542,12 @@ function askable(
     if (ageBand(config, body.ageDays) === 'child') return 'that is not for a child'
   }
   if (bloodKin(me, target)) return 'they are your own blood'
+  if (verb === 'court') {
+    const today = Math.floor(state.tick / MINUTES_PER_DAY)
+    if (me.courted?.withId === target.id && me.courted.day === today)
+      return 'you walked out together already today'
+    return null
+  }
   if (verb === 'propose') {
     if (me.partnerId !== undefined) return 'you already have a partner'
     if (target.partnerId !== undefined) return 'they already have a partner'

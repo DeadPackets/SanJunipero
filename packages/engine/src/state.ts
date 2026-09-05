@@ -75,6 +75,8 @@ export type AgentBody = {
   // The ask standing over this body, so the engine can tell a second consent from a fresh first.
   // Absent until the first one, and cleared by the answer.
   asked?: { byId: string; verb: InvitationVerb; tick: number }
+  // The last walk out together: one a day per pair, or the same two ask each other all day.
+  courted?: { withId: string; day: number }
   // Who this body is partnered to. Set both ways at once, absent until the first partnership,
   // so every log before the town's first one hashes as it always did.
   partnerId?: string

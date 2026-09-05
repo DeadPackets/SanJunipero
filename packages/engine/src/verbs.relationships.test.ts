@@ -261,6 +261,21 @@ describe('the answer', () => {
     ])
   })
 
+  // Rehearsal 12: 113 asks to court in under three sim-days, the same pair nine times in a day.
+  it('★ a pair walks out together once a day, whoever asks the second time', () => {
+    let s = at(outside(), 100)
+    s = asked(s, 'a1', 'court')
+    const back = ask(s, 'a2', 'court')
+    s = apply(s, back.ok ? back.events : [])
+    expect(s.agents.a1!.courted).toEqual({ withId: 'a2', day: 0 })
+    expect(s.agents.a2!.courted).toEqual({ withId: 'a1', day: 0 })
+    expect(refusal(ask(at(s, 900), 'a1', 'court'))).toBe('you walked out together already today')
+    expect(refusal(ask(at(s, 900), 'a2', 'court'))).toBe('you walked out together already today')
+    // the next morning it is an ask again, and a proposal was never held back by it
+    expect(ask(at(s, 1500), 'a1', 'court').ok).toBe(true)
+    expect(ask(at(s, 900), 'a1', 'propose').ok).toBe(true)
+  })
+
   it('a stale ask is a fresh ask, not an answer', () => {
     let s = at(outside(), 100)
     s = asked(s, 'a1', 'propose')

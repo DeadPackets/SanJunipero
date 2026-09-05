@@ -351,6 +351,10 @@ export function stakesFor(current: number, kind: SceneKind, quarrelTie: boolean)
   return Math.min(10, Math.max(current, STAKES_BY_KIND[kind]) + (quarrelTie ? 1 : 0))
 }
 
+/** A rule needs a room. Two people saying "from now on" to each other have made a promise,
+ *  and a promise between two is not the town agreeing to anything. */
+export const COUNCIL_MINIMUM = 3
+
 /** The kind this scene has become, given the line just said. Evaluated on open and on every
  *  line; a scene only ever moves off `talk`. */
 export function upgradedKind(
@@ -363,7 +367,8 @@ export function upgradedKind(
   },
 ): SceneKind {
   if (namesAQuarrel(scene, text, ctx.tiesOf, ctx.nameOf)) return 'quarrel'
-  if (proposesALaw(text)) return 'council'
+  if (proposesALaw(text) && scene.participants.length + scene.audience.length >= COUNCIL_MINIMUM)
+    return 'council'
   if (ctx.gathering) return 'gathering'
   return scene.kind
 }

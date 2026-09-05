@@ -255,7 +255,7 @@ describe('the kind a scene becomes', () => {
   })
 
   it('becomes a council on a proposal, and a gathering on a crowd', () => {
-    const s = scene(['nadia', 'omar'])
+    const s = scene(['nadia', 'omar', 'salma'])
     expect(proposesALaw('From now on the well is drawn at dawn')).toBe(true)
     expect(proposesALaw('Let us agree we carry back what we take')).toBe(true)
     expect(proposesALaw('I drew water at dawn')).toBe(false)
@@ -265,6 +265,15 @@ describe('the kind a scene becomes', () => {
     expect(upgradedKind(s, 'The fire is lit.', { tiesOf: noTies, nameOf, gathering: true })).toBe(
       'gathering',
     )
+    // Two alone saying "from now on" have made a promise, not a rule the town agreed.
+    const pair = scene(['nadia', 'omar'])
+    expect(
+      upgradedKind(pair, 'From now on we draw at dawn.', {
+        tiesOf: noTies,
+        nameOf,
+        gathering: false,
+      }),
+    ).toBe('talk')
   })
 })
 
