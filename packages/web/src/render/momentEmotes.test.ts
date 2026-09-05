@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Container, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import { InvitationAccepted, InvitationRefused, Invited, PartnershipFormed } from '@sj/engine'
@@ -162,7 +162,10 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     const h = harness()
     await Promise.resolve() // the atlas lands on a microtask
     const at = performance.now()
+    // The mark is born on the clock inside `emit`; under load that is not `at` any more.
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(at)
     h.emit(ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })))
+    clock.mockRestore()
     expect(h.sprites()).toHaveLength(2)
 
     h.layer.tick(at + MOMENT_EMOTE_MS - 1)
