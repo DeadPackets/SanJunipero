@@ -1,6 +1,6 @@
 // Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
 // behind the body proves nothing about the seam.
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -1427,6 +1427,14 @@ describe('★ the recognizer holds the window it reads, not the town’s whole l
     expect(events.map((e) => e.tick / MINUTES_PER_DAY)).toEqual([
       21, 22, 23, 24, 25, 26, 27, 28, 29,
     ])
+  })
+
+  // A stopped town keeps ticking — that is the design — and the rate window's trim sits behind
+  // an early return it never passes. Nothing reads the array after a stop, so the guard is the
+  // only thing there is to hold on to.
+  it('stops sampling the rate window once the minds are stopped', () => {
+    const src = readFileSync(new URL('./liveWorld.ts', import.meta.url), 'utf8')
+    expect(src).toContain('if (!stopped) tickHistory.push(')
   })
 
   it('leaves a town younger than the window untouched', () => {

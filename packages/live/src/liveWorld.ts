@@ -874,7 +874,9 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (retired.length > 0) log(`stream: retired ${retired.join(', ')} — ${RETIRED_REASON}`)
       }
       bridge.onTick((tick) => {
-        tickHistory.push({ ms: Date.now(), tick })
+        // Not past a stop: the trim below sits behind the spend check, which a stopped town
+        // never reaches, so a sample pushed here would stay for the life of the process.
+        if (!stopped) tickHistory.push({ ms: Date.now(), tick })
         if (tick % LIVE_RUNTIME_SAVE_TICKS === 0) saveRuntime?.(tick)
         if (tick > 0 && tick % MINUTES_PER_DAY === 0) {
           if (built !== null) retireTheDay(built, tick)
