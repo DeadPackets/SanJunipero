@@ -22,6 +22,7 @@ import {
   LAWS_SHOWN,
   loneCandidateFor,
   distantWater,
+  firstReachable,
   makeables,
   naturalPlaces,
   placeName,
@@ -29,6 +30,7 @@ import {
   SQUARE_RADIUS,
   standingLaws,
   submitIntent,
+  walkDestination,
   waterWithinReach,
   WELL_KIND,
   type TickHandler,
@@ -45,7 +47,7 @@ import {
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
-import type { KnownPlace, PerceptionPacket, SourceKind } from '../prompt/prose.js'
+import type { KnownPlace, PerceptionPacket, SourceKind, WalkMark } from '../prompt/prose.js'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 
 // How far off a body still picks water out of the middle distance.
@@ -428,6 +430,37 @@ export class EngineBridge {
         return [{ id: s.id, kind: s.kind, x: s.x, y: s.y, ...(name === undefined ? {} : { name }) }]
       }),
     ]
+  }
+
+  /** Whether the walk verb would take this mark from where this body stands. The seam itself is
+   *  the judge, so a target the prose offers can never be one the world turns away. */
+  canWalkTo(agentId: string, mark: WalkMark): boolean {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined || a.insideId !== undefined) return false
+    const to = walkDestination(state, this.#simConfig, agentId, mark)
+    // A mark that settles on the tile underfoot is refused as the non-walk it is, so it is not
+    // one of the marks this body can walk to either.
+    return !('refusal' in to) && !(to.x === a.x && to.y === a.y)
+  }
+
+  /** The nearest ground beside a spot that these legs can reach, and the spot itself when a foot
+   *  can hold it. Water and a well are tiles nobody stands on, so the coordinates the roads name
+   *  are marks a walk refuses. */
+  footingNear(agentId: string, x: number, y: number): { x: number; y: number } | null {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined || a.insideId !== undefined) return null
+    const ring: { x: number; y: number }[] = []
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const p = { x: x + dx, y: y + dy }
+        if ((p.x !== a.x || p.y !== a.y) && isPassable(state, p.x, p.y)) ring.push(p)
+      }
+    }
+    const near = (p: { x: number; y: number }): number => Math.abs(p.x - a.x) + Math.abs(p.y - a.y)
+    ring.sort((p, q) => near(p) - near(q) || p.y - q.y || p.x - q.x)
+    return firstReachable(state, a, ring, this.#simConfig)
   }
 
   // The other place work can go: free ground moves to a fresh plot the moment somebody plants

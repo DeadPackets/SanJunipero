@@ -41,6 +41,7 @@ import {
   perceptionToProse,
   placesKnownLine,
   valleyExtentLine,
+  walkTargetsLine,
   roadOutLine,
   PARTNER_GONE_DAYS,
   RESTLESS_DAYS,
@@ -51,6 +52,7 @@ import {
   type Company,
   gatheringLine,
   type ProseWorld,
+  type WalkMark,
   standingWallsLine,
   stasisLine,
   stillnessAt,
@@ -1096,6 +1098,8 @@ export class AgentRuntime {
     // sentence no mind ever sees, and it fails as silence rather than as an error.
     const world: Required<ProseWorld> = {
       isWalkable: (x: number, y: number) => this.#bridge.isWalkable(x, y),
+      canWalkTo: (mark: WalkMark) => this.#bridge.canWalkTo(this.#agentId, mark),
+      footingNear: (x: number, y: number) => this.#bridge.footingNear(this.#agentId, x, y),
       isEdible: (kind: string) => this.#bridge.isEdible(kind),
       waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
       nearestWater: (x: number, y: number) => this.#bridge.nearestWater(x, y),
@@ -1126,12 +1130,14 @@ export class AgentRuntime {
     const canMake = this.#bridge.makeables()
     const doorstep = doorstepLine(packet, this.#doorstepSaidTick)
     if (doorstep.length > 0) this.#doorstepSaidTick = tick
+    const known = this.#bridge.knownPlaces(this.#agentId)
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
       roadLine(canMake, packet, world),
       valleyExtentLine(world),
-      placesKnownLine(this.#bridge.knownPlaces(this.#agentId), packet),
+      placesKnownLine(known, packet),
+      walkTargetsLine(known, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       doorstep,
       stasisLine(this.#still, tick),

@@ -295,8 +295,17 @@ function footprintPhrase(w: number, h: number): string {
 /** What a material can be found as: a node still standing, a tree, or a stack somebody left. */
 export type SourceKind = ForageableKind | 'tree' | 'stack'
 
+/** A mark the walk verb resolves by name rather than by two numbers. */
+export type WalkMark = { targetId: string } | { structureId: string }
+
 export type ProseWorld = {
   isWalkable?: (x: number, y: number) => boolean
+  // Whether the legs would really start for this mark, asked of the walk verb's own seam so a
+  // target the prose offers is a target the world takes.
+  canWalkTo?: (mark: WalkMark) => boolean
+  // The nearest ground beside a spot that these legs can reach. Water and a well are both tiles
+  // no foot can stand on, so the coordinates the roads name are not marks a walk can take.
+  footingNear?: (x: number, y: number) => { x: number; y: number } | null
   isEdible?: (kind: string) => boolean
   // Where the water is. Nothing in the packet can say: terrain is the one thing perception
   // never projects, and block 1 now teaches two verbs that need it.
@@ -686,6 +695,66 @@ export function valleyExtentLine(world?: ProseWorld): string {
   const e = world?.extent?.()
   if (e === undefined) return ''
   return `The valley runs from (0, 0) to (${e.w - 1}, ${e.h - 1}). Past its edges there is only the road out.`
+}
+
+// Four names and six places is enough to choose from and short enough to stay a sentence. Each
+// candidate costs the walk verb one search of the ground, so the caps are a budget as well.
+const WALK_PEOPLE_SHOWN = 4
+const WALK_PLACES_SHOWN = 6
+
+/** ★ The marks these legs can actually take, every one of them put to the walk verb's own seam
+ *  first. 61 of rehearsal 13's 178 refusals were a walk target the world could not resolve or
+ *  reach: no path, no one by that name, or a body out of sight. Silent indoors, where the
+ *  affordance line above already says the doorway is the only walk there is. */
+export function walkTargetsLine(
+  places: KnownPlace[],
+  packet: PerceptionPacket,
+  world?: ProseWorld,
+): string {
+  const can = world?.canWalkTo
+  if (world === undefined || can === undefined || packet.self.inside !== undefined) return ''
+  const { x, y } = packet.self
+  const near = (p: { x: number; y: number }): number => Math.hypot(p.x - x, p.y - y)
+  const order = (
+    a: { id: string; x: number; y: number },
+    b: { id: string; x: number; y: number },
+  ) => near(a) - near(b) || (a.id < b.id ? -1 : 1)
+  const marks: string[] = []
+  for (const a of [...packet.visible.agents].sort(order)) {
+    if (marks.length >= WALK_PEOPLE_SHOWN) break
+    if (can({ targetId: a.id })) marks.push(`${a.name} (${a.id})`)
+  }
+  let shown = 0
+  for (const p of [...places].sort(order)) {
+    if (shown >= WALK_PLACES_SHOWN) break
+    if (!can({ structureId: p.id })) continue
+    marks.push(`${placeSaid(p)} (${p.id})`)
+    shown++
+  }
+  marks.push(...walkableSources(packet, world))
+  if (marks.length === 0) return ''
+  return (
+    `You can walk to any of these right now and your legs will find the way: ${marks.join(', ')}. ` +
+    'Any other spot you name by two numbers may have no way through to it.'
+  )
+}
+
+/** Where the three standing wants are, said as ground a foot can hold rather than as the water
+ *  or the wall itself, which is the mark the roads above have always named. */
+function walkableSources(packet: PerceptionPacket, world: ProseWorld): string[] {
+  const footing = world.footingNear
+  if (footing === undefined) return []
+  const { x, y } = packet.self
+  const said: string[] = []
+  const offer = (at: { x: number; y: number } | null, what: string): void => {
+    const on = at === null ? null : footing(at.x, at.y)
+    if (on !== null) said.push(`(${on.x}, ${on.y}) for ${what}`)
+  }
+  offer(world.nearestWater?.(x, y) ?? null, 'water')
+  const food = world.nearestFood?.(x, y) ?? null
+  if (food !== null) offer(food, food.kind)
+  offer(world.nearestSource?.(FUEL_ITEM, x, y) ?? null, FUEL_ITEM)
+  return said
 }
 
 // Two tiles is the same spot: a step to the water butt and back is not a walk that went
