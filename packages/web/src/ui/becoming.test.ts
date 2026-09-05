@@ -358,4 +358,22 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(rich).not.toContain(CHANGE_EMPTY)
     expect(rich.indexOf('after the flood')).toBeLessThan(rich.indexOf('first written'))
   })
+
+  // A block that scrolls sideways and holds nothing focusable is text a keyboard cannot reach.
+  it('lets a keyboard reach the part of a diff that scrolled off the sheet', () => {
+    const rich = renderToStaticMarkup(
+      createElement(PersonStoryView, {
+        thought: null,
+        journal: [],
+        changes: changeLog([
+          { version: 1, day: 0, doc: 'a wall of a line', edit: 'first written' },
+          { version: 2, day: 4, doc: 'another wall of a line', edit: 'after the flood' },
+        ]),
+      }),
+    )
+    const tag = /<pre class="diff"([^>]*)>/.exec(rich)?.[1] ?? ''
+    expect(tag).toContain('tabindex="0"')
+    expect(tag).toContain('role="region"')
+    expect(tag).toContain('aria-label="')
+  })
 })

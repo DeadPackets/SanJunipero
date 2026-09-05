@@ -162,7 +162,7 @@ export function PersonStoryView({
                 <span className="stamp">Day {e.day}</span> {e.edit}
               </p>
               {e.diff.length > 0 && (
-                <pre className="diff">
+                <pre className="diff" tabIndex={0} role="region" aria-label="What changed">
                   {e.diff.map((l, i) => (
                     <div key={i} className={`diff-line ${l.kind}`}>
                       {l.kind === 'add' ? '+ ' : l.kind === 'del' ? '− ' : '  '}
