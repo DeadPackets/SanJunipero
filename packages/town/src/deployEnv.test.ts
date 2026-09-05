@@ -74,6 +74,23 @@ describe('★ the backup covers the minds that exist, not the minds that were pl
   })
 })
 
+// The script that spends real money is also the one that publishes a log tail: a five-second
+// grace re-enters a teardown still draining, and "grep -v key" is not a redaction.
+describe('★ a rehearsal ends the way the container does, and publishes no secret', () => {
+  const SH = read('scripts/rehearse.sh')
+
+  it('gives the town the same grace compose gives the container', () => {
+    expect(COMPOSE).toContain('stop_grace_period: 20s')
+    expect(SH, 'a second signal five seconds in').not.toContain('sleep 5; kill')
+    expect(SH).toContain('for i in $(seq 1 20); do sleep 1; kill -0 $PID')
+  })
+
+  it('redacts by the shape of a secret, not by the word "key"', () => {
+    expect(SH).not.toContain('grep -v -i "key"')
+    expect(SH).toContain('s/sk-[A-Za-z0-9._-]{6,}/[redacted]/g')
+  })
+})
+
 describe('★ every knob the docs promise reaches the container', () => {
   it('is reading the table it thinks it is', () => {
     const knobs = documentedKnobs()

@@ -170,7 +170,12 @@ export async function main(): Promise<void> {
 
   // A stream is a long-running process and a container stops it with a signal; without this the
   // world dies mid-write and the next boot reads a half-flushed db.
+  // Once, however many signals arrive: a second SIGTERM behind a slow drain used to run the whole
+  // teardown again on the same handles, with both `process.exit(0)` calls racing the WAL flush.
+  let stopping = false
   const stop = (signal: string): void => {
+    if (stopping) return
+    stopping = true
     console.log(`stream: ${signal} — closing the town`)
     admin?.close()
     void running.stop().then(() => process.exit(0))

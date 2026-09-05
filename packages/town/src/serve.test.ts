@@ -51,6 +51,15 @@ describe('★ a spend stop leaves the process standing', () => {
   })
 })
 
+// A rehearsal signals twice when the first teardown outlasts its grace, and both ran the whole
+// close on the same handles — two `process.exit(0)` calls racing one WAL flush.
+describe('★ the town closes once, however many signals arrive', () => {
+  it('guards the teardown behind a flag', () => {
+    const src = readFileSync(new URL('./serve.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(/if \(stopping\) return/)
+  })
+})
+
 describe('★ a ledger refusal holds the minds, never the viewer', () => {
   it('hands back no cast when the ledger refuses the boot', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {})
