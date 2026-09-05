@@ -92,12 +92,15 @@ async function seedDay(
   return mem.memoriesOfDay(day)
 }
 
-/** What opens the nightly edit: one act at the mark `actImportance` gives a making. Appended,
- *  so the fixtures' own row order and ids are the ones every other test already reads. */
-const A_DAY_THAT_CHANGED_SOMETHING = [
-  ...TWO_PERSON_DAY,
-  { text: 'You have raised a wall.', people: [], importance: 7, kind: 'action' as const },
-]
+/** What opens the nightly edit: one act at the mark `actImportance` gives a making. Appended to
+ *  a day, so the fixtures' row order and ids are the ones every other test already reads. */
+const A_MAKING = {
+  text: 'You have raised a wall.',
+  people: [],
+  importance: 7,
+  kind: 'action' as const,
+}
+const A_DAY_THAT_CHANGED_SOMETHING = [...TWO_PERSON_DAY, A_MAKING]
 
 /** One the day opened and one it paid off, plus a neighbour who was never in the valley. */
 const LISTED_TIES: Awaited<ReturnType<ReflectionLlm['listTies']>> = [
@@ -209,10 +212,7 @@ describe('runSleepReflection pipeline', () => {
 
   it('runs steps in spec order: facts strictly before any summarize', async () => {
     const { mem, personality } = await makeStores()
-    const memories = await seedDay(mem, DAY, [
-      ...SINGLE_PERSON_DAY,
-      { text: 'You have raised a wall.', people: [], importance: 7, kind: 'action' as const },
-    ])
+    const memories = await seedDay(mem, DAY, [...SINGLE_PERSON_DAY, A_MAKING])
     const llm = new ScriptedReflectionLlm(null)
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
