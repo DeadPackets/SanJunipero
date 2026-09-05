@@ -25,6 +25,7 @@ import { openAgentDb } from '../memory/schema.js'
 import { TieStore } from '../memory/ties.js'
 import {
   EARSHOT_GRACE_TICKS,
+  WALK_OFF_WINDOW_TICKS,
   TALK_BUDGET_TICKS,
   MAX_COMPILES_PER_DAY,
   SceneCoordinator,
@@ -473,14 +474,34 @@ describe('every way a scene ends', () => {
     expect(h.coordinator.open()[0]!.participants).toEqual([NADIA, OMAR].sort())
   })
 
-  it('★ walking off on purpose is remembered on both sides', async () => {
+  it('★ walking off on purpose is remembered on both sides once the body has gone', async () => {
     const h = harness({})
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
-    h.coordinator.leave(OMAR, NOON + 1, 'walked')
+    h.coordinator.walkingOff(OMAR, NOON + 1)
+    h.coordinator.onTick(NOON + 1)
+    await flush()
+    expect(h.coordinator.open(), 'the choice alone moves nobody').toHaveLength(1)
+    h.emitNext('agent_moved', { id: OMAR, x: 21, y: 3 })
+    h.loop.step()
+    for (let t = 2; t <= 2 + EARSHOT_GRACE_TICKS; t++) h.coordinator.onTick(NOON + t)
     await flush()
     expect(memoriesOf(h, NADIA)).toContain('Omar walked off while you were still talking.')
     expect(memoriesOf(h, OMAR)).toContain('You walked off from Nadia mid-talk.')
     expect(closeReasonOf(h)).toBe('left')
+  })
+
+  it('★ a walk that goes nowhere is not walking off, and the choice is forgotten in time', async () => {
+    const h = harness({})
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    h.coordinator.walkingOff(OMAR, NOON + 1)
+    for (let t = 1; t <= WALK_OFF_WINDOW_TICKS + 1; t++) h.coordinator.onTick(NOON + t)
+    h.emitNext('agent_moved', { id: OMAR, x: 21, y: 3 })
+    h.loop.step()
+    const gone = NOON + WALK_OFF_WINDOW_TICKS + 2
+    for (let t = 0; t <= EARSHOT_GRACE_TICKS; t++) h.coordinator.onTick(gone + t)
+    await flush()
+    expect(closeReasonOf(h)).toBe('left')
+    expect(memoriesOf(h, NADIA)).not.toContain('Omar walked off while you were still talking.')
   })
 
   it('somebody going to bed ends it', async () => {

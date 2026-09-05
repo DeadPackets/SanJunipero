@@ -861,9 +861,9 @@ export class AgentRuntime {
         if (this.#pendingIntent !== intent) return
         if (res.ok) {
           this.#pendingIntent = null
-          // Legs or bed taken mid-talk is leaving it on purpose, and the others are told so.
+          // Legs or bed taken mid-talk is leaving it on purpose; the others are told once the body goes.
           if (LEAVES_A_TALK.has(intent.verb))
-            this.#scenes?.leave(this.#agentId, this.#bridge.currentTick(), 'walked')
+            this.#scenes?.walkingOff(this.#agentId, this.#bridge.currentTick())
           return
         }
         if (res.reason.startsWith('already busy')) return

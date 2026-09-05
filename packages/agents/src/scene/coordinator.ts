@@ -87,6 +87,8 @@ export const TALK_BUDGET_TICKS = 180
  *  doorway: r14 closed 31 of 59 talks with both people at one tile, one inside and one at the door,
  *  and the same pair opened a new talk indoors a minute later. */
 export const EARSHOT_GRACE_TICKS = 8
+/** How long a turn's own choice to walk, sleep or leave still explains the body going. */
+export const WALK_OFF_WINDOW_TICKS = 60
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
 // How many of its own last lines a mind is shown before it speaks again.
@@ -133,6 +135,8 @@ export class SceneCoordinator {
   readonly #lapsed = new Set<string>()
   readonly #talked = new Map<string, { day: number; ticks: number }>()
   readonly #away = new Map<string, number>()
+  /** Minds whose own turn chose legs or bed mid-talk, by the tick they chose. */
+  readonly #leaving = new Map<string, number>()
   readonly #now: () => number
   readonly #onError: (kind: string, detail: string) => void
   readonly #scenes = new Map<string, Scene>()
@@ -222,6 +226,7 @@ export class SceneCoordinator {
     const said = sanitizeSpokenText(text)
     const mine = this.sceneFor(agentId)
     if (mine !== null) {
+      this.#leaving.delete(agentId)
       this.#recordLine(mine, agentId, said, '', 'none', null, tick)
       return mine
     }
@@ -415,11 +420,26 @@ export class SceneCoordinator {
 
   /** The body took this mind out of the talk. One person's alarm drops that person; the talk
    *  ends only where too few are left to answer each other. */
-  leave(agentId: string, tick: number, how: 'quiet' | 'walked' = 'quiet'): void {
+  leave(agentId: string, tick: number): void {
     const scene = this.sceneFor(agentId)
     if (scene === null) return
-    // A body that walks off mid-talk is noticed: the others remember it, and so does the walker.
-    if (how === 'walked') {
+    this.#part(scene, agentId, tick)
+    if (scene.participants.length < TALKERS_NEEDED) {
+      void this.#close(scene, 'left', tick).catch(this.#sink)
+    }
+  }
+
+  /** This mind's own turn chose legs or bed while in a talk. Nothing happens until the body
+   *  goes: a walk to the tile underfoot or a step through a door leaves nobody. */
+  walkingOff(agentId: string, tick: number): void {
+    if (this.sceneFor(agentId) !== null) this.#leaving.set(agentId, tick)
+  }
+
+  /** The body has gone. If its own turn chose that, the others remember it, and so does the walker. */
+  #gone(scene: Scene, agentId: string, tick: number): void {
+    const chose = this.#leaving.get(agentId)
+    this.#leaving.delete(agentId)
+    if (chose !== undefined && tick - chose <= WALK_OFF_WINDOW_TICKS) {
       const name = this.#nameOf(agentId) ?? agentId
       const others = scene.participants.filter((id) => id !== agentId)
       for (const id of others)
@@ -428,9 +448,6 @@ export class SceneCoordinator {
       if (them.length > 0) this.#tell(agentId, `You walked off from ${them} mid-talk.`, 3, tick)
     }
     this.#part(scene, agentId, tick)
-    if (scene.participants.length < TALKERS_NEEDED) {
-      void this.#close(scene, 'left', tick).catch(this.#sink)
-    }
   }
 
   /** Every tick, once, whoever calls first: the ones who walked away or went to bed, and the
@@ -618,16 +635,18 @@ export class SceneCoordinator {
       const key = `${scene.id}:${id}`
       if (here(id)) {
         this.#away.delete(key)
+        const chose = this.#leaving.get(id)
+        if (chose !== undefined && tick - chose > WALK_OFF_WINDOW_TICKS) this.#leaving.delete(id)
         continue
       }
       // Asleep or dead is gone at once; merely out of earshot gets the length of a doorway.
       if (!this.#canTalk(id)) {
-        this.#part(scene, id, tick)
+        this.#gone(scene, id, tick)
         continue
       }
       const since = this.#away.get(key) ?? tick
       this.#away.set(key, since)
-      if (tick - since >= EARSHOT_GRACE_TICKS) this.#part(scene, id, tick)
+      if (tick - since >= EARSHOT_GRACE_TICKS) this.#gone(scene, id, tick)
     }
     scene.audience = scene.audience.filter(here)
   }
