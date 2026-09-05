@@ -165,6 +165,16 @@ describe('what a mind can see for itself', () => {
     expect(occasionsInPacket(packet({ feltEvents: ['rain_started'] }), ME)).toEqual([])
   })
 
+  it('word that your work was used answers esteem, whichever way it was used', () => {
+    for (const tag of ['your_work_used_ate', 'your_work_used_drank', 'your_work_used_burned'])
+      expect(occasionsInPacket(packet({ feltEvents: [tag] }), ME)).toEqual(['relied_on'])
+    expect(FED_BY.relied_on).toBe('esteem')
+    const { wants } = store()
+    wants.feed(['relied_on'], 0)
+    expect(wants.levelOf('esteem', 0)).toBe(0)
+    expect(wants.levelOf('belonging', 1_000)).toBeGreaterThan(0)
+  })
+
   it('a quiet moment answers nothing', () => {
     expect(occasionsInPacket(quietMeadowPacket, ME)).toEqual([])
   })

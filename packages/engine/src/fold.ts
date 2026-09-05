@@ -79,6 +79,7 @@ import {
   ItemSpoiled,
   ItemTaken,
   ItemUnequipped,
+  ItemUsedByAnother,
   Invited,
   InvitationAccepted,
   InvitationRefused,
@@ -262,6 +263,7 @@ export function fold(
             qty: p.qty,
             ...(p.text !== undefined ? { text: p.text } : {}),
             ...(p.owner !== undefined ? { owner: p.owner } : {}),
+            ...(p.madeBy !== undefined ? { madeBy: p.madeBy } : {}),
             ...(p.crafterMark !== undefined ? { crafterMark: p.crafterMark } : {}),
             ...(p.spoilage !== undefined ? { spoilage: p.spoilage } : {}),
             ...(p.durability !== undefined ? { durability: p.durability } : {}),
@@ -286,6 +288,11 @@ export function fold(
     }
     case 'item_taken': {
       ItemTaken.parse(event.payload)
+      return state
+    }
+    // The thing is already spent by the events beside this one; what is left is who to thank.
+    case 'item_used_by_another': {
+      ItemUsedByAnother.parse(event.payload)
       return state
     }
     // The same class as a taking: witnessed, recorded, and folded to nothing. What a dance

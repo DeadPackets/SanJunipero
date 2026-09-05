@@ -906,6 +906,28 @@ function swallowEvents(
   ]
 }
 
+/** The word back to whoever made the thing. Nothing when the maker is unknown, and nothing
+ *  when the maker is the one using it: thanking yourself is not being relied on. */
+function usedByAnother(
+  item: Item,
+  userId: string,
+  how: 'ate' | 'drank' | 'burned',
+): PendingEvent[] {
+  if (item.madeBy === undefined || item.madeBy === userId) return []
+  return [
+    {
+      type: 'item_used_by_another',
+      payload: {
+        agentId: userId,
+        itemId: item.id,
+        kind: item.kind,
+        madeBy: item.madeBy,
+        how,
+      },
+    },
+  ]
+}
+
 const eat: VerbDef = makeVerb({
   kind: 'eat',
   params: EatParams,
@@ -938,6 +960,7 @@ const eat: VerbDef = makeVerb({
       // The hand closes before the mouth opens, and it closes exactly as `take` closes it.
       ...liftEvents(state, config, agentId, p.itemId),
       ...swallowEvents(state, config, agentId, item, rng),
+      ...usedByAnother(item, agentId, 'ate'),
     ]
   },
 })
@@ -1250,8 +1273,13 @@ const stoke: VerbDef = makeVerb({
     const p = StokeParams.parse(params)
     const s = state.structures[p.structureId]
     if (!s || !isStokeable(config, s.kind) || heldQty(state, agentId, FUEL_KIND) < 1) return []
+    const burned = consumeHeld(state, agentId, FUEL_KIND, 1)
     return [
-      ...consumeHeld(state, agentId, FUEL_KIND, 1),
+      ...burned,
+      ...burned.flatMap((e) => {
+        const log = state.items[(e.payload as { id: string }).id]
+        return log === undefined ? [] : usedByAnother(log, agentId, 'burned')
+      }),
       {
         type: 'structure_fueled',
         payload: {
@@ -1435,6 +1463,7 @@ const harvest: VerbDef = makeVerb({
           qty,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
           ...spoilageFor(state, crop.kind, config),
         },
       },
@@ -1518,6 +1547,7 @@ const fish: VerbDef = makeVerb({
           qty: 1,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
           ...spoilageFor(state, FISH_KIND, config),
         },
       },
@@ -1604,6 +1634,7 @@ const hunt: VerbDef = makeVerb({
           qty: y.qty,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
           ...spoilageFor(state, y.kind, config),
         },
       })),
@@ -1658,6 +1689,7 @@ const forage: VerbDef = makeVerb({
             qty: 1,
             loc: { t: 'agent', id: agentId },
             ...ownerStamp(config, agentId),
+            madeBy: agentId,
             ...spoilageFor(state, kind, config),
           },
         },
@@ -1675,6 +1707,7 @@ const forage: VerbDef = makeVerb({
           qty,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
           ...spoilageFor(state, FORAGE_KIND, config),
         },
       },
@@ -1684,7 +1717,8 @@ const forage: VerbDef = makeVerb({
 })
 
 // What you pull out of the ground, the water or the woods — or write down — is yours from the
-// first moment. Making is making, whatever the hand does.
+// first moment. Making is making, whatever the hand does. The `madeBy` beside every call is not
+// gated the same way: a town that owns nothing still knows whose hands the loaf came out of.
 function ownerStamp(config: SimConfig, agentId: string): { owner?: string } {
   return config.ownership.enabled ? { owner: agentId } : {}
 }
@@ -1926,6 +1960,7 @@ const craft: VerbDef = makeVerb({
           qty: recipe.output.qty,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
           ...crafterStamp(state, config, agentId, recipe.skill),
           ...spoilageFor(state, recipe.output.kind, config),
         },
@@ -2033,6 +2068,7 @@ const chop: VerbDef = makeVerb({
           qty: TIMBER_PER_TREE,
           loc: { t: 'agent', id: agentId },
           ...ownerStamp(config, agentId),
+          madeBy: agentId,
         },
       },
     ]

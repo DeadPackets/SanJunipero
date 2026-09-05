@@ -82,6 +82,47 @@ describe('fold items', () => {
       /no durability/i,
     )
   })
+  it('remembers whose hands made a thing, and forgets nothing on replay', () => {
+    const made = ev(1, 'item_spawned', {
+      id: 'item_1',
+      kind: 'fish',
+      qty: 1,
+      loc: { t: 'agent', id: 'a1' },
+      madeBy: 'a1',
+    })
+    const s = fold(genesisState(DEFAULT_CONFIG), made)
+    expect(s.items.item_1!.madeBy).toBe('a1')
+    expect(fold(genesisState(DEFAULT_CONFIG), made)).toEqual(s)
+    expect(fold(genesisState(DEFAULT_CONFIG), spawnItem('item_2')).items.item_2).not.toHaveProperty(
+      'madeBy',
+    )
+  })
+  it("folds one hand using another hand's work to nothing, and still checks its shape", () => {
+    const s = fold(genesisState(DEFAULT_CONFIG), spawnItem('item_1'))
+    const used = ev(2, 'item_used_by_another', {
+      agentId: 'a2',
+      itemId: 'item_1',
+      kind: 'wood',
+      madeBy: 'a1',
+      how: 'burned',
+    })
+    expect(fold(s, used)).toEqual(s)
+    expect(() =>
+      fold(s, ev(2, 'item_used_by_another', { agentId: 'a2', itemId: 'item_1', how: 'burned' })),
+    ).toThrow()
+    expect(() =>
+      fold(
+        s,
+        ev(2, 'item_used_by_another', {
+          agentId: 'a2',
+          itemId: 'item_1',
+          kind: 'wood',
+          madeBy: 'a1',
+          how: 'sold',
+        }),
+      ),
+    ).toThrow()
+  })
   it('strict payloads reject extra keys on item events', () => {
     const s = fold(genesisState(DEFAULT_CONFIG), spawnItem('item_1'))
     expect(() =>

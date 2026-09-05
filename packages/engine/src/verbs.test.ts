@@ -596,9 +596,17 @@ describe('hunt: the caps and the regen ARE the ecology', () => {
         qty: 2,
         loc: { t: 'agent', id: 'a1' },
         owner: 'a1',
+        madeBy: 'a1',
         spoilage: { spawnDay: 0, days: 4 },
       },
-      { id: 'item_3', kind: 'hide', qty: 1, loc: { t: 'agent', id: 'a1' }, owner: 'a1' },
+      {
+        id: 'item_3',
+        kind: 'hide',
+        qty: 1,
+        loc: { t: 'agent', id: 'a1' },
+        owner: 'a1',
+        madeBy: 'a1',
+      },
     ])
     const rabbit = taken(stalked('rabbit'), 0)
       .slice(1)
@@ -1493,5 +1501,110 @@ describe('a torch is a thing hands can make', () => {
   it('needs both halves', () => {
     expect(make(bench([['wood', 1]])).ok).toBe(false)
     expect(make(bench([['fiber', 1]])).ok).toBe(false)
+  })
+})
+
+describe('made by these hands: the thing remembers, and the maker hears it was used', () => {
+  const CFG = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+    fauna: { enabled: false },
+  })
+  const NEVER: RngStream = { next: () => 1, int: () => 0 } as unknown as RngStream
+
+  /** a1 at (0, 0) and a2 at (1, 0), with `food` in a2's hands. */
+  function twoBodies(madeBy?: string): WorldState {
+    let s = makeWorld()
+    s = fold(
+      s,
+      ev(2, 'agent_spawned', { id: 'a2', name: 'a2', x: 1, y: 0, ageDays: 30 * 365 }),
+      CFG,
+    )
+    return fold(
+      s,
+      ev(3, 'item_spawned', {
+        id: 'food',
+        kind: 'fish',
+        qty: 1,
+        loc: { t: 'agent', id: 'a2' },
+        ...(madeBy === undefined ? {} : { madeBy }),
+      }),
+      CFG,
+    )
+  }
+
+  const used = (events: { type: string; payload: unknown }[]) =>
+    events.filter((e) => e.type === 'item_used_by_another')
+
+  it('stamps the catcher on the fish they pull out of the water', () => {
+    const water = fold(
+      makeWorld(['.~', '.~']),
+      ev(2, 'weather_changed', { kind: 'sunny', temperatureC: 14 }),
+      CFG,
+    )
+    const caught = VERBS.fish!.onComplete(water, CFG, 'a1', { x: 1, y: 0 }, {
+      next: () => 0,
+      int: () => 0,
+    } as unknown as RngStream)
+    const spawn = caught.find((e) => e.type === 'item_spawned')!
+    expect((spawn.payload as { madeBy?: string }).madeBy).toBe('a1')
+  })
+
+  it('tells the catcher when somebody else eats it, and says nothing when they eat it themselves', () => {
+    const other = VERBS.eat!.onComplete(twoBodies('a1'), CFG, 'a2', { itemId: 'food' }, NEVER)
+    expect(used(other)).toEqual([
+      {
+        type: 'item_used_by_another',
+        payload: { agentId: 'a2', itemId: 'food', kind: 'fish', madeBy: 'a1', how: 'ate' },
+      },
+    ])
+    expect(
+      used(VERBS.eat!.onComplete(twoBodies('a2'), CFG, 'a2', { itemId: 'food' }, NEVER)),
+    ).toEqual([])
+    expect(used(VERBS.eat!.onComplete(twoBodies(), CFG, 'a2', { itemId: 'food' }, NEVER))).toEqual(
+      [],
+    )
+  })
+
+  it('tells whoever chopped the wood when another body burns it, once per stack it burns', () => {
+    let s = makeWorld()
+    s = fold(
+      s,
+      ev(2, 'structure_planned', {
+        id: 'structure_1',
+        kind: 'fire_pit',
+        x: 1,
+        y: 0,
+        w: 1,
+        h: 1,
+        maxHp: 10,
+        flammable: false,
+        builderId: 'a1',
+      }),
+      CFG,
+    )
+    s = fold(s, ev(3, 'structure_completed', { id: 'structure_1' }), CFG)
+    const withLog = (madeBy?: string) =>
+      fold(
+        s,
+        ev(4, 'item_spawned', {
+          id: 'log',
+          kind: 'wood',
+          qty: 2,
+          loc: { t: 'agent', id: 'a1' },
+          ...(madeBy === undefined ? {} : { madeBy }),
+        }),
+        CFG,
+      )
+    const feed = (world: WorldState) =>
+      VERBS.stoke!.onComplete(world, CFG, 'a1', { structureId: 'structure_1' }, NEVER)
+    expect(used(feed(withLog('a2')))).toEqual([
+      {
+        type: 'item_used_by_another',
+        payload: { agentId: 'a1', itemId: 'log', kind: 'wood', madeBy: 'a2', how: 'burned' },
+      },
+    ])
+    expect(used(feed(withLog('a1')))).toEqual([])
+    expect(used(feed(withLog()))).toEqual([])
   })
 })

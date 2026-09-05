@@ -10,7 +10,7 @@ import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { doorTile } from './interiors.js'
 import { hears } from './earshot.js'
-import { composePerception } from './perception.js'
+import { composePerception, FELT_TAGS } from './perception.js'
 import { witnessesOf } from './socialLaws.js'
 import { VERBS } from './verbs/index.js'
 import { RngStream } from './rng.js'
@@ -220,6 +220,45 @@ describe('composePerception: felt events', () => {
     expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual([
       'you_were_attacked',
     ])
+  })
+
+  it('tells the maker their work was used, across the whole map, and tells nobody else', () => {
+    const s = makeWorld([
+      { id: 'a', x: 0, y: 0 },
+      { id: 'b', x: 60, y: 60 },
+    ])
+    const events = [
+      ev('item_used_by_another', {
+        agentId: 'b',
+        itemId: 'item_1',
+        kind: 'fish',
+        madeBy: 'a',
+        how: 'ate',
+      }),
+    ]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', events).feltEvents).toEqual([
+      'your_work_used_ate',
+    ])
+    expect(composePerception(s, DEFAULT_CONFIG, 'b', events).feltEvents).toEqual([])
+  })
+
+  it('gives each way of using a made thing its own tag, and every tag has prose to find', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const felt = (how: string): string[] =>
+      composePerception(s, DEFAULT_CONFIG, 'a', [
+        ev('item_used_by_another', {
+          agentId: 'b',
+          itemId: 'item_1',
+          kind: 'wood',
+          madeBy: 'a',
+          how,
+        }),
+      ]).feltEvents
+    expect(felt('ate')).toEqual(['your_work_used_ate'])
+    expect(felt('drank')).toEqual(['your_work_used_drank'])
+    expect(felt('burned')).toEqual(['your_work_used_burned'])
+    for (const tag of ['your_work_used_ate', 'your_work_used_drank', 'your_work_used_burned'])
+      expect(FELT_TAGS).toContain(tag)
   })
 })
 

@@ -331,6 +331,14 @@ const SELF_EVENT_TAG: Record<string, string> = {
   agent_tended: 'you_were_tended',
 }
 
+// Word reaching the maker that their work was used, one tag per way of using it. The town is
+// small and people talk, so this one carries however far it has to.
+const WORK_USED_TAG: Record<string, string> = {
+  ate: 'your_work_used_ate',
+  drank: 'your_work_used_drank',
+  burned: 'your_work_used_burned',
+}
+
 // The one interruption a mind is told about in words. Every other act cut short is read off the
 // body next turn — standing still, holding nothing — and needs no sentence of its own.
 const INTERRUPT_TAG: Record<string, string> = { [WALK_LOST_THEM]: 'you_lost_them' }
@@ -340,6 +348,7 @@ const INTERRUPT_TAG: Record<string, string> = { [WALK_LOST_THEM]: 'you_lost_them
 export const FELT_TAGS: readonly string[] = [
   ...Object.keys(PRECIPITATION).map((kind) => `${kind}_started`),
   ...Object.values(SELF_EVENT_TAG),
+  ...Object.values(WORK_USED_TAG),
   ...Object.values(INTERRUPT_TAG),
 ]
 
@@ -351,6 +360,13 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     const kind = p?.kind
     if (typeof kind !== 'string' || PRECIPITATION[kind] !== true) return null
     return p?.prevKind === kind ? null : `${kind}_started` // same-kind temp steps pass silently
+  }
+  // The only event a body feels that is not addressed to it: here the maker is `madeBy`, and
+  // the `agentId` is whoever put the thing to use.
+  if (ev.type === 'item_used_by_another') {
+    const p = ev.payload as { madeBy?: unknown; how?: unknown } | null
+    if (p?.madeBy !== agentId || typeof p.how !== 'string') return null
+    return WORK_USED_TAG[p.how] ?? null
   }
   if ((ev.payload as { agentId?: unknown } | null)?.agentId !== agentId) return null
   if (ev.type === 'action_interrupted') {

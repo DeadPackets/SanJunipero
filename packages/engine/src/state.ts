@@ -164,6 +164,9 @@ export type Item = {
   qty: number
   text?: string
   owner?: string // absent = unowned; outlives the owner's death
+  // Whose hands pulled it out of the world or put it together. Absent on genesis stock and on
+  // anything delivered by the script, because nobody in the town can be thanked for those.
+  madeBy?: string
   crafterMark?: string // expert crafts only; set once at spawn, never reassigned
   spoilage?: { spawnDay: number; days: number } // absent = keeps forever
   durability?: number // absent = never wears; 0 breaks the thing

@@ -324,6 +324,7 @@ describe('verb: harvest', () => {
         qty: 3,
         loc: { t: 'agent', id: 'a1' },
         owner: 'a1',
+        madeBy: 'a1',
         spoilage: { spawnDay: 0, days: 60 },
       },
     })
