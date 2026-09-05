@@ -641,6 +641,67 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(memoriesOfKind(agentDb, 'action')).toHaveLength(1)
   })
 
+  // The bridge settles a submit at the START of the next tick, before any tick callback runs, so
+  // a turn resolving in the 2 s between the two lands its new plan first and the old head's
+  // answer arrives after it.
+  it('drops a plan-head answer that belongs to a plan the turn already replaced', async () => {
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => {
+      openGate = resolve
+    })
+    let calls = 0
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        calls += 1
+        const answer =
+          calls === 1
+            ? {
+                thought: 'Walk out there, then make the thing.',
+                plan: [
+                  { verb: 'walk', params: { x: 20, y: 20 } },
+                  { verb: 'frobnicate', params: {} },
+                ],
+                reconsider_at: '00:03',
+                importance: 3,
+              }
+            : {
+                thought: 'No — the bread first.',
+                plan: [{ verb: 'walk', params: { x: 5, y: 6 } }],
+                importance: 3,
+              }
+        if (calls === 2) await gate
+        // Nothing after the two: a third turn would install the plan again and hide the wipe.
+        if (calls > 2) await new Promise(() => {})
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(askedShape(answer)) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: ZERO_USAGE,
+          warnings: [],
+        }
+      },
+    })
+    const { loop, bridge, runtime } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, boredomTicks: 10_000 },
+      simConfig: SLOW_BODY,
+    })
+    // The stale head goes out while the replacing turn is still in flight: opening the gate here
+    // is the interleaving, not a delay bolted onto the test.
+    const real = bridge.submit.bind(bridge)
+    bridge.submit = (agentId, intent, onResult) => {
+      if (intent.verb === 'frobnicate') openGate()
+      return real(agentId, intent, onResult)
+    }
+    await stepUntil(loop, () => calls >= 2 && runtime.snapshot().plan.queue.length === 1, 400)
+    for (let i = 0; i < 30; i++) await flush()
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
+
+    loop.step()
+    await flush()
+    expect(runtime.snapshot().plan.lastResult).toBe('running')
+    expect(runtime.snapshot().plan.queue.map((s) => s.verb)).toEqual(['walk'])
+  })
+
   // Run G paid for 610 turns that answered with a thought and nothing else, leaving no event,
   // no refusal and no alert. This row is the only trace such a turn ever leaves.
   it('books what each turn produced against the back end that served it', async () => {

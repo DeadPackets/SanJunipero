@@ -939,6 +939,9 @@ export class AgentRuntime {
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
     this.#noteAccepted(head, res)
+    // A head answered after the turn replaced the plan speaks for a queue that is gone: reading
+    // it would wipe the plan the mind just paid for.
+    if (this.#plan.queue[0] !== head) return
     if (res.ok) return
     // A word for standing still is a step spent, not a plan refused: the body was already doing
     // it, so the queue carries on from the next step instead of dying at this one.
