@@ -122,6 +122,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
   // one prefix and share its cache.
   const roster = opts.arbiter?.roster
   const customs = opts.arbiter?.customs
+  const frontier = opts.arbiter?.frontier
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
     const personality = new PersonalityStore(db, spec.id)
@@ -140,6 +141,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
           }),
           ...(roster === undefined ? {} : { roster }),
           ...(customs === undefined ? {} : { customs }),
+          ...(frontier === undefined ? {} : { frontier }),
           livingCast,
         }),
         ties,

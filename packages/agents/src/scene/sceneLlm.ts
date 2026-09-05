@@ -28,6 +28,9 @@ export type SceneVoice = {
   roster?: () => readonly RosterEntry[]
   /** The town's own names for its habits, from the same seam the ordinary turn reads. */
   customs?: () => readonly string[]
+  /** What stands at the edge of the known valley. One more block of the shared prefix: without
+   *  it the scene line and the ordinary turn stop being the same bytes at customs. */
+  frontier?: () => readonly string[]
   /** Everyone alive in the valley. A closed roll: the mind may name nobody else. */
   livingCast: () => readonly { id: string; name: string }[]
   /** The mind's strongest want, in its own words. Nothing at all until wants exist. */
@@ -210,6 +213,7 @@ function sceneSystem(voice: SceneVoice): string {
     rulesOfBeing: RULES_OF_BEING,
     ...(voice.roster === undefined ? {} : { roster: voice.roster() }),
     ...(voice.customs === undefined ? {} : { customs: voice.customs() }),
+    ...(voice.frontier === undefined ? {} : { frontier: voice.frontier() }),
     identity: voice.identity,
     personality: voice.personality(),
     journal: [],

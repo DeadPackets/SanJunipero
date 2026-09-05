@@ -136,6 +136,24 @@ describe('the scene turn keeps the cached prefix', () => {
     })
   })
 
+  // The frontier is one more block between customs and identity, so a scene line that skipped it
+  // ended the shared prefix there and cached the autobiography a second time per mind.
+  it('sends the frontier the ordinary turn sends, so the prefix runs to the end', () => {
+    const frontier = ['the ridge past the north field']
+    const blocks = fixtureBlocks()
+    const turnSystem = assemblePrompt({
+      ...blocks,
+      rulesOfBeing: RULES_OF_BEING,
+      identity: CARDED,
+      frontier,
+    }).system
+    const { model, prompts } = answering(TURN)
+    const llm = makeSceneLlm(client(model), voice({ frontier: () => frontier }))
+    return llm.line(ask()).then(() => {
+      expect(prompts[0]).toContain(turnSystem)
+    })
+  })
+
   it('replaces every volatile block with one scene block', async () => {
     const { model, prompts } = answering(TURN)
     const llm = makeSceneLlm(client(model), voice())
