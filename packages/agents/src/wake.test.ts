@@ -662,3 +662,44 @@ describe('★ the dusk gathering: the rung that reads a want', () => {
     db.close()
   })
 })
+
+describe('an hour lain with somebody', () => {
+  const lying = (): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    self: { ...quietMeadowPacket.self, activity: 'lie_with' },
+  })
+
+  it('buys no boredom turn and no plan turn, the way sleep buys none', () => {
+    expect(wakeReasons(cfg, lying(), clk(), 600, pln({ lastResult: 'done' }))).toEqual([])
+    expect(wakeReasons(cfg, lying(), clk(), 600, pln())).toEqual([])
+  })
+
+  it('is still pierced by a blow', () => {
+    const struck = { ...lying(), feltEvents: ['you_were_attacked'] }
+    expect(wakeReasons(cfg, struck, clk(), 600, pln())).toContain('salient_perception')
+  })
+
+  it('is still pierced by a body that is failing', () => {
+    const failing = {
+      ...lying(),
+      self: {
+        ...lying().self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 1 },
+        },
+      },
+    }
+    expect(wakeReasons(cfg, failing, clk(), 600, pln())).toContain('body_alarm')
+  })
+
+  it('holds nobody still whose hands are on ordinary work', () => {
+    const working = {
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, activity: 'craft' },
+    }
+    expect(wakeReasons(cfg, working, clk(), 600, pln({ lastResult: 'done' }))).toContain(
+      'plan_done',
+    )
+  })
+})

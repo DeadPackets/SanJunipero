@@ -146,6 +146,10 @@ export function wakeReasons(
   // running down: merely tired keeps listening, genuinely failing goes.
   const failing = bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)
 
+  // An hour lain with somebody is chosen, and it is as deep a state as sleep: a boredom or a
+  // plan wake out of it is a turn spent being refused for hands that are full.
+  if (packet.self.activity === 'lie_with' && !packet.self.asleep && !rousing && !failing) return []
+
   // A listener takes no turn at all — that is what makes hearing free.
   if (floor.inScene && !packet.self.asleep && !rousing && !failing) {
     return floor.holdsFloor ? ['floor'] : []
