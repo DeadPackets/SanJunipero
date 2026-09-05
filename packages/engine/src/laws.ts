@@ -8,9 +8,6 @@ import type { SimConfig } from '@sj/shared'
 // not on this list cannot be changed at runtime by anyone, through any surface.
 export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'reproduction.enabled': z.boolean(),
-  'reproduction.coSleepNightsToPartner': z.number().int().positive(),
-  'reproduction.partnerWindowDays': z.number().int().positive(),
-  'reproduction.conceptionChancePerNight': z.number().min(0).max(1),
   'reproduction.gestationDays': z.number().int().positive(),
   'aging.deathOfOldAgeEnabled': z.boolean(),
   'spoilage.enabled': z.boolean(),

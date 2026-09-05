@@ -77,7 +77,6 @@ describe('§19 off-state: reproduction.enabled', () => {
     const kinds = new Set(res.events.map((e) => e.type))
     for (const t of ['co_slept', 'agent_conceived', 'agent_born']) expect(kinds.has(t)).toBe(false)
     expect(res.state.agents.a1!.asleep).toBe(true) // the co-sleepers sleep on regardless
-    expect(res.state.pairNights).toBeUndefined()
   }
 
   it('on, the night is recorded', () => {

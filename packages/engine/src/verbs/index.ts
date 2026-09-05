@@ -39,7 +39,9 @@ import {
   type TileId,
   type WorldState,
 } from '../state.js'
+import { ageBand } from '../systems/aging.js'
 import { fleeTo } from '../systems/fauna.js'
+import { CONCEPTION_CHANCE_PER_ACT, motherAndFather } from '../systems/reproduction.js'
 import { isSpoiling, spoilageFor } from '../systems/spoilage.js'
 import { fireIsOnYourSide, inTheRoomWith, isHeatSource } from '../systems/warmth.js'
 import {
@@ -81,10 +83,13 @@ import {
   simTimeFromTick,
   structureGlowRadius,
   ticksFor,
+  verbPhrase,
   visionRadiusAt,
+  INVITATION_STANDS_TICKS,
   WANTS_DISCOVERING,
   type ClosedKey,
   type DurationWord,
+  type InvitationVerb,
   type SimConfig,
 } from '@sj/shared'
 
@@ -124,6 +129,10 @@ export type VerbKind =
   | 'inscribe'
   | 'teach'
   | 'attack'
+  | 'court'
+  | 'propose'
+  | 'lie_with'
+  | 'leave_partner'
 
 export type VerbDef = {
   kind: string
@@ -2490,6 +2499,165 @@ const attack: VerbDef = makeVerb({
   rngStream: 'combat',
 })
 
+// One schema for all four: every one of them is aimed at exactly one other person.
+export const CourtParams = z.object({ targetId: z.string() }).strict()
+
+// Parent, child, or a parent in common. The engine only knows the `parents` it wrote itself;
+// a founder's persona kin is a tie the prompt renders, not a wall the world can hold up.
+function bloodKin(a: AgentBody, b: AgentBody): boolean {
+  if (a.parents?.includes(b.id) === true || b.parents?.includes(a.id) === true) return true
+  return a.parents !== undefined && b.parents !== undefined
+    ? a.parents.some((id) => b.parents!.includes(id))
+    : false
+}
+
+/** Everything the three invitation verbs refuse for, in one order, said in the town's words. */
+function askable(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  params: Record<string, unknown>,
+  verb: InvitationVerb,
+): string | null {
+  const p = CourtParams.safeParse(params)
+  if (!p.success) return `${verbPhrase(verb)} needs someone to ask`
+  const bad = adjacentLivingTarget(state, agentId, p.data.targetId, {
+    self: 'you cannot ask yourself',
+    gone: 'no one there to ask',
+    far: 'not close enough to ask',
+  })
+  if (bad) return bad
+  const me = state.agents[agentId]!
+  const target = state.agents[p.data.targetId]!
+  if (target.asleep) return 'they are asleep'
+  for (const body of [me, target]) {
+    if (ageBand(config, body.ageDays) === 'child') return 'that is not for a child'
+  }
+  if (bloodKin(me, target)) return 'they are your own blood'
+  if (verb === 'propose') {
+    if (me.partnerId !== undefined) return 'you already have a partner'
+    if (target.partnerId !== undefined) return 'they already have a partner'
+    return null
+  }
+  if (verb === 'lie_with') {
+    const roof = me.insideId === undefined ? undefined : state.structures[me.insideId]
+    const own =
+      roof !== undefined &&
+      me.insideId === target.insideId &&
+      config.structures.privateKinds.includes(roof.kind) &&
+      (roof.owner === undefined || roof.owner === agentId || roof.owner === target.id)
+    if (!own) return 'not under a roof of your own'
+    // Only the answer needs two free pairs of hands: the ask itself is a word, and words are free.
+    if (isAcceptance(state, agentId, target.id, verb)) {
+      if (me.activity) return 'your hands are full'
+      if (target.activity) return 'their hands are full'
+    }
+  }
+  return null
+}
+
+/** The same verb, aimed back, inside the window: two intents in the log are the two consents. */
+function isAcceptance(
+  state: WorldState,
+  agentId: string,
+  targetId: string,
+  verb: InvitationVerb,
+): boolean {
+  const asked = state.agents[agentId]?.asked
+  if (asked?.byId !== targetId || asked.verb !== verb) return false
+  return state.tick - asked.tick <= INVITATION_STANDS_TICKS
+}
+
+const invitationVerb = (
+  verb: InvitationVerb,
+  consummate: (agentId: string, targetId: string) => PendingEvent[],
+): VerbDef =>
+  makeVerb({
+    kind: verb,
+    params: CourtParams,
+    takes: 'moment',
+    validate(state, config, agentId, params) {
+      return askable(state, config, agentId, params, verb)
+    },
+    atOnce(state, _config, agentId, params) {
+      const p = CourtParams.parse(params)
+      if (!isAcceptance(state, agentId, p.targetId, verb)) {
+        return [{ type: 'invited', payload: { agentId: p.targetId, byId: agentId, verb } }]
+      }
+      return [
+        { type: 'invitation_accepted', payload: { agentId, byId: p.targetId, verb } },
+        ...consummate(agentId, p.targetId),
+      ]
+    },
+    onComplete() {
+      return []
+    },
+  })
+
+const court = invitationVerb('court', () => [])
+
+const propose = invitationVerb('propose', (agentId, targetId) => {
+  const [aId, bId] = [agentId, targetId].sort()
+  return [{ type: 'partnership_formed', payload: { aId, bId } }]
+})
+
+const lieWith: VerbDef = {
+  ...invitationVerb('lie_with', (agentId, targetId) =>
+    [
+      [agentId, targetId],
+      [targetId, agentId],
+    ].map(([id, other]) => ({
+      type: 'action_started',
+      payload: {
+        agentId: id,
+        verb: 'lie_with',
+        params: { targetId: other },
+        duration: ticksFor('hour'),
+      },
+    })),
+  ),
+  // The one roll the town does not schedule: it is drawn once, by the lower id, when both
+  // bodies have seen the hour out. An interrupted partner is no roll at all.
+  onComplete(state, config, agentId, params, rng) {
+    const p = CourtParams.parse(params)
+    if (agentId >= p.targetId) return []
+    const other = state.agents[p.targetId]
+    if (!other?.alive) return []
+    if (other.activity?.verb !== 'lie_with' || other.activity.params.targetId !== agentId) return []
+    const pair = motherAndFather(state, config, agentId, p.targetId)
+    if (!pair) return []
+    if (rng.next() >= CONCEPTION_CHANCE_PER_ACT) return []
+    return [
+      {
+        type: 'agent_conceived',
+        payload: { ...pair, day: Math.floor(state.tick / MINUTES_PER_DAY) },
+      },
+    ]
+  },
+  rngStream: 'reproduction',
+}
+
+// No answer is asked for and none is waited on: a person may leave, and the other learns of it.
+const leavePartner: VerbDef = makeVerb({
+  kind: 'leave_partner',
+  params: CourtParams,
+  takes: 'moment',
+  validate(state, _config, agentId, params) {
+    const p = CourtParams.safeParse(params)
+    if (!p.success) return 'leaving needs the partner named'
+    if (state.agents[agentId]!.partnerId !== p.data.targetId) return 'you have no such partner'
+    return null
+  },
+  atOnce(_state, _config, agentId, params) {
+    const p = CourtParams.parse(params)
+    const [aId, bId] = [agentId, p.targetId].sort()
+    return [{ type: 'partnership_dissolved', payload: { aId, bId, byId: agentId } }]
+  },
+  onComplete() {
+    return []
+  },
+})
+
 export const VERBS: Record<string, VerbDef> = {
   walk,
   sleep,
@@ -2529,6 +2697,10 @@ export const VERBS: Record<string, VerbDef> = {
   inscribe,
   teach,
   attack,
+  court,
+  propose,
+  lie_with: lieWith,
+  leave_partner: leavePartner,
 }
 
 // Hot-registration seam: codified recipe verbs join the live registry by kind id, and bring

@@ -11,7 +11,6 @@ import {
   fromTileKey,
   clampNeed,
   INJURY_HEAL_DAYS,
-  pairKey,
   thirstOf,
   tileKey,
   type Affliction,
@@ -76,7 +75,12 @@ import {
   ItemSpoiled,
   ItemTaken,
   ItemUnequipped,
+  Invited,
+  InvitationAccepted,
+  InvitationRefused,
   Marked,
+  PartnershipDissolved,
+  PartnershipFormed,
   PlaceNamed,
   StructureFueled,
   ConfigChanged,
@@ -765,35 +769,78 @@ export function fold(
         counters: bumpCounter(state.counters, p.id),
       }
     }
-    // A night together is a fact; partnership is the count of them. A gap wider than
-    // the window ends the run — and if the pair had reached partnership, that is a breakup.
+    // A night under one roof is a fact the viewer and the chronicle may show, and nothing more:
+    // who is partnered to whom is now chosen aloud, not counted off the beds.
     case 'co_slept': {
       const p = CoSlept.parse(event.payload)
       for (const id of [p.aId, p.bId]) {
         if (!state.agents[id]) throw new Error(`co_slept for unknown agent ${id}`)
       }
-      const key = pairKey(p.aId, p.bId)
-      const prev = state.pairNights?.[key]
-      const broken =
-        prev !== undefined && p.day - prev.lastNightDay > config.reproduction.partnerWindowDays
-      const nights = prev === undefined || broken ? 1 : prev.nights + 1
-      let formedTick = prev?.formedTick ?? null
-      let dissolvedTick = prev?.dissolvedTick ?? null
-      if (broken && formedTick !== null) dissolvedTick = event.tick
-      if (
-        nights >= config.reproduction.coSleepNightsToPartner &&
-        (formedTick === null || dissolvedTick !== null)
-      ) {
-        formedTick = event.tick
-        dissolvedTick = null
+      return state
+    }
+    // The ask itself. Last ask wins: a second suitor's word is the one standing when it lands.
+    case 'invited': {
+      const p = Invited.parse(event.payload)
+      for (const id of [p.agentId, p.byId]) {
+        if (!state.agents[id]) throw new Error(`invited for unknown agent ${id}`)
       }
+      const invitee = state.agents[p.agentId]!
       return {
         ...state,
-        pairNights: {
-          ...state.pairNights,
-          [key]: { nights, lastNightDay: p.day, formedTick, dissolvedTick },
+        agents: {
+          ...state.agents,
+          [p.agentId]: { ...invitee, asked: { byId: p.byId, verb: p.verb, tick: event.tick } },
         },
       }
+    }
+    case 'invitation_accepted': {
+      const p = InvitationAccepted.parse(event.payload)
+      const invitee = state.agents[p.agentId]
+      if (!invitee?.asked) return state
+      const next = { ...invitee }
+      delete next.asked
+      return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+    }
+    // Only the ask that was refused is cleared: a stale one from a third party still stands.
+    case 'invitation_refused': {
+      const p = InvitationRefused.parse(event.payload)
+      const invitee = state.agents[p.agentId]
+      if (invitee?.asked?.byId !== p.byId || invitee.asked.verb !== p.verb) return state
+      const next = { ...invitee }
+      delete next.asked
+      return { ...state, agents: { ...state.agents, [p.agentId]: next } }
+    }
+    case 'partnership_formed': {
+      const p = PartnershipFormed.parse(event.payload)
+      for (const id of [p.aId, p.bId]) {
+        if (!state.agents[id]) throw new Error(`partnership_formed for unknown agent ${id}`)
+      }
+      const a = state.agents[p.aId]!
+      const b = state.agents[p.bId]!
+      if (a.partnerId === p.bId && b.partnerId === p.aId) return state
+      if (a.partnerId !== undefined) throw new Error(`${p.aId} already has a partner`)
+      if (b.partnerId !== undefined) throw new Error(`${p.bId} already has a partner`)
+      return {
+        ...state,
+        agents: {
+          ...state.agents,
+          [p.aId]: { ...a, partnerId: p.bId },
+          [p.bId]: { ...b, partnerId: p.aId },
+        },
+      }
+    }
+    // Only a partnership that points both ways is undone, so a stale leaving cannot strand
+    // a body that has already remarried.
+    case 'partnership_dissolved': {
+      const p = PartnershipDissolved.parse(event.payload)
+      const a = state.agents[p.aId]
+      const b = state.agents[p.bId]
+      if (!a || !b || a.partnerId !== p.bId || b.partnerId !== p.aId) return state
+      const left = { ...a }
+      const right = { ...b }
+      delete left.partnerId
+      delete right.partnerId
+      return { ...state, agents: { ...state.agents, [p.aId]: left, [p.bId]: right } }
     }
     // Nothing changes. The payload is checked so a replay cannot invent a happening
     // the table never authored, and the state is returned untouched, same object.

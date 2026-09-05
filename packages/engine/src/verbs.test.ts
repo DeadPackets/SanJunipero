@@ -107,6 +107,10 @@ const TIER1 = [
   'inscribe',
   'teach',
   'attack',
+  'court',
+  'propose',
+  'lie_with',
+  'leave_partner',
 ]
 
 afterEach(() => {

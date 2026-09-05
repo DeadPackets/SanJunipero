@@ -92,6 +92,13 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_spawned',
   'agent_spoke',
   'agent_conceived',
+  // Silent only until the chronicle has its own words for them: the fold knows them now,
+  // and this list is what the totality test measures the fold against.
+  'invited',
+  'invitation_accepted',
+  'invitation_refused',
+  'partnership_formed',
+  'partnership_dissolved',
   // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.
   'scene_opened',
   'scene_line',

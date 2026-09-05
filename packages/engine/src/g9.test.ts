@@ -22,7 +22,6 @@ import { replayFromGenesis, replayLatest } from './replay.js'
 import { RngStream, RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { ageBand } from './systems/aging.js'
-import { isPartnered, partnershipOf } from './systems/reproduction.js'
 import { spoilDeadline } from './systems/spoilage.js'
 import { TickLoop } from './tickLoop.js'
 import { VERBS, type PendingEvent } from './verbs/index.js'
@@ -33,11 +32,10 @@ import { ev, grid } from './testutil/world.js'
 // scripted actor or a named system caused, never weather noise.
 const QUIET = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
 const CFG: SimConfig = SimConfigSchema.parse(QUIET)
-// The only acceleration in this file, and neither clock is under test here.
-const FERTILE: SimConfig = SimConfigSchema.parse({
-  ...QUIET,
-  reproduction: { conceptionChancePerNight: 1, gestationDays: 1 },
-})
+// The only acceleration in this file, and that clock is not under test here. The chance of a
+// child is no longer a dial, so the roll is met with a seed instead: 'r3' draws under the 0.2.
+const FERTILE: SimConfig = SimConfigSchema.parse({ ...QUIET, reproduction: { gestationDays: 1 } })
+const CONCEIVES = 'r3'
 
 const RNG = RngStream.seed('g9a', 'actions')
 
@@ -119,59 +117,74 @@ const typed = (events: PendingEvent[], type: string): PendingEvent[] =>
 const live = (s: WorldState, base = CFG): SimConfig => effectiveConfig(base, s.laws)
 
 // A couple in their own house, asleep — the only shape the co-sleeping pass ever reads.
-function couple(config: SimConfig): WorldState {
+function couple(config: SimConfig, awake = false): WorldState {
   let s = raise(genesisState(config, MAP()), config, HOUSE)
   s = spawn(s, config, { id: 'ada', x: 4, y: 6, sex: 'f', ageDays: 30 * DAYS_PER_YEAR })
   s = spawn(s, config, { id: 'bex', x: 4, y: 6, sex: 'm', ageDays: 32 * DAYS_PER_YEAR })
   for (const id of ['ada', 'bex']) {
     s = indoors(s, config, id, HOUSE)
-    s = asleep(s, config, id)
+    if (!awake) s = asleep(s, config, id)
   }
   return s
 }
 
-describe('G9a-1: partnership is counted at the real threshold, and an eight-day gap ends it', () => {
-  it('three nights make a pair; two do not', () => {
-    expect(CFG.reproduction.coSleepNightsToPartner).toBe(3) // the threshold is the thing under test
-    const two = nights(couple(CFG), CFG, [1, 2])
-    expect(partnershipOf(two, 'ada', 'bex')!.nights).toBe(2)
-    expect(isPartnered(two, 'ada', 'bex', CFG)).toBe(false)
-    expect(partnershipOf(two, 'ada', 'bex')!.formedTick).toBeNull()
-
-    const three = nights(two, CFG, [3])
-    expect(partnershipOf(three, 'ada', 'bex')!.nights).toBe(3)
-    expect(isPartnered(three, 'ada', 'bex', CFG)).toBe(true)
-    expect(partnershipOf(three, 'ada', 'bex')!.formedTick).toBe(3 * MINUTES_PER_DAY)
-    expect(partnershipOf(three, 'ada', 'bex')!.dissolvedTick).toBeNull()
+describe('G9a-1: a partnership is two consents in the log, and nights under one roof are not', () => {
+  it('three nights together form nothing at all', () => {
+    const three = nights(couple(CFG), CFG, [1, 2, 3])
+    expect(typed(pass(three, CFG, 4).events, 'co_slept')).toHaveLength(1)
+    expect(three.agents.ada).not.toHaveProperty('partnerId')
+    expect(three.agents.bex).not.toHaveProperty('partnerId')
   })
 
-  it('an eight-day gap dissolves it, and the breakup is stamped for C11 to read', () => {
-    const partnered = nights(couple(CFG), CFG, [1, 2, 3])
-    const apart = nights(partnered, CFG, [11]) // day 3 → day 11: an eight-day gap
-    expect(partnershipOf(apart, 'ada', 'bex')).toEqual({
-      nights: 1,
-      lastNightDay: 11,
-      formedTick: 3 * MINUTES_PER_DAY,
-      dissolvedTick: 11 * MINUTES_PER_DAY,
-    })
-    expect(isPartnered(apart, 'ada', 'bex', CFG)).toBe(false)
+  it('a proposal answered by the same word makes the pair, and leaving unmakes it', () => {
+    let s = { ...couple(CFG, true), tick: 12 * 60 }
+    for (const [id, other] of [
+      ['ada', 'bex'],
+      ['bex', 'ada'],
+    ]) {
+      const r = submitIntent(s, CFG, id!, 'propose', { targetId: other! })
+      expect(r.ok).toBe(true)
+      s = apply(s, CFG, r.ok ? r.events : [], s.tick)
+    }
+    expect(s.agents.ada!.partnerId).toBe('bex')
+    expect(s.agents.bex!.partnerId).toBe('ada')
+
+    const leaving = submitIntent(s, CFG, 'bex', 'leave_partner', { targetId: 'ada' })
+    expect(leaving.ok && leaving.events).toEqual([
+      { type: 'partnership_dissolved', payload: { aId: 'ada', bId: 'bex', byId: 'bex' } },
+    ])
+    s = apply(s, CFG, leaving.ok ? leaving.events : [], s.tick)
+    expect(s.agents.ada).not.toHaveProperty('partnerId')
   })
 })
 
 describe('G9a-2: conception, gestation and a child born at twelve', () => {
   it('runs the whole chain, and the newborn wakes as a twelve-year-old', () => {
-    const twoNights = nights(couple(FERTILE), FERTILE, [1, 2])
-    expect(twoNights.agents.ada!.pregnant).toBeUndefined() // two nights in is still two nights in
+    // An hour behind their own door, both consenting: the only road to a child there now is.
+    let s = { ...couple(FERTILE, true), tick: 12 * 60 }
+    for (const [id, other] of [
+      ['ada', 'bex'],
+      ['bex', 'ada'],
+    ]) {
+      const r = submitIntent(s, FERTILE, id!, 'lie_with', { targetId: other! })
+      expect(r.ok, `${id!} lie_with`).toBe(true)
+      s = apply(s, FERTILE, r.ok ? r.events : [], s.tick)
+    }
+    expect(s.agents.ada!.activity).toMatchObject({ verb: 'lie_with', ticksRemaining: 60 })
 
-    // The third night both partners them and conceives, in that order.
-    const third = pass(twoNights, FERTILE, 3)
-    expect(typed(third.events, 'agent_conceived').map((e) => e.payload)).toEqual([
-      { motherId: 'ada', fatherId: 'bex', day: 3 },
-    ])
-    const carrying = third.state
-    expect(carrying.agents.ada!.pregnant).toEqual({ sinceDay: 3, byId: 'bex' })
+    const rng = new RngStreams(CONCEIVES)
+    const tick = createWorldTick(FERTILE, rng)
+    const conceived: PendingEvent[] = []
+    for (let i = 0; i < 60; i++) {
+      const out = tick(fold(s, ev('tick_advanced', {}, s.tick + 1), FERTILE))
+      s = out.state
+      conceived.push(...typed(out.events, 'agent_conceived'))
+    }
+    expect(conceived.map((e) => e.payload)).toEqual([{ motherId: 'ada', fatherId: 'bex', day: 0 }])
+    const carrying = s
+    expect(carrying.agents.ada!.pregnant).toEqual({ sinceDay: 0, byId: 'bex' })
 
-    const delivery = pass(carrying, FERTILE, 4)
+    const delivery = pass(carrying, FERTILE, 2)
     const born = typed(delivery.events, 'agent_born')
     expect(born).toHaveLength(1)
     const p = born[0]!.payload as { id: string; sex: 'f' | 'm'; motherId: string; fatherId: string }

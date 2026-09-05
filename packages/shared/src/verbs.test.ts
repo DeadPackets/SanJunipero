@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pastParticiple, verbPhrasePast } from './verbs.js'
+import { pastParticiple, verbPhraseGerund, verbPhrasePast } from './verbs.js'
 
 describe('pastParticiple', () => {
   it('knows the irregulars and builds the rest', () => {
@@ -17,5 +17,13 @@ describe('pastParticiple', () => {
       expect(pastParticiple(slug), slug).toBe(`${slug}ed`)
     }
     expect(verbPhrasePast('constructor_gate')).toBe('constructored gate')
+  })
+})
+
+describe('the present participle', () => {
+  it('says lying, not lieing — the act two bodies are in the middle of', () => {
+    expect(verbPhraseGerund('lie_with')).toBe('lying with')
+    expect(verbPhrasePast('lie_with')).toBe('lain with')
+    expect(verbPhraseGerund('leave_partner')).toBe('leaving partner')
   })
 })

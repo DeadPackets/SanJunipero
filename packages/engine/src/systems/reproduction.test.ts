@@ -13,11 +13,10 @@ import { RngStreams } from '../rng.js'
 import { createWorldTick } from '../worldTick.js'
 import { ageBand } from './aging.js'
 import { BIRTH_NAMES } from '../data/names.js'
-import { pairKey } from '../state.js'
-import { isPartnered, partnershipOf, sexOf } from './reproduction.js'
+import { sexOf } from './reproduction.js'
 import { ev } from '../testutil/world.js'
 
-// Partnership is inferred, never declared: the town reads it off who sleeps where.
+// A night under one roof is witnessed and nothing more; who is partnered is chosen aloud.
 
 const CFG: SimConfig = SimConfigSchema.parse({ weather: { hourlyChangeChance: 0 } })
 const OFF: SimConfig = SimConfigSchema.parse({
@@ -99,15 +98,23 @@ function nights(s: WorldState, days: number[], config = CFG): WorldState {
 }
 
 describe('the midnight co-sleeping pass', () => {
-  it('records the pair asleep in one house', () => {
-    const { state, coSlept } = midnight(world(['a1', 'a2']), 1)
+  it('records the pair asleep in one house, and forms nothing by it', () => {
+    const before = world(['a1', 'a2'])
+    const { state, coSlept } = midnight(before, 1)
     expect(coSlept).toEqual([{ type: 'co_slept', payload: { aId: 'a1', bId: 'a2', day: 1 } }])
-    expect(partnershipOf(state, 'a1', 'a2')).toEqual({
-      nights: 1,
-      lastNightDay: 1,
-      formedTick: null,
-      dissolvedTick: null,
-    })
+    expect(state.agents.a1).not.toHaveProperty('partnerId')
+    expect(state.agents.a2).not.toHaveProperty('partnerId')
+  })
+
+  it('folds to the very same state: three nights make no pair and no child', () => {
+    const s = world(['a1', 'a2'], CFG, HOUSE, { sexes: { a1: 'f', a2: 'm' } })
+    const witnessed = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 1 }), CFG)
+    expect(witnessed).toBe(s)
+    const three = nights(s, [1, 2, 3])
+    expect(three.agents.a1).not.toHaveProperty('partnerId')
+    for (const day of [4, 5, 6]) {
+      expect(midnight(three, day).events.filter((e) => e.type === 'agent_conceived')).toEqual([])
+    }
   })
 
   it('ignores an occupant who is awake', () => {
@@ -128,164 +135,6 @@ describe('the midnight co-sleeping pass', () => {
 
   it('goes quiet with the reproduction flag off', () => {
     expect(midnight(world(['a1', 'a2'], OFF), 1, OFF).coSlept).toEqual([])
-    expect(midnight(world(['a1', 'a2'], OFF), 1, OFF).state.pairNights).toBeUndefined()
-  })
-
-  it('keys a pair the same way whichever name comes first', () => {
-    expect(pairKey('a2', 'a1')).toBe('a1|a2')
-    expect(pairKey('a1', 'a2')).toBe('a1|a2')
-  })
-})
-
-describe('partnership is counted, not declared', () => {
-  it('reaches partnership on the third consecutive night', () => {
-    const s = world(['a1', 'a2'])
-    const two = nights(s, [1, 2])
-    expect(partnershipOf(two, 'a1', 'a2')!.nights).toBe(2)
-    expect(isPartnered(two, 'a1', 'a2', CFG)).toBe(false)
-    const three = midnight(two, 3).state
-    expect(partnershipOf(three, 'a1', 'a2')!.nights).toBe(3)
-    expect(isPartnered(three, 'a1', 'a2', CFG)).toBe(true)
-  })
-
-  it('stamps formedTick at the threshold tick and not one night before', () => {
-    const two = nights(world(['a1', 'a2']), [1, 2])
-    expect(partnershipOf(two, 'a1', 'a2')!.formedTick).toBeNull()
-    const three = midnight(two, 3).state
-    expect(partnershipOf(three, 'a1', 'a2')!.formedTick).toBe(3 * MINUTES_PER_DAY)
-    // A fourth night does not re-stamp what is already true.
-    expect(partnershipOf(midnight(three, 4).state, 'a1', 'a2')!.formedTick).toBe(
-      3 * MINUTES_PER_DAY,
-    )
-  })
-
-  it('leaves both transition fields null for a pair that never got there', () => {
-    expect(partnershipOf(nights(world(['a1', 'a2']), [1, 2]), 'a1', 'a2')).toEqual({
-      nights: 2,
-      lastNightDay: 2,
-      formedTick: null,
-      dissolvedTick: null,
-    })
-  })
-
-  it('resets the count to one after a gap wider than the window', () => {
-    const s = nights(world(['a1', 'a2']), [1, 2, 11]) // 9-day gap
-    expect(partnershipOf(s, 'a1', 'a2')).toEqual({
-      nights: 1,
-      lastNightDay: 11,
-      formedTick: null,
-      dissolvedTick: null,
-    })
-  })
-
-  it('stamps dissolvedTick at the gap-reset midnight once they were partnered', () => {
-    const partnered = nights(world(['a1', 'a2']), [1, 2, 3])
-    expect(partnershipOf(partnered, 'a1', 'a2')!.formedTick).toBe(3 * MINUTES_PER_DAY)
-    const apart = midnight(partnered, 12).state // 9-day gap
-    expect(partnershipOf(apart, 'a1', 'a2')).toEqual({
-      nights: 1,
-      lastNightDay: 12,
-      formedTick: 3 * MINUTES_PER_DAY,
-      dissolvedTick: 12 * MINUTES_PER_DAY,
-    })
-    expect(isPartnered(apart, 'a1', 'a2', CFG)).toBe(false)
-  })
-
-  it('re-stamps formedTick and clears dissolvedTick when they find each other again', () => {
-    const apart = nights(world(['a1', 'a2']), [1, 2, 3, 12])
-    expect(partnershipOf(apart, 'a1', 'a2')!.dissolvedTick).toBe(12 * MINUTES_PER_DAY)
-    const again = nights(apart, [13, 14])
-    expect(partnershipOf(again, 'a1', 'a2')).toEqual({
-      nights: 3,
-      lastNightDay: 14,
-      formedTick: 14 * MINUTES_PER_DAY,
-      dissolvedTick: null,
-    })
-    expect(isPartnered(again, 'a1', 'a2', CFG)).toBe(true)
-  })
-
-  it('a night exactly at the window edge is not a gap', () => {
-    const s = nights(world(['a1', 'a2']), [1, 8]) // gap of 7 = partnerWindowDays
-    expect(partnershipOf(s, 'a1', 'a2')!.nights).toBe(2)
-  })
-
-  it('knows nothing about strangers', () => {
-    const s = midnight(world(['a1', 'a2']), 1).state
-    expect(partnershipOf(s, 'a1', 'a9')).toBeUndefined()
-    expect(isPartnered(s, 'a1', 'a9', CFG)).toBe(false)
-    expect(partnershipOf(genesisState(CFG), 'a1', 'a2')).toBeUndefined()
-  })
-})
-
-describe('conception', () => {
-  const CONCEIVES = 'r3' // first reproduction roll ≈ 0.143, under the 0.2 chance
-  const REFUSES = 'r0' // ≈ 0.777
-  const SEXES = { a1: 'f', a2: 'm' } as const
-
-  // Three nights together, then the fourth midnight is the one that can conceive.
-  function couple(config = CFG, opts: WorldOpts = {}): WorldState {
-    return nights(
-      world(['a1', 'a2'], config, HOUSE, { sexes: { ...SEXES }, ...opts }),
-      [1, 2, 3],
-      config,
-    )
-  }
-
-  const conceptions = (s: WorldState, seed: string, config = CFG, day = 4) =>
-    midnight(s, day, config, seed).events.filter((e) => e.type === 'agent_conceived')
-
-  it('fires for a partnered, co-sleeping, fertile f/m pair when the roll lands', () => {
-    const s = couple()
-    expect(conceptions(s, CONCEIVES)).toEqual([
-      { type: 'agent_conceived', payload: { motherId: 'a1', fatherId: 'a2', day: 4 } },
-    ])
-    expect(midnight(s, 4, CFG, CONCEIVES).state.agents.a1!.pregnant).toEqual({
-      sinceDay: 4,
-      byId: 'a2',
-    })
-  })
-
-  it('does not fire when the roll misses', () => {
-    expect(conceptions(couple(), REFUSES)).toEqual([])
-  })
-
-  it('does not fire before the pair is partnered — two nights in is still two nights in', () => {
-    const one = nights(world(['a1', 'a2'], CFG, HOUSE, { sexes: { ...SEXES } }), [1])
-    expect(conceptions(one, CONCEIVES, CFG, 2)).toEqual([])
-    // The third night both partners them and can conceive, in that order.
-    expect(conceptions(nights(one, [2]), CONCEIVES, CFG, 3)).toHaveLength(1)
-  })
-
-  it('does not fire on a night they slept apart', () => {
-    const s = couple()
-    const apart = { ...s, agents: { ...s.agents, a2: { ...s.agents.a2!, asleep: false } } }
-    expect(conceptions(apart, CONCEIVES)).toEqual([])
-  })
-
-  it('does not fire for two of the same sex', () => {
-    expect(conceptions(couple(CFG, { sexes: { a1: 'f', a2: 'f' } }), CONCEIVES)).toEqual([])
-    expect(conceptions(couple(CFG, { sexes: { a1: 'm', a2: 'm' } }), CONCEIVES)).toEqual([])
-  })
-
-  it('does not fire outside the mother’s fertile years', () => {
-    expect(conceptions(couple(CFG, { ages: { a1: 15 * DAYS_PER_YEAR } }), CONCEIVES)).toEqual([])
-    expect(conceptions(couple(CFG, { ages: { a1: 46 * DAYS_PER_YEAR } }), CONCEIVES)).toEqual([])
-    expect(conceptions(couple(CFG, { ages: { a1: 16 * DAYS_PER_YEAR } }), CONCEIVES)).toHaveLength(
-      1,
-    )
-  })
-
-  it('never stacks a second pregnancy on the first', () => {
-    const carrying = fold(
-      couple(),
-      ev('agent_conceived', { motherId: 'a1', fatherId: 'a2', day: 4 }),
-      CFG,
-    )
-    expect(conceptions(carrying, CONCEIVES, CFG, 5)).toEqual([])
-  })
-
-  it('goes quiet with the reproduction flag off', () => {
-    expect(conceptions(couple(OFF), CONCEIVES, OFF)).toEqual([])
   })
 })
 
