@@ -11,28 +11,28 @@ import { normalizeIntent } from './rulebook.js'
 // The acts a body does for their own sake. Stems, so tenses and endings all match.
 const EXPRESSIVE_STEMS: readonly string[] = [
   'danc',
-  'sing',
   'sang',
   'song',
   'chant',
-  'hum',
   'whistl',
-  'pray',
   'mourn',
   'grie',
   'weep',
   'wail',
   'laugh',
   'salut',
-  'bow',
   'kneel',
   'clap',
-  'wave',
   'celebrat',
   'honour',
   'honor',
   'rejoic',
 ]
+
+// Whole words with their endings spelled out, because these five are the heads of humble,
+// singe, bowl, waver and — the one that landed — a hide singeing over the coals.
+const EXPRESSIVE_WORDS =
+  /\b(?:hum(?:s|med|ming)?|sing(?:s|ing)?|bow(?:s|ed|ing)?|wave(?:s|d)?|waving|pray(?:s|ed|ing|er|ers)?)\b/
 
 // A word that names a change to the world. One of these anywhere in the intent and the act is
 // not free, whatever else it is dressed as.
@@ -89,7 +89,10 @@ const hasStem = (text: string, stems: readonly string[]): boolean =>
 // something is not an expression, and pays the full price.
 export function isExpressive(intent: string): boolean {
   const text = normalizeIntent(intent)
-  return hasStem(text, EXPRESSIVE_STEMS) && !hasStem(text, MUTATING_STEMS)
+  return (
+    (hasStem(text, EXPRESSIVE_STEMS) || EXPRESSIVE_WORDS.test(text)) &&
+    !hasStem(text, MUTATING_STEMS)
+  )
 }
 
 // The word is an id the town will use forever, so the model is shown its exact shape; `sense`
