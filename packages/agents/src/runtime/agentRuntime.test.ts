@@ -1023,6 +1023,23 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(personality.current().version).toBe(1)
   })
 
+  // A mind that talked past dawn or worked a plan all night never lay down, so the sleep gate
+  // never caught it and the day went unwritten for good.
+  it('writes the night down at dawn for a mind that never lay down', async () => {
+    const reflection = new ScriptedReflectionLlm()
+    const { loop, runtime, mem } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      reflectionLlm: reflection,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.tick >= DAY_1_DAWN_TICK, 3000)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+    await stepUntil(loop, () => mem.summaryNodes('day', 0).length === 1, 100)
+    expect(runtime.stats().reflections).toBe(1)
+    expect(mem.summaryNodes('day', 0)).toHaveLength(1)
+  })
+
   it('a refused dream is alerted as a dream, not as the night that already landed', async () => {
     const reflection = new ScriptedReflectionLlm()
     const dream = new ScriptedDreamLlm()

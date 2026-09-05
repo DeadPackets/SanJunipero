@@ -974,6 +974,10 @@ export class AgentRuntime {
   #handleNight(tick: number, packet: PerceptionPacket): void {
     const isNight = packet.time.isNight
     if (this.#wasNight && !isNight) {
+      // A mind that never lay down still lived the day. The night is over either way, and a day
+      // nobody wrote down is a day the mind never gets back.
+      const owed = nightOf(tick - 1)
+      if (owed >= 0 && this.#reflectedNight !== owed) void this.#runNight(owed)
       if (this.#pendingDreamMood !== null) {
         const cur = this.#personality.current().doc.current
         this.#personality.updateCurrent({ ...cur, mood: this.#pendingDreamMood })
