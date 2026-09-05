@@ -143,7 +143,9 @@ export type CallSettings = {
 
 // Wafer's tail is prefill and queueing, not decode: 14.7 s p95 and 41.0 s max on 300-token
 // answers, so a bound derived from the output ceiling alone aborts honest answers and re-bills.
-const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 45_000 }
+// 70 s and not 45: over r13 the turn's p99 was 38.9 s and its longest honest answer 43.5 s, with
+// reflection at 41.2 s — the old bound sat inside the real tail and cut 35 answers off unbilled.
+const ON_GLM = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs: 70_000 }
 const ON_DEEPSEEK = { model: PROSE_MODEL, providerOrder: PROSE_PROVIDER_ORDER }
 // Measured at this effort and no other: at 'low' it answered in 4.4 s p50 with every ruling on
 // the schema. The ceiling is 2x the longest recipe the bake-off saw, reasoning included.
@@ -207,10 +209,11 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   council: { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
   'law.compile': { ...ON_RULING, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
-  // share one warm prefix; bounded under the scene's own 30 s floor, which drops a later answer.
+  // share one warm prefix; bounded under the scene's own floor timeout, which drops a later
+  // answer. 40 s and not 25: 14 lines aborted at 25 s against a measured p99 of 17.9 s.
   scene: {
     ...ON_GLM,
-    minTimeoutMs: 25_000,
+    minTimeoutMs: 40_000,
     maxQueueWaitMs: 10_000,
     maxOutputTokens: 300,
     temperature: 1,

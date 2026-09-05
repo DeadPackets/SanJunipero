@@ -1265,8 +1265,8 @@ describe('★ one unified call discipline, the arbiter included', () => {
       expect(bound(caller), caller).toBe(MIN_REQUEST_TIMEOUT_MS)
     }
     // Wafer's tail is prefill, not decode: the turn's 600-token ceiling needs 13.6 s and its
-    // answers have taken 41.0 s, so this one caller is bounded by the provider instead.
-    expect(bound('turn')).toBe(45_000)
+    // answers have taken 43.5 s, so this one caller is bounded by the provider instead.
+    expect(bound('turn')).toBe(70_000)
     for (const caller of [
       'arbiter',
       'reflection',
