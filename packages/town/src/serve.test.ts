@@ -1,5 +1,5 @@
 // A spent ledger is a budget event, not a fault: the minds are held and the town keeps serving.
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
@@ -38,6 +38,16 @@ describe('★ a spend knob with nothing after the = is unset, never a cap of zer
     expect(usdEnv('SJ_SPEND_CAP_USD')).toBe(0)
     vi.stubEnv('SJ_SPEND_CAP_USD', '12.5')
     expect(usdEnv('SJ_SPEND_CAP_USD')).toBe(12.5)
+  })
+})
+
+// ★ `void world?.stop().then(() => process.exit(1))` short-circuits the WHOLE chain when the
+// world is still booting, so the stop it promised was a no-op. Nothing exits on a spend stop now.
+describe('★ a spend stop leaves the process standing', () => {
+  it('has no exit to short-circuit past', () => {
+    const src = readFileSync(new URL('./serve.ts', import.meta.url), 'utf8')
+    expect(src).not.toContain('process.exit(1)')
+    expect(src).not.toContain('world?.stop()')
   })
 })
 
