@@ -238,6 +238,12 @@ const RATE_LIMIT_WAIT_MS = 2_000
 // How long a caller with no pinned patience will queue behind the gate before giving its tick up.
 const DEFAULT_QUEUE_WAIT_MS = 15_000
 
+/** What a RE-ASK gets at the gate however little of the call's budget the attempt before it
+ *  left. A first attempt that stalled out its whole patience handed the retry 0 ms, which dozed
+ *  the mind the instant the pool was full: 9 of r13's 13 dozes. Half the 9.9 s turn p50, which
+ *  is several hand-backs at a cap of 8; a pool still full when it runs out dozes as before. */
+export const MIN_QUEUE_WAIT_MS = 5_000
+
 /** How long to wait before re-asking; nothing at all unless the refusal was a rate limit.
  *  Public so a test can prove the shape without waiting it out. */
 export function retryBackoffMs(err: unknown, attempt = 0): number {
@@ -571,7 +577,7 @@ export class LlmClient {
       try {
         return await this.limiter.run(
           () => this.attemptOnce(model, modelName, exec, bill),
-          Math.max(0, queueUntil - Date.now()),
+          Math.max(sends === 1 ? 0 : MIN_QUEUE_WAIT_MS, queueUntil - Date.now()),
         )
       } catch (err) {
         lastError = err

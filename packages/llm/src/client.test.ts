@@ -20,6 +20,7 @@ const idOf = (r: Reserved): number => {
 import {
   BudgetExceededError,
   LlmClient,
+  MIN_QUEUE_WAIT_MS,
   defaultExtraBody,
   retryBackoffMs,
   servedProvider,
@@ -1609,6 +1610,25 @@ describe('the fleet meets the provider through one gate', () => {
     expect(alertsOf(db, 'llm_call_failed')[0]).toContain('turn: 1 attempt(s)')
     held.open()
     await Promise.all(blocking)
+  })
+
+  // ★ 9 of r13's 13 dozes read "no slot after 0 ms": the first attempt stalled out the whole
+  // queue budget and the re-ask reached a full pool with nothing left to wait with.
+  it('★ a re-ask joins the gate with real patience, not the 0 ms its stall left behind', async () => {
+    const db = openDb()
+    const gate = limiterFor(PROVIDER_ORDER.join(','))
+    const waits: number[] = []
+    const straightThrough = gate.run.bind(gate)
+    vi.spyOn(gate, 'run').mockImplementation(async (exec, maxWaitMs) => {
+      waits.push(maxWaitMs)
+      return await straightThrough(exec, maxWaitMs)
+    })
+    const model = mockModel([{ fail: true }, { text: 'ok' }])
+    await new LlmClient({ model, db, caller: 'turn', maxQueueWaitMs: 0 }).text({
+      messages: [{ role: 'user', content: 'u' }],
+    })
+    expect(waits[0], 'the first attempt spends exactly the patience it was pinned').toBe(0)
+    expect(waits[1], 'and the re-ask is not sent to the gate empty-handed').toBe(MIN_QUEUE_WAIT_MS)
   })
 
   // The gate's state is worth one line to the operator, not one line per call: a pin stuck at
