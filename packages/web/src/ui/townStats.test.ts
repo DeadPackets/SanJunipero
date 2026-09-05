@@ -81,7 +81,7 @@ describe('EMPTY_COPY', () => {
       give: /\bgift\b/,
       teach: /\blesson\b/,
       attack: /\bblow\b/,
-      co_slept: /night under one roof/,
+      partnership_formed: /partnership taken up/,
       born: /\bchild\b/,
     }
     for (const act of acts) {

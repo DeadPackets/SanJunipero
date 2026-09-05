@@ -14,6 +14,7 @@ import { rectInView, type ViewRect } from './cull.js'
 import { entitySpriteOf } from './entities.js'
 import { feetOf, TILE_W, TILE_H } from './iso.js'
 import type { Scene } from './scene.js'
+import { NO_SHUTTERS, SHUTTERED_GLOW, foldShutters, isShuttered } from './shuttered.js'
 import { bakeTexture, buildingArt, cellPointOf } from './textures.js'
 import { skyLevel } from './tints.js'
 
@@ -155,6 +156,10 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
   const still = !scene.wantsMotion()
   let t = 0
   let drawn = 0
+  let shutters = NO_SHUTTERS
+  const offEvents = store.onEvents((evts) => {
+    shutters = foldShutters(shutters, evts, (id) => store.getState()?.agents[id]?.insideId)
+  })
 
   const light = (texture: Texture, tint: number): Sprite => {
     const s = new Sprite(texture)
@@ -283,12 +288,13 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
             : windowSpot(pts, l.sprite.texture.width, l.sprite.texture.height)
         if (win !== null) {
           l.glow ??= light(tex, GLOW_COLOR)
+          const shut = isShuttered(shutters, f.id, tick) ? SHUTTERED_GLOW : 1
           place(
             l.glow,
             pointOn(l.sprite, win),
             WINDOW_R,
             WINDOW_R,
-            (GLOW_BASE_ALPHA + 2 * b) * strength,
+            (GLOW_BASE_ALPHA + 2 * b) * strength * shut,
             view,
           )
         } else if (l.glow !== null) l.glow.visible = false
@@ -326,6 +332,7 @@ export function createLightPools(scene: Scene, store: WorldStore): LightPools {
       return drawn
     },
     destroy() {
+      offEvents()
       for (const l of lights.values()) {
         drop(l.pool)
         drop(l.bloom)

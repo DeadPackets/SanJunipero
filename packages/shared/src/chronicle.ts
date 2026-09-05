@@ -11,14 +11,18 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   // that life can now DO is second, and it is the only entry here that is permanent.
   discovery_made: 19,
   agent_born: 18,
+  partnership_formed: 16,
   world_grown: 15,
+  partnership_dissolved: 15,
   grave_placed: 12,
-  co_slept: 12,
+  invitation_accepted: 12,
   structure_completed: 10,
+  invitation_refused: 10,
   fire_ignited: 9,
   fire_extinguished: 9,
   agent_harmed: 8,
   agent_afflicted: 8,
+  invited: 8,
   fire_spread: 7,
   structure_inscribed: 6,
   affliction_recovered: 6,
@@ -27,6 +31,8 @@ export const CHRONICLE_WEIGHTS: Record<string, number> = {
   fauna_killed: 5,
   mystery_event: 4,
   tile_changed: 4,
+  // A shared roof is a roof and nothing more now: the acts two people choose say the rest.
+  co_slept: 3,
   agent_expressed: 2,
 }
 
@@ -36,7 +42,12 @@ export const CHRONICLE_ICONS: Record<string, string> = {
   agent_born: 'spark',
   world_grown: 'star',
   grave_placed: 'cross',
-  co_slept: 'heart',
+  partnership_formed: 'heart',
+  partnership_dissolved: 'flame',
+  invitation_accepted: 'heart',
+  invitation_refused: 'quill',
+  invited: 'heart',
+  co_slept: 'house',
   structure_completed: 'house',
   fire_ignited: 'flame',
   fire_extinguished: 'flame',
@@ -92,13 +103,6 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'agent_spawned',
   'agent_spoke',
   'agent_conceived',
-  // Silent only until the chronicle has its own words for them: the fold knows them now,
-  // and this list is what the totality test measures the fold against.
-  'invited',
-  'invitation_accepted',
-  'invitation_refused',
-  'partnership_formed',
-  'partnership_dissolved',
   // A scene reaches the chronicle as the speech it is made of; the bookkeeping around it does not.
   'scene_opened',
   'scene_line',
@@ -259,6 +263,22 @@ export function constructLine(c: { name: string | null }): string {
     : `They have taken to gathering, and they call it ${c.name}.`
 }
 
+// What a passer-by would have seen of an invitation. A bedding is asked and refused where
+// nobody is watching, so only the shut door reaches the paper; and a proposal accepted is the
+// partnership line one breath later, which says it better than the yes does.
+function invitationLine(type: string, verb: string, asker: string, invitee: string): string | null {
+  if (type === 'invited') {
+    if (verb === 'court') return `${asker} asked ${invitee} to walk out.`
+    return verb === 'propose' ? `${asker} asked ${invitee} to be their partner.` : null
+  }
+  if (type === 'invitation_accepted') {
+    if (verb === 'court') return `${invitee} said yes to ${asker}.`
+    return verb === 'lie_with' ? `${asker} and ${invitee} went in and shut the door.` : null
+  }
+  if (verb === 'court') return `${invitee} would not walk out with ${asker}.`
+  return verb === 'propose' ? `${invitee} refused ${asker} a life together.` : null
+}
+
 // Human-framed, one sentence, never mechanics. null means "this type has no line yet",
 // which is how a future event type stays harmless.
 export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | null {
@@ -329,6 +349,22 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       return `${str(p.name)} was born.`
     case 'co_slept':
       return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} kept house together.`
+    case 'invited':
+    case 'invitation_accepted':
+    case 'invitation_refused':
+      return invitationLine(
+        ev.type,
+        str(p.verb),
+        look.agentName(str(p.byId)),
+        look.agentName(str(p.agentId)),
+      )
+    case 'partnership_formed':
+      return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} are partners now.`
+    case 'partnership_dissolved': {
+      const leaver = str(p.byId)
+      const left = leaver === str(p.aId) ? str(p.bId) : str(p.aId)
+      return `${look.agentName(leaver)} has left ${look.agentName(left)}.`
+    }
     case 'structure_completed':
       return `The ${look.structureKind(str(p.id))} is finished.`
     case 'fire_ignited':

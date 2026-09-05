@@ -2,14 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG } from '@sj/shared'
+import { ADULT_AGE_DAYS, BondsResponseSchema, DEFAULT_CONFIG, bondId } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import Database from 'better-sqlite3'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createGateway, type Gateway } from './server.js'
 import type { RouteHandler } from './router.js'
-import { JOURNAL_MAX, mountDataApi } from './api.js'
+import { FOLD_TYPES, JOURNAL_MAX, mountDataApi } from './api.js'
 import { WorldMirror } from './worldMirror.js'
 
 // @sj/agents is frozen this chunk and does not export openAgentDb; DDL below is copied
@@ -346,5 +346,79 @@ describe('★ the per-mind handles are held, not reopened per request', () => {
     ])
     expect(api.call('nobody')).toEqual([])
     api.close()
+  })
+})
+
+/** The SELECT is the whole gate: a type `FOLD_TYPES` does not name is a row the read path never
+ *  fetches, so neither heat nor bonds could ever see it however it is weighted. */
+describe('★ the five acts of a relationship reach the read path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwrel-'))
+  let gw: Gateway
+  let base: string
+
+  beforeAll(async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('rel-test'),
+      snapshotEveryTicks: 25,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['alice', 'Alice'],
+            ['bob', 'Bob'],
+            ['cara', 'Cara'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 4) emit('invited', { agentId: 'bob', byId: 'alice', verb: 'court' })
+        if (tick === 5)
+          emit('invitation_refused', {
+            agentId: 'bob',
+            byId: 'alice',
+            verb: 'court',
+            witnesses: ['cara'],
+          })
+        if (tick === 6) emit('invited', { agentId: 'bob', byId: 'alice', verb: 'propose' })
+        if (tick === 7)
+          emit('invitation_accepted', { agentId: 'bob', byId: 'alice', verb: 'propose' })
+        if (tick === 8) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
+        if (tick === 9) emit('partnership_dissolved', { aId: 'alice', bId: 'bob', byId: 'bob' })
+      },
+    })
+    for (let i = 0; i < 12; i++) loop.step()
+    gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    base = `http://127.0.0.1:${gw.port}`
+  })
+  afterAll(async () => {
+    await gw.close()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('names all five in FOLD_TYPES and scores every one of them through the SELECT', async () => {
+    for (const type of [
+      'invited',
+      'invitation_accepted',
+      'invitation_refused',
+      'partnership_formed',
+      'partnership_dissolved',
+    ])
+      expect(FOLD_TYPES, type).toContain(type)
+
+    expect(await (await fetch(`${base}/api/heat`)).json()).toEqual([
+      // the pair events pay one face; the invitation trio pays the one who was asked
+      { fromTick: 0, toTick: 59, agentId: 'alice', score: 12 + 14 },
+      { fromTick: 0, toTick: 59, agentId: 'bob', score: 6 + 10 + 6 + 8 },
+    ])
+  })
+
+  it('makes the partnership a bond and the public no a slight', async () => {
+    const body = BondsResponseSchema.parse(await (await fetch(`${base}/api/bonds`)).json())
+    const b = body.bonds.find((x) => x.id === bondId('alice', 'bob'))
+    expect(b?.acts).toEqual([{ kind: 'partner', count: 1, firstTick: 8, lastTick: 8 }])
+    expect(b?.kind, 'they parted at tick 9').not.toBe('partner')
+    expect(b?.warmth).toBeLessThan(0)
   })
 })

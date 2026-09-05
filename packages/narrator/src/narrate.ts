@@ -130,7 +130,6 @@ export async function narrateDay(deps: {
       : detectTier2(events, {
           seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
           config: deps.world.config,
-          state: deps.world.state,
         })
   const milestones = [...tier1, ...tier2]
   const privateThoughts = deps.privateCounts.thoughts + deps.privateCounts.journals

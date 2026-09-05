@@ -39,7 +39,7 @@ export const EMPTY_COPY = {
   // ledger can be permanently and correctly empty.
   bonds:
     'No bonds yet. A town braids its ties out of what people do to one another — a word, ' +
-    'a gift, a lesson, a blow, a night under one roof, a child — and none of that is in the ' +
+    'a gift, a lesson, a blow, a partnership taken up, a child — and none of that is in the ' +
     'record here.',
   moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
   discoveries: 'The town has not worked anything out yet.',

@@ -37,12 +37,15 @@ const ARRIVAL_TYPE = 'agent_spawned'
  *  as rows and emits no event for one, so nothing reaches this slot to print (see the report). */
 export const CUE_TYPES: readonly string[] = [
   'discovery_made',
-  // A death, a birth, a thing finished, a night kept, somebody arriving: the five a replay is
-  // most often OF. Every one of them already has a chronicle line, so this costs no new copy.
+  // A death, a birth, a thing finished, somebody arriving, and the four turns of a relationship:
+  // what a replay is most often OF. Every one already has a chronicle line, so this costs no copy.
   'agent_died',
   'agent_born',
   'structure_completed',
-  'co_slept',
+  'invitation_accepted',
+  'invitation_refused',
+  'partnership_formed',
+  'partnership_dissolved',
   ARRIVAL_TYPE,
   ...Object.keys(LAW_LINES),
 ]

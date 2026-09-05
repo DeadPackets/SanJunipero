@@ -308,7 +308,6 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
     state: {
       agents: {},
       structures: { structure_9: { id: 'structure_9', kind } },
-      pairNights: {},
     } as never,
   })
 
@@ -374,7 +373,6 @@ describe('narrateDay: the souls are counted from the world in reach', () => {
         ]),
       ),
       structures: {},
-      pairNights: {},
     } as never,
   })
 

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { Container, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
+import { InvitationAccepted, InvitationRefused, Invited, PartnershipFormed } from '@sj/engine'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import type { TextureBook } from './textures.js'
@@ -35,8 +36,9 @@ const ev = (type: string, payload: Record<string, unknown>): SimEvent => ({
 // how to smoke a fish, or two people becoming a pair, passed in silence.
 describe('★ a pixel rises off the head of whoever it happened to', () => {
   it('★ wears the right glyph for what happened', () => {
-    expect(momentEmote('co_slept')).toBe('heart')
+    expect(momentEmote('partnership_formed')).toBe('heart')
     expect(momentEmote('partnership_dissolved')).toBe('anger') // the crack
+    expect(momentEmote('co_slept'), 'a shared roof is not a moment').toBe(null)
     expect(momentEmote('discovery_made')).toBe('idea') // the lit bulb
     expect(momentEmote('law_ratified')).toBe('idea')
     expect(momentEmote('law_repealed')).toBe('exclaim') // the ember mark
@@ -50,7 +52,7 @@ describe('★ a pixel rises off the head of whoever it happened to', () => {
   })
 
   it('★ spawns one per involved body', () => {
-    expect(bodiesOf(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 1 }))).toEqual([
+    expect(bodiesOf(ev('partnership_formed', { aId: 'amara', bId: 'yusuf' }))).toEqual([
       'amara',
       'yusuf',
     ])
@@ -160,7 +162,7 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     const h = harness()
     await Promise.resolve() // the atlas lands on a microtask
     const at = performance.now()
-    h.emit(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 1 }))
+    h.emit(ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })))
     expect(h.sprites()).toHaveLength(2)
 
     h.layer.tick(at + MOMENT_EMOTE_MS - 1)
@@ -173,7 +175,7 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     const h = harness()
     await Promise.resolve()
     const at = performance.now()
-    h.emit(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 1 }))
+    h.emit(ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })))
     expect(h.sprites()).toHaveLength(2)
 
     h.goIndoors()
@@ -186,6 +188,39 @@ describe('★ the layer puts one sprite over each body, and takes them away agai
     await Promise.resolve()
     h.emit(ev('agent_moved', { id: 'amara', x: 1, y: 1 }))
     expect(h.sprites()).toHaveLength(0)
+  })
+
+  // Every payload is the engine's own schema, parsed: a fixture that drifts fails here.
+  it('★ marks the one who was asked, and the one who was turned down, and nobody else', async () => {
+    const h = harness()
+    await Promise.resolve()
+    h.emit(ev('invited', Invited.parse({ agentId: 'amara', byId: 'yusuf', verb: 'court' })))
+    expect(h.sprites(), 'the question rises off the one who must answer').toHaveLength(1)
+
+    const h2 = harness()
+    await Promise.resolve()
+    h2.emit(
+      ev(
+        'invitation_refused',
+        InvitationRefused.parse({
+          agentId: 'amara',
+          byId: 'yusuf',
+          verb: 'propose',
+          witnesses: ['omar'],
+        }),
+      ),
+    )
+    expect(h2.sprites(), 'the rain falls on the one who asked').toHaveLength(1)
+
+    const h3 = harness()
+    await Promise.resolve()
+    h3.emit(
+      ev(
+        'invitation_accepted',
+        InvitationAccepted.parse({ agentId: 'amara', byId: 'yusuf', verb: 'court' }),
+      ),
+    )
+    expect(h3.sprites(), 'a yes belongs to both of them').toHaveLength(2)
   })
 })
 

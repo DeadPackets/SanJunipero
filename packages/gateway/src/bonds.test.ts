@@ -11,12 +11,23 @@ import {
   TIE_VALENCE,
   bondId,
   bondNote,
+  decayWarmth,
   type Bond,
   type BondsResponse,
   type SimEvent,
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
-import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
+import {
+  CoSlept,
+  InvitationAccepted,
+  InvitationRefused,
+  PartnershipDissolved,
+  PartnershipFormed,
+  RngStreams,
+  TickLoop,
+  genesisState,
+  type TileId,
+} from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { toEvent, type EventRow } from './http.js'
 import { BONDS_REBUILD_TICKS, BOND_TYPES, buildBonds, mountBondsApi } from './bonds.js'
@@ -93,9 +104,10 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
             duration: 1,
           })
         if (tick === 29) emit('action_completed', { agentId: 'eve', verb: 'attack' })
-        // two nights kept → partner, strength 2
-        if (tick === 30) emit('co_slept', { aId: 'alice', bId: 'bob', day: 0 })
-        if (tick === 40) emit('co_slept', { aId: 'alice', bId: 'bob', day: 0 })
+        // chosen, parted, chosen again → partner, strength 2
+        if (tick === 30) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
+        if (tick === 35) emit('partnership_dissolved', { aId: 'alice', bId: 'bob', byId: 'bob' })
+        if (tick === 40) emit('partnership_formed', { aId: 'alice', bId: 'bob' })
         // a birth → kin on both sides
         if (tick === 50) {
           emit('agent_born', {
@@ -128,13 +140,13 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     expect(body.asOfTick).toBe(60)
   })
 
-  it('ties the couple who kept house, and counts the nights', () => {
+  it('ties the couple who chose each other, and the parting does not undo the history', () => {
     const b = find('alice', 'bob')
     expect(b?.kind).toBe('partner')
     expect(b?.strength).toBe(2)
     expect(b?.recent.map((h) => bondNote(h.kind))).toEqual([
-      'kept house together',
-      'kept house together',
+      'took each other as partners',
+      'took each other as partners',
     ])
     expect(b?.acts).toEqual([{ kind: 'partner', count: 2, firstTick: 30, lastTick: 40 }])
     expect(b?.formedTick).toBe(30)
@@ -512,5 +524,115 @@ describe('★ the talk window is a window, not the whole log', () => {
     const large = distanceChecks(8_000)
     // quadratic would be ~64×; the bound makes it ~8×. Ten is the honest line between them.
     expect(large / small, `1k weighed ${small} pairs, 8k weighed ${large}`).toBeLessThan(10)
+  })
+})
+
+describe('★ a relationship is the acts two people chose', () => {
+  // Every payload is parsed by the engine's own schema before it is folded, so a fixture that
+  // drifts from the event the engine writes fails here rather than passing quietly.
+  let seq = 0
+  const rel = <T>(tick: number, type: string, schema: { parse(v: unknown): T }, payload: unknown) =>
+    ({ seq: ++seq, tick, type, payload: schema.parse(payload) }) as SimEvent
+  const only = (events: SimEvent[], a: string, b: string, at: number): Bond | undefined =>
+    buildBonds(events, DEFAULT_CONFIG.movement.earshotRadius, at).bonds.find(
+      (x) => x.id === bondId(a, b),
+    )
+
+  it('makes a partnership from the vow and nothing from a shared roof', () => {
+    const roof = [
+      rel(10, 'co_slept', CoSlept, { aId: 'ada', bId: 'bex', day: 0 }),
+      rel(20, 'co_slept', CoSlept, { aId: 'ada', bId: 'bex', day: 1 }),
+    ]
+    expect(BOND_TYPES).not.toContain('co_slept')
+    expect(only(roof, 'ada', 'bex', 30), 'a roof is a roof').toBeUndefined()
+
+    const vow = [rel(10, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' })]
+    const b = only(vow, 'ada', 'bex', 30)
+    expect(b?.kind).toBe('partner')
+    expect(b?.strength).toBe(1)
+  })
+
+  it('parts them: the kind falls back, the warmth drops six, and a second vow takes it up again', () => {
+    const formed = rel(10, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' })
+    const standing = only([formed], 'ada', 'bex', 10)!
+    const parted = only(
+      [
+        formed,
+        rel(20, 'partnership_dissolved', PartnershipDissolved, {
+          aId: 'ada',
+          bId: 'bex',
+          byId: 'bex',
+        }),
+      ],
+      'ada',
+      'bex',
+      20,
+    )!
+    expect(standing.kind).toBe('partner')
+    expect(parted.kind, 'the partnership is over and the record is not').not.toBe('partner')
+    expect(parted.warmth).toBeCloseTo(decayWarmth(standing.warmth, 10, 20) + TIE_VALENCE.parted, 10)
+    expect(parted.acts).toEqual([{ kind: 'partner', count: 1, firstTick: 10, lastTick: 10 }])
+
+    const remarried = only(
+      [
+        formed,
+        rel(20, 'partnership_dissolved', PartnershipDissolved, {
+          aId: 'ada',
+          bId: 'bex',
+          byId: 'bex',
+        }),
+        rel(30, 'partnership_formed', PartnershipFormed, { aId: 'ada', bId: 'bex' }),
+      ],
+      'ada',
+      'bex',
+      30,
+    )
+    expect(remarried?.kind).toBe('partner')
+    expect(remarried?.strength).toBe(2)
+  })
+
+  it('reads a walk out together as warmth, and leaves a bedding to the two of them', () => {
+    const court = [
+      rel(10, 'invitation_accepted', InvitationAccepted, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'court',
+      }),
+    ]
+    const b = only(court, 'ada', 'bex', 10)
+    expect(b?.warmth).toBeCloseTo(TIE_VALENCE.attraction, 10)
+    expect(b?.strength, 'a tie is no act').toBe(0)
+
+    for (const verb of ['propose', 'lie_with']) {
+      const other = only(
+        [rel(10, 'invitation_accepted', InvitationAccepted, { agentId: 'bex', byId: 'ada', verb })],
+        'ada',
+        'bex',
+        10,
+      )
+      expect(other, verb).toBeUndefined()
+    }
+  })
+
+  it('costs the asker only when the no was said in front of people', () => {
+    const seen = [
+      rel(10, 'invitation_refused', InvitationRefused, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'propose',
+        witnesses: ['cass'],
+      }),
+    ]
+    expect(only(seen, 'ada', 'bex', 10)?.warmth).toBeCloseTo(TIE_VALENCE.slight, 10)
+
+    const alone = [
+      rel(10, 'invitation_refused', InvitationRefused, {
+        agentId: 'bex',
+        byId: 'ada',
+        verb: 'propose',
+        witnesses: [],
+      }),
+    ]
+    expect(only(alone, 'ada', 'bex', 10), 'a no in private is between them').toBeUndefined()
   })
 })

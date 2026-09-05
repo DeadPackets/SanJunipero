@@ -29,7 +29,9 @@ export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
   agent_died: 'rain',
   agent_born: 'heart',
   agent_spawned: 'star',
-  co_slept: 'heart',
+  invited: 'question',
+  invitation_accepted: 'heart',
+  invitation_refused: 'rain',
   partnership_formed: 'heart',
   partnership_dissolved: 'anger',
   discovery_made: 'idea',
@@ -37,6 +39,13 @@ export const MOMENT_EMOTE: Readonly<Record<string, EmoteKind>> = {
   law_ratified: 'idea',
   law_broken: 'exclaim',
   law_repealed: 'exclaim',
+}
+
+/** Where a moment belongs to ONE of the two people the payload names: the one who was asked
+ *  wears the question, and the one who was turned down wears the rain. */
+export const MOMENT_EMOTE_ONE: Readonly<Record<string, string>> = {
+  invited: 'agentId',
+  invitation_refused: 'byId',
 }
 
 /** A moment that happens to a BUILDING has nobody to rise off — `structure_completed` carries
@@ -93,7 +102,10 @@ export function createMomentEmotes(
     if (kind === null) return
     const texture = cellOf(kind)
     if (texture === null) return
-    for (const agentId of bodiesOf(ev)) {
+    const key = MOMENT_EMOTE_ONE[ev.type]
+    const one = key === undefined ? undefined : (ev.payload as Record<string, unknown>)[key]
+    const bodies = bodiesOf(ev)
+    for (const agentId of typeof one === 'string' ? bodies.filter((b) => b === one) : bodies) {
       const sprite = new Sprite(texture)
       sprite.anchor.set(0.5, 1)
       sprite.width = GLYPH_PX

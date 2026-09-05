@@ -5,18 +5,24 @@ import { DEFAULT_CONFIG, type HeatWindow, type SimEvent } from '@sj/shared'
 export const HEAT_WINDOW_TICKS = 60
 export const HEAT_WEIGHTS: Record<string, number> = {
   agent_died: 20,
+  partnership_dissolved: 14,
   discovery_made: 12,
   fire_ignited: 12,
   law_ratified: 12,
+  partnership_formed: 12,
   fire_spread: 10,
+  invitation_refused: 10,
   law_broken: 9,
   agent_injured: 8,
-  co_slept: 8,
+  invitation_accepted: 8,
+  invited: 6,
   structure_completed: 6,
   agent_collapsed: 6,
   agent_spoke: 6,
   agent_expressed: 4,
   crop_harvested: 3,
+  // A shared roof is a roof: what two people chose is scored on the choosing, above.
+  co_slept: 2,
   item_moved: 1,
 }
 
@@ -91,6 +97,8 @@ function dramatis(ev: SimEvent, ctx: HeatContext): string | null {
     // One night pays one of the pair, the way one fire pays one person: the camera can only be
     // on one face, and whichever it takes has the other standing in the same shot.
     case 'co_slept':
+    case 'partnership_formed':
+    case 'partnership_dissolved':
       return p.aId ?? null
     case 'fire_ignited':
       return p.structureId === undefined ? null : ctx.builderOf(p.structureId)

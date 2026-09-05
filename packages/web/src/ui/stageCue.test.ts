@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import { InvitationRefused, PartnershipDissolved, PartnershipFormed } from '@sj/engine'
 import type { TownScene } from '../state/worldStore.js'
 import { CHRONICLE_GLYPH } from './importantFeed.js'
 import { contrast, tokens } from './contrast.test.js'
@@ -64,10 +65,42 @@ describe('★ the stage says what just happened', () => {
   })
 
   it('★ names a bond change, and both the bodies it happened to', () => {
-    const cue = cueFor(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 3 }), state)
-    expect(cue?.text).toBe('Amara and Yusuf kept house together.')
+    const cue = cueFor(
+      ev('partnership_formed', PartnershipFormed.parse({ aId: 'amara', bId: 'yusuf' })),
+      state,
+    )
+    expect(cue?.text).toBe('Amara and Yusuf are partners now.')
     expect(cue?.icon).toBe('heart')
     expect(cue?.bodies).toEqual(['amara', 'yusuf'])
+
+    const parted = cueFor(
+      ev(
+        'partnership_dissolved',
+        PartnershipDissolved.parse({ aId: 'amara', bId: 'yusuf', byId: 'yusuf' }),
+      ),
+      state,
+    )
+    expect(parted?.text).toBe('Yusuf has left Amara.')
+    expect(parted?.icon).toBe('flame')
+    expect(parted?.bodies, 'the one who left is named first').toEqual(['yusuf', 'amara'])
+  })
+
+  it('★ leaves the shared roof and the private ask off the stage', () => {
+    expect(cueFor(ev('co_slept', { aId: 'amara', bId: 'yusuf', day: 3 }), state)).toBeNull()
+    expect(
+      cueFor(
+        ev(
+          'invitation_refused',
+          InvitationRefused.parse({
+            agentId: 'amara',
+            byId: 'yusuf',
+            verb: 'lie_with',
+            witnesses: [],
+          }),
+        ),
+        state,
+      ),
+    ).toBeNull()
   })
 
   it('★ says a law in its own words, and says who broke one', () => {
@@ -98,6 +131,8 @@ describe('★ the stage says what just happened', () => {
           name: 'a thing',
           kind: 'craft',
           day: 1,
+          verb: 'court',
+          witnesses: [],
         }),
         state,
       )

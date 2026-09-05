@@ -197,6 +197,113 @@ const DEATH_CAUSES = [
 // same reason DEATH_CAUSES is: shared sits under the engine and cannot import it.
 const AFFLICTION_KINDS = ['fatigue', 'illness', 'injury', 'poison']
 
+describe('the acts two people choose', () => {
+  // Shared sits under the engine, so the schemas cannot be imported here: the guard below reads
+  // their source instead and holds the keys these lines index against the engine's own.
+  it('reads the keys the engine actually writes on the five relationship events', () => {
+    const defs = readFileSync(new URL('../../engine/src/events.def.ts', import.meta.url), 'utf8')
+    const keysOf = (name: string): string[] => {
+      const at = defs.indexOf(`export const ${name} = z`)
+      expect(at, name).toBeGreaterThan(-1)
+      const body = defs.slice(at, defs.indexOf('.strict()', at))
+      return [...body.matchAll(/(\w+):\s*(?:z\.|[A-Z])/g)].map((m) => m[1]!).sort()
+    }
+    expect(keysOf('Invited')).toEqual(['agentId', 'byId', 'verb'])
+    expect(keysOf('InvitationRefused')).toEqual(['agentId', 'byId', 'verb', 'witnesses'])
+    expect(keysOf('PartnershipFormed')).toEqual(['aId', 'bId'])
+    expect(keysOf('PartnershipDissolved')).toEqual(['aId', 'bId', 'byId'])
+  })
+
+  it('tells the paper who asked, who said yes and who would not', () => {
+    expect(chronicleLine(ev('invited', { agentId: 'a2', byId: 'a1', verb: 'court' }), look)).toBe(
+      'Rahel asked Tomas to walk out.',
+    )
+    expect(chronicleLine(ev('invited', { agentId: 'a2', byId: 'a1', verb: 'propose' }), look)).toBe(
+      'Rahel asked Tomas to be their partner.',
+    )
+    expect(
+      chronicleLine(ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'court' }), look),
+    ).toBe('Tomas said yes to Rahel.')
+    expect(
+      chronicleLine(
+        ev('invitation_refused', {
+          agentId: 'a2',
+          byId: 'a1',
+          verb: 'propose',
+          witnesses: ['a3'],
+        }),
+        look,
+      ),
+    ).toBe('Tomas refused Rahel a life together.')
+    expect(chronicleLine(ev('partnership_formed', { aId: 'a1', bId: 'a2' }), look)).toBe(
+      'Rahel and Tomas are partners now.',
+    )
+  })
+
+  it('names the one who walked out of the partnership, not whichever id sorts first', () => {
+    expect(
+      chronicleLine(ev('partnership_dissolved', { aId: 'a1', bId: 'a2', byId: 'a2' }), look),
+    ).toBe('Tomas has left Rahel.')
+    expect(
+      chronicleLine(ev('partnership_dissolved', { aId: 'a1', bId: 'a2', byId: 'a1' }), look),
+    ).toBe('Rahel has left Tomas.')
+  })
+
+  it('keeps a bedding private but for the shut door', () => {
+    expect(
+      chronicleLine(ev('invited', { agentId: 'a2', byId: 'a1', verb: 'lie_with' }), look),
+    ).toBeNull()
+    expect(
+      chronicleLine(
+        ev('invitation_refused', { agentId: 'a2', byId: 'a1', verb: 'lie_with', witnesses: [] }),
+        look,
+      ),
+    ).toBeNull()
+    expect(
+      chronicleLine(
+        ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'lie_with' }),
+        look,
+      ),
+    ).toBe('Rahel and Tomas went in and shut the door.')
+    // The partnership line one weight above says it in the same breath; two lines for one yes
+    // would read as two moments.
+    expect(
+      chronicleLine(
+        ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'propose' }),
+        look,
+      ),
+    ).toBeNull()
+  })
+
+  it('weighs a parting above a night kept under one roof, and names nobody by id', () => {
+    expect(CHRONICLE_WEIGHTS.partnership_dissolved!).toBeGreaterThan(CHRONICLE_WEIGHTS.co_slept!)
+    expect(CHRONICLE_WEIGHTS.partnership_formed!).toBeGreaterThan(CHRONICLE_WEIGHTS.invited!)
+    for (const type of [
+      'invited',
+      'invitation_accepted',
+      'invitation_refused',
+      'partnership_formed',
+      'partnership_dissolved',
+    ]) {
+      expect(NOT_CHRONICLED.has(type), type).toBe(false)
+      expect(CHRONICLE_WEIGHTS[type], type).toBeGreaterThan(0)
+    }
+    const line = chronicleLine(ev('partnership_formed', { aId: 'a1', bId: 'a2' }), look)!
+    expect(line).not.toMatch(/a1|a2|_/)
+  })
+
+  it('frames both bodies of a relationship line and never the verb', () => {
+    const isAgent = (id: string): boolean => id === 'a1' || id === 'a2'
+    expect(
+      chronicleCast(ev('invited', { agentId: 'a2', byId: 'a1', verb: 'court' }), isAgent),
+    ).toEqual(['a2', 'a1'])
+    expect(chronicleCast(ev('partnership_formed', { aId: 'a1', bId: 'a2' }), isAgent)).toEqual([
+      'a1',
+      'a2',
+    ])
+  })
+})
+
 describe('the C11 vocabulary', () => {
   it('covers every event the fold knows — weighted, or silent on purpose', () => {
     const fold = readFileSync(new URL('../../engine/src/fold.ts', import.meta.url), 'utf8')
