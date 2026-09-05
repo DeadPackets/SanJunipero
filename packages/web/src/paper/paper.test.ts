@@ -378,6 +378,7 @@ describe('★ every page that can be quiet can also be out of reach', () => {
     './pages/Moments.tsx',
     './pages/BondsGraph.tsx',
     './pages/Person.tsx',
+    './pages/Building.tsx',
   ]
 
   it.each(PAGES)('%s branches on the read failing, and offers it again', (page) => {

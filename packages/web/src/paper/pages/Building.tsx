@@ -2,8 +2,9 @@ import { useSyncExternalStore } from 'react'
 import type { WorldState } from '@sj/engine/state'
 import { structureTitle } from '@sj/shared'
 import { builtLine, roomCard, type Provenance, type RoomCard } from '../../ui/interiorModel.js'
+import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import { usePolled } from '../../ui/useEndpoint.js'
+import { useEndpointFor, useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
@@ -36,9 +37,10 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   const id = subject?.kind === 'structure' ? subject.id : null
   // Keyed on the building, so a new subject is structurally a new read and the page can never
   // show one building's sentence under the next one's name.
-  const prov = usePolled<Provenance>(
+  const provRead = useEndpointFor<Provenance>(
     id === null ? null : `/api/structure/${encodeURIComponent(id)}/provenance`,
   )
+  const prov = useFeed(provRead)
   const builderId = prov.data?.builderId ?? null
   const journal = usePolled<Journal[]>(
     builderId === null ? null : `/api/agent/${encodeURIComponent(builderId)}/journal`,
@@ -68,7 +70,9 @@ export function BuildingPage({ tab, subject, store, insideId, onInside }: PagePr
   return (
     <section className="provenance">
       <h3 className="feed-head">{structureTitle(structure)}</h3>
-      {settled ? (
+      {prov.failed && prov.data === null ? (
+        <OutOfReach onRetry={provRead.retry} />
+      ) : settled ? (
         <p className="provenance-line">{provenanceLines(state, prov.data, journal.data ?? [])}</p>
       ) : (
         <Skeleton rows={1} />
