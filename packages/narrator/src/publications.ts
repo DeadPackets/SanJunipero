@@ -1,8 +1,16 @@
 import type Database from 'better-sqlite3'
-import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, SOMEONE, type SimEvent, verbPhrase } from '@sj/shared'
-import { applyFootnotes, publishClean } from './chronicle.js'
+import {
+  FORBIDDEN_FRAMING,
+  MINUTES_PER_DAY,
+  SOMEONE,
+  type SimEvent,
+  sanitizeSpokenText,
+  verbPhrase,
+} from '@sj/shared'
+import { applyFootnotes, publishClean, withoutStrangers } from './chronicle.js'
 import type { NarratorStore } from './store.js'
 import type {
+  CastMember,
   ChapterRow,
   HeatScores,
   Milestone,
@@ -78,7 +86,9 @@ export function publicRecordText(ev: SimEvent): string {
   const p = (ev.payload ?? {}) as P
   switch (ev.type) {
     case 'agent_spoke':
-      return `was heard to say: "${strOr(p.text, '')}"`
+      // Sanitized here as well as at the verb: a world resumed from an older log carries raw
+      // text, and this one goes inside a quote fence on one line of a prompt.
+      return `was heard to say: "${sanitizeSpokenText(strOr(p.text, ''))}"`
     case 'action_completed':
       return `was seen to ${verbPhrase(strOr(p.verb, 'act'))}`
     case 'structure_planned':
@@ -145,6 +155,7 @@ export async function writeBiography(deps: {
   agentId: string
   name: string
   throughDay: number
+  cast?: readonly CastMember[] | undefined
   alert?: (d: string) => void
 }): Promise<PublicationRow> {
   const record = collectPublicRecord(deps.world, deps.agentId, deps.throughDay)
@@ -166,8 +177,9 @@ export async function writeBiography(deps: {
       deps.alert?.(
         `dangling_citation: biography of ${deps.agentId} cited unknown ledger numbers ${seen.dangling.join(', ')}`,
       )
+    const where = `biography of ${deps.agentId}`
     title = bio.title
-    body = publishClean(deps, `biography of ${deps.agentId}`, seen.text)
+    body = publishClean(deps, where, withoutStrangers(deps, where, seen.text, deps.cast ?? []))
   }
   const id = deps.store.insertPublication({
     day: deps.throughDay,

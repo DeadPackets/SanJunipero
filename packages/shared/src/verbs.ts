@@ -54,7 +54,10 @@ const IRREGULAR_PARTICIPLE: Record<string, string> = {
 const DOUBLES_FINAL_CONSONANT = /^[^aeiou]*[aeiou][^aeiouwxy]$/
 
 export const pastParticiple = (verb: string): string => {
-  const irregular = IRREGULAR_PARTICIPLE[verb]
+  // A minted verb id may be spelled `constructor`, and a plain object answers to that.
+  const irregular = Object.hasOwn(IRREGULAR_PARTICIPLE, verb)
+    ? IRREGULAR_PARTICIPLE[verb]
+    : undefined
   if (irregular !== undefined) return irregular
   if (verb.endsWith('e')) return `${verb}d`
   if (DOUBLES_FINAL_CONSONANT.test(verb)) return `${verb}${verb.slice(-1)}ed`

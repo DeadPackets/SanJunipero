@@ -25,11 +25,32 @@ const OPS_KEYS: readonly string[] = [
   'semantic firsts',
 ]
 
+// What the ops plane calls itself: the court that judges an act, the ladder it judges against,
+// and the machinery that answers a prompt. A town has none of these, and is never told of them.
+const OPS_PLANE_WORDS: readonly string[] = [
+  'arbiter',
+  'arbiters',
+  'codex',
+  'court',
+  'courts',
+  'ruling',
+  'rulings',
+  'verdict',
+  'verdicts',
+  'schema',
+  'schemas',
+  'provider',
+  'providers',
+  'model',
+  'models',
+]
+
 // Each is also an ordinary English noun: a mind may hear one from another mouth, but no
 // authored surface may hand one over.
 export const CONSTRUCT_VOCABULARY: readonly string[] = [
   ...CONSTRUCT_TYPES,
   ...OPS_JARGON_WORDS,
+  ...OPS_PLANE_WORDS,
   ...OPS_KEYS,
 ]
 
@@ -55,6 +76,13 @@ const opsKeyShape = (term: string): boolean => /[_ ]/.test(term)
 // Milestone kinds are all `first_<something>`, so the shape is banned rather than the roster:
 // a kind invented next year is caught the day it is written.
 const MILESTONE_KIND = /\bfirst_\w+/giu
+
+// The log's own name for a thing — `structure_fire_pit_39_39`, `item_wood_3`: a kind, then
+// what it is, then the number that makes it that one. The number is what tells an id from an
+// event type (`item_owner_changed`), which the narrator's own digests carry.
+const RAW_ID = /\b(?:structure|item|agent|crop|node|fauna)(?:_[a-z0-9]+)*_\d+\b/giu
+
+const SHAPES: readonly RegExp[] = [MILESTONE_KIND, RAW_ID]
 
 // Cyrillic and Greek letters that render as their Latin twin. Only the ones that can spell a
 // roster word; a longer table would be a Unicode confusables copy nobody maintains.
@@ -136,9 +164,11 @@ const OPS_ONLY_PATTERNS = patternsFor(MID_RUN_ENFORCED)
 
 function scan(prompt: string, patterns: readonly Pattern[]): string[] {
   const out = patterns.filter(({ re }) => re.test(prompt)).map(({ term }) => term)
-  for (const m of prompt.matchAll(MILESTONE_KIND)) {
-    const kind = m[0].toLowerCase()
-    if (!out.includes(kind)) out.push(kind)
+  for (const shape of SHAPES) {
+    for (const m of prompt.matchAll(shape)) {
+      const kind = m[0].toLowerCase()
+      if (!out.includes(kind)) out.push(kind)
+    }
   }
   return out
 }
@@ -226,7 +256,8 @@ function scanSpans(folded: string, patterns: readonly Pattern[]): Span[] {
   for (const { term, all } of patterns) {
     for (const m of folded.matchAll(all)) add(term, m.index, m[0])
   }
-  for (const m of folded.matchAll(MILESTONE_KIND)) add(m[0].toLowerCase(), m.index, m[0])
+  for (const shape of SHAPES)
+    for (const m of folded.matchAll(shape)) add(m[0].toLowerCase(), m.index, m[0])
   return out.sort((a, b) => a.start - b.start || b.end - a.end)
 }
 

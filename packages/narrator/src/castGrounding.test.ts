@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
-import { castLaw, namesOutsideRoll, renderChapter, withoutStrangers } from './chronicle.js'
+import Database from 'better-sqlite3'
+import {
+  castLaw,
+  namesOutsideRoll,
+  renderChapter,
+  renderEra,
+  withoutStrangers,
+} from './chronicle.js'
+import { writeBiography } from './publications.js'
 import { makeNarratorLlm } from './llm/narratorLlm.js'
 import { openNarratorDb } from './schema.js'
 import { NarratorStore } from './store.js'
@@ -131,6 +139,59 @@ describe('the chronicle may name nobody the world has not got', () => {
     const { store } = watched()
     expect(withoutStrangers({ store }, 'day 5', GROUNDED, ROLL)).toBe(GROUNDED)
     expect(withoutStrangers({ store }, 'day 5', HALLUCINATED, [])).toBe(HALLUCINATED)
+  })
+
+  it('drops the stranger from a week summary', async () => {
+    const { store, alerts } = watched()
+    const era = await renderEra({
+      store,
+      llm: {
+        summarizeChapter: vi.fn(),
+        summarizeEra: vi.fn(async () => ({
+          title: 'The Quiet Week',
+          text: HALLUCINATED,
+          citations: [1],
+        })),
+        newspaperCopy: vi.fn(),
+        biography: vi.fn(),
+      },
+      startDay: 0,
+      endDay: 6,
+      chapters: [
+        { id: 1, day: 5, title: 'A Still Day', text: GROUNDED, citations: [1], sceneIds: [1] },
+      ],
+      validEventIds: [1],
+      cast: ROLL,
+    })
+    expect(namesOutsideRoll(era.text, ROLL)).toEqual([])
+    expect(alerts().map((a) => a.kind)).toContain('cast_leak')
+  })
+
+  it('drops the stranger from a life', async () => {
+    const { store, alerts } = watched()
+    const world = new Database(':memory:')
+    world.exec(
+      'CREATE TABLE events (seq INTEGER PRIMARY KEY, tick INTEGER, type TEXT, payload TEXT)',
+    )
+    world
+      .prepare('INSERT INTO events (seq, tick, type, payload) VALUES (?, ?, ?, ?)')
+      .run(1, 7200, 'agent_spoke', JSON.stringify({ agentId: 'yusuf', text: 'Rain.' }))
+    const bio = await writeBiography({
+      store,
+      llm: {
+        summarizeChapter: vi.fn(),
+        summarizeEra: vi.fn(),
+        newspaperCopy: vi.fn(),
+        biography: vi.fn(async () => ({ title: 'Yusuf', body: HALLUCINATED })),
+      },
+      world,
+      agentId: 'yusuf',
+      name: 'Yusuf',
+      throughDay: 5,
+      cast: ROLL,
+    })
+    expect(namesOutsideRoll(bio.body, ROLL)).toEqual([])
+    expect(alerts().map((a) => a.kind)).toContain('cast_leak')
   })
 
   it('says nothing it does not know, and drops the stillness once somebody acts', () => {

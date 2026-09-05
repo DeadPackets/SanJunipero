@@ -137,16 +137,32 @@ describe('narrateDay', () => {
     expect(alert.mock.calls.some(([msg]) => String(msg).includes('founding'))).toBe(true)
   })
 
-  it('skips institution detection off week boundaries', async () => {
+  it('finds a role founded on an ordinary day, and names it once however often it recurs', async () => {
     const store = memStore()
+    const fishing = (day: number): SimEvent[] => {
+      const t = day * 1440
+      return [
+        ev(1, t + 160, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+        ev(2, t + 161, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+        ev(3, t + 162, 'action_completed', { agentId: 'yusuf', verb: 'fish' }),
+      ]
+    }
     await narrateDay({
       store,
-      llm: scriptedLlm([4]),
-      events: DAY1,
+      llm: scriptedLlm([1]),
+      events: fishing(4),
       rulebookCount: 0,
       privateCounts: { thoughts: 0, journals: 0 },
     })
-    expect(store.institutions().length).toBe(0) // day 1 is not a week boundary
+    expect(store.institutions().map((i) => i.name)).toEqual(['the fisher'])
+    await narrateDay({
+      store,
+      llm: scriptedLlm([1]),
+      events: fishing(5),
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(store.institutions().map((i) => i.name)).toEqual(['the fisher'])
   })
 })
 
@@ -209,6 +225,29 @@ describe('narrateDay: a chronicle that will not render does not take the semanti
     expect(caught).toBeInstanceOf(ChapterRenderError)
     expect((caught as ChapterRenderError).night.semanticRan).toBe(true)
     expect((caught as ChapterRenderError).message).toContain('response did not match schema')
+  })
+
+  // ★ The scenes were written before the call, so a night that would not render left its rooms
+  // behind — and a re-run of that day wrote them all a second time.
+  it('★ leaves no rooms behind on a night that did not render', async () => {
+    const store = memStore()
+    await narrateDay({
+      store,
+      llm: throwingLlm(),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    }).catch(() => null)
+    expect(store.scenesForDay(1)).toEqual([])
+
+    await narrateDay({
+      store,
+      llm: scriptedLlm([4]),
+      events: DAY1,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+    })
+    expect(store.scenesForDay(1)).toHaveLength(3)
   })
 
   it('says the pass ran on a night that rendered, so a caller can count the nights it did not', async () => {

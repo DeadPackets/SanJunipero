@@ -312,20 +312,7 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
     // second hit of a concept already taken tonight is simply a recurrence.
     if (accepted.has(hit.conceptKind)) continue
     accepted.add(hit.conceptKind)
-    deps.store.insertSemanticFirst({
-      conceptKind: hit.conceptKind,
-      agentId: hit.agentId,
-      day: hit.day,
-      sourceKind: hit.sourceKind,
-      eventSeq: hit.eventSeq ?? null,
-      memoryRef: hit.memoryRef ?? null,
-      quote: hit.quote,
-      quote2: hit.quote2 ?? null,
-      provenance2: hit.provenance2 ?? null,
-      confidence: hit.confidence,
-      rationale: hit.rationale,
-    })
-    out.push({
+    const mark: Milestone = {
       kind: `first_${hit.conceptKind}`,
       tier: 2.5,
       domain: 'semantic',
@@ -334,7 +321,24 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
       day: hit.day,
       tick: source.tick,
       agentIds: [hit.agentId],
-    })
+    }
+    deps.store.recordSemanticFirst(
+      {
+        conceptKind: hit.conceptKind,
+        agentId: hit.agentId,
+        day: hit.day,
+        sourceKind: hit.sourceKind,
+        eventSeq: hit.eventSeq ?? null,
+        memoryRef: hit.memoryRef ?? null,
+        quote: hit.quote,
+        quote2: hit.quote2 ?? null,
+        provenance2: hit.provenance2 ?? null,
+        confidence: hit.confidence,
+        rationale: hit.rationale,
+      },
+      mark,
+    )
+    out.push(mark)
   }
   return out
 }

@@ -96,8 +96,7 @@ export type MilestoneRead = {
   tier: number
   domain: string
   agentIds: string[]
-  constructId: string | null
-  nameProvenance: QuotedName | null
+  nameProvenance: Omit<QuotedName, 'byId'> | null
 }
 
 /** A JSON column of a ledger read through the glass: unparseable is one thin row, not a 500. */
@@ -110,9 +109,23 @@ const jsonColumn = <T>(text: string | null, fallback: T): T => {
   }
 }
 
-/** Declared beside the row, so no reader decides on its own what a JSON column or TEXT tier means. */
+// `first_festival` and its four siblings are the ops plane's own taxonomy, and `first_name_<id>`
+// carries a construct's raw id. The rest of the catalogue is written in the town's own words.
+const OPS_KIND = /^first_(?:festival|faith|council|market|custom)$|^first_name_/
+
+// FNV-1a, so this file stays importable by the viewer's bundle. The kind is a key and a glyph
+// hint on the wire, never a word on a page, so an opaque one is as good as the word.
+const shortHash = (text: string): string => {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+/** Declared beside the row, so no reader decides on its own what a JSON column or TEXT tier
+ *  means. The taxonomy, the construct's own id and the id of whoever named it stay in the
+ *  ledger: this is what a viewer is served, and a viewer is never shown any of them. */
 export const milestoneFromRow = (r: MilestoneRow): MilestoneRead => ({
-  kind: r.kind,
+  kind: OPS_KIND.test(r.kind) ? `first_${shortHash(r.kind)}` : r.kind,
   label: r.label,
   eventSeq: r.event_seq,
   day: r.day,
@@ -120,9 +133,13 @@ export const milestoneFromRow = (r: MilestoneRow): MilestoneRead => ({
   tier: Number(r.tier),
   domain: r.domain,
   agentIds: jsonColumn<string[]>(r.agent_ids, []),
-  constructId: r.construct_id,
-  nameProvenance: jsonColumn<QuotedName | null>(r.name_provenance, null),
+  nameProvenance: named(jsonColumn<QuotedName | null>(r.name_provenance, null)),
 })
+
+const named = (q: QuotedName | null): Omit<QuotedName, 'byId'> | null =>
+  q === null
+    ? null
+    : { name: q.name, sourceKind: q.sourceKind, eventSeq: q.eventSeq, quote: q.quote }
 export type SceneRow = {
   day: number
   start_tick: number

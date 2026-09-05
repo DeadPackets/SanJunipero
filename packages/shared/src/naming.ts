@@ -30,7 +30,16 @@ export const personWords = (name: string | undefined): string => name ?? SOMEONE
 
 export type NameIndex = Readonly<Record<string, { name: string } | undefined>>
 
+/** The one way to read somebody out of a roster keyed by id. `state.agents` is built by object
+ *  spread off `JSON.parse`, so it carries `Object.prototype`: `agents.constructor` is a function
+ *  and a bare read hands back a person the town never had. */
+export const personAt = <T>(
+  index: Readonly<Record<string, T>> | null | undefined,
+  id: string,
+): T | undefined =>
+  index === null || index === undefined || !Object.hasOwn(index, id) ? undefined : index[id]
+
 /** The one way to turn an agent id into words. An id goes in and prose comes out, so no caller
  *  is left holding the id — which is how `?? id` stopped being a thing anyone could type. */
 export const agentName = (index: NameIndex | null | undefined, id: string): string =>
-  personWords(index?.[id]?.name)
+  personWords(personAt(index, id)?.name)

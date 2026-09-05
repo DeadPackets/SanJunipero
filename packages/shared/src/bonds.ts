@@ -219,6 +219,9 @@ export type BondFold = {
   /** A tie the minds wrote, weighed into warmth alone. It counts toward no act and names no
    *  bond kind, so the served window and its ceiling are what they were. */
   addTie(act: TieAct, tick: number): void
+  /** Move the "as of" the prior half of the reading is measured against. Only forward, and only
+   *  so a fold kept alive across rebuilds answers what a fresh one would. */
+  advanceTo(asOfTick: number): void
   acts(): number
   bond(): Bond
 }
@@ -228,7 +231,7 @@ export type BondFold = {
 export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   const [lo, hi] = [aId, bId].sort() as [string, string]
   const id = bondId(aId, bId)
-  const priorAt = Math.max(0, asOfTick - WARMTH_HALF_LIFE_TICKS)
+  let priorAt = Math.max(0, asOfTick - WARMTH_HALF_LIFE_TICKS)
 
   let kind: BondKind = 'friend'
   let first = true
@@ -241,6 +244,9 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
   let warmth = 0 // running, evaluated at `lastTick`
   let prior = 0 // the same, over acts at or before `priorAt`
   let priorFrom = 0
+  // Acts still newer than `priorAt`, in tick order. They fall into `prior` as it moves forward,
+  // so this holds one half-life of a pair's acts and never the town's whole history.
+  const pending: { w: number; tick: number }[] = []
   // the level as at the end of the last CLOSED tick, and when it last differed
   let closedLevel: BondLevel | null = null
   let levelChangedTick = 0
@@ -269,7 +275,7 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     if (tick <= priorAt) {
       prior = decayWarmth(prior, priorFrom, tick) + w
       priorFrom = tick
-    }
+    } else pending.push({ w, tick })
   }
 
   return {
@@ -290,6 +296,16 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     },
     addTie(act, tick) {
       weigh(TIE_VALENCE[act], tick)
+    },
+    advanceTo(at) {
+      const moved = Math.max(0, at - WARMTH_HALF_LIFE_TICKS)
+      if (moved <= priorAt) return
+      priorAt = moved
+      while (pending.length > 0 && pending[0]!.tick <= priorAt) {
+        const a = pending.shift()!
+        prior = decayWarmth(prior, priorFrom, a.tick) + a.w
+        priorFrom = a.tick
+      }
     },
     acts: () => count,
     bond() {

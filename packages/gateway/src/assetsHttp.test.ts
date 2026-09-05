@@ -98,6 +98,15 @@ describe('asset http routes', () => {
     expect((await fetch(`${base}/assets/placeholder/spaceship.png`)).status).toBe(404)
   })
 
+  // ★ A name every plain object answers to is not a class the town draws.
+  it('★ 404s a name the table inherits rather than holds', async () => {
+    for (const klass of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      const res = await fetch(`${base}/assets/placeholder/${klass}.png`)
+      expect(res.status, klass).toBe(404)
+      await res.text()
+    }
+  })
+
   /** A sharp encode can fail — an exhausted libuv pool, an OOM on a big raw buffer. Unanswered,
    *  the socket holds head-less and silent until Node's 300 s requestTimeout closes it. */
   it('★ answers a failed encode instead of holding the socket open', async () => {

@@ -186,6 +186,28 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/agent/bob/personality`)).json()).toEqual([])
   })
 
+  /** Two prepares per journal GET, on the thread that ticks the town: a stranger looping the
+   *  panel paid a compile each time. The SQL is a literal, so the statement is held with it. */
+  it('★ compiles a mind\u2019s reads once, not once per GET', async () => {
+    const proto = Object.getPrototypeOf(new Database(':memory:')) as {
+      prepare: (sql: string) => unknown
+    }
+    const real = proto.prepare
+    let compiled = 0
+    proto.prepare = function (this: unknown, sql: string): unknown {
+      if (sql.includes('FROM journal')) compiled += 1
+      return real.call(this, sql)
+    }
+    try {
+      await (await fetch(`${base}/api/agent/alice/journal`)).json()
+      const first = compiled
+      for (let i = 0; i < 5; i++) await (await fetch(`${base}/api/agent/alice/journal`)).json()
+      expect(compiled, 'five more GETs compiled nothing').toBe(first)
+    } finally {
+      proto.prepare = real
+    }
+  })
+
   it('the journal feed is capped, and the cap keeps the newest of both halves', async () => {
     const over = JOURNAL_MAX + 50
     const cdb = openAgentFixtureDb(join(dir, 'carl.db'))

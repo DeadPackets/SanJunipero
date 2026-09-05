@@ -1,10 +1,10 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { makeStaticSite } from './staticSite.js'
+import { makeStaticSite, resolveInRoot } from './staticSite.js'
 
 describe('the built client, served from the world’s own origin', () => {
   const dir = mkdtempSync(join(tmpdir(), 'sj-static-'))
@@ -38,5 +38,37 @@ describe('the built client, served from the world’s own origin', () => {
       .then((r) => r.text())
       .catch(() => null)
     expect(await (await fetch(`${base}/`)).text()).toContain('the town')
+  })
+})
+
+/** A path that leaves the root as a STRING is already refused. A symlink leaves it as a file. */
+describe('resolveInRoot', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-root-'))
+  const root = join(dir, 'client')
+
+  beforeAll(() => {
+    writeFileSync(join(dir, 'secret.txt'), 'not the town’s to serve')
+    mkdirSync(root)
+    writeFileSync(join(root, 'app.js'), 'the app')
+    symlinkSync(dir, join(root, 'out'))
+  })
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('keeps a file inside the root', () => {
+    expect(resolveInRoot(root, '/app.js')).toBe(join(root, 'app.js'))
+    expect(resolveInRoot(root, '/nothing-here.js')).toBe(join(root, 'nothing-here.js'))
+  })
+
+  it('folds a walk out of it back inside, and refuses a name with a NUL in it', () => {
+    expect(resolveInRoot(root, '/../secret.txt')).toBe(join(root, 'secret.txt'))
+    expect(resolveInRoot(root, '/%2e%2e/secret.txt')).toBe(join(root, 'secret.txt'))
+    expect(resolveInRoot(root, '/app%00.js')).toBeNull()
+  })
+
+  it('★ and refuses a link out of it, which no string test can see', () => {
+    expect(resolveInRoot(root, '/out/secret.txt')).toBeNull()
   })
 })

@@ -42,8 +42,20 @@ export class ChapterRenderError extends Error {
   }
 }
 
-// The incremental one-day job: segment -> score -> firsts -> institutions (week
-// boundaries only) -> chapter. Idempotent per day (chapters.day is UNIQUE).
+// Living AND dead: prose may name a grave, and may name nothing else. The world's own roster
+// answers where it is in reach, because only it knows who has died.
+const castRoll = (
+  cast: readonly { id: string; name: string }[] | undefined,
+  state: WorldState | undefined,
+): CastMember[] => {
+  const known = Object.values(state?.agents ?? {})
+  return known.length > 0
+    ? known.map((a) => ({ name: a.name, alive: a.alive }))
+    : (cast ?? []).map((c) => ({ name: c.name, alive: true }))
+}
+
+// The incremental one-day job: segment -> score -> firsts -> institutions -> chapter.
+// Idempotent per day (chapters.day is UNIQUE).
 export async function narrateDay(deps: {
   store: NarratorStore
   llm: NarratorLlm
@@ -73,12 +85,8 @@ export async function narrateDay(deps: {
   const nameOf = (id: string): string => personWords(names.get(id))
   // A scene is stored as the tile it happened on. The prompt is given the place instead, so no
   // chapter can echo a coordinate the model was never shown.
-  // Living AND dead: the chronicle may name a grave, and may name nothing else.
   const known = Object.values(deps.world?.state?.agents ?? {})
-  const roll: CastMember[] =
-    known.length > 0
-      ? known.map((a) => ({ name: a.name, alive: a.alive }))
-      : (deps.cast ?? []).map((c) => ({ name: c.name, alive: true }))
+  const roll = castRoll(deps.cast, deps.world?.state)
   const standing = Object.values(deps.world?.state?.structures ?? {})
   const placeOf = (location: string): string | null => {
     const m = /^(\d+),(\d+)$/.exec(location)
@@ -183,8 +191,8 @@ export async function narrateDay(deps: {
   let semanticRan = false
   if (deps.semantic !== undefined) {
     semanticRan = true
+    // The pass writes each mark beside the row that says its concept is found, so nothing here.
     const semantic = await detectSemanticFirsts({ ...deps.semantic, store, day })
-    for (const m of semantic) store.insertMilestone(m)
     milestones.push(...semantic)
   }
 
@@ -192,18 +200,20 @@ export async function narrateDay(deps: {
     throw new ChapterRenderError(renderFailure, { semanticRan, milestones })
   const rendered = chapter!
 
-  if (day % 7 === 0) {
-    for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
-      const { foundingSceneIndex, ...rest } = inst
-      const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
-      if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
-        deps.alert?.(
-          `unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`,
-        )
-        continue
-      }
-      store.insertInstitution({ ...rest, foundingSceneId })
+  // A thing the town does is recognised the day it recurs, not on the day of the week the
+  // detector happens to run; the roster is what keeps a standing role from being founded twice.
+  const founded = new Set(store.institutions().map((i) => `${i.kind}\n${i.name}`))
+  for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
+    const { foundingSceneIndex, ...rest } = inst
+    if (founded.has(`${rest.kind}\n${rest.name}`)) continue
+    const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
+    if (foundingSceneIndex === -1 || foundingSceneId === undefined) {
+      deps.alert?.(
+        `unmapped_founding_scene: institution "${inst.name}" founded in a dropped scene — not persisted`,
+      )
+      continue
     }
+    store.insertInstitution({ ...rest, foundingSceneId })
   }
 
   return { chapter: rendered, heat: heats, milestones, semanticRan }
@@ -214,6 +224,7 @@ export async function narrateWeek(deps: {
   llm: NarratorLlm
   days: ChapterRow[]
   validEventIds: number[]
+  cast?: readonly CastMember[]
   alert?: (d: string) => void
 }): Promise<EraRow> {
   if (deps.days.length === 0) throw new Error('narrateWeek requires at least one chapter')
@@ -225,6 +236,7 @@ export async function narrateWeek(deps: {
     endDay: chapters[chapters.length - 1]!.day,
     chapters,
     validEventIds: deps.validEventIds,
+    cast: deps.cast,
     alert: deps.alert,
   })
 }
@@ -256,6 +268,7 @@ export async function closeDay(deps: {
   alert?: (d: string) => void
 }): Promise<ChapterRow> {
   const { store, llm, cast } = deps
+  const roll = castRoll(cast, deps.world?.state)
   const { chapter, heat, milestones } = await narrateDay({
     store,
     llm,
@@ -303,6 +316,7 @@ export async function closeDay(deps: {
         agentId: subject.id,
         name: subject.name,
         throughDay: day,
+        cast: roll,
         ...(deps.alert === undefined ? {} : { alert: deps.alert }),
       })
     } catch (err) {
@@ -320,6 +334,7 @@ export async function closeDay(deps: {
         llm,
         days,
         validEventIds: seqsBetweenDays(deps.worldDb, week.startDay, week.endDay),
+        cast: roll,
         ...(deps.alert === undefined ? {} : { alert: deps.alert }),
       })
   }

@@ -42,6 +42,27 @@ function scriptedWorld(dbPath: string): Database.Database {
     onTick: ({ tick, emit }) => {
       if (tick === 1)
         emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+      // Two rooms an hour apart on day 0, so the minute a link names picks between them.
+      if (tick === 120)
+        emit('scene_opened', {
+          id: 'sc_1',
+          kind: 'talk',
+          participants: ['alice'],
+          topic: 'the well',
+          stakes: 3,
+        })
+      if (tick === 130)
+        emit('scene_closed', { id: 'sc_1', summary: '', deltas: [], closeReason: 'ended' })
+      if (tick === 600)
+        emit('scene_opened', {
+          id: 'sc_2',
+          kind: 'quarrel',
+          participants: ['alice'],
+          topic: 'the fence',
+          stakes: 8,
+        })
+      if (tick === 610)
+        emit('scene_closed', { id: 'sc_2', summary: '', deltas: [], closeReason: 'ended' })
     },
   })
   // Into day 2: a card is refused for a day the town has not lived, so the fixture must live
@@ -227,6 +248,18 @@ describe('the card route and the tags the app is served with', () => {
     expect(noon).toBe(night)
   })
 
+  /** Day 0 held two rooms an hour apart. The minute is dropped, so both minutes — and the
+   *  midnight the tags point at — are one card, one raster, one scan. */
+  it('★ a day that held rooms still answers with one card for every minute of it', async () => {
+    const rooms = await Promise.all(
+      ['02:00', '10:00', '00:00'].map(async (t) =>
+        (await fetch(`${base}/card/moment/0/${t}.svg`)).text(),
+      ),
+    )
+    expect(rooms[0]).toBe(rooms[1])
+    expect(rooms[0]).toBe(rooms[2])
+  })
+
   // Twitter, Slack, Discord, Facebook, LinkedIn and iMessage all refuse an SVG for `og:image`.
   it('rasterizes the same card, so a pasted link unfurls with a picture', async () => {
     const res = await fetch(`${base}/card/moment/1/19:31.png`)
@@ -294,6 +327,37 @@ describe('the card route and the tags the app is served with', () => {
     expect(xml).toContain(`<loc>${base}/</loc>`)
     expect(xml).toContain(`<loc>${base}/agent/alice</loc>`)
     expect(xml).toContain(`<loc>${base}/moment/1/00:00</loc>`)
+  })
+
+  /** The forwarded host is a stranger's to choose, and it is written into every canonical link,
+   *  every card URL and every `<loc>` a crawler is handed. */
+  it('★ takes its address from the operator, not from a header a stranger picks', async () => {
+    const before = process.env.SJ_PUBLIC_ORIGIN
+    process.env.SJ_PUBLIC_ORIGIN = 'https://town.example/'
+    const forged = { 'x-forwarded-host': 'evil.test', 'x-forwarded-proto': 'https' }
+    try {
+      const xml = await (await fetch(`${base}/sitemap.xml`, { headers: forged })).text()
+      expect(xml).toContain('<loc>https://town.example/</loc>')
+      expect(xml).not.toContain('evil.test')
+      const html = await (await fetch(`${base}/moment/1/19:31`, { headers: forged })).text()
+      expect(html).toContain('href="https://town.example/moment/1/00:00"')
+      expect(html).not.toContain('evil.test')
+    } finally {
+      if (before === undefined) delete process.env.SJ_PUBLIC_ORIGIN
+      else process.env.SJ_PUBLIC_ORIGIN = before
+    }
+  })
+
+  /** `state.agents` carries `Object.prototype`, so a bare read gave the town a person called
+   *  `constructor` and named them "Object". */
+  it('★ has no person by a name every plain object answers to', async () => {
+    for (const id of ['constructor', 'toString', 'hasOwnProperty']) {
+      const card = await fetch(`${base}/card/agent/${id}.png`)
+      expect(card.status, id).toBe(404)
+      await card.text()
+      const html = await (await fetch(`${base}/agent/${id}`)).text()
+      expect(html, id).toContain('Someone the town no longer has')
+    }
   })
 
   it('keeps the living day’s card on a short lease — it is rewritten as the day is lived', async () => {

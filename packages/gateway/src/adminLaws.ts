@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { z } from 'zod'
 import { TOGGLABLE_PATHS } from '@sj/engine'
@@ -6,7 +7,12 @@ import { parseTarget, sendJson } from './http.js'
 
 const ADMIN_LAWS_PATH = '/admin/laws'
 const DEFAULT_ADMIN_HOST = '127.0.0.1'
-const MAX_BODY_BYTES = 4096
+export const MAX_BODY_BYTES = 4096
+
+/** The served origin proxies `/admin/*` here, so every request arrives from 127.0.0.1 and there
+ *  is no caller to count against: the run of refusals is the channel's, and shuts it for all. */
+export const MAX_AUTH_FAILURES = 10
+export const LOCKOUT_MS = 60_000
 
 const LawRequest = z.object({ path: z.string().min(1), value: z.unknown() })
 
@@ -28,16 +34,25 @@ export type LawsAdminOpts = {
 export function readBody(req: IncomingMessage): Promise<string | null> {
   return new Promise((resolve) => {
     let text = ''
-    let over = false
+    let answered = false
+    const answer = (body: string | null): void => {
+      if (answered) return
+      answered = true
+      text = ''
+      resolve(body)
+    }
     req.on('data', (chunk: Buffer) => {
+      if (answered) return
       text += chunk.toString()
-      if (text.length > MAX_BODY_BYTES) over = true
+      // The cap bounds the MEMORY, not the answer: reading a body to its end to refuse it holds
+      // every byte of it, and past ~512 MB the concatenation itself throws inside this listener.
+      if (text.length > MAX_BODY_BYTES) answer(null)
     })
     req.on('end', () => {
-      resolve(over ? null : text)
+      answer(text)
     })
     req.on('error', () => {
-      resolve(null)
+      answer(null)
     })
   })
 }
@@ -102,6 +117,16 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
   }
   const routes: readonly AdminRoute[] = [laws, ...(opts.routes ?? [])]
 
+  // Byte-compared through `timingSafeEqual`, and the run of refusals is counted: the bearer is
+  // the whole lock on a channel a stranger can reach, so it may not be guessed at line rate.
+  const want = Buffer.from(`Bearer ${opts.token}`)
+  let failures = 0
+  let lockedUntil = 0
+  const bearerOk = (given: string | undefined): boolean => {
+    const got = Buffer.from(given ?? '')
+    return got.length === want.length && timingSafeEqual(got, want)
+  }
+
   return createServer((req, res) => {
     const url = parseTarget(req.url)
     if (url === null) {
@@ -113,11 +138,20 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
       if (params === null) continue
       if (route.method !== (req.method ?? 'GET')) {
         sendJson(res, { error: `${route.method} only` }, 405)
-      } else if (req.headers.authorization !== `Bearer ${opts.token}`) {
+      } else if (Date.now() < lockedUntil) {
+        res.setHeader('retry-after', String(Math.ceil((lockedUntil - Date.now()) / 1000)))
+        sendJson(res, { error: 'too many refusals' }, 429)
+      } else if (!bearerOk(req.headers.authorization)) {
+        failures += 1
+        if (failures >= MAX_AUTH_FAILURES) {
+          failures = 0
+          lockedUntil = Date.now() + LOCKOUT_MS
+        }
         sendJson(res, { error: 'unauthorized' }, 401)
       } else if (wrongInterface(req)) {
         sendJson(res, { error: `the law channel answers on ${host} only` }, 403)
       } else {
+        failures = 0
         try {
           route.handle(req, res, params)
         } catch (e) {

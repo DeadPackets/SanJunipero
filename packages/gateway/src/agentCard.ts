@@ -15,13 +15,18 @@ const SPRITE_BOX = 288
 
 export type AgentRead = { id: string; name: string; line: string | null }
 
+/** Cropped busts held at once — the cast, and a few sheets behind them. Each is a ~14 KB data
+ *  URI, so this is about half a megabyte. */
+export const MAX_CUT = 32
+
 /** A sheet with no v4 manifest — the built placeholder — is deliberately not offered: a card is
  *  a face or it is type, never a test pattern. */
 export function makeSpriteReader(
   getCodex: () => AssetCodex | null,
 ): (agentId: string) => Promise<string | null> {
   const newestReady = makeNewestReady()
-  // Keyed by ASSET id, which a regenerated sheet never reuses — so this is a memo, not a cache.
+  // Keyed by ASSET id, which a regenerated sheet never reuses — so this is a memo, not a cache,
+  // and oldest-first past the cap, or a town that recommissions art holds every bust it ever had.
   // Without it every card GET re-reads a 748 KB blob and spends 10 ms of the pool re-cropping it.
   const cut = new Map<string, Promise<string>>()
 
@@ -40,6 +45,7 @@ export function makeSpriteReader(
         .png()
         .toBuffer()
         .then((png) => `data:image/png;base64,${png.toString('base64')}`)
+      if (cut.size >= MAX_CUT) cut.delete(cut.keys().next().value!)
       cut.set(id, uri)
     }
     return uri

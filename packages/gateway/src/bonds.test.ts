@@ -304,6 +304,95 @@ describe('★ the bond graph is rebuilt on a cadence, not on every tick', () => 
   })
 })
 
+/** The cadence bounds how OFTEN the graph is folded; this is what bounds how MUCH. */
+describe('★ the graph is folded once and then only forward', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-bondsforward-'))
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('reads only what is new, and still answers what a whole fold answers', () => {
+    const world = openDb(join(dir, 'w.db'))
+    const loop = new TickLoop({
+      store: new EventStore(world),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('forward'),
+      snapshotEveryTicks: 1000,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          emit('agent_spawned', { id: 'a', name: 'A', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', { id: 'b', name: 'B', x: 1, y: 1, ageDays: ADULT_AGE_DAYS })
+        }
+        emit('agent_spoke', { agentId: tick % 2 === 0 ? 'a' : 'b', text: 'w', x: 1, y: 1 })
+        if (tick % 10 === 0) emit('co_slept', { aId: 'a', bId: 'b', day: 0 })
+      },
+    })
+
+    let read = 0
+    const real = world.prepare.bind(world)
+    Object.defineProperty(world, 'prepare', {
+      value: (sql: string) => {
+        const st = real(sql)
+        if (!sql.includes('FROM events')) return st
+        const iterate = st.iterate.bind(st)
+        st.iterate = function* (...a: unknown[]): IterableIterator<unknown> {
+          for (const row of iterate(...a) as Iterable<unknown>) {
+            read += 1
+            yield row
+          }
+        }
+        return st
+      },
+    })
+
+    let tick = 0
+    const routes = new Map<string, RouteHandler>()
+    mountBondsApi(
+      {
+        route: (m, p, fn) => {
+          routes.set(`${m} ${p}`, fn)
+        },
+      },
+      {
+        db: world,
+        config: DEFAULT_CONFIG,
+        mirror: { seq: () => tick, state: () => ({ tick }) } as unknown as WorldMirror,
+      },
+    )
+    const ask = (): BondsResponse => {
+      let out = ''
+      routes.get('GET /api/bonds')!(
+        { url: '/api/bonds' } as IncomingMessage,
+        {
+          writeHead: () => {},
+          end: (b: string) => {
+            out = b
+          },
+        } as unknown as ServerResponse,
+        {},
+      )
+      return JSON.parse(out) as BondsResponse
+    }
+    const wholeFold = (): BondsResponse => {
+      const rows = world
+        .prepare('SELECT seq, tick, type, payload FROM events ORDER BY seq')
+        .all() as EventRow[]
+      return buildBonds(rows.map(toEvent), DEFAULT_CONFIG.movement.earshotRadius, tick)
+    }
+
+    for (let i = 0; i < 200; i++) loop.step()
+    tick = 200
+    expect(ask()).toEqual(wholeFold())
+    const first = read
+
+    for (let i = 0; i < BONDS_REBUILD_TICKS; i++) loop.step()
+    tick = 200 + BONDS_REBUILD_TICKS
+    expect(ask()).toEqual(wholeFold())
+    expect(read - first, 'the second fold read only the new rows').toBeLessThan(first / 2)
+    world.close()
+  })
+})
+
 /** The one thing in the graph the minds wrote themselves. It moves how a pair stands without
  *  claiming the world witnessed an act, so the window and its ceiling are untouched. */
 describe('★ a tie a scene left behind is worth something to the pair', () => {
