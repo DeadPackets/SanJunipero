@@ -173,6 +173,35 @@ def thought_stats(thoughts):
         rows.append((t, a, txt, c, bool(names), w))
     return dict(n=n, cls=cls, questions=qs, other=other, want=want, words=lens, rows=rows)
 
+# ---------- adoption (phase-4 gate, design §7) ----------
+# The four things that separate a town with a culture from a town with a log: a word one mind
+# minted that another mind used, a recipe cooked more than once, a custom that recurred after it
+# was recognised, and a rule that was kept for a day while the acts it governs were still tried.
+def adoption(con, apath):
+    minted = dict(q(con, "select json_extract(payload,'$.recipeId'), json_extract(payload,'$.byId') from events where type='discovery_made'"))
+    started = q(con, "select json_extract(payload,'$.verb'), json_extract(payload,'$.agentId'), count(*) from events where type='action_started' group by 1,2")
+    borrowed = [(v, a, c) for v, a, c in started if v in minted and a != minted[v]]
+    done = collections.Counter()
+    for v, c in q(con, "select json_extract(payload,'$.verb'), count(*) from events where type='action_completed' group by 1"):
+        if v in minted: done[v] += c
+    twice = {v: c for v, c in done.items() if c >= 2}
+
+    followed = repeats = 0
+    if os.path.exists(apath):
+        ac = ro(apath)
+        followed, repeats = q(ac, "select count(distinct r.construct_id), count(*) from construct_events r join construct_events k on k.construct_id = r.construct_id and k.type = 'construct_recognized' where r.type = 'construct_recurred' and r.tick > k.tick")[0]
+        ac.close()
+
+    max_tick = q(con, 'select max(tick) from events')[0][0] or 0
+    honoured = []
+    for lid, t, pk, verb, text in q(con, "select json_extract(payload,'$.lawId'), tick, json_extract(payload,'$.predicate.kind'), json_extract(payload,'$.predicate.verb'), json_extract(payload,'$.text') from events where type='law_ratified'"):
+        if pk in (None, 'none') or t + DAY > max_tick: continue  # a rule enforced by nobody, or one the log outlived
+        if q(con, "select count(*) from events where type in ('law_broken','law_repealed') and json_extract(payload,'$.lawId') = ? and tick between ? and ?", lid, t, t + DAY)[0][0]: continue
+        # `common` and `tithe` govern a thing rather than a verb: nothing to have attempted.
+        if verb is not None and not q(con, "select count(*) from events where type='action_started' and json_extract(payload,'$.verb') = ? and tick between ? and ?", verb, t, t + DAY)[0][0]: continue
+        honoured.append((lid, pk, text))
+    return {'minted': minted, 'borrowed': borrowed, 'twice': twice, 'customs': (followed, repeats), 'honoured': honoured}
+
 def fmt_pct(x, n):
     return f'{100 * x / n:.0f}%' if n else '-'
 
@@ -327,6 +356,16 @@ def main():
                 who = p.get('agentId') or p.get('byId') or (p.get('aId', '') + '+' + p.get('bId', '')) or ''
                 P(f'| {ty} {who} | {t} | {t / DAY:.1f} | {ranks.get(sid, "no scene") if sid else "no scene"} | {totals.get(sid, 0):.1f} |' if sid else f'| {ty} {who} | {t} | {t / DAY:.1f} | no scene | - |')
             nc.close()
+
+        # 6b adoption: the phase-4 gate counts these four off the log, not off a report
+        ad = adoption(con, f'{mdir}/_arbiter.db')
+        P('\n### 6b. Adoption\n')
+        P('| adopted | n | what |')
+        P('|---|---|---|')
+        P(f'| a minted verb used by another mind | {sum(c for _, _, c in ad["borrowed"])} | ' + ('; '.join(f'{v} by {a} x{c}' for v, a, c in ad['borrowed']) or 'none') + ' |')
+        P(f'| a recipe cooked twice | {len(ad["twice"])} | ' + ('; '.join(f'{v} x{c}' for v, c in sorted(ad['twice'].items(), key=lambda kv: -kv[1])) or 'none') + f' (of {len(ad["minted"])} minted) |')
+        P(f'| a custom followed | {ad["customs"][0]} | {ad["customs"][1]} recurrences after recognition |')
+        P(f'| a law honoured | {len(ad["honoured"])} | ' + ('; '.join(f'[{k}] "{t}"' for _, k, t in ad['honoured']) or 'none stood a full sim-day unbroken with its verb still tried') + ' |')
 
         # 7 turn economics
         P('\n### 7. Turn economics\n')
