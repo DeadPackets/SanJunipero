@@ -142,7 +142,7 @@ describe('★ water at the far edge of the valley', () => {
     const prose = perceptionToProse(bridge.perception(AGENT), undefined, {
       distantWater: (x, y) => bridge.distantWater(x, y),
     })
-    expect(prose).toContain('Water glints to the west.')
+    expect(prose).toContain('You can see water off to the west.')
     // The same water the legs would be sent to, so the glint and the walk cannot disagree.
     const to = walkDestination(loop.state, config, AGENT, { structureId: 'river' })
     expect((to as { x: number }).x).toBeLessThan(EAST_BANK.x)

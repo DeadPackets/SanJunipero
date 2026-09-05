@@ -30,14 +30,14 @@ const world = { extent: () => ({ w: 128, h: 128 }) }
 describe('★ the valley has a way out of it now', () => {
   it('says so at the edge, where a body used to be told there was nothing beyond', () => {
     const said = perceptionToProse(seeing({ atRim: true }), undefined, world)
-    expect(said).toContain("You are standing at the valley's edge, where the road comes in")
-    expect(said).toContain('the town lies up the road')
+    expect(said).toContain('You are at the edge of the valley, where the road comes in')
+    expect(said).toContain('The town is up the road')
     expect(said).not.toContain('nothing lies beyond')
   })
 
   it('says so in the line about how far the ground goes', () => {
     expect(valleyExtentLine(world)).toBe(
-      'The valley runs from (0, 0) to (127, 127); past its edges there is only the road out of it.',
+      'The valley runs from (0, 0) to (127, 127). Past its edges there is only the road out.',
     )
     expect(valleyExtentLine(world)).not.toContain('nothing to find')
   })
@@ -46,7 +46,7 @@ describe('★ the valley has a way out of it now', () => {
 describe('★ a face nobody here has seen before', () => {
   it('is named as one, and only while the town is still getting used to it', () => {
     expect(perceptionToProse(withAgents([person({ stranger: true })]), undefined, world)).toContain(
-      'Mira (agent_9), a stranger come up the valley road, stands',
+      'Mira (agent_9), a stranger who came up the valley road, stands',
     )
     expect(perceptionToProse(withAgents([person()]), undefined, world)).toContain(
       'Mira (agent_9) stands',
@@ -59,13 +59,13 @@ describe('★ a face nobody here has seen before', () => {
       undefined,
       world,
     )
-    expect(down).toContain('Mira (agent_9), a stranger come up the valley road, lies collapsed')
+    expect(down).toContain('Mira (agent_9), a stranger who came up the valley road, lies collapsed')
     const abed = perceptionToProse(
       withAgents([person({ stranger: true, asleep: true })]),
       undefined,
       world,
     )
-    expect(abed).toContain('Mira (agent_9), a stranger come up the valley road, sleeps')
+    expect(abed).toContain('Mira (agent_9), a stranger who came up the valley road, sleeps')
   })
 
   it('is watched walking in by whoever had the edge in sight', () => {
@@ -74,7 +74,7 @@ describe('★ a face nobody here has seen before', () => {
       undefined,
       world,
     )
-    expect(said).toContain('You watch Mira come up the valley road into the valley.')
+    expect(said).toContain('You see Mira come up the valley road.')
   })
 })
 
@@ -85,14 +85,14 @@ describe('★ the road out, said only where something stands behind it', () => {
 
   it('names the loneliness, the days of it, and the word for the road', () => {
     const said = roadOutLine({ kind: 'restless', days: 6 })
-    expect(said).toContain('6 days now with nobody')
+    expect(said).toContain('6 days now without anybody')
     expect(said).toContain('name it leave_town')
   })
 
   it('names whoever took it first, and when', () => {
     expect(roadOutLine({ kind: 'partner_gone', name: 'Amara', days: 2 })).toBe(
-      'Amara went down the valley road 2 days ago.' +
-        ' The road is still there; you could follow, and it is named leave_town.',
+      'Amara left down the valley road 2 days ago.' +
+        ' The road is still there. You could follow them: name it leave_town.',
     )
     expect(roadOutLine({ kind: 'partner_gone', name: 'Amara', days: 1 })).toContain('yesterday')
     expect(roadOutLine({ kind: 'partner_gone', name: 'Amara', days: 0 })).toContain('today')
@@ -100,7 +100,7 @@ describe('★ the road out, said only where something stands behind it', () => {
 
   it('names the times the town watched, and hands over no remedy', () => {
     const said = roadOutLine({ kind: 'shunned', times: 3 })
-    expect(said).toContain('3 times now the town has watched you')
+    expect(said).toContain('3 times now the town has seen you break')
     expect(scanForDirective(said)).toEqual([])
   })
 })

@@ -103,14 +103,14 @@ describe('★ the ground a verb takes a tile for keeps its numbers', () => {
       nearestWater: () => ({ x: 20, y: 4 }),
     })
     // `fish`, `drink` and `fill` are all refused off the same test, and none takes a mark.
-    expect(said).toContain('The nearest water you know of lies at (20, 4), close to the north-east')
+    expect(said).toContain('The nearest water you know of is at (20, 4), close to the north-east')
     // `till`, `plant`, `pave`, `dig_channel` and `chop` are all judged from where the body is.
     expect(said).toContain('You stand at (12, 9).')
   })
 
   it('names the ground for a new roof, which is a tile a body has to be standing on', () => {
     expect(makeablesLine(makeables(CFG), { x: 30, y: 40 })).toContain(
-      'The town keeps ground for a new roof at (30, 40); you must be standing there to begin a new one.',
+      'The town keeps ground for a new building at (30, 40). You have to be standing there to start one.',
     )
   })
 
@@ -121,7 +121,7 @@ describe('★ the ground a verb takes a tile for keeps its numbers', () => {
       forageables: [{ id: 'node_1', kind: 'berry_bush', x: 8, y: 12, prose: 'berry bushes' }],
     })
     expect(said).toContain('You can see wheat (crop_1) at (12, 8).')
-    expect(said).toContain('A rabbit (fauna_1) is out at (15, 9).')
+    expect(said).toContain('A rabbit (fauna_1) is at (15, 9).')
     expect(said).toContain('You see berry bushes (node_1) at (8, 12).')
     // And the tree the road sends a mind to, which `chop` takes as a tile and no walk can name.
     expect(
@@ -160,7 +160,7 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
 
   it('a full room is still told apart from a wall, and still without the tile', () => {
     const full = seeing({ structures: [cabin({ full: true })] })
-    expect(full).toContain('it has a doorway, and there is no floor left in it.')
+    expect(full).toContain('it has a doorway, and there is no room left inside.')
     expect(sentenceWith(full, 'structure_1')).not.toMatch(PAIR)
     expect(seeing({ structures: [cabin({ door: undefined })] })).not.toContain('doorway')
   })
@@ -175,10 +175,10 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
       undefined,
       FLAT_WORLD,
     )
-    expect(said).toContain('you can walk nowhere and enter nothing')
-    expect(said).toContain('the doorway at (12, 10) is the way back out under the sky')
+    expect(said).toContain('you cannot walk anywhere or enter anything')
+    expect(said).toContain('the doorway at (12, 10) is the way back out')
     // And the roof line, which used to say the same pair a second time, now only says which roof.
-    expect(said).toContain('this is the roof you are under.')
+    expect(said).toContain('this is the building you are in.')
     expect(sentenceWith(said, 'structure_1) stands')).not.toMatch(PAIR)
   })
 })

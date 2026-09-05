@@ -216,9 +216,7 @@ describe('★ and the prose says it where the mind will read it', () => {
 
   it('still tells the mind it can get to the walls, which is the half that lets it join', () => {
     const said = say({ done: 1440, needs: 2880 })
-    expect(said).toContain(
-      'its walls are half up; walk to it and your legs will set you down beside it.',
-    )
+    expect(said).toContain('its walls are half up; walk to it and you end up beside it.')
     // The site is named, and a walk that names it lands on the ring: no tile is offered to copy.
     expect(said).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
   })
@@ -291,7 +289,7 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 
   it('names the doorway either way — a full room is not a wall', () => {
     expect(seeing({})).toContain('it has a doorway; walk to it and you can go in.')
-    expect(seeing({ full: true })).toContain('it has a doorway, and there is no floor left in it.')
+    expect(seeing({ full: true })).toContain('it has a doorway, and there is no room left inside.')
   })
 
   // The distinction the whole of R2 turns on: a mind that cannot tell "full now" from "no way
@@ -360,7 +358,7 @@ describe('* walls already standing are a place the world can name', () => {
     ])
     const w = unfinishedWork(s, CFG, { x: 1, y: 1 })!
     expect(w.id).toBe('structure_2')
-    expect(standingWallsLine(w)).toBe('Walls already stand at (2, 4): a house, half up.')
+    expect(standingWallsLine(w)).toBe('A house is already going up at (2, 4): half up.')
   })
 
   it('is silent when the town has nothing half-raised in it', () => {
@@ -393,7 +391,7 @@ describe('* walls already standing are a place the world can name', () => {
   // BEGINS, the other is where one already stands.
   it('the town ground now says "begin a new one", not "raise one"', () => {
     const line = makeablesLine(makeables(CFG), { x: 7, y: 7 })
-    expect(line).toContain('you must be standing there to begin a new one.')
+    expect(line).toContain('You have to be standing there to start one.')
     expect(line).not.toContain('to raise one')
   })
 })

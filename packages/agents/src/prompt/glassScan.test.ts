@@ -329,7 +329,7 @@ describe('the naming law', () => {
       { builds: [{ kind: 'house', inputs: { wood: 10 } }], crafts: [] },
       { x: 67, y: 94 },
     )
-    expect(line).toContain('The town keeps ground for a new roof at (67, 94)')
+    expect(line).toContain('The town keeps ground for a new building at (67, 94)')
     expect(scanForLayoutLeak(line)).toEqual([])
     expect(scanPromptForGlassLeak(line)).toEqual([])
     // And it says nothing at all when there is nowhere left, rather than an empty phrase.

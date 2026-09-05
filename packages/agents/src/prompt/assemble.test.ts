@@ -150,7 +150,7 @@ describe('human framing guard', () => {
 describe('perceptionToProse: the ground says what it is, and nothing about what to do', () => {
   // The engine may state a physical fact. The moment it states a preference it is a rule.
   const NUDGES = /\b(should|ought|better site|recommended|recommend|ideal|best place|advise)\b/i
-  const ROAD_CLAUSE = 'Carts and feet reach this spot easily.'
+  const ROAD_CLAUSE = 'This spot is easy to reach on foot or by cart.'
   const onRoad = { ...quietMeadowPacket, ground: { wellTravelled: true as const } }
 
   it('renders the clause once for well-travelled ground and not at all otherwise', () => {
@@ -168,7 +168,7 @@ describe('perceptionToProse: the ground says what it is, and nothing about what 
 })
 
 describe("perceptionToProse: a walk that stops short says so, in a body's words", () => {
-  const UNCLEAR = 'The way is unclear from here.'
+  const UNCLEAR = 'You are not sure of the way from here.'
   const MECHANICS = /\b(path|node|budget|A\*|search|route|cap|capped|partial|unreachable)\b/i
   const cutShort = { ...quietMeadowPacket, wayUnclear: true as const }
 
@@ -332,7 +332,7 @@ describe('perceptionToProse', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['you_collapsed'] }, alert)
     expect(prose).toContain(FELT_EVENT_PROSE.you_collapsed)
-    expect(prose).not.toContain('You sense something change nearby.')
+    expect(prose).not.toContain('Something nearby has changed.')
     expect(alert).not.toHaveBeenCalled()
     expect(FELT_EVENT_PROSE.you_collapsed).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -346,7 +346,7 @@ describe('perceptionToProse', () => {
       const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: [tag] }, alert)
       expect(FELT_EVENT_PROSE[tag], `no prose for felt tag ${tag}`).toBeTruthy()
       expect(prose, tag).toContain(FELT_EVENT_PROSE[tag])
-      expect(prose, tag).not.toContain('You sense something change nearby.')
+      expect(prose, tag).not.toContain('Something nearby has changed.')
       expect(alert, tag).not.toHaveBeenCalled()
       expect(FELT_EVENT_PROSE[tag]).not.toMatch(FORBIDDEN_FRAMING)
     }
@@ -416,7 +416,7 @@ describe('perceptionToProse', () => {
         { kind: 'mystery', mystery: mystery.kind, prose: mystery.prose },
       ],
     })
-    expect(prose).toContain("You watch Cass take Bex's plank.")
+    expect(prose).toContain("You see Cass take Bex's plank.")
     expect(prose).toContain(mystery.prose)
     expect(prose).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -424,7 +424,7 @@ describe('perceptionToProse', () => {
   it('renders an unknown felt tag to the generic sentence and alerts', () => {
     const alert = vi.fn()
     const prose = perceptionToProse({ ...quietMeadowPacket, feltEvents: ['quantum_flux'] }, alert)
-    expect(prose).toContain('You sense something change nearby.')
+    expect(prose).toContain('Something nearby has changed.')
     expect(alert).toHaveBeenCalledTimes(1)
     expect(alert).toHaveBeenCalledWith('unknown felt tag: quantum_flux')
   })
@@ -440,7 +440,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(packet)).toContain('Hunger is all you can think about.')
+    expect(perceptionToProse(packet)).toContain('You are starving and can think about little else.')
   })
 
   it('renders the shared calendar — the day, the part of it, and the season', () => {
@@ -529,7 +529,7 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('collapsed')
-    expect(prose).toContain('Hunger is all you can think about.')
+    expect(prose).toContain('You are starving and can think about little else.')
   })
 
   it('never mentions the sun at night', () => {
@@ -582,10 +582,10 @@ describe('perceptionToProse', () => {
           body: { ...quietMeadowPacket.self.body, afflictions: [{ kind, severity }] },
         },
       })
-    expect(ailing('poison', 1)).toContain('something you ate has gone against you')
+    expect(ailing('poison', 1)).toContain('Something you ate has made you ill')
     expect(ailing('poison', 1)).not.toContain('It is very bad')
     expect(ailing('illness', 4)).toContain('It is very bad.')
-    expect(ailing('fatigue', 2)).toContain('A tiredness sits in your bones')
+    expect(ailing('fatigue', 2)).toContain('You are tired in a way that sleep has not fixed')
     // Whatever the severity, the sentences it adds carry no digit at all.
     const sentences = (p: string): string[] => p.split('. ')
     const base = sentences(perceptionToProse(quietMeadowPacket))
@@ -623,7 +623,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(collapsing)).toContain('sleep is taking you where you stand')
+    expect(perceptionToProse(collapsing)).toContain('You will fall asleep where you stand')
   })
 
   it('renders structure footprint and advises walking beside it', () => {
@@ -650,7 +650,7 @@ describe('perceptionToProse', () => {
     const prose = perceptionToProse(packet)
     expect(prose).toContain('storehouse (structure_1) stands close to the south-west')
     expect(prose).toContain('2 tiles wide and 1 tile tall')
-    expect(prose).toContain('walk to it and your legs will set you down beside it')
+    expect(prose).toContain('walk to it and you end up beside it')
   })
 
   it('says when nothing beside a structure can hold a body, and offers no tile either way', () => {
@@ -676,18 +676,18 @@ describe('perceptionToProse', () => {
     }
     // Which tile is the walk's to pick, so the sentence turns only on whether one exists at all.
     const open = perceptionToProse(packet, undefined, { isWalkable: () => true })
-    expect(open).toContain('walk to it and your legs will set you down beside it')
+    expect(open).toContain('walk to it and you end up beside it')
     expect(open).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
 
     // One tile of open ground is ground enough, and it is still never named.
     const oneGap = perceptionToProse(packet, undefined, {
       isWalkable: (x, y) => x === 10 && y === 11,
     })
-    expect(oneGap).toContain('walk to it and your legs will set you down beside it')
+    expect(oneGap).toContain('walk to it and you end up beside it')
 
     // No open ground at all: say so instead of pointing at a wall.
     const walled = perceptionToProse(packet, undefined, { isWalkable: () => false })
-    expect(walled).toContain('no open ground lies beside it')
+    expect(walled).toContain('there is no open ground beside it')
   })
 
   it('names the food in hand when hunger gnaws (g3 round 6)', () => {
@@ -707,7 +707,7 @@ describe('perceptionToProse', () => {
     }
     const isEdible = (kind: string) => kind === 'bread'
     expect(perceptionToProse(hungry, undefined, { isEdible })).toContain(
-      'Your satchel holds bread (b1). You could eat it now.',
+      'You are carrying bread (b1). You could eat it now.',
     )
 
     // Sated: no nagging about the satchel.

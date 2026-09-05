@@ -84,7 +84,7 @@ describe('the water a body can and cannot reach is said before the turn is spent
     const t = valley(BANK)
     expect(t.bridge.waterAtHand(AGENT)).toBe(true)
     const said = proseFor(t)
-    expect(said).toContain('Water lies within reach of your hands')
+    expect(said).toContain('Water is within reach')
     expect(said).not.toContain('No water is within reach')
   })
 
@@ -98,13 +98,13 @@ describe('the water a body can and cannot reach is said before the turn is spent
       'the world allowed it',
     )
     expect(t.loop.state.agents[AGENT]).toMatchObject(BANK)
-    expect(proseFor(t)).toContain('Water lies within reach of your hands')
+    expect(proseFor(t)).toContain('Water is within reach')
   })
 
   it('on dry ground a dry throat is told the water is not here, and which way it is', () => {
     const said = proseFor(thirsty(valley(DRY)))
-    expect(said).toContain('No water is within reach of your hands')
-    expect(said).toContain('The nearest water you know of lies at (13, 40), a way to the east.')
+    expect(said).toContain('No water is within reach')
+    expect(said).toContain('The nearest water you know of is at (13, 40), a way to the east.')
   })
 
   // Below the channel's southern end the river is offered off its nearest end, so the places
@@ -116,8 +116,8 @@ describe('the water a body can and cannot reach is said before the turn is spent
     const t = valley(BELOW_THE_END)
     expect(placesFor(t)).toContain('the river (river)')
     const said = proseFor(thirsty(t))
-    expect(said).toContain('No water is within reach of your hands')
-    expect(said).toContain('The nearest water you know of lies at (13, 67), a way to the east.')
+    expect(said).toContain('No water is within reach')
+    expect(said).toContain('The nearest water you know of is at (13, 67), a way to the east.')
     expect(said).not.toContain('west')
   })
 
@@ -137,16 +137,14 @@ describe('the water a body can and cannot reach is said before the turn is spent
     expect(t.loop.state.agents[AGENT]!.activity).toMatchObject({ then: { verb: 'fill' } })
     for (let i = 0; i < 200 && t.loop.state.agents[AGENT]!.activity !== null; i++) t.step()
     expect(t.bridge.waterAtHand(AGENT)).toBe(true)
-    expect(proseFor(t)).toContain('Water lies within reach of your hands')
+    expect(proseFor(t)).toContain('Water is within reach')
   })
 
   it('water past all reach is still refused, with the state beside the reason', async () => {
     const t = valley({ x: 40, y: 40 }, { bucket: true })
     const reason = await refusal(t, { verb: 'fill', params: { itemId: BUCKET } })
     expect(reason).toBe('no water within reach')
-    expect(proseFor(t, lastTurnLine('fill', reason))).toContain(
-      'No water is within reach of your hands',
-    )
+    expect(proseFor(t, lastTurnLine('fill', reason))).toContain('No water is within reach')
   })
 
   // Omar cast at dry ground 37 times in run B. A cast wants neither a vessel nor a dry throat,

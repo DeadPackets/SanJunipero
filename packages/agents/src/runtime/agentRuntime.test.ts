@@ -1473,7 +1473,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Last user message is block 6, `now`. It is the one place the words appear.
     const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
     expect(nowA).toContain('a house (10 wood)')
-    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is feeding')
+    expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is keeping fed')
     expect(a.find((m) => m.role === 'system')!.text).not.toContain('a house (10 wood)')
     // And not in the day log, which is the day's events: a standing fact repeated every turn
     // would compact the day out of the mind that lived it.
@@ -2794,7 +2794,7 @@ describe('★ the morning line names what this mind wants', () => {
 
     const carried = prompts
       .map((_, i) => i)
-      .filter((i) => saidOn(prompts, i).includes('Today you most want'))
+      .filter((i) => saidOn(prompts, i).includes('Today the thing you want most is'))
     const mornings = wakeReasonsBilled(agentDb)
       .map((reason, i) => ({ reason, i }))
       .filter((r) => r.reason === 'morning')
@@ -2804,7 +2804,7 @@ describe('★ the morning line names what this mind wants', () => {
     expect(carried).toEqual(mornings)
     // Nothing fed a want overnight, so the seven stand level and the contract's order decides.
     expect(saidOn(prompts, carried[0]!)).toContain(
-      'Today you most want belonging; who could give you that?',
+      'Today the thing you want most is belonging. Who could give you that?',
     )
   })
 })

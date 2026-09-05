@@ -244,12 +244,12 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const prose = proseFor(inside, 'nadia')
     // R21-A. No line said she was under a roof, and the roof line sent her to its own doorway.
     expect(prose).toContain(`You stand inside the house (${house.id}) at (79, 99).`)
-    expect(prose).toContain('Four walls are around you')
+    expect(prose).toContain('While you are in here you cannot walk anywhere')
     // ★ THE ONE DOOR TILE THAT STAYS. Walking is refused indoors and `exit` takes no mark, so no
     // walk can be aimed at this pair: it says where the body comes out, and the roof line, which
     // used to repeat it, now only says which roof it is.
-    expect(prose).toContain('the doorway at (81, 99) is the way back out under the sky')
-    expect(prose).toContain('this is the roof you are under.')
+    expect(prose).toContain('the doorway at (81, 99) is the way back out')
+    expect(prose).toContain('this is the building you are in.')
     expect(prose).not.toContain('walk to it and you can go in')
     // The world's answer to the instruction that used to be given: both acts now stand, the
     // first because she is already under that roof, the second by way of its door.
@@ -274,9 +274,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const p = composePerception(walking, CFG, 'nadia', [])
     expect(p.self.activity).toBe('walk')
     expect(p.self.activityToward).toEqual({ x: 68, y: 47 })
-    expect(proseFor(walking, 'nadia')).toContain(
-      'Your legs are already carrying you toward (68, 47)',
-    )
+    expect(proseFor(walking, 'nadia')).toContain('You are already walking toward (68, 47)')
 
     // A pair of hands busy with something that is not a walk says so without a destination.
     const cutting: WorldState = {
@@ -286,7 +284,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
         nadia: { ...s.agents.nadia!, activity: { verb: 'chop', params: {}, ticksRemaining: 8 } },
       },
     }
-    expect(proseFor(cutting, 'nadia')).toContain('you are partway through chop')
+    expect(proseFor(cutting, 'nadia')).toContain('You are partway through chop')
   })
 
   it('thirst is given a road and hunger is not, and the run drank fifteen times and ate once', () => {
@@ -302,10 +300,10 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...WORLD,
       nearestFood: () => ({ x: 68, y: 60, kind: 'bread' }),
     })
-    expect(prose).toContain('The nearest water you know of lies at (50, 62)')
+    expect(prose).toContain('The nearest water you know of is at (50, 62)')
     // R21-B. The stomach used to get a sensation and no road; it now gets the road thirst
     // has had, and only when the hands are empty.
-    expect(prose).toContain('Hunger is all you can think about.')
+    expect(prose).toContain('You are starving and can think about little else.')
     expect(prose).toContain('The nearest food you know of is bread at (68, 60).')
 
     // A hand already holding a loaf is told about the loaf, not sent across town for one.
@@ -320,7 +318,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       ...WORLD,
       nearestFood: () => ({ x: 0, y: 0, kind: 'berries' }),
     })
-    expect(fed).toContain('Your satchel holds bread (held_loaf). You could eat it now.')
+    expect(fed).toContain('You are carrying bread (held_loaf). You could eat it now.')
     expect(fed).not.toContain('The nearest food you know of')
   })
 
@@ -335,7 +333,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       },
     }
     const prose = perceptionToProse(prosePacket(lonely, 'nadia'), undefined, world)
-    expect(prose).toContain('Loneliness settles over you.')
+    expect(prose).toContain('You feel lonely.')
     expect(prose).toContain('The nearest person you know of is Omar, at (62, 55).')
 
     // One road a turn: a dry throat outranks a lonely one and the social line goes quiet.
@@ -344,7 +342,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
       agents: { ...lonely.agents, nadia: { ...lonely.agents.nadia!, thirst: 10 } },
     }
     const thirsty = perceptionToProse(prosePacket(dry, 'nadia'), undefined, world)
-    expect(thirsty).toContain('The nearest water you know of lies at (50, 62)')
+    expect(thirsty).toContain('The nearest water you know of is at (50, 62)')
     expect(thirsty).not.toContain('The nearest person you know of')
   })
 

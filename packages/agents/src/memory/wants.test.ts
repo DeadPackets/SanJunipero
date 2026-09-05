@@ -226,22 +226,24 @@ describe('★ the want the morning line names', () => {
   })
 
   it('says the plan’s sentence, and nothing at all without a want', () => {
-    expect(wantLine('belonging')).toBe('Today you most want belonging; who could give you that?')
+    expect(wantLine('belonging')).toBe(
+      'Today the thing you want most is belonging. Who could give you that?',
+    )
     expect(wantLine(null)).toBe('')
   })
 
-  it('costs 14 tokens of a 7,368-token turn', () => {
+  it('costs 17 tokens of a 7,368-token turn', () => {
     const blocks = fixtureBlocks()
     const withLine = {
       ...blocks,
       now: { ...blocks.now, prose: `${blocks.now.prose} ${wantLine('belonging')}` },
     }
     const delta = assemblePrompt(withLine).estTokens - assemblePrompt(blocks).estTokens
-    expect(delta).toBe(14)
-    // Every kind fits inside the same fourteen: the longest word is only four longer than the
-    // shortest, so no mind's morning costs more than another's.
+    expect(delta).toBe(17)
+    // Every kind costs within a token of every other, so no mind's morning costs more than
+    // another's.
     for (const kind of WANT_KINDS) {
-      expect(Math.ceil((wantLine(kind).length + 1) / 4), kind).toBeLessThanOrEqual(14)
+      expect(Math.ceil((wantLine(kind).length + 1) / 4), kind).toBeLessThanOrEqual(18)
     }
   })
 
