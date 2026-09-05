@@ -83,7 +83,18 @@ const WORLD: WorldState = {
       owner: 'amara',
     },
   } as unknown as WorldState['items'],
-  crops: {},
+  // A crop kind is operator config, so an underscore in one is a live possibility, not a fiction.
+  crops: {
+    crop_9: {
+      id: 'crop_9',
+      kind: 'winter_wheat',
+      x: 1,
+      y: 1,
+      plantedDay: 0,
+      stage: 3,
+      withered: false,
+    },
+  },
   wildlife: { fish: 1, deer: 1 },
   counters: { nextEntityId: 1 },
 }
@@ -104,6 +115,7 @@ const payloadFor = (type: string): Record<string, unknown> => ({
   structureId: 'structure_house_44_51',
   toId: 'structure_house_44_51',
   cause: 'doused',
+  cropId: 'crop_9',
   kind: 'herb_bundle',
   reason: 'paved',
   verb: 'recipe:drink_rain',
@@ -112,9 +124,14 @@ const payloadFor = (type: string): Record<string, unknown> => ({
 })
 
 const eventsOfEveryType = (): SimEvent[] =>
-  [...CHRONICLE_TYPES, 'item_moved', 'item_spawned', 'structure_damaged', 'fauna_moved'].map(
-    (type, i) => ({ seq: i + 1, tick: 10, type, payload: payloadFor(type) }),
-  )
+  [
+    ...CHRONICLE_TYPES,
+    'item_moved',
+    'item_spawned',
+    'structure_damaged',
+    'fauna_moved',
+    'crop_harvested',
+  ].map((type, i) => ({ seq: i + 1, tick: 10, type, payload: payloadFor(type) }))
 
 describe('no viewer-facing string prints a machine id', () => {
   it('the shared chronicle line never says an id, named world or empty', () => {
