@@ -232,14 +232,14 @@ describe('★ the want the morning line names', () => {
     expect(wantLine(null)).toBe('')
   })
 
-  it('costs 17 tokens of a 7,368-token turn', () => {
+  it('costs 18 tokens of a 7,368-token turn', () => {
     const blocks = fixtureBlocks()
     const withLine = {
       ...blocks,
       now: { ...blocks.now, prose: `${blocks.now.prose} ${wantLine('belonging')}` },
     }
     const delta = assemblePrompt(withLine).estTokens - assemblePrompt(blocks).estTokens
-    expect(delta).toBe(17)
+    expect(delta).toBe(18)
     // Every kind costs within a token of every other, so no mind's morning costs more than
     // another's.
     for (const kind of WANT_KINDS) {

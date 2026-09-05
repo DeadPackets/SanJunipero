@@ -1448,6 +1448,21 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(first.some((m) => m.text.includes('What you remember:'))).toBe(false)
   })
 
+  it('says what the world has seen these hands do, to the mind itself and about the face beside it', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, runtime, bridge } = await setup({ model, mindConfig: FAST_MIND })
+    bridge.announce('skill_gained', { agentId: AGENT, track: 'fishing', xp: 24 })
+    bridge.announce('agent_spawned', { id: 'nadia', name: 'Nadia', x: 3, y: 3, ageDays: 30 })
+    bridge.announce('skill_gained', { agentId: 'nadia', track: 'foraging', xp: 9 })
+    await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
+
+    const turn = prompts[0]!
+    expect(turn.find((m) => m.role === 'system')!.text).toContain(
+      'Your hands: fishing you are known for.',
+    )
+    expect(turn.map((m) => m.text).join('\n')).toContain('Nadia, who is handy at foraging.')
+  })
+
   it('keeps the cache prefix byte-stable across consecutive turns: same system, dayLog only appended (g3 round 6)', async () => {
     const { model, prompts } = capturingModel([BENIGN_TURN, BENIGN_TURN])
     const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })

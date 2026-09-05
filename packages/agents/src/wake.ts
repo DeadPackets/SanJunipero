@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { dayPhaseFromTick, MINUTES_PER_DAY } from '@sj/shared'
+import { dayPhaseFromTick, MINUTES_PER_DAY, WAKE_HOUR } from '@sj/shared'
 import { IntentSchema } from './turn.js'
 import type { PerceptionPacket } from './prompt/prose.js'
 
@@ -18,6 +18,9 @@ export type MindConfig = {
   ambientK: number
   // How high `belonging` has to stand before the dusk fire is worth a turn of its own.
   gatheringWant: number
+  // The hour this body gets up. The town's own hour unless a card says otherwise, and night
+  // still gates it, so nobody is up before the valley is light.
+  riseHour: number
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
@@ -38,6 +41,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   // town saw this fire for nobody until day three, and the first two days are what a new watcher
   // watches. Belonging resets to zero on any scene, so the lonely gather and then stop firing.
   gatheringWant: 40,
+  riseHour: WAKE_HOUR,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }
@@ -169,10 +173,15 @@ export function wakeReasons(
     // Sleep is the cure for a low energy, not a reason to rise: r20 saw Halim woken by his own
     // tiredness bell eleven times in one night and drop each time before he was back in bed.
     if (sleeperAlarmBelow(cfg, packet.self.body)) reasons.push('body_alarm')
+    // A night somebody meant to be up for: the hour was named before they lay down, so it is
+    // kept even in the dark, where nothing else but a body failing would wake them.
+    if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick)
+      reasons.push('reconsider')
     // A daytime sleeper is asked again after a nap, or one bad morning costs the whole day.
     const napped = clock.lastTurnTick === null ? Infinity : tick - clock.lastTurnTick
     const dawn = clock.morningWokeDay !== Math.floor(tick / MINUTES_PER_DAY)
-    if (!packet.time.isNight && (dawn || napped >= cfg.napTicks)) reasons.push('morning')
+    const risen = packet.time.hour >= cfg.riseHour
+    if (!packet.time.isNight && risen && (dawn || napped >= cfg.napTicks)) reasons.push('morning')
     return reasons
   }
 

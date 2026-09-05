@@ -284,6 +284,29 @@ describe('hearing is not being spoken to', () => {
   })
 })
 
+describe('a night somebody meant to be up for, and hours that differ', () => {
+  const asleepAt = (hour: number): PerceptionPacket => ({
+    ...quietMeadowPacket,
+    self: { ...quietMeadowPacket.self, asleep: true },
+    time: { ...quietMeadowPacket.time, hour, isNight: hour >= 20 || hour < 6 },
+  })
+
+  it('wakes a sleeper at the hour they named before they lay down', () => {
+    const at0230 = 2 * 60 + 30
+    const clock = () => clk({ reconsiderAtTick: at0230 })
+    expect(decideWake(cfg, asleepAt(2), clock(), at0230, pln())).toBe('reconsider')
+    expect(decideWake(cfg, asleepAt(2), clock(), at0230 - 1, pln())).toBe(null)
+    expect(decideWake(cfg, asleepAt(2), clk(), at0230, pln())).toBe(null)
+  })
+
+  it('leaves a late riser in bed at six and has them up at nine', () => {
+    const late = { ...cfg, riseHour: 9 }
+    expect(decideWake(late, asleepAt(6), clk(), 6 * 60, pln())).toBe(null)
+    expect(decideWake(late, asleepAt(9), clk(), 9 * 60, pln())).toBe('morning')
+    expect(decideWake(cfg, asleepAt(6), clk(), 6 * 60, pln())).toBe('morning')
+  })
+})
+
 describe('decideWake — asleep gate', () => {
   const asleep = (feltEvents: string[] = []): PerceptionPacket => ({
     ...quietMeadowPacket,

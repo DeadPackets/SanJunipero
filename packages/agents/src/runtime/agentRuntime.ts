@@ -11,6 +11,7 @@ import {
   simTimeFromTick,
   stateHash,
   TICK_REAL_MS,
+  topSkillWord,
   verbPhraseGerund,
   verbPhrasePast,
   WANTS_DISCOVERING,
@@ -464,7 +465,11 @@ export class AgentRuntime {
     this.#identity = deps.identity
     this.#personality = deps.personality
     this.#bridge = deps.bridge
-    this.#config = { ...DEFAULT_MIND_CONFIG, ...deps.config }
+    this.#config = {
+      ...DEFAULT_MIND_CONFIG,
+      ...deps.config,
+      ...(deps.identity.hours === undefined ? {} : { riseHour: deps.identity.hours.rise }),
+    }
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
@@ -1202,7 +1207,7 @@ export class AgentRuntime {
       laws: this.#bridge.lawTexts(),
       tabled: this.#bridge.tabledLines(),
       ...(this.#frontier === null ? {} : { frontier: this.#frontier() }),
-      identity: this.#identity,
+      identity: this.#withHands(),
       personality: {
         doc: this.#personality.current().doc,
         autobiography: this.#mem!.autobiography(),
@@ -1211,7 +1216,7 @@ export class AgentRuntime {
         day: worldDay(e.tick),
         text: e.text,
       })),
-      scene: { ledgers: this.#buildLedgers(cues.people), memories: ambient },
+      scene: { ledgers: this.#buildLedgers(cues.people, packet), memories: ambient },
       dayLog: this.#dayLog,
       recalled: this.#pendingRecall,
       lastOutcome: this.#lastOutcome,
@@ -1540,16 +1545,28 @@ export class AgentRuntime {
     return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join('; ')}.`]))
   }
 
-  #buildLedgers(people: string[]): { name: string; doc: string }[] {
+  #buildLedgers(people: string[], packet: PerceptionPacket): PromptBlocks['scene']['ledgers'] {
     const ties = this.#tiesByName()
-    const out: { name: string; doc: string }[] = []
+    const idOf = new Map(packet.visible.agents.map((a) => [a.name, a.id]))
+    const out: PromptBlocks['scene']['ledgers'] = []
     for (const person of people) {
       const doc = [this.#mem!.getLedger(person)?.doc ?? '', ties.get(person) ?? '']
         .filter((p) => p.length > 0)
         .join(' ')
-      if (doc.length > 0) out.push({ name: person, doc })
+      const id = idOf.get(person)
+      const facts = id === undefined ? null : this.#bridge.agentFacts(id)
+      const knownFor = facts === null ? null : topSkillWord(facts.skills)
+      if (doc.length === 0 && knownFor === null) continue
+      out.push({ name: person, doc, ...(knownFor === null ? {} : { knownFor }) })
     }
     return out
+  }
+
+  // Read off the world every turn and rendered in buckets: what changes is the number, and the
+  // words only turn over when a bucket does, so the identity block stays cached.
+  #withHands(): IdentityCore {
+    const skills = this.#bridge.agentFacts(this.#agentId)?.skills
+    return skills === undefined ? this.#identity : { ...this.#identity, skills }
   }
 
   /** Bookkeeping around a turn the town has already been billed for. A method the client never

@@ -62,6 +62,45 @@ export const PLAN_MAX_STEPS = 12
  *  does in a line, and which of the closed keys an act of it must name. */
 export type RosterEntry = { id: string; name: string; gloss: string; reads: ClosedKey[] }
 
+// Three buckets and nothing finer: a number would be a score, and what the town says about a
+// pair of hands changes a few times a life, so the prompt it sits in stays cached.
+const SKILL_BUCKETS = [
+  { xp: 20, said: 'is known for', own: 'you are known for' },
+  { xp: 8, said: 'is handy at', own: 'you are handy at' },
+  { xp: 3, said: 'has taken up', own: 'you have taken up' },
+] as const
+
+/** What the town would say about this much work at one track, or null when nobody would
+ *  remark on it yet. */
+export function skillWord(track: string, xp: number): string | null {
+  const bucket = SKILL_BUCKETS.find((b) => xp >= b.xp)
+  return bucket === undefined ? null : `${bucket.said} ${track}`
+}
+
+// Most done first, and the track name breaks a tie, so the same hands read the same way twice.
+function ranked(skills: Record<string, number>): [string, number][] {
+  return Object.entries(skills).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+}
+
+/** The one thing these hands are most known for, as another person would say it. */
+export function topSkillWord(skills: Record<string, number>): string | null {
+  for (const [track, xp] of ranked(skills)) {
+    const word = skillWord(track, xp)
+    if (word !== null) return word
+  }
+  return null
+}
+
+/** The same buckets said back to the person whose hands they are, most done first. */
+export function ownSkillWords(skills: Record<string, number>): string[] {
+  const out: string[] = []
+  for (const [track, xp] of ranked(skills)) {
+    const bucket = SKILL_BUCKETS.find((b) => xp >= b.xp)
+    if (bucket !== undefined) out.push(`${track} ${bucket.own}`)
+  }
+  return out
+}
+
 /** An act that names nothing: every key answered null. */
 export const NO_PARAMS: ClosedIntentParams = Object.freeze(
   Object.fromEntries(CLOSED_KEYS.map((key) => [key, null])),

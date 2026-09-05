@@ -1,5 +1,5 @@
 // Last stage of bridge -> prose -> agentRuntime -> assemble, and the only one that renders bytes.
-import { sanitizeSpokenText, type RosterEntry } from '@sj/shared'
+import { ownSkillWords, sanitizeSpokenText, type RosterEntry } from '@sj/shared'
 import { LAWS_SHOWN, LAW_TEXT_MAX } from '@sj/engine'
 import type { PersonalityDoc } from '../personality.js'
 import type { ScoredMemory } from '../memory/retrieve.js'
@@ -20,6 +20,12 @@ export type IdentityCore = {
     // Absent renders nothing, keeping every pre-C9 persona byte-stable.
     wordBudget?: { typical: number; burst: number }
   }
+  // Xp by track, read fresh each turn and rendered in buckets: hands that have done nothing
+  // render nothing, and a bucket turns over a few times a life, so the block stays cached.
+  skills?: Record<string, number>
+  // The hours of the day this body keeps. Absent renders nothing, so a card written before
+  // anybody had hours reads exactly as it always did.
+  hours?: { rise: number; bed: number }
 }
 
 type JournalEntry = { day: number; text: string }
@@ -47,7 +53,12 @@ export type PromptBlocks = {
   identity: IdentityCore // block 2 — never changes
   personality: { doc: PersonalityDoc; autobiography: string[] } // block 3 — changes at sleep only
   journal: JournalEntry[] // the mind's own book — changes only when it writes in it
-  scene: { ledgers: { name: string; doc: string }[]; memories: ScoredMemory[] } // block 4 — per scene
+  // block 4 — per scene. `knownFor` is what this face's hands have done, in the same buckets
+  // the mind reads its own in; absent on hands the town would not remark on.
+  scene: {
+    ledgers: { name: string; doc: string; knownFor?: string }[]
+    memories: ScoredMemory[]
+  }
   dayLog: string[] // block 5 — append-only all day
   recalled: Recalled | null // only on the turn after a mind cast its mind back
   // Only on the turn after an act the engine turned away. Absent everywhere else, so a packet
@@ -88,11 +99,16 @@ export const OWN_WORDS_SHOWN = 4
 
 function renderIdentity(id: IdentityCore): string {
   const v = id.voiceCard
+  const hands = ownSkillWords(id.skills ?? {})
   const lines = [
     `Name: ${id.name}`,
     `Age: ${id.age}`,
     `Temperament: ${id.temperament}`,
     `Backstory: ${id.backstory}`,
+    ...(hands.length === 0 ? [] : [`Your hands: ${hands.join('; ')}.`]),
+    ...(id.hours === undefined
+      ? []
+      : [`Hours: up around ${id.hours.rise}, abed by ${id.hours.bed}.`]),
     `Voice: ${v.register} ${v.rhythm}`,
     `Habits: ${v.tics.join('; ')}`,
     `Never says: ${v.neverSays.join('; ')}`,
@@ -163,10 +179,15 @@ function renderSaid(said: readonly string[]): string {
     .join('\n')
 }
 
+function ledgerLine(l: PromptBlocks['scene']['ledgers'][number]): string {
+  const who = l.knownFor === undefined ? l.name : `${l.name}, who ${l.knownFor}`
+  return l.doc.length === 0 ? `${who}.` : `${who}: ${l.doc}`
+}
+
 function renderScene(scene: PromptBlocks['scene']): string {
   const parts: string[] = []
   if (scene.ledgers.length > 0) {
-    parts.push(`People here:\n${scene.ledgers.map((l) => `${l.name}: ${l.doc}`).join('\n')}`)
+    parts.push(`People here:\n${scene.ledgers.map(ledgerLine).join('\n')}`)
   }
   if (scene.memories.length > 0) {
     parts.push(`What you remember:\n${scene.memories.map(promptText).join('\n')}`)

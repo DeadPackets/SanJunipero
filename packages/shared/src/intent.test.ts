@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { CLOSED_KEYS, ClosedIntentParams, Intent, NO_PARAMS, namedParams } from './intent.js'
+import {
+  CLOSED_KEYS,
+  ClosedIntentParams,
+  Intent,
+  NO_PARAMS,
+  namedParams,
+  ownSkillWords,
+  skillWord,
+  topSkillWord,
+} from './intent.js'
 
 const allNull = (): Record<string, unknown> => Object.fromEntries(CLOSED_KEYS.map((k) => [k, null]))
 
@@ -49,6 +58,35 @@ describe('Intent', () => {
     expect(Intent.safeParse({ verb: '', params: allNull() }).success).toBe(false)
     expect(Intent.safeParse({ verb: 'walk', params: {} }).success).toBe(false)
     expect(Intent.safeParse({ verb: 'walk', params: allNull(), aside: 'x' }).success).toBe(false)
+  })
+})
+
+describe('skill buckets', () => {
+  it('says nothing under three, then turns over at three, eight and twenty', () => {
+    expect(skillWord('fishing', 0)).toBeNull()
+    expect(skillWord('fishing', 2)).toBeNull()
+    expect(skillWord('fishing', 3)).toBe('has taken up fishing')
+    expect(skillWord('fishing', 7)).toBe('has taken up fishing')
+    expect(skillWord('fishing', 8)).toBe('is handy at fishing')
+    expect(skillWord('fishing', 19)).toBe('is handy at fishing')
+    expect(skillWord('fishing', 20)).toBe('is known for fishing')
+    expect(skillWord('carpentry', 400)).toBe('is known for carpentry')
+  })
+
+  it('names the most worked track first, and breaks a tie on the track word', () => {
+    expect(topSkillWord({ farming: 4, fishing: 30 })).toBe('is known for fishing')
+    expect(topSkillWord({ masonry: 9, carpentry: 9 })).toBe('is handy at carpentry')
+    expect(topSkillWord({ farming: 2 })).toBeNull()
+    expect(topSkillWord({})).toBeNull()
+  })
+
+  it('says the same buckets back to the hands they belong to', () => {
+    expect(ownSkillWords({ fishing: 22, farming: 3, medicine: 1 })).toEqual([
+      'fishing you are known for',
+      'farming you have taken up',
+    ])
+    expect(ownSkillWords({ masonry: 10 })).toEqual(['masonry you are handy at'])
+    expect(ownSkillWords({})).toEqual([])
   })
 })
 

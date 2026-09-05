@@ -1277,6 +1277,71 @@ describe('what the town has agreed', () => {
 
 // The prompt's bill, itemised: which block bought which tokens, and which of them the cache
 // can keep. Measurement only — nothing here changes a byte a mind reads.
+describe('what a pair of hands has done', () => {
+  it('says nothing at all for hands the town would not remark on', () => {
+    const base = fixtureBlocks()
+    const bare = assemblePrompt(base).system
+    expect(bare).not.toContain('Your hands:')
+    for (const skills of [{}, { fishing: 0 }, { fishing: 2, farming: 1 }]) {
+      const identity = { ...base.identity, skills }
+      expect(assemblePrompt({ ...base, identity }).system).toBe(bare)
+    }
+  })
+
+  it('names the tracks after the backstory, most worked first', () => {
+    const base = fixtureBlocks()
+    const identity = { ...base.identity, skills: { fishing: 26, farming: 4 } }
+    const system = assemblePrompt({ ...base, identity }).system
+
+    expect(system).toContain(
+      `Backstory: ${base.identity.backstory}\nYour hands: fishing you are known for; farming you have taken up.\nVoice:`,
+    )
+  })
+
+  it('stands byte for byte while the bucket holds, and turns over when it does', () => {
+    const base = fixtureBlocks()
+    const at20 = { ...base.identity, skills: { fishing: 20 } }
+    const at31 = { ...base.identity, skills: { fishing: 31 } }
+    const at8 = { ...base.identity, skills: { fishing: 8 } }
+
+    expect(assemblePrompt({ ...base, identity: at31 }).system).toBe(
+      assemblePrompt({ ...base, identity: at20 }).system,
+    )
+    expect(assemblePrompt({ ...base, identity: at8 }).system).not.toBe(
+      assemblePrompt({ ...base, identity: at20 }).system,
+    )
+  })
+
+  it('mirrors a face back to the town beside what this mind knows of them', () => {
+    const base = fixtureBlocks()
+    const scene = {
+      ...base.scene,
+      ledgers: [
+        { name: 'Nadia', doc: 'The basket weaver.', knownFor: 'is known for foraging' },
+        { name: 'Yusuf', doc: '', knownFor: 'has taken up carpentry' },
+        { name: 'Salma', doc: 'Sings at her work.' },
+      ],
+    }
+    const people = assemblePrompt({ ...base, scene }).messages[1]!.content
+
+    expect(people).toContain('Nadia, who is known for foraging: The basket weaver.')
+    expect(people).toContain('Yusuf, who has taken up carpentry.')
+    expect(people).toContain('Salma: Sings at her work.')
+  })
+})
+
+describe('the hours a body keeps', () => {
+  it('says them in plain words, and says nothing for a card that has none', () => {
+    const base = fixtureBlocks()
+    expect(assemblePrompt(base).system).not.toContain('Hours:')
+
+    const identity = { ...base.identity, hours: { rise: 5, bed: 20 } }
+    const system = assemblePrompt({ ...base, identity }).system
+    expect(system).toContain('Hours: up around 5, abed by 20.')
+    expect(assemblePrompt({ ...base, identity }).system).toBe(system)
+  })
+})
+
 describe('blockTokens', () => {
   function commonPrefixLength(a: string, b: string): number {
     let i = 0
