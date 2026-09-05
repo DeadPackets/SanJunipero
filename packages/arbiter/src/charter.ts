@@ -15,6 +15,8 @@ export type VerbCharter = {
   unlocks?: { id: string; name: string; prerequisiteId: string }
   inventor: { agentId: string; saying: string }
   skillCheck?: { track: string; difficulty: number }
+  // Work done with the eyes, as every built-in craft is. Absent means yes: a charter is a craft.
+  needsLight?: boolean
   canon: string[]
 }
 
