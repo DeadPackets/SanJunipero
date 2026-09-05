@@ -3,6 +3,7 @@ import type { LlmUsage } from '@sj/llm'
 import type { ChapterDigest, PublicRecord, SceneDigest } from '../types.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 import {
+  CHAPTER_MOMENTS,
   ChapterSummarySchema,
   EraSummarySchema,
   makeNarratorLlm,
@@ -27,12 +28,22 @@ const scripted = (value: unknown, captured: Captured[] = []): NarratorLlmClient 
 
 const digests: SceneDigest[] = [
   {
-    eventIds: [3, 7, 11],
     cast: ['omar', 'yusuf'],
     location: '3,4',
-    typeCounts: { agent_spoke: 2, agent_injured: 1 },
+    moments: [
+      { n: 3, text: 'Omar said: "The wall stands on my plot and you know it."' },
+      { n: 7, text: 'Yusuf was seen wounded.' },
+      { n: 11, text: 'Omar was seen to build.' },
+    ],
   },
-  { eventIds: [15, 21], cast: ['nadia'], location: null, typeCounts: { crop_harvested: 2 } },
+  {
+    cast: ['nadia'],
+    location: null,
+    moments: [
+      { n: 15, text: 'A crop was brought in.' },
+      { n: 21, text: 'Nadia was seen to harvest.' },
+    ],
+  },
 ]
 
 const chapterDigests: ChapterDigest[] = [
@@ -45,7 +56,7 @@ const record: PublicRecord[] = [
 ]
 
 describe('makeNarratorLlm', () => {
-  it('summarizeChapter sends every eventId and the citation instruction, returns the scripted summary', async () => {
+  it('summarizeChapter sends every moment number, the quote rule and the citation instruction', async () => {
     const captured: Captured[] = []
     const canned = {
       title: 'The Argument by the Storehouse',
@@ -59,6 +70,8 @@ describe('makeNarratorLlm', () => {
     expect(last.role).toBe('user')
     for (const id of [3, 7, 11, 15, 21]) expect(last.content).toContain(String(id))
     expect(last.content.toLowerCase()).toContain('cite only ledger numbers listed')
+    expect(last.content).toContain(CHAPTER_MOMENTS)
+    expect(last.content).toContain('The wall stands on my plot')
   })
 
   it('summarizeEra returns the scripted era object', async () => {

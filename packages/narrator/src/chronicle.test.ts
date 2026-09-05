@@ -81,28 +81,29 @@ describe('renderChapter', () => {
 })
 
 describe('sceneDigests', () => {
-  it('maps scenes to digests with injected typeCounts', () => {
-    const counter = (ids: number[]) => ({ agent_spoke: ids.length })
+  it('maps scenes to digests with the moments picked for them, and no event ids', () => {
     const look = {
       nameOf: (id: string) => id.toUpperCase(),
       placeOf: (loc: string) => (loc === '3,4' ? 'the well' : null),
     }
-    const digests = sceneDigests(scenes, counter, look)
+    const moments = [[{ n: 2, text: 'OMAR was seen to build.' }], []]
+    const digests = sceneDigests(scenes, look, moments)
     expect(digests).toEqual([
       {
-        eventIds: [1, 2, 3],
         cast: ['OMAR', 'YUSUF'],
         location: 'the well',
-        typeCounts: { agent_spoke: 3 },
+        moments: [{ n: 2, text: 'OMAR was seen to build.' }],
       },
-      { eventIds: [4, 5], cast: ['NADIA'], location: null, typeCounts: { agent_spoke: 2 } },
+      { cast: ['NADIA'], location: null, moments: [] },
     ])
+    expect(JSON.stringify(digests)).not.toContain('eventIds')
   })
 
   it('shows the model no id and no tile when nothing can name them', () => {
-    const [first] = sceneDigests(scenes, () => ({}))
+    const [first] = sceneDigests(scenes)
     expect(first!.cast).toEqual(['someone', 'someone'])
     expect(first!.location).toBeNull()
+    expect(first!.moments).toEqual([])
   })
 })
 

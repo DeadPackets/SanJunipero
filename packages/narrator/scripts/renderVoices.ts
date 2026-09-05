@@ -6,6 +6,7 @@ import Database from 'better-sqlite3'
 import { FORBIDDEN_FRAMING, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { LlmClient } from '@sj/llm'
 import { applyFootnotes, proseIdLeaks, sceneDigests } from '../src/chronicle.js'
+import { pickDayMoments } from '../src/moments.js'
 import { scanPromptForGlassLeak } from '@sj/shared'
 import { makeNarratorLlm } from '../src/llm/narratorLlm.js'
 import { collectPublicRecord } from '../src/publications.js'
@@ -29,22 +30,37 @@ copyFileSync(NARRATOR_DB, copyPath)
 const db = new Database(copyPath)
 const world = new Database(WORLD_DB, { readonly: true })
 
-const scenes = new NarratorStore(db).scenesForDay(DAY)
+const store = new NarratorStore(db)
+const scenes = store.scenesForDay(DAY)
 
-const dayEvents = world
-  .prepare('SELECT seq, type FROM events WHERE tick <= ?')
-  .all((DAY + 1) * MINUTES_PER_DAY - 1) as Pick<SimEvent, 'seq' | 'type'>[]
-const typeOf = new Map(dayEvents.map((e) => [e.seq, e.type]))
-const typeCounts = (ids: number[]): Record<string, number> => {
-  const counts: Record<string, number> = {}
-  for (const id of ids) {
-    const t = typeOf.get(id)
-    if (t !== undefined) counts[t] = (counts[t] ?? 0) + 1
-  }
-  return counts
-}
+const dayEvents = (
+  world
+    .prepare('SELECT seq, tick, type, payload FROM events WHERE tick <= ?')
+    .all((DAY + 1) * MINUTES_PER_DAY - 1) as {
+    seq: number
+    tick: number
+    type: string
+    payload: string
+  }[]
+).map(
+  (r): SimEvent => ({
+    seq: r.seq,
+    tick: r.tick,
+    type: r.type,
+    payload: JSON.parse(r.payload) as Record<string, unknown>,
+  }),
+)
+const bySeq = new Map(dayEvents.map((e) => [e.seq, e]))
+const heats = store.heatsForDay(DAY)
+const moments = pickDayMoments(
+  scenes.map((s, i) => ({
+    events: s.eventIds.map((id) => bySeq.get(id)).filter((e): e is SimEvent => e !== undefined),
+    heat: heats[i]?.s.total ?? 0,
+  })),
+  (id) => id,
+)
 
-const digests = sceneDigests(scenes, typeCounts)
+const digests = sceneDigests(scenes, {}, moments)
 const validChapter = new Set(scenes.flatMap((s) => s.eventIds))
 const record = collectPublicRecord(world, SUBJECT.id, DAY)
 const validBio = new Set(record.map((r) => r.eventSeq))
