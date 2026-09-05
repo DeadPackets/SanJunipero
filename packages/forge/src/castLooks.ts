@@ -2,7 +2,7 @@
 // say almost nothing about clothes, so the costumes below are DERIVED from role, age and
 // period — that derivation is the part a human should argue with. Omar keeps CHAR_DESC_V4,
 // the one design a human has signed off, and is not re-derived.
-export type CastMember = {
+export type CastLook = {
   id: string
   /** swaps in for CHAR_DESC_V4 in the calibrated prompts */
   desc: string
@@ -10,7 +10,7 @@ export type CastMember = {
   featureCap: string
 }
 
-export const CAST_V5: readonly CastMember[] = [
+export const CAST_V5: readonly CastLook[] = [
   {
     // 24, m — improviser, tinkerer, machine repair; keeper of the generator. The approved design.
     id: 'omar',
@@ -209,3 +209,154 @@ export const CAST_V5: readonly CastMember[] = [
  *  founder's master call carries. Round 3 measured what happens without one — Nadia came back
  *  at 4.5 heads in a finer pixel, and her back figure faced the wrong way. */
 export const PROPORTION_ANCHOR_ID = 'omar'
+
+// ── a person the town made ───────────────────────────────────────────────────────────────────
+// The sixteen above were authored one at a time. A child born here and a stranger off the road
+// are not, so their look is DERIVED from the id: the same person is drawn the same way on any
+// machine, and a resumed town asks for the sheet it already had.
+
+/** What the derivation needs of a person. Lane A's `NewPerson` satisfies it. */
+export type LookSubject = { id: string; sex: 'f' | 'm'; ageYears: number }
+
+/** FNV-1a. Any stable hash would do; this one needs no dependency and no seed. */
+function hashOf(s: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193)
+  return h >>> 0
+}
+
+const draw = <T>(xs: readonly T[], h: number, salt: number): T =>
+  xs[(Math.imul(h ^ salt, 0x01000193) >>> 0) % xs.length]!
+
+// Palette words only: every hue here is one the style bible already names, so a derived costume
+// cannot walk a figure off the town's colours.
+const HAIR: readonly string[] = ['dark', 'black', 'honey-brown', 'red-brown', 'grey-streaked dark']
+const OLD_HAIR = 'white'
+const HAIR_F: readonly string[] = [
+  'tied back',
+  'in a single long braid over one shoulder',
+  'in a neat round bun',
+  'cropped short',
+  'worn loose over one shoulder',
+]
+const HAIR_M: readonly string[] = [
+  'cut short',
+  'combed back',
+  'falling shaggy over the eyes',
+  'cropped close',
+  'thick and untidy',
+]
+const TOPS: readonly { colour: string; kind: string }[] = [
+  { colour: 'slate-blue', kind: 'zip-up fleece' },
+  { colour: 'sage-green', kind: 'quilted body-warmer gilet' },
+  { colour: 'warm-grey', kind: 'padded work jacket' },
+  { colour: 'dusty-rose', kind: 'knitted cardigan' },
+  { colour: 'olive-green', kind: 'waxed field jacket' },
+  { colour: 'mustard-yellow', kind: 'anorak' },
+  { colour: 'plum-purple', kind: 'button-up cardigan' },
+  { colour: 'navy-blue', kind: 'waterproof jacket' },
+]
+const LEGS: readonly string[] = [
+  'dark denim jeans',
+  'charcoal trousers',
+  'honey-brown canvas work trousers',
+  'khaki cargo trousers',
+  'plain dark trousers',
+]
+const BOOTS: readonly string[] = ['short brown boots', 'dark laced boots', 'brown hiking boots']
+const CARRIED: readonly { thing: string; feature: string }[] = [
+  { thing: 'a large tan canvas backpack worn on both shoulders', feature: 'the tan backpack' },
+  {
+    thing: 'a flat canvas shoulder bag on a WIDE strap across the chest',
+    feature: 'the shoulder bag',
+  },
+  { thing: 'a coral-red neckerchief knotted at the throat', feature: 'the coral-red neckerchief' },
+  { thing: 'a rust-orange knitted beanie', feature: 'the rust-orange beanie' },
+  { thing: 'a brown flat cap', feature: 'the brown flat cap' },
+]
+
+const ONES = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+] as const
+const TENS = [
+  '',
+  '',
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety',
+] as const
+
+/** The authored descs spell the age out, so a derived one has to as well — a prompt that mixes
+ *  "about 31" with "about thirty-one" reads to the model as two different writers. */
+export function yearsInWords(years: number): string {
+  const n = Math.max(1, Math.min(99, Math.round(years)))
+  if (n < 20) return ONES[n]!
+  const o = n % 10
+  return o === 0 ? TENS[Math.floor(n / 10)]! : `${TENS[Math.floor(n / 10)]!}-${ONES[o]!}`
+}
+
+const buildOf = (years: number): string =>
+  years >= 60
+    ? 'a stooped, thin'
+    : years >= 45
+      ? 'a solid, heavy-shouldered'
+      : years >= 30
+        ? 'a lean'
+        : 'a slight'
+
+/** A parent's hair colour, read back out of their desc, so an authored founder and a derived
+ *  child pass the trait through the same words. */
+function hairOf(parent: CastLook): string {
+  for (const c of [OLD_HAIR, ...HAIR]) if (parent.desc.includes(`${c} hair`)) return c
+  return HAIR[0]!
+}
+
+/** The look for somebody the town made — a child born here, or a stranger the road brought.
+ *  Deterministic in the id alone; `parents` decides only whose hair the child has. */
+export function lookFor(
+  person: LookSubject,
+  parents: readonly [CastLook, CastLook] | null = null,
+): CastLook {
+  const h = hashOf(person.id)
+  const female = person.sex === 'f'
+  const hair =
+    person.ageYears >= 65 ? OLD_HAIR : parents === null ? draw(HAIR, h, 1) : hairOf(parents[h % 2]!)
+  const top = draw(TOPS, h, 9)
+  const carried = draw(CARRIED, h, 21)
+  return {
+    id: person.id,
+    desc:
+      `${buildOf(person.ageYears)} ${female ? 'woman' : 'man'} of about ` +
+      `${yearsInWords(person.ageYears)}, about 3 heads tall, with ${hair} hair ` +
+      `${draw(female ? HAIR_F : HAIR_M, h, 5)}, wearing a ${top.colour} ${top.kind} over a cream ` +
+      `long-sleeved top, ${draw(LEGS, h, 13)}, ${draw(BOOTS, h, 17)}, and ${carried.thing}`,
+    featureCap:
+      `Only THREE signature features: the ${hair} hair, the ${top.colour} ${top.kind}, ` +
+      `${carried.feature}. No hat beyond what is named, no tools, no bag beyond what is named, ` +
+      'no jewelry, no extra props. Both hands are EMPTY.',
+  }
+}
