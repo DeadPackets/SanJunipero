@@ -4,6 +4,7 @@ import type {
   CastMember,
   ChapterRow,
   EraRow,
+  Moment,
   NarratorLlm,
   SceneDigest,
   SceneSegment,
@@ -232,14 +233,13 @@ export type DigestLookup = {
 
 export function sceneDigests(
   scenes: SceneSegment[],
-  typeCounts: (ids: number[]) => Record<string, number>,
   look: DigestLookup = {},
+  moments: Moment[][] = [],
 ): SceneDigest[] {
-  return scenes.map((s) => ({
-    eventIds: s.eventIds,
+  return scenes.map((s, i) => ({
     cast: s.cast.map(look.nameOf ?? (() => SOMEONE)),
     location: s.location === null ? null : (look.placeOf?.(s.location) ?? null),
-    typeCounts: typeCounts(s.eventIds),
+    moments: moments[i] ?? [],
   }))
 }
 
@@ -250,7 +250,8 @@ export async function renderChapter(deps: {
   llm: NarratorLlm
   day: number
   scenes: SceneSegment[]
-  typeCounts?: ((ids: number[]) => Record<string, number>) | undefined
+  /** The day's moments, index-aligned with `scenes`. Picked where the heat is known. */
+  moments?: Moment[][] | undefined
   look?: DigestLookup | undefined
   cast?: readonly CastMember[] | undefined
   alert?: ((d: string) => void) | undefined
@@ -259,7 +260,7 @@ export async function renderChapter(deps: {
   // The rooms are written down only once the chapter is in hand: a render that fails would
   // otherwise leave them behind, and `chapters.day` — the idempotence — never sees them.
   const summary = await llm.summarizeChapter(
-    sceneDigests(scenes, deps.typeCounts ?? (() => ({})), deps.look ?? {}),
+    sceneDigests(scenes, deps.look ?? {}, deps.moments ?? []),
     deps.cast ?? [],
   )
   const valid = new Set(scenes.flatMap((s) => s.eventIds))

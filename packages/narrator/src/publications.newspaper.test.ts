@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { migrateNarratorTables } from './schema.js'
 import { NarratorStore } from './store.js'
 import { renderNewspaper } from './publications.js'
-import { FORBIDDEN_FRAMING } from '@sj/shared'
+import { FORBIDDEN_FRAMING, SOMEONE } from '@sj/shared'
 import type { ChapterRow, HeatScores, Milestone, SceneSegment } from './types.js'
 
 const chapter: ChapterRow = {
@@ -91,6 +91,16 @@ describe('renderNewspaper', () => {
     expect(rows.length).toBe(1)
     expect(rows[0]!.kind).toBe('newspaper')
     expect(rows[0]!.citations).toEqual([1, 3])
+  })
+
+  it('never prints someone in the thick of it, and drops the line under two real names', () => {
+    const half = renderNewspaper(1, chapter, heats, milestones, scenes, (id) =>
+      id === 'omar' ? 'Omar' : SOMEONE,
+    )
+    expect(half.body).not.toContain(SOMEONE)
+    expect(half.body).not.toContain('Seen in the thick of it')
+    const none = renderNewspaper(1, chapter, heats, milestones, scenes)
+    expect(none.body).not.toContain(SOMEONE)
   })
 
   it('omits the cast line without scenes and the marks list without same-day milestones', () => {

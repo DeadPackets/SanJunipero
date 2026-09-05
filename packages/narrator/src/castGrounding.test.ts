@@ -113,7 +113,7 @@ describe('the chronicle may name nobody the world has not got', () => {
       text: vi.fn(),
     }
     await makeNarratorLlm(client as never).summarizeChapter(
-      [{ eventIds: [1], cast: [], location: null, typeCounts: { fauna_moved: 4 } }],
+      [{ cast: [], location: null, moments: [] }],
       ROLL,
     )
     const prompt = seen[0]!

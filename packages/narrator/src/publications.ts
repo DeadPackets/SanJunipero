@@ -42,8 +42,9 @@ export function renderNewspaper(
     heats.forEach((h, i) => {
       if (h.total > (heats[top]?.total ?? 0)) top = i
     })
-    const cast = scenes[top]?.cast ?? []
-    if (cast.length > 0) parts.push(`Seen in the thick of it: ${cast.map(nameOf).join(', ')}.`)
+    // A list with "someone" in it names nobody. Under two real names there is no list to print.
+    const named = (scenes[top]?.cast ?? []).map(nameOf).filter((n) => n !== SOMEONE)
+    if (named.length >= 2) parts.push(`Seen in the thick of it: ${named.join(', ')}.`)
   }
 
   return { headline: chapter.title, body: parts.join('\n\n'), citations: chapter.citations }

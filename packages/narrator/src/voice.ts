@@ -12,7 +12,8 @@ export const NARRATOR_VOICES: Record<NarratorVoice, VoiceInstructions> = {
   chronicler: {
     chapter:
       'Write the day in third person and the past tense, plain and warm, two or three short paragraphs. ' +
-      'Name people and give each of them one thing they did. A place is a place, never a coordinate.',
+      'Name people and give each of them one thing they did. A place is a place, never a coordinate. ' +
+      "Quote a line where one is given; a person's own words beat a summary of them.",
     era: 'Write the week in third person and the past tense, one warm paragraph on how it turned.',
     biography: `Write a life in third person and the past tense, plain and warm. ${BIOGRAPHY_SHAPE}`,
   },

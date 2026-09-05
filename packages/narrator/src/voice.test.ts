@@ -143,7 +143,9 @@ describe.each(VOICES)('the %s voice', (voice) => {
       },
     } as unknown as NarratorLlmClient
     const llm = makeNarratorLlm(client, voice)
-    await llm.summarizeChapter([{ eventIds: [1], cast: ['omar'], location: null, typeCounts: {} }])
+    await llm.summarizeChapter([
+      { cast: ['omar'], location: null, moments: [{ n: 1, text: 'Omar was seen to build.' }] },
+    ])
     await llm.biography('omar', 'Omar', [
       { eventSeq: 4, day: 0, text: 'was seen about the settlement' },
     ])
@@ -191,9 +193,7 @@ describe('NARRATOR_VOICE', () => {
         return { value: { title: 't', text: 'x', citations: [] } }
       },
     } as unknown as NarratorLlmClient
-    await makeNarratorLlm(client).summarizeChapter([
-      { eventIds: [1], cast: [], location: null, typeCounts: {} },
-    ])
+    await makeNarratorLlm(client).summarizeChapter([{ cast: [], location: null, moments: [] }])
     expect(sent[0]).toContain(NARRATOR_VOICES[NARRATOR_VOICE].chapter)
   })
 })

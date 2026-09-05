@@ -86,11 +86,12 @@ export type DetectConfig = {
 
 export type ChapterSummary = { title: string; text: string; citations: number[] }
 export type EraSummary = { title: string; text: string; citations: number[] }
+/** One thing that happened, in words, with the ledger number the chapter may cite for it. */
+export type Moment = { n: number; text: string }
 export type SceneDigest = {
-  eventIds: number[]
   cast: string[]
   location: string | null
-  typeCounts: Record<string, number>
+  moments: Moment[]
 }
 export type ChapterDigest = { day: number; title: string; text: string; citations: number[] }
 

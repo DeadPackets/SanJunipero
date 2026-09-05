@@ -13,6 +13,7 @@ import { detectFirsts, populationDelta } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
 import { detectSemanticFirsts, type SemanticDeps } from './semanticFirsts.js'
 import { scoreHeat } from './heat.js'
+import { pickDayMoments } from './moments.js'
 import { detectInstitutions } from './institutions.js'
 import { segmentScenes } from './segment.js'
 import type { NarratorStore } from './store.js'
@@ -137,9 +138,11 @@ export async function narrateDay(deps: {
   // Priors count each type's occurrences in earlier scenes of THIS day only: stored scenes
   // carry event ids and not types, so the day is the novelty horizon.
   const running: Record<string, number> = {}
+  const sceneEvents: SimEvent[][] = []
   const heats = scenes.map((scene) => {
     const inScene = new Set(scene.eventIds)
     const evs = events.filter((e) => inScene.has(e.seq))
+    sceneEvents.push(evs)
     const priorTypeCounts: Record<string, number> = {}
     for (const e of evs) priorTypeCounts[e.type] = running[e.type] ?? 0
     const heat = scoreHeat(
@@ -156,12 +159,12 @@ export async function narrateDay(deps: {
     return heat
   })
 
-  const typeCounts = (ids: number[]): Record<string, number> => {
-    const idSet = new Set(ids)
-    const counts: Record<string, number> = {}
-    for (const e of events) if (idSet.has(e.seq)) counts[e.type] = (counts[e.type] ?? 0) + 1
-    return counts
-  }
+  // The chapter reads what was said and what became of people, not how many times a type fired.
+  // The day cap needs the heat, so the moments are picked here and handed to the render.
+  const moments = pickDayMoments(
+    sceneEvents.map((evs, i) => ({ events: evs, heat: heats[i]!.total })),
+    nameOf,
+  )
 
   // renderChapter owns scene persistence; `chapter.sceneIds` is the one index -> store-id map.
   // Only what needs the chapter fails with it: heats go down with it, milestones do not.
@@ -173,7 +176,7 @@ export async function narrateDay(deps: {
       llm: deps.llm,
       day,
       scenes,
-      typeCounts,
+      moments,
       look: { nameOf, placeOf },
       cast: roll,
       alert: deps.alert,
