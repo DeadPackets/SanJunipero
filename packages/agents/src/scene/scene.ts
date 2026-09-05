@@ -5,35 +5,15 @@ import {
   stateHash,
   type InvitationVerb,
   type SceneKind,
+  SCENE_MOVES,
+  type SceneMove,
 } from '@sj/shared'
 import type { LawPredicate } from '@sj/engine'
 import type { Tie } from '../memory/ties.js'
 
-/** What a line is doing. The first five are stances toward what was just said; the rest are
- *  how a person moves a talk along: news, a real question, a joke, agreement, a new subject. */
-export type Move =
-  | 'press'
-  | 'give_way'
-  | 'deflect'
-  | 'tease'
-  | 'none'
-  | 'tell'
-  | 'ask'
-  | 'joke'
-  | 'agree'
-  | 'shift'
-const MOVES = [
-  'press',
-  'give_way',
-  'deflect',
-  'tease',
-  'none',
-  'tell',
-  'ask',
-  'joke',
-  'agree',
-  'shift',
-] as const satisfies readonly Move[]
+/** What a line is doing: the shared list, so the log always holds what a mind may say. */
+export type Move = SceneMove
+const MOVES = SCENE_MOVES
 
 /** Where one mind stands on a rule somebody put to the room. */
 export type Stance = 'for' | 'against' | 'unsure'
@@ -72,6 +52,8 @@ export type Scene = {
     proposedBy: string
     stances: Record<string, Stance>
     predicate: LawPredicate
+    /** Set when this talk is the vote on a rule an earlier council tabled. */
+    tabledId?: string
   }
   invitation?: { verb: InvitationVerb; from: string; to: string; askedTick: number }
   /** Whoever in this talk the town is meeting for the first time. Absent in every talk between
@@ -380,6 +362,10 @@ export function stakesFor(current: number, kind: SceneKind, quarrelTie: boolean)
 /** A rule needs a room. Two people saying "from now on" to each other have made a promise,
  *  and a promise between two is not the town agreeing to anything. */
 const COUNCIL_MINIMUM = 3
+
+/** Whether enough people are in and around this talk for it to decide anything for the town. */
+export const roomForACouncil = (scene: Scene): boolean =>
+  scene.participants.length + scene.audience.length >= COUNCIL_MINIMUM
 
 /** The kind this scene has become, given the line just said. Evaluated on open and on every
  *  line; a scene only ever moves off `talk`. */

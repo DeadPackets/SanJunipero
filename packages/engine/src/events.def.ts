@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { InvitationVerbSchema, TOWN_FACINGS } from '@sj/shared'
+import { InvitationVerbSchema, TOWN_FACINGS, SceneMove } from '@sj/shared'
 import { LAW_TEXT_MAX, LawPredicateSchema } from './lawShapes.js'
 
 export const TickAdvanced = z.object({}).strict()
@@ -316,7 +316,7 @@ export const SceneLineSaid = z
     id: z.string().min(1),
     agentId: z.string().min(1),
     text: z.string(),
-    move: z.enum(['press', 'give_way', 'deflect', 'tease', 'none']),
+    move: SceneMove,
   })
   .strict()
 export const SceneClosed = z
@@ -357,6 +357,23 @@ export const LawProposed = z
     lawId: z.string().min(1),
     agentId: z.string().min(1),
     text: z.string().min(1).max(LAW_TEXT_MAX),
+  })
+  .strict()
+export const LawTabled = z
+  .object({
+    lawId: z.string().min(1),
+    agentId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    votes: z
+      .object({ for: z.array(z.string().min(1)), against: z.array(z.string().min(1)) })
+      .strict(),
+  })
+  .strict()
+export const LawDropped = z
+  .object({
+    lawId: z.string().min(1),
+    text: z.string().min(1).max(LAW_TEXT_MAX),
+    why: z.enum(['rejected', 'lapsed']),
   })
   .strict()
 export const LawRatified = z

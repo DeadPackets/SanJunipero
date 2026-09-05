@@ -1,3 +1,4 @@
+import type { SceneMove } from '../protocol.js'
 // Recorded, not written. Every `thought`, `speech`, `move` and `leave` below is a real answer a
 // model gave to the scene prototype (`docs/superpowers/specs/v2/scene-proto`) on the pinned mind
 // route and two stronger ones; `importance` replays the values the gate rehearsal's own turn
@@ -9,7 +10,7 @@ export type SceneCorpusLine = {
   speaker: string
   thought: string
   speech: string
-  move: 'press' | 'give_way' | 'deflect' | 'tease' | 'none'
+  move: SceneMove
   leave: boolean
   importance: number
 }

@@ -105,6 +105,24 @@ export const SceneKind = z.enum([
   'invitation',
 ])
 export type SceneKind = z.infer<typeof SceneKind>
+
+/** What a line in a talk is doing. The first five are stances toward what was just said; the
+ *  rest are how a person moves a talk along. One list: the engine's event schema and the minds'
+ *  answer schema both read it, so a move the mind may say is always a move the log may hold. */
+export const SCENE_MOVES = [
+  'press',
+  'give_way',
+  'deflect',
+  'tease',
+  'none',
+  'tell',
+  'ask',
+  'joke',
+  'agree',
+  'shift',
+] as const
+export const SceneMove = z.enum(SCENE_MOVES)
+export type SceneMove = z.infer<typeof SceneMove>
 // Scene STATE, not its lines: the lines already reach a viewer as speech. `summary` arrives on
 // the closing frame only.
 export const ServerScene = z

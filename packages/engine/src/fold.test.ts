@@ -5,6 +5,7 @@ import {
   MINUTES_PER_DAY,
   stateHash,
   type SimEvent,
+  SCENE_MOVES,
 } from '@sj/shared'
 import { AFFLICTION_KINDS, genesisState, type WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -376,6 +377,20 @@ describe('what a minted verb can do to the world folds to a golden', () => {
       ).agents.a1!.needs.social,
     ).toBe(60)
     golden(event, '8021c2cb539e47d3ca2026d694b2b0ecdd6bd9d5747f93277400dff041cba31d')
+  })
+})
+
+// Rehearsal 14: the minds learned five new moves and the log still knew five. Every line that
+// said one failed its tick, a hundred ticks in a row, and the town's talks died with it.
+describe('scene_line', () => {
+  it('★ holds every move a mind may answer with, and nothing else', () => {
+    const s = fold(genesisState(DEFAULT_CONFIG), spawn('a1'))
+    for (const move of SCENE_MOVES) {
+      const line = ev(2, 'scene_line', { id: 'scene_1', agentId: 'a1', text: 'Well.', move })
+      expect(() => fold(s, line), move).not.toThrow()
+    }
+    const bad = ev(2, 'scene_line', { id: 'scene_1', agentId: 'a1', text: 'Well.', move: 'shrug' })
+    expect(() => fold(s, bad)).toThrow()
   })
 })
 
