@@ -177,6 +177,39 @@ describe('★ a walk that names a thing on the ground', () => {
   })
 })
 
+describe('★ an act aimed at a person walks after them as a chase', () => {
+  const holding = (s: WorldState): WorldState =>
+    fold(s, ev('item_spawned', { id: 'i1', kind: 'wood', qty: 1, loc: { t: 'agent', id: ME } }))
+
+  const offerFar = (): WorldState => {
+    const s = holding(world({ x: 2, y: 12 }, { x: 12, y: 12 }))
+    const r = submitIntent(s, CFG, ME, 'give', { itemId: 'i1', targetId: YOU })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    if (!r.ok) throw new Error(r.reason)
+    expect(r.events[0]!.payload).toMatchObject({
+      verb: 'walk',
+      params: { targetId: YOU },
+      then: { verb: 'give' },
+    })
+    return r.events.reduce((w, e) => fold(w, ev(e.type, e.payload), CFG), s)
+  }
+
+  it('names them in the composed walk, so the clock that ends a chase applies to it too', () => {
+    const s0 = offerFar()
+    const a = s0.agents[ME]!
+    const worn: WorldState = {
+      ...s0,
+      agents: {
+        ...s0.agents,
+        [ME]: { ...a, activity: { ...a.activity!, chase: { ticks: 30, grew: 0, gap: 10 } } },
+      },
+    }
+    const { state, types } = run(worn, 2)
+    expect(types).toContain('action_interrupted')
+    expect(state.agents[ME]!.activity).toBe(null)
+  })
+})
+
 // ★ 21 of the 32 walks that named a mark also carried the mind's own guess at its coordinates,
 // and the coordinate branch read first — so the guess decided and the name was never used.
 describe('★ a mark the mind named beats the numbers it guessed', () => {

@@ -62,6 +62,17 @@ function walkFirst(
   }
   const to = approachFor(state, config, agentId, verb, params)
   if (to === null) return { ok: false, reason: refusal }
+  // A person walks off while the legs are going. Naming them makes the leg a chase, which
+  // re-aims itself and has a clock; a coordinate leg lands short and is composed again forever.
+  const after = params.targetId
+  if (typeof after === 'string' && state.agents[after]?.alive === true) {
+    const chase = carrying(
+      submitIntent(state, config, agentId, 'walk', { targetId: after }),
+      verb,
+      params,
+    )
+    if (chase.ok) return chase
+  }
   const go = carrying(submitIntent(state, config, agentId, 'walk', to), verb, params)
   return go.ok ? go : { ok: false, reason: refusal }
 }
