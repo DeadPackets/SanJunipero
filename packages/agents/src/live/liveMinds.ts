@@ -166,6 +166,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         },
         // Warmth lives in each runtime's own company map; a scene reads it through the runtime.
         warmth: (otherId) => runtimes.get(spec.id)?.warmthToward(otherId) ?? 0,
+        feed: (occasions, tick) => runtimes.get(spec.id)?.feedWants(occasions, tick),
       })
     }
     const runtime = new AgentRuntime({
@@ -184,7 +185,6 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       ...(scenes === null ? {} : { scenes }),
       ties: { store: ties, cast: livingCast },
       ...(spec.wantBias === undefined ? {} : { wantBias: spec.wantBias }),
-      partners: (spec.kin ?? []).filter((k) => k.relation === 'partner').map((k) => k.id),
     })
     runtime.start(spec.id)
     const was = opts.restoring?.get(spec.id)
@@ -194,6 +194,16 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     cast.set(spec.id, spec)
   }
   for (const spec of opts.minds) boot(spec)
+  // A persona written as somebody's partner is one in the world too, and the world only learns
+  // it from an event. Announced by the lower id alone, and the fold is idempotent besides.
+  for (const spec of opts.minds) {
+    for (const k of spec.kin ?? []) {
+      if (k.relation !== 'partner' || spec.id >= k.id) continue
+      if (!opts.bridge.isAlive(spec.id) || !opts.bridge.isAlive(k.id)) continue
+      if (opts.bridge.partnerOf(spec.id) !== null) continue
+      opts.bridge.announce('partnership_formed', { aId: spec.id, bId: k.id })
+    }
+  }
   return {
     runtimes,
     scenes,
