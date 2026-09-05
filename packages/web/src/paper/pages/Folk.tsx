@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useSyncExternalStore } from 'react'
+import { Suspense, lazy, useMemo, useState, useSyncExternalStore } from 'react'
 import { agentName, personWords, tickToMoment } from '@sj/shared'
 import { actsOf, becomingOf as buildBecoming, type Becoming } from '../../ui/roster/expand.js'
 import { rosterRows2, sortRoster, type RosterSort } from '../../ui/roster/rosterRow.js'
@@ -47,20 +47,20 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       personalityRows,
     ).data ?? NO_CHANGES
 
+  const records = store.assetRecords()
+  const events = store.recentEvents()
+  const earshot = store.getConfig()?.movement.earshotRadius
+  // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
+  // The whole fold is one array allocation per person, so opening a row must not redo it.
+  const byName = useMemo(
+    () => (state === null ? [] : rosterRows2(state, records, bonds, tick, events, earshot)),
+    [state, records, bonds, tick, events, earshot],
+  )
+
   if (state === null) return <Skeleton rows={5} />
 
-  // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
-  const byName = rosterRows2(
-    state,
-    store.assetRecords(),
-    bonds,
-    tick,
-    store.recentEvents(),
-    store.getConfig()?.movement.earshotRadius,
-  )
   const rows = sort === 'name' ? byName : sortRoster(byName, sort)
   const people = Object.fromEntries(Object.values(state.agents).map((a) => [a.id, a.name]))
-  const events = store.recentEvents()
 
   const becomingOf = (agentId: string): Becoming =>
     buildBecoming({

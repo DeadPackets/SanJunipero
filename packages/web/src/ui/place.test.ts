@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DAYS_PER_YEAR, FOUNDER_IDS, makeCityTemplate } from '@sj/shared'
 import type { Structure, TileId, WorldState } from '@sj/engine/state'
@@ -145,6 +146,19 @@ describe('placeOf — beside something', () => {
     expect(placeOf(tied, 'a')).toEqual(first)
     // by id, so a rename or a re-order can never move somebody
     expect(first.words).toBe('at the shed')
+  })
+
+  // The tie used to be settled by sorting every building in the town, once per person per
+  // render. The answer must not move now that it is settled as the walk goes.
+  it('settles a tie by id whichever order the world lists the two in, and sorts nothing', () => {
+    const zeta = struct({ id: 'zeta', kind: 'shed', x: 8, y: 10 })
+    const alpha = struct({ id: 'alpha', kind: 'well', x: 12, y: 10 })
+    const at = (structures: Structure[]): string =>
+      placeOf(world({ structures, agents: [{ id: 'a', x: 10, y: 10 }] }), 'a').words
+    expect(at([zeta, alpha])).toBe('at the well')
+    expect(at([alpha, zeta])).toBe('at the well')
+    const source = readFileSync(new URL('./place.ts', import.meta.url), 'utf8')
+    expect(source).not.toContain('Object.values(state.structures).sort')
   })
 })
 
