@@ -26,8 +26,8 @@ import {
   THOUGHT_EMPTY,
   changeLog,
   hasChanged,
+  personalityRows,
   type ChangeEntry,
-  type PersonalityRow,
 } from '../../ui/becoming.js'
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
@@ -51,8 +51,6 @@ const journalRows = (b: unknown): JournalRow[] | null =>
   Array.isArray(b) ? (b as JournalRow[]) : null
 const ledgerRows = (b: unknown): LedgerRow[] | null =>
   Array.isArray(b) ? (b as LedgerRow[]) : null
-const changeRows = (b: unknown): PersonalityRow[] | null =>
-  Array.isArray(b) ? (b as PersonalityRow[]) : null
 
 /** A dream is the mind's, but it is not something the mind wrote down — say which is which. */
 const journalStamp = (row: JournalRow): string =>
@@ -275,7 +273,10 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   // and a tab nobody opened reads `null` — the endpoint layer's own "do not read".
   const story = tab !== 'Bonds' && tab !== 'Ledger'
   const journalRead = useEndpointFor(story ? docUrl(agentId, 'journal') : null, journalRows)
-  const personalityRead = useEndpointFor(story ? docUrl(agentId, 'personality') : null, changeRows)
+  const personalityRead = useEndpointFor(
+    story ? docUrl(agentId, 'personality') : null,
+    personalityRows,
+  )
   const ledgerRead = useEndpointFor(
     tab === 'Ledger' ? docUrl(agentId, 'ledgers') : null,
     ledgerRows,

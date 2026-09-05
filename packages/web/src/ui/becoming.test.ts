@@ -18,6 +18,7 @@ import {
   THOUGHT_EMPTY,
   authoredIdentityOffenders,
   changeLog,
+  personalityRows,
   substanceOf,
   type SubstanceInput,
 } from './becoming.js'
@@ -357,6 +358,19 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
     expect(rich).toContain('after the flood')
     expect(rich).not.toContain(CHANGE_EMPTY)
     expect(rich.indexOf('after the flood')).toBeLessThan(rich.indexOf('first written'))
+  })
+
+  // `feedFor` keys its reader cache on the URL alone, so two parsers for one document means
+  // whichever page mounted first decides what a malformed body means for both.
+  it('reads a personality document through one parser, wherever it is read from', () => {
+    expect(personalityRows([{ version: 1, day: 0, doc: 'a', edit: 'written' }])).toHaveLength(1)
+    // not `[]`: a body the parser rejects is not an answer, and the reader keeps the last good one
+    expect(personalityRows({ oops: true })).toBeNull()
+    for (const f of ['../paper/pages/Folk.tsx', '../paper/pages/Person.tsx']) {
+      const source = readFileSync(new URL(f, import.meta.url), 'utf8')
+      expect(source, f).toContain('personalityRows')
+      expect(source, f).not.toMatch(/const \w+ *= *\(b(?:ody)?: unknown\): PersonalityRow/)
+    }
   })
 
   // A block that scrolls sideways and holds nothing focusable is text a keyboard cannot reach.
