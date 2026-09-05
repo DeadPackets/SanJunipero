@@ -7,6 +7,9 @@ import type { RngStreams } from './rng.js'
 export type TickHandler = (ctx: {
   tick: number
   emit: (type: string, payload: unknown) => void
+  // The same write as `emit`, answering with the world it made. A handler that folds a world of
+  // its own — `createWorldTick` — passes this down so the tick folds each event once, not twice.
+  apply?: (type: string, payload: unknown) => WorldState
 }) => void
 
 // Not the world's cadence, despite the name: the beat is `arm()`/`beat()` in
@@ -99,12 +102,13 @@ export class TickLoop {
 
   #doStep(): void {
     this.#store.transaction(() => {
-      const apply = (type: string, payload: unknown) => {
+      const apply = (type: string, payload: unknown): WorldState => {
         const ev = this.#store.append(this.#tick, type, payload)
         this.#state = fold(this.#state, ev, this.#config)
+        return this.#state
       }
       apply('tick_advanced', {})
-      this.#onTick({ tick: this.#tick, emit: apply })
+      this.#onTick({ tick: this.#tick, emit: apply, apply })
       if (this.#tick % this.#snapEvery === 0) {
         this.#store.saveSnapshot(
           this.#tick,
