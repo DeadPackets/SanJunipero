@@ -386,6 +386,25 @@ def report(src, tmp):
                 run = 1
         runs.append(best)
     long_runs = sum(1 for r in runs if r >= 4)
+    # By the town's own scenes, not by a clock window: a real conversation with any pause over
+    # CHAIN_TICKS was being cut into pieces that each scored short.
+    by_scene = collections.OrderedDict()
+    for t, ty, p in ev:
+        if ty == 'scene_line' and p.get('text') and p.get('presence') is None:
+            by_scene.setdefault(p.get('id'), []).append(p.get('agentId'))
+    scene_runs = []
+    for spk in by_scene.values():
+        run = best = 1
+        for k in range(1, len(spk)):
+            if spk[k] != spk[k - 1]:
+                run += 1
+                best = max(best, run)
+            else:
+                run = 1
+        scene_runs.append(best if len(spk) > 1 else 0)
+    convs = len(scene_runs)
+    conv_long = sum(1 for r in scene_runs if r >= 4)
+    conv_still = sum(1 for r in scene_runs if r == 0)
     dup = collections.Counter(txt for _, _, txt, _, _ in lines)
     repeats = sum(v - 1 for v in dup.values() if v > 1)
     surv_speech = sum(1 for _, _, txt, _, _ in lines if SURV_RE.search(txt))
@@ -396,7 +415,11 @@ def report(src, tmp):
         ['reply within 30 ticks and 8 tiles', f'{replies} ({pct(replies, n)})', '-', '-'],
         ['exchanges with 2+ speakers', len(multi), '-', '-'],
         ['median longest alternating run', f'{statistics.median(runs):.0f}' if runs else 'n/a', '-', '-'],
-        ['exchanges with a run of 4+', f'{long_runs} ({num(long_runs, days)}/sim-day)', '3/day', '5/day'],
+        ['exchanges with a run of 4+ (clock-window chains, legacy)', f'{long_runs} ({num(long_runs, days)}/sim-day)', '3/day', '5/day'],
+        ['conversations (scenes)', f'{convs} ({num(convs, days)}/sim-day)', '-', '-'],
+        ['…that sustain a 4+ alternating run', f'{conv_long} ({pct(conv_long, convs)})', '-', '60%'],
+        ['…stillborn: one line, the other walked off', f'{conv_still} ({pct(conv_still, convs)})', '-', 'under 10%'],
+        ['median longest run in a conversation', f'{statistics.median(scene_runs):.0f}' if scene_runs else 'n/a', '-', '-'],
         ['verbatim repeats', f'{repeats} ({pct(repeats, n)})', '-', '-'],
         ['survival vocabulary', pct(surv_speech, n), '-', '-'],
     ]
@@ -524,8 +547,12 @@ def report(src, tmp):
          mark(mind_ticks, idle_h < 8), 'under 6', mark(mind_ticks, idle_h < 6)],
         ['speech about people or wonder (heuristic; the LLM pass is the number to quote)',
          f'{pw:.0f}%' if n else 'n/a', 'over 55%', mark(n, pw > 55), 'over 60%', mark(n, pw > 60)],
-        ['exchanges with a run of 4+ per sim-day', f'{runs_day:.1f}' if days else 'n/a', '3',
+        ['exchanges with a run of 4+ per sim-day (legacy window)', f'{runs_day:.1f}' if days else 'n/a', '3',
          mark(days, runs_day >= 3), '5', mark(days, runs_day >= 5)],
+        ['conversations sustaining a 4+ run (by scene)', pct(conv_long, convs) if convs else 'n/a', '-', '-',
+         '60%', mark(convs, convs > 0 and conv_long / convs >= 0.6)],
+        ['conversations stillborn (by scene)', pct(conv_still, convs) if convs else 'n/a', '-', '-',
+         'under 10%', mark(convs, convs > 0 and conv_still / convs < 0.1)],
         ['invention attempts per mind-day', f'{inv_md:.2f}' if mind_days else 'n/a', '0.5',
          mark(mind_days, inv_md >= 0.5), '1', mark(mind_days, inv_md >= 1)],
         ['laws ratified per week', f'{laws_week:.1f}' if weeks else 'n/a', 'n/a', '-',
