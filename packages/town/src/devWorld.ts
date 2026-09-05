@@ -190,13 +190,15 @@ export async function startDevWorld(
   // Refused BEFORE the art ingest, so a boot that cannot proceed does not spend a minute first.
   {
     const probe = openDb(dbPath)
+    const probeStore = new EventStore(probe)
     try {
       ensureWorldMetaTable(probe)
       const stored = readWorldMeta(probe)
-      const lived = new EventStore(probe).lastSeq() > 0
+      const lived = probeStore.lastSeq() > 0
       if (lived && stored === null) throw new Error(unstampedWorldRefusal(identity))
       if (stored && lived) assertSameWorld(stored, identity)
     } finally {
+      probeStore.close()
       probe.close()
     }
   }
@@ -319,6 +321,7 @@ export async function startDevWorld(
   } catch (e) {
     // Nothing outside this function has a handle to stop the cast or close the db it opened.
     await cast?.stop()
+    store.close()
     db.close()
     throw e
   }
@@ -404,6 +407,7 @@ export async function startDevWorld(
       // The cast first: a mind holding a promise on an intent the loop will never step never returns.
       await cast?.stop()
       await gateway.close()
+      store.close()
       db.close()
     },
   }
