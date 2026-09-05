@@ -173,9 +173,10 @@ export function App() {
       firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
   }, [scene, link, store])
 
-  // The first cut is the first thing worth watching, so the lines get out of its way.
-  const onShot = useCallback((cast: readonly string[], sceneId: string | null) => {
-    if (cast.length > 0) fadeFirstLines()
+  // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
+  // round turn is not one: it happens the instant the town arrives, before anybody has read them.
+  const onShot = useCallback((cast: readonly string[], sceneId: string | null, cut: boolean) => {
+    if (cut) fadeFirstLines()
     setShot({ cast, sceneId })
   }, [])
 

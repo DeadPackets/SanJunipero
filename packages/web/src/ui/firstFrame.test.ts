@@ -88,7 +88,10 @@ describe('★ the two lines over the first shot', () => {
     expect(SRC).toContain("const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const")
     expect(SRC).toContain('setTimeout(fadeFirstLines, FIRST_LINES_MS)')
     // ...and the first cut is the app telling it there is something better to look at
-    expect(APP).toContain('if (cast.length > 0) fadeFirstLines()')
+    expect(APP).toContain('if (cut) fadeFirstLines()')
+    expect(APP).toMatch(
+      /onShot = useCallback\(\(cast: readonly string\[\], sceneId: string \| null, cut: boolean\)/,
+    )
     expect(APP).toContain('showFirstLines(livingCount(store.getState()?.agents))')
   })
 

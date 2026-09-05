@@ -77,8 +77,9 @@ export function DirectorMode({
   onCue?: (text: string | null) => void
   /** the gateway's sentence for the shot it scored, in the town's own words */
   onWhy?: (why: string | null) => void
-  /** who is in frame, and the scene it is of — what the card and the caption follow */
-  onShot?: (cast: readonly string[], sceneId: string | null) => void
+  /** who is in frame, the scene it is of, and whether the shot was CUT to (the gateway's or a
+   *  moment's) rather than turned to by the quiet round — what the card and the caption follow */
+  onShot?: (cast: readonly string[], sceneId: string | null, cut: boolean) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
   const frame = useSyncExternalStore(store.subscribe, store.getDirector)
@@ -187,9 +188,10 @@ export function DirectorMode({
 
   // Split from the key rather than passed as the claim's own array: a fresh array every render
   // would re-run this on every tick of the town.
+  const isCut = claimBy === 'cut' || claimBy === 'moment'
   useEffect(() => {
-    onShot?.(shotKey === '' ? NO_CAST : shotKey.split(' '), sceneId)
-  }, [shotKey, sceneId, onShot])
+    onShot?.(shotKey === '' ? NO_CAST : shotKey.split(' '), sceneId, isCut)
+  }, [shotKey, sceneId, isCut, onShot])
 
   // Who the camera is on, for the layers that live in the Pixi closure — the thought gate keeps
   // every wisp of the subject, and on a broadcast nobody has picked anybody.
