@@ -363,9 +363,6 @@ const StructuresSchema = z
 const ReproductionSchema = z
   .object({
     enabled: z.boolean().default(true),
-    coSleepNightsToPartner: z.number().int().default(3),
-    partnerWindowDays: z.number().int().default(7),
-    conceptionChancePerNight: z.number().default(0.2),
     // Twenty days against the 28-day year: a pregnancy is most of a year here, as it is anywhere.
     gestationDays: z.number().int().default(20),
     fertileYears: z

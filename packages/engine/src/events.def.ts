@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { TOWN_FACINGS } from '@sj/shared'
+import { InvitationVerbSchema, TOWN_FACINGS } from '@sj/shared'
 
 export const TickAdvanced = z.object({}).strict()
 export const AgentSpawned = z
@@ -14,6 +14,26 @@ export const AgentSpawned = z
   .strict()
 export const CoSlept = z
   .object({ aId: z.string(), bId: z.string(), day: z.number().int() })
+  .strict()
+// `agentId` is always the invitee and `byId` the asker, which is the pair of keys the cue,
+// emote and heat layers already read a person out of.
+export const Invited = z
+  .object({ agentId: z.string(), byId: z.string(), verb: InvitationVerbSchema })
+  .strict()
+// The same shape under its own name: an acceptance is the ask coming back the other way.
+export const InvitationAccepted = Invited
+export const InvitationRefused = z
+  .object({
+    agentId: z.string(),
+    byId: z.string(),
+    verb: InvitationVerbSchema,
+    witnesses: z.array(z.string()),
+  })
+  .strict()
+// aId < bId, so one partnership has one spelling.
+export const PartnershipFormed = z.object({ aId: z.string(), bId: z.string() }).strict()
+export const PartnershipDissolved = z
+  .object({ aId: z.string(), bId: z.string(), byId: z.string() })
   .strict()
 export const AgentConceived = z
   .object({

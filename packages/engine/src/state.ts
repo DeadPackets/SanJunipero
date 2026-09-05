@@ -7,6 +7,7 @@ import {
   T_SAND,
   T_WATER,
   sanitizeSpokenText,
+  type InvitationVerb,
   type SimConfig,
   type TileId,
   type TownFacing,
@@ -66,6 +67,12 @@ export type AgentBody = {
   sex?: 'f' | 'm' // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   pregnant?: { sinceDay: number; byId: string }
   parents?: [string, string] // [motherId, fatherId]; only ever set on the born
+  // The ask standing over this body, so the engine can tell a second consent from a fresh first.
+  // Absent until the first one, and cleared by the answer.
+  asked?: { byId: string; verb: InvitationVerb; tick: number }
+  // Who this body is partnered to. Set both ways at once, absent until the first partnership,
+  // so every log before the town's first one hashes as it always did.
+  partnerId?: string
   // Absent until the first affliction and absent again when the last one lifts, sorted by kind
   // so two bodies ailing the same way hash the same way.
   afflictions?: Affliction[]
@@ -191,16 +198,6 @@ export type WorldState = {
   items: Record<string, Item>
   crops: Record<string, Crop>
   wildlife: { fish: number; deer: number }
-  // Absent until the first co_slept, so a world with no nights hashes as it always did.
-  pairNights?: Record<
-    string,
-    {
-      nights: number
-      lastNightDay: number
-      formedTick: number | null
-      dissolvedTick: number | null
-    }
-  >
   // Runtime overrides of world physics, keyed by dotted config path. Absent until the
   // first config_changed; hashed, snapshotted and replayed like every other fact.
   laws?: Record<string, unknown>
@@ -242,10 +239,6 @@ export function tileKey(x: number, y: number): string {
 export function fromTileKey(key: string): { x: number; y: number } {
   const comma = key.indexOf(',')
   return { x: Number(key.slice(0, comma)), y: Number(key.slice(comma + 1)) }
-}
-
-export function pairKey(a: string, b: string): string {
-  return [a, b].sort().join('|')
 }
 
 export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldState {

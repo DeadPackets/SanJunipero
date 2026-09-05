@@ -139,10 +139,8 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(inTheRoom).toContain(CITY_BED_KIND)
   })
 
-  it('reproduction: partnership, conception, gestation, fertility', () => {
-    expect(c.reproduction.coSleepNightsToPartner).toBe(3)
-    expect(c.reproduction.partnerWindowDays).toBe(7)
-    expect(c.reproduction.conceptionChancePerNight).toBe(0.2)
+  it('reproduction: gestation and fertility — the chance of a child is not a dial', () => {
+    expect(c.reproduction).not.toHaveProperty('conceptionChancePerNight')
     expect(c.reproduction.gestationDays).toBe(20)
     expect(c.reproduction.fertileYears).toEqual({ from: 16, to: 45 })
   })
@@ -187,7 +185,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(() => SimConfigSchema.parse({ seasons: { winter: { bogus: 1 } } })).toThrow()
     const o = SimConfigSchema.parse({ reproduction: { gestationDays: 1 } })
     expect(o.reproduction.gestationDays).toBe(1)
-    expect(o.reproduction.coSleepNightsToPartner).toBe(3)
+    expect(o.reproduction.enabled).toBe(true)
     expect(o.spoilage.enabled).toBe(true)
   })
 

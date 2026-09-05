@@ -174,24 +174,15 @@ describe('fold: config_changed', () => {
   })
 
   it('the fold itself reads the law it just set — replay cannot drift from the live run', () => {
-    // partnerWindowDays is read inside the co_slept fold; widen it and the same gap stops breaking the pair.
-    let s = world()
-    s = fold(
-      s,
-      ev('agent_spawned', { id: 'a2', name: 'a2', x: 3, y: 2, ageDays: ADULT_AGE_DAYS }),
-      CFG,
-    )
-    s = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 0 }), CFG)
-    const narrow = fold(s, ev('co_slept', { aId: 'a1', bId: 'a2', day: 20 }), CFG)
-    expect(narrow.pairNights!['a1|a2']!.nights).toBe(1) // the gap broke the run
+    // mortality.enabled is read inside the agent_collapsed fold; switch it off and the ladder
+    // the next fall would have climbed is not counted at all.
+    const s = world()
+    const counted = fold(s, ev('agent_collapsed', { agentId: 'a1' }), CFG)
+    expect(counted.agents.a1!.collapsesWithoutRecovery).toBe(1)
 
-    const widened = fold(
-      s,
-      ev('config_changed', { path: 'reproduction.partnerWindowDays', value: 40 }),
-      CFG,
-    )
-    const kept = fold(widened, ev('co_slept', { aId: 'a1', bId: 'a2', day: 20 }), CFG)
-    expect(kept.pairNights!['a1|a2']!.nights).toBe(2)
+    const quiet = fold(s, ev('config_changed', { path: 'mortality.enabled', value: false }), CFG)
+    const fell = fold(quiet, ev('agent_collapsed', { agentId: 'a1' }), CFG)
+    expect(fell.agents.a1!).not.toHaveProperty('collapsesWithoutRecovery')
   })
 })
 
