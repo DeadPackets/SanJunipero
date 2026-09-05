@@ -238,7 +238,7 @@ out of**. Several now, and the sheet's own lists read the sheet rather than the 
 | Query | What it is for |
 |---|---|
 | `max-width: 640px` | the sheet takes 96% × 80%; the arms move to the top edge as a 2×2 block |
-| `max-width: 1000px` | the head becomes a grid — date and marginalia on one row, tabs scrolling along the next. The one-row section line needs ~677px of head, which a 78% sheet only reaches near a 970px window |
+| `max-width: 1919.98px` | the head becomes a grid — date and marginalia on one row, tabs scrolling along the next. With the weekday in the dateline the one-row section line needs ~723px of head, which only the 1040px sheet above 1920px has |
 | `641–1000px` | with the sheet open the arms take the top-left corner, 2×2: the sheet at the left edge leaves 146px beside it at 768 and the longest arm is 192px |
 | `641–1400px` | the sheet steps left far enough to clear the arms, statically, so nothing moves when it opens |
 | `max-height: 620px` | the sheet takes `100dvh - 64px` and 96% of the width; the post is hidden; the arms lie in a row above it |

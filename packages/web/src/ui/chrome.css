@@ -1765,10 +1765,13 @@ body {
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* The one-row section line needs about 677px of head: five tabs, the date, the clock and the
-   close word. A 78% sheet only reaches that around a 970px window, so below the 1000px the
-   signpost already breaks at, the tabs take the second row to themselves and scroll along it. */
-@media (max-width: 1000px) {
+/* The one-row section line needs about 723px of head: five tabs, the date, the clock and the
+   close word. The dateline carries its weekday now, which took the date from 157px to 207px and
+   the line past what a 760px sheet can hold — measured, the date's own text was painting 50px
+   outside its track and over the first tab at every width from 1024 to 1600. The sheet is capped
+   at 760px until 1920px widens it to 1040, so 1920 is the ONLY width where one row fits, and the
+   complement of that rule is where the tabs take the second row and scroll along it. */
+@media (max-width: 1919.98px) {
   .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
     grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;

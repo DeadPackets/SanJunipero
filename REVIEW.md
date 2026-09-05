@@ -8,7 +8,14 @@ are false positives on a documented redundant-encoding system, one `layout-trans
 real and fixed below.
 
 **Line references are to the code as found**, at base commit `519b8f27`. Fixes land in five
-commits on `worktree-agent-a43592a0b679ffd90`.
+commits on `worktree-agent-a43592a0b679ffd90`, which was then merged up to `v2` (`853afe43`).
+
+Three fixes moved during that merge, because v2 had moved the code they lived in: the law
+notice's live region followed the notice from `pages/Laws.tsx` up into `Paper.tsx`, and the
+moments player's arrow keys, pointer capture and per-frame commit followed the transport out of
+the sheet and into `stage/Transport.tsx`. Two fixes were dropped because v2 had already reached
+the same defect and landed a better answer — the run export's deferred revoke (`handToBrowser`)
+and the auto-cut listeners (rewritten as a store, already passive).
 
 ## Score
 
@@ -26,7 +33,14 @@ and three test files enforce it. Almost every defect below is the system **not b
 somewhere, not the system being wrong. Six of the eight blockers are places where a documented
 law has a hole in its coverage.
 
-**Counts: 8 blockers found, 8 fixed. 24 should-fix found, 24 fixed. 12 taste items raised, 0
+**One further blocker surfaced when this branch merged up to v2** and is fixed here: v2 put a
+weekday in the paper's dateline, which took the date from 157px to 207px in a track only 157px
+wide. With `white-space: nowrap` and no overflow rule the date's own text painted 50px outside
+its box and over the first tab, at every width from 1024 to 1600 — `MONDAY · DAY 0 · SPRING`
+overprinting `TODAY`. The head now reflows to two rows wherever the sheet is at its 760px cap,
+which is the complement of the 1920px rule that widens it. (`ui/chrome.css:1771`.)
+
+**Counts: 9 blockers found, 9 fixed. 24 should-fix found, 24 fixed. 12 taste items raised, 0
 changed — they are under Owner picks.**
 
 ---
@@ -199,7 +213,13 @@ The 390 bonds page is the clearest pair: `before/paper-folk-bonds-390.png` (shee
 ## Gate
 
 `npm run -s typecheck` · `npx eslint packages/web/src --quiet` · `npx biome format` ·
-`npx knip` · `npx vitest run packages/web` — all green, 1,953 tests.
+`npx knip` · `npx vitest run packages/web` — all green. 2,361 web tests after the v2 merge
+(1,953 before it).
+
+`packages/town` and `packages/live` carry 12 failures that arrive with v2 and are not this
+branch's: both trees are byte-identical to `853afe43`. The clearest is
+`adminLaws.test.ts:96`, which expects 400 for `needs.hungerDecayPerTick` and gets 202 — the
+test lags v2's own whitelist. The other 11 are `liveWorld.test.ts`'s arbiter cases.
 
 Tests whose literals moved because a fix moved them, each said in its own commit:
 `paper.test.ts` (`aria-controls="paper"`, ×2), `SubjectRing.test.ts` (the ring fixture owns a
