@@ -360,6 +360,21 @@ export function RulingsSection({
   )
 }
 
+/** The browser reads the blob during the save, and a revoke on the same turn can beat it to it;
+ *  a detached anchor is never dispatched at all in some browsers. */
+export const SAVE_HOLD_MS = 60_000
+export function handToBrowser(doc: Document, url: string, name: string): void {
+  const a = doc.createElement('a')
+  a.href = url
+  a.download = name
+  doc.body.append(a)
+  a.click()
+  a.remove()
+  setTimeout(() => {
+    URL.revokeObjectURL(url)
+  }, SAVE_HOLD_MS)
+}
+
 /** A link that carries a bearer, which an anchor cannot: the channel refuses an unauthorized
  *  GET, so the file is fetched and then handed to the browser to save. */
 export function ExportLink({ token, onNotice }: { token: string; onNotice: (s: string) => void }) {
@@ -369,12 +384,7 @@ export function ExportLink({ token, onNotice }: { token: string; onNotice: (s: s
     void fetch(`${ADMIN_ENDPOINT}/admin/export`, { headers: { authorization: `Bearer ${token}` } })
       .then(async (res) => {
         if (!res.ok) throw new Error(`the channel answered ${res.status}`)
-        const url = URL.createObjectURL(await res.blob())
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'san-junipero-run.tar'
-        a.click()
-        URL.revokeObjectURL(url)
+        handToBrowser(document, URL.createObjectURL(await res.blob()), 'san-junipero-run.tar')
       })
       .catch((err: unknown) => {
         onNotice(err instanceof Error ? err.message : String(err))
