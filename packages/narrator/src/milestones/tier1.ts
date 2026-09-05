@@ -130,7 +130,14 @@ export const TIER1_DEFS: MilestoneDef[] = [
     match: (ev) => ev.type === 'agent_recovered',
     agentIds: one('agentId'),
   },
-  { kind: 'first_law', label: 'the first law', tier: 1, domain: 'engine', match: () => false }, // emitted from rulebookCount
+  {
+    kind: 'first_law',
+    label: 'the first law',
+    tier: 1,
+    domain: 'engine',
+    match: (ev) => ev.type === 'law_ratified',
+    agentIds: one('agentId'),
+  },
 
   // C11's deep world, in the same shape.
   {

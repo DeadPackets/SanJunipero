@@ -49,21 +49,5 @@ export function detectFirsts(events: SimEvent[], ctx: FirstCtx): Milestone[] {
     }
   }
 
-  // Arbiter codification writes rulebook, not an event (plan Deviation #4) —
-  // cite the day's first event instead.
-  const law = FIRST_DEFS.find((d) => d.kind === 'first_law')!
-  if (ctx.rulebookCount >= 1 && !seen.has('first_law') && events.length > 0) {
-    const ev = events[0]!
-    out.push({
-      kind: law.kind,
-      tier: law.tier,
-      domain: law.domain,
-      label: law.label,
-      eventSeq: ev.seq,
-      day: Math.floor(ev.tick / MINUTES_PER_DAY),
-      tick: ev.tick,
-      agentIds: [],
-    })
-  }
   return out
 }

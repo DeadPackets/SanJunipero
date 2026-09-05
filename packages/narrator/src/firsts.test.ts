@@ -12,6 +12,16 @@ const ev = (seq: number, tick: number, type: string, payload: unknown = {}): Sim
   payload,
 })
 
+const ratified = (seq: number, tick: number): SimEvent =>
+  ev(seq, tick, 'law_ratified', {
+    lawId: 'law_slate',
+    agentId: 'nadia',
+    text: 'Nobody takes another\u2019s planks.',
+    why: '',
+    predicate: { kind: 'forbid', verb: 'take' },
+    votes: { for: ['nadia'], against: [] },
+  })
+
 const speechAndTrade = [
   ev(1, 10, 'agent_spoke', { agentId: 'a', text: 'first', x: 0, y: 0 }),
   ev(2, 11, 'agent_spoke', { agentId: 'b', text: 'second', x: 0, y: 0 }),
@@ -52,24 +62,42 @@ describe('detectFirsts', () => {
     expect(ms.map((m) => m.kind)).toEqual(['first_trade'])
   })
 
-  it('first_law fires from rulebookCount, citing the first event of the day', () => {
-    const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 1 })
-    const law = ms.find((m) => m.kind === 'first_law')
-    expect(law).toEqual({
+  // The town writes its own rules now, so the first one is the council that passed it and the
+  // person who put it to the room — not a count of rows in the court's book.
+  it('first_law fires on the ratification, naming whoever proposed it', () => {
+    const ms = detectFirsts([...speechAndTrade, ratified(4, 20)], {
+      seenKinds: new Set(),
+      rulebookCount: 0,
+    })
+    expect(ms.find((m) => m.kind === 'first_law')).toEqual({
       kind: 'first_law',
       tier: 1,
       domain: 'engine',
       label: 'the first law',
-      eventSeq: 1,
+      eventSeq: 4,
       day: 0,
-      tick: 10,
-      agentIds: [],
+      tick: 20,
+      agentIds: ['nadia'],
     })
   })
 
-  it('first_law already seen emits nothing', () => {
-    const ms = detectFirsts(speechAndTrade, { seenKinds: new Set(['first_law']), rulebookCount: 1 })
-    expect(ms.find((m) => m.kind === 'first_law')).toBeUndefined()
+  it('fires once, and never from a rulebook the town never voted on', () => {
+    expect(
+      detectFirsts([ratified(1, 20), ratified(2, 30)], {
+        seenKinds: new Set(),
+        rulebookCount: 0,
+      }).filter((m) => m.kind === 'first_law'),
+    ).toHaveLength(1)
+    expect(
+      detectFirsts([ratified(1, 20)], { seenKinds: new Set(['first_law']), rulebookCount: 1 }).find(
+        (m) => m.kind === 'first_law',
+      ),
+    ).toBeUndefined()
+    expect(
+      detectFirsts(speechAndTrade, { seenKinds: new Set(), rulebookCount: 9 }).find(
+        (m) => m.kind === 'first_law',
+      ),
+    ).toBeUndefined()
   })
 
   it('non-give action_completed is not a trade — it is whatever it actually was', () => {
