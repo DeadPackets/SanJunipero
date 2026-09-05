@@ -139,6 +139,28 @@ describe('the daily pass', () => {
     ])
   })
 
+  it('never takes the name of one of its own bodies for the gathering', async () => {
+    const introduction = ev(5 * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
+      agentId: 'ada',
+      text: 'Bex, this is Cass, my son.',
+      x: 30,
+      y: 30,
+    })
+    const { rows } = await pass([...threeNights(), introduction], new ScriptedLlm(ruleEvery()))
+    expect(rows[0]!.name).toBeNull()
+  })
+
+  it('never takes a name that leads with one of its own bodies', async () => {
+    const remark = ev(5 * MINUTES_PER_DAY + 19 * 60 + 2, 'agent_spoke', {
+      agentId: 'ada',
+      text: 'We call it Cass Night, after the boy.',
+      x: 30,
+      y: 30,
+    })
+    const { rows } = await pass([...threeNights(), remark], new ScriptedLlm(ruleEvery()))
+    expect(rows[0]!.name).toBeNull()
+  })
+
   it('leaves the name null when nobody has said one', async () => {
     const { rows } = await pass(threeNights(), new ScriptedLlm(ruleEvery()))
     expect(rows[0]!.name).toBeNull()
@@ -188,6 +210,42 @@ describe('the daily pass', () => {
     await runConstructPass(deps)
     expect(store.all()).toHaveLength(1)
     expect(store.events().filter((e) => e.type === 'construct_recognized')).toHaveLength(1)
+  })
+
+  it('goes on recording recurrences long after the first week is over', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const run = (events: SimEvent[]) =>
+      runConstructPass({
+        events,
+        baseConfig: DEFAULT_CONFIG,
+        store,
+        llm: llm as unknown as LlmClient,
+      })
+    await run(threeNights())
+    const [row] = await run([...threeNights(), ...gathering(20)])
+
+    const at = (day: number): number => day * MINUTES_PER_DAY + 19 * 60
+    expect(row!.recurrences.map((r) => r.tick)).toEqual([at(3), at(5), at(20)])
+    expect(store.events().filter((e) => e.type === 'construct_recurred')).toHaveLength(3)
+  })
+
+  it('asks the classifier only about the sites it has never typed', async () => {
+    const db = openArbiterDb(':memory:')
+    const store = new ConstructStore(db)
+    const llm = new ScriptedLlm(ruleEvery())
+    const deps = {
+      events: threeNights(),
+      baseConfig: DEFAULT_CONFIG,
+      store,
+      llm: llm as unknown as LlmClient,
+    }
+    await runConstructPass(deps)
+    const rows = await runConstructPass(deps)
+
+    expect(llm.objectCalls).toBe(1)
+    expect(rows[0]!.type).toBe('festival')
   })
 
   it('shows the model every type id it is allowed to answer with, and refuses the rest', async () => {
