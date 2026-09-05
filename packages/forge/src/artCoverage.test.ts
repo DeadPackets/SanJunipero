@@ -8,7 +8,12 @@ import {
   parseCharacterAtlasManifest,
   parseLibraryItemManifest,
 } from '@sj/shared'
-import { BUILDINGS_CONTENT_DIR, STRUCTURE_FACINGS, listCommittedBuildings } from './buildingArt.js'
+import {
+  BUILDINGS_CONTENT_DIR,
+  STRUCTURE_FACINGS,
+  listCommittedBuildings,
+  registerCommittedBuildings,
+} from './buildingArt.js'
 import { loadReferenceSheet, paletteSwatchPng } from './referenceSheet.js'
 import { openForgeDb } from './db.js'
 import { AssetCodex } from './codex.js'
@@ -140,7 +145,11 @@ describe('★ the committed-art ingest scans the codex once, not once per item',
     const db = openForgeDb(':memory:')
     try {
       const codex = new AssetCodex(db)
-      const first = [...registerCommittedItems(codex), ...registerCommittedCast(codex)]
+      const first = [
+        ...registerCommittedItems(codex),
+        ...registerCommittedCast(codex),
+        ...registerCommittedBuildings(codex),
+      ]
       expect(first.length).toBeGreaterThan(50)
 
       let scans = 0
@@ -150,11 +159,15 @@ describe('★ the committed-art ingest scans the codex once, not once per item',
         return real(since)
       }
 
-      const again = [...registerCommittedItems(codex), ...registerCommittedCast(codex)]
+      const again = [
+        ...registerCommittedItems(codex),
+        ...registerCommittedCast(codex),
+        ...registerCommittedBuildings(codex),
+      ]
       // the second boot registers nothing — otherwise a low scan count means nothing was checked
       expect(again.map((e) => e.action)).toEqual(again.map(() => 'unchanged'))
-      // items + interiors + cast: three whole-table passes, not one per piece
-      expect(scans, `${scans} full codex scans for ${again.length} pieces`).toBeLessThanOrEqual(3)
+      // items + interiors + cast + buildings: four whole-table passes, not one per piece
+      expect(scans, `${scans} full codex scans for ${again.length} pieces`).toBeLessThanOrEqual(4)
     } finally {
       db.close()
     }
