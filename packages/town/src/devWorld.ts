@@ -162,8 +162,9 @@ export async function startDevWorld(
     /** Per-mind memory dbs (`<id>.db`), thrown away with the world when `fresh` is asked for. */
     agentDbDir?: string
     /** A FACTORY, not a cast: one built before this call has already opened the per-mind dbs
-     *  that `fresh` deletes. */
-    cast?: () => Promise<LiveCast>
+     *  that `fresh` deletes. Hands back null when the ledger holds the minds — the town is
+     *  served scripted rather than not served at all. */
+    cast?: () => Promise<LiveCast | null>
   } = {},
 ): Promise<DevWorld> {
   const dbPath = opts.dbPath ?? DEV_DB_PATH

@@ -261,6 +261,12 @@ function dailyStopMessage(spent: number, budget: number): string {
   ].join('\n')
 }
 
+/** A refusal the ledger raised, not a fault: the minds must not run, and the town must keep
+ *  serving anyway. `serve.ts` boots the scripted cast on this one and refuses on every other. */
+export class MindsHeldError extends Error {
+  override readonly name = 'MindsHeldError'
+}
+
 /** The daily budget refuses a boot too, and BEFORE the pre-flight: a container that restarts on
  *  its own would otherwise pay for a pre-flight on every loop to be told the same thing. */
 export function dailyReachedRefusal(spent: number, budget: number): string {
@@ -378,17 +384,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const priorRateStop = rateStopOnRecord(opsDb)
   if (priorRateStop !== null) {
     opsDb.close()
-    throw new Error(rateStopRefusal(priorRateStop, opts.agentDbDir))
+    throw new MindsHeldError(rateStopRefusal(priorRateStop, opts.agentDbDir))
   }
   const alreadySpent = ledgerTotalUsd(opsDb)
   if (cap > 0 && alreadySpent >= cap) {
     opsDb.close()
-    throw new Error(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
+    throw new MindsHeldError(capReachedRefusal(alreadySpent, cap, opts.agentDbDir))
   }
   const today = spentToday()
   if (today >= dailyBudget) {
     opsDb.close()
-    throw new Error(dailyReachedRefusal(today, dailyBudget))
+    throw new MindsHeldError(dailyReachedRefusal(today, dailyBudget))
   }
 
   const openRouterKey = process.env.OPENROUTER_API_KEY ?? ''

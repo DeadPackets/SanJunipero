@@ -31,6 +31,7 @@ import {
   DEFAULT_IDLE_GAP_TICKS,
   idleGapTicks,
   ledgerTotalUsd,
+  MindsHeldError,
   preflightCostUsd,
   restorableSnapshot,
   settle,
@@ -634,7 +635,10 @@ describe('★ the money, inside the served world', () => {
     billTo(opsDb, Date.now(), 0.4)
     await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
 
+    // Typed, not bare: `serve.ts` boots the town scripted on this one and refuses on every other
+    // failure, so a spent day costs the viewer nothing.
     await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toThrow(/daily budget/)
+    await expect(liveWorld({ dir, spendDailyUsd: 0.25 })).rejects.toBeInstanceOf(MindsHeldError)
   }, 60_000)
 
   // A run that never reconciles is a run whose dollar figures have no second opinion. The stale
