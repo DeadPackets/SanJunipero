@@ -1,5 +1,6 @@
 // A person has exactly ONE STATE and zero or more CONDITIONS, and the two vocabularies are DISJOINT
 // sets of words, asserted — so a condition can never quietly become a synonym of a state.
+import { verbPhraseGerund } from '@sj/shared'
 
 /** A structural read of `AgentBody`. An absent optional field simply never matches its row, so every
  *  rule here is correct before the fields it anticipates exist. */
@@ -50,8 +51,6 @@ export const NEED_LOW = 30
 
 const SPEECH_VERBS: ReadonlySet<string> = new Set(['speak', 'teach'])
 
-/** t7 gerund ruling: drop a trailing 'e', append 'ing'; no other morphology. */
-const gerund = (verb: string): string => `${verb.endsWith('e') ? verb.slice(0, -1) : verb}ing`
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
 /** `nowTick` is optional and only ever ADDS the conversation: with a clock, a person who spoke a
@@ -78,7 +77,7 @@ export function statusOf(a: AgentView, nowTick?: number): State {
  *  is used ONLY for `working`, so a walking talker can never be labelled "Walking". */
 export function stateWord(a: AgentView, nowTick?: number): string {
   const s = statusOf(a, nowTick)
-  if (s === 'working' && a.activity !== null) return sentenceCase(gerund(a.activity.verb))
+  if (s === 'working' && a.activity !== null) return sentenceCase(verbPhraseGerund(a.activity.verb))
   return STATE_WORD[s]
 }
 

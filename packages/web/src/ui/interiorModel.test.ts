@@ -183,6 +183,13 @@ describe('roomCard — who lives here and who is in', () => {
     expect(roomStateOf({ asleep: true, activity: { verb: 'sleep' } })).toBe(ROOM_STATE_ASLEEP)
   })
 
+  it('a slug is spent before the room card says it', () => {
+    expect(roomStateOf({ asleep: false, activity: { verb: 'dig_channel' } })).toBe(
+      'Digging channel',
+    )
+    expect(roomStateOf({ asleep: false, activity: { verb: 'recipe:plank' } })).toBe('Making plank')
+  })
+
   it('a public building has nobody living in it, and that is not an error', () => {
     const c = roomCard(world(), 'store1', RECORDS, null)!
     expect(c.lives).toEqual([])
