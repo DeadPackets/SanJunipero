@@ -42,6 +42,19 @@ describe('protocol', () => {
     ).toThrow()
     expect(() => ServerMsg.parse({ t: 'mutate_world' })).toThrow()
   })
+
+  // ★ Nobody reads it, and a hello without it was closed as a version mismatch.
+  it('★ takes a hello that has drawn nothing yet, with or without the mark', () => {
+    expect(ClientMsg.parse({ t: 'hello', v: PROTOCOL_VERSION })).toEqual({
+      t: 'hello',
+      v: PROTOCOL_VERSION,
+    })
+    expect(ClientMsg.parse({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: 12 })).toEqual({
+      t: 'hello',
+      v: PROTOCOL_VERSION,
+      lastSeenTick: 12,
+    })
+  })
   it('carries a scene as state, and closes one with a summary', () => {
     const open = {
       t: 'scene',

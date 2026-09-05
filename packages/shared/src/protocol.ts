@@ -10,8 +10,10 @@ export const PROTOCOL_VERSION = 6 // 6: the replay frames — a v5 viewer folds 
 export const CLOSE_BAD_HELLO = 4400
 const tick = z.number().int().nonnegative()
 
+// `lastSeenTick` is what the viewer last drew, offered for a catch-up the gateway does not yet
+// do. Optional, because a hello that leaves it out is a hello, not a version mismatch.
 export const ClientHello = z
-  .object({ t: z.literal('hello'), v: z.number().int(), lastSeenTick: tick.nullable() })
+  .object({ t: z.literal('hello'), v: z.number().int(), lastSeenTick: tick.nullable().optional() })
   .strict()
 export const ClientScrub = z
   .object({ t: z.literal('scrub'), tick, reqId: z.number().int().nonnegative() })
