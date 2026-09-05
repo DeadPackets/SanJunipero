@@ -68,6 +68,7 @@ function sceneTurn(i: number): SceneTurn {
     move: line.move,
     stance: null,
     answer: null,
+    ask: null,
     leave: false,
     importance: line.importance,
   }

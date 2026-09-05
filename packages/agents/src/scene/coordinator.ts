@@ -1,11 +1,13 @@
 import { dayPhaseFromTick, sanitizeSpokenText } from '@sj/shared'
-import type { EngineBridge } from '../runtime/bridge.js'
+import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
 import type { Tie, TieStore } from '../memory/ties.js'
+import type { WantOccasion } from '../memory/wants.js'
 import {
   addressedIn,
   appendLine,
   CLOSING_TIMEOUTS,
   FLOOR_TIMEOUT_MS,
+  idNamed,
   lineCapOf,
   nextFloor,
   openScene,
@@ -18,6 +20,16 @@ import {
   type SceneTurn,
   type TieDelta,
 } from './scene.js'
+import {
+  INVITATION_STAKES,
+  memoryLinesFor,
+  momentPassedLine,
+  noAnswerLine,
+  peopleIn,
+  readFact,
+  tiesFor,
+  type RelationshipFact,
+} from './invitations.js'
 
 /** What one mind lends a scene: the call it pays for, the ties it holds, the memory the scene
  *  leaves it, and how warm it feels toward whoever else is standing there. */
@@ -26,6 +38,8 @@ export type SceneMind = {
   ties: TieStore
   remember(m: { tick: number; text: string; importance: number }): Promise<void>
   warmth(otherId: string): number
+  /** The wants this mind's own runtime keeps. Absent, a relationship feeds none of them. */
+  feed?(occasions: readonly WantOccasion[], tick: number): void
 }
 
 /** A scene as a checkpoint holds it. The three fields a talk gained when it learned to have an
@@ -50,6 +64,23 @@ const NO_REPORT = (): void => {
   /* nothing to tell */
 }
 
+/** Which want each of them answers. A partnership feeds affection, a birth feeds legacy, and
+ *  being refused in front of people or being walked out on feeds rivalry. */
+function wantsFrom(fact: RelationshipFact): [string, WantOccasion][] {
+  if (fact.type === 'partnership_formed') {
+    return [fact.aId, fact.bId].map((id): [string, WantOccasion] => [id, 'partnered'])
+  }
+  if (fact.type === 'agent_born') {
+    return [fact.motherId, fact.fatherId].map((id): [string, WantOccasion] => [id, 'child'])
+  }
+  if (fact.type === 'invitation_refused' && fact.witnesses.length > 0)
+    return [[fact.byId, 'slight']]
+  if (fact.type === 'partnership_dissolved') {
+    return [[fact.byId === fact.aId ? fact.bId : fact.aId, 'slight']]
+  }
+  return []
+}
+
 /** One per world. It hears every word, decides who holds the floor, and is the only thing that
  *  knows a conversation is a conversation. */
 export class SceneCoordinator {
@@ -66,12 +97,16 @@ export class SceneCoordinator {
   readonly #floorSince = new Map<string, { agentId: string; atMs: number }>()
   #token = 0
   #lastTick = -1
+  /** How far into the log the relationship scan has read. Starts where the world stands, so a
+   *  restart never replays yesterday's weddings. */
+  #lastSeq: number
 
   constructor(opts: SceneCoordinatorOpts) {
     this.#bridge = opts.bridge
     this.#mindFor = opts.mindFor
     this.#now = opts.now ?? Date.now
     this.#onError = opts.onError ?? NO_REPORT
+    this.#lastSeq = opts.bridge.lastSeq()
   }
 
   /** Every open scene, for the gateway's frame and for a snapshot. */
@@ -222,14 +257,20 @@ export class SceneCoordinator {
       return
     }
     const said = turn.speech === null ? '' : sanitizeSpokenText(turn.speech)
-    if (said.length === 0) {
+    // An answer given and an invitation put are both things done: a mouth that did one of them
+    // and said nothing has not passed.
+    const answered = this.#answer(scene, agentId, turn, tick)
+    const invited = this.#askFrom(scene, agentId, turn, tick)
+    if (said.length === 0 && !answered && !invited) {
       await this.#pass(scene, tick)
       return
     }
     scene.passes = 0
     scene.timeouts = 0
     // Not awaited: an intent settles on the next tick, and the floor must not wait a tick to move.
-    void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
+    if (said.length > 0) {
+      void this.#bridge.submit(agentId, { verb: 'speak', params: { text: said } }).catch(this.#sink)
+    }
     this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick)
     if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
   }
@@ -250,6 +291,7 @@ export class SceneCoordinator {
   onTick(tick: number): void {
     if (tick === this.#lastTick) return
     this.#lastTick = tick
+    this.#readRelationshipEvents(tick)
     for (const scene of this.open()) {
       this.#dropAbsent(scene, tick)
       if (scene.participants.length < TALKERS_NEEDED) {
@@ -298,6 +340,8 @@ export class SceneCoordinator {
   /** Every hand-off of the floor: the stall clock starts here, not where the mouth gets round
    *  to asking. */
   #floorTo(scene: Scene, next: string | null): void {
+    // Whatever was in flight was asked of the floor as it stood; an answer to it is stale.
+    this.#asked.delete(scene.id)
     scene.floor = next
     if (next === null) this.#floorSince.delete(scene.id)
     else this.#floorSince.set(scene.id, { agentId: next, atMs: this.#now() })
@@ -376,6 +420,12 @@ export class SceneCoordinator {
     tick: number,
   ): Promise<void> {
     if (scene.closedTick !== null) return
+    // An ask nobody ever answered. There is no event for a silence, so the asker gets a memory.
+    if (scene.invitation !== undefined) {
+      const { from, to } = scene.invitation
+      delete scene.invitation
+      this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
+    }
     scene.closedTick = tick
     scene.closeReason = reason
     scene.floor = null
@@ -419,6 +469,137 @@ export class SceneCoordinator {
       if (mind === null) continue
       await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
     }
+  }
+
+  /** Every relationship the log has written since the last look, and the one place their ties,
+   *  their memories and their wants are written from. A `leave_partner` said in an ordinary turn
+   *  and a restart mid-invitation both come through here, so both land the same. */
+  #readRelationshipEvents(tick: number): void {
+    for (const ev of this.#bridge.relationshipEventsSince(this.#lastSeq)) {
+      this.#lastSeq = Math.max(this.#lastSeq, ev.seq)
+      const fact = readFact(ev)
+      if (fact === null) continue
+      this.#writeFact(fact, tick)
+      if (fact.type === 'invited') this.#onInvited(fact, tick)
+    }
+  }
+
+  #writeFact(fact: RelationshipFact, tick: number): void {
+    const people = peopleIn(fact)
+    const partnered = this.#bridge.partnerOf(people[0]!) === people[1]
+    const deltas = tiesFor(fact, { partnered, roof: this.#bridge.roofOf(people[0]!) })
+    const at = this.#bridge.currentTick()
+    for (const id of people) this.#mindFor(id)?.ties.apply(deltas, at, 'relationship')
+    for (const m of memoryLinesFor(fact, (id) => this.#nameOf(id) ?? id)) {
+      this.#tell(m.agentId, m.text, m.importance, tick)
+    }
+    for (const [id, occasion] of wantsFrom(fact)) this.#mindFor(id)?.feed?.([occasion], tick)
+  }
+
+  /** An ask reached the world. It opens a scene between the two of them, or takes over the one
+   *  either is already standing in, and hands the floor to whoever has to answer. */
+  #onInvited(fact: RelationshipFact & { type: 'invited' }, tick: number): void {
+    const from = fact.byId
+    const to = fact.agentId
+    if (this.#mindFor(to) === null) {
+      this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
+      return
+    }
+    let scene = this.sceneFor(from) ?? this.sceneFor(to)
+    if (scene === null) {
+      scene = openScene({
+        openedTick: tick,
+        participants: [from, to],
+        audience: this.#bridge
+          .earshot(from)
+          .filter((id) => id !== to && this.#mindFor(id) !== null && this.#canTalk(id)),
+        opener: from,
+        topic: null,
+        stakes: INVITATION_STAKES,
+      })
+      scene.kind = 'invitation'
+      this.#scenes.set(scene.id, scene)
+      this.#bridge.announce('scene_opened', {
+        id: scene.id,
+        kind: scene.kind,
+        participants: [...scene.participants],
+        topic: scene.topic,
+        stakes: scene.stakes,
+      })
+    } else {
+      this.#admit(scene, from, tick)
+      this.#admit(scene, to, tick)
+      scene.kind = 'invitation'
+      scene.stakes = Math.max(scene.stakes, INVITATION_STAKES)
+    }
+    scene.invitation = { verb: fact.verb, from, to, askedTick: tick }
+    this.#floorTo(scene, to)
+  }
+
+  /** The answer, said by the one it was put to. Yes is the same verb aimed back, so the world
+   *  judges the second consent at the moment it is given; no is a fact with no verb to it. */
+  #answer(scene: Scene, agentId: string, turn: SceneTurn, tick: number): boolean {
+    const invitation = scene.invitation
+    if (invitation === undefined || invitation.to !== agentId || turn.answer === null) return false
+    delete scene.invitation
+    const { from, verb } = invitation
+    if (turn.answer === 'refuse') {
+      const witnesses = [
+        ...scene.audience,
+        ...scene.participants.filter((id) => id !== from && id !== agentId),
+      ].sort()
+      this.#bridge.announce('invitation_refused', { agentId, byId: from, verb, witnesses })
+      return true
+    }
+    void this.#bridge
+      .submit(agentId, { verb, params: { targetId: from } }, (res) => {
+        this.#accepted(scene, invitation, res, tick)
+      })
+      .catch(this.#sink)
+    return true
+  }
+
+  /** What the world made of the yes. It is judged at the moment of the answer and not of the
+   *  ask, so an asker who walked off, went to bed or married elsewhere is a moment lost. */
+  #accepted(
+    scene: Scene,
+    invitation: NonNullable<Scene['invitation']>,
+    res: SubmitResult,
+    tick: number,
+  ): void {
+    if (!res.ok) {
+      for (const id of [invitation.from, invitation.to]) {
+        this.#tell(id, momentPassedLine(res.reason), 6, tick)
+      }
+      return
+    }
+    // Two bodies busy for an hour do not hold a floor.
+    if (invitation.verb === 'lie_with') {
+      void this.#close(scene, 'ended', this.#bridge.currentTick()).catch(this.#sink)
+    }
+  }
+
+  /** An invitation put inside a talk. The floor-holder names the verb and who it is for; the
+   *  scan picks the ask up next tick and aims the floor at whoever has to answer. */
+  #askFrom(scene: Scene, agentId: string, turn: SceneTurn, tick: number): boolean {
+    if (turn.ask === null) return false
+    const others = [...scene.participants, ...scene.audience].filter((id) => id !== agentId)
+    const named = turn.to === null ? null : idNamed(turn.to, others, (id) => this.#nameOf(id))
+    const inTalk = scene.participants.filter((id) => id !== agentId)
+    const targetId = named ?? (inTalk.length === 1 ? inTalk[0]! : null)
+    if (targetId === null) return false
+    const verb = turn.ask
+    void this.#bridge
+      .submit(agentId, { verb, params: { targetId } }, (res) => {
+        if (!res.ok) this.#tell(agentId, `You could not ask: ${res.reason}.`, 4, tick)
+      })
+      .catch(this.#sink)
+    return true
+  }
+
+  /** One line into one mind's book. Never awaited: nothing in a tick waits on a memory. */
+  #tell(agentId: string, text: string, importance: number, tick: number): void {
+    void this.#mindFor(agentId)?.remember({ tick, text, importance }).catch(this.#sink)
   }
 
   #named(ids: readonly string[]): { id: string; name: string }[] {
