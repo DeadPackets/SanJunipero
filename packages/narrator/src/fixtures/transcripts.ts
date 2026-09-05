@@ -85,6 +85,8 @@ export const GOOD_VERDICT = {
       eventSeq: 101,
       memoryRef: null,
       quote: 'The dead are not nothing.',
+      quote2: null,
+      provenance2: null,
       confidence: 0.93,
       rationale: 'She speaks of the dead as continuing.',
     },

@@ -3,7 +3,12 @@ import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { GIST_SYSTEM, gistMemories, type GistBatch, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
-import { PersonalityEditSchema, type PersonalityDoc, type PersonalityStore } from './personality.js'
+import {
+  PersonalityEditSchema,
+  type PersonalityDoc,
+  type PersonalityStore,
+  type PersonalityEdit,
+} from './personality.js'
 import { TIE_KINDS, type TieDelta } from './scene/scene.js'
 import type { TieStore } from './memory/ties.js'
 
@@ -490,10 +495,32 @@ const TIES_SCHEMA = z
   })
   .strict()
 const PARAGRAPH_SCHEMA = z.object({ paragraph: z.string().min(1) }).strict()
-export const ProposeEditSchema = z.discriminatedUnion('verdict', [
-  z.object({ verdict: z.literal('no_proposal') }).strict(),
-  z.object({ verdict: z.literal('propose'), edit: PersonalityEditSchema }).strict(),
-])
+// Flat, every key present: OpenAI's strict decoder takes no oneOf and no missing key, and a
+// discriminated union is both. `editFromAnswer` folds it back into a PersonalityEdit.
+export const ProposeEditSchema = z
+  .object({
+    verdict: z.enum(['no_proposal', 'propose']),
+    op: z.enum(['add', 'remove', 'revise']).nullable(),
+    field: z.enum(['values', 'beliefs']).nullable(),
+    index: z.number().int().nonnegative().nullable(),
+    text: z.string().max(200).nullable(),
+    evidence: z.array(z.number().int()),
+  })
+  .strict()
+export type ProposeEditAnswer = z.infer<typeof ProposeEditSchema>
+
+export function editFromAnswer(a: ProposeEditAnswer): PersonalityEdit | null {
+  if (a.verdict !== 'propose' || a.op === null || a.field === null) return null
+  const { op, field, evidence } = a
+  const raw =
+    op === 'add'
+      ? { op, field, text: a.text, evidence }
+      : op === 'remove'
+        ? { op, field, index: a.index, evidence }
+        : { op, field, index: a.index, text: a.text, evidence }
+  const parsed = PersonalityEditSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
 
 export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   // With the night's thinking off, facts and scenes came back identical and only the personality
@@ -567,7 +594,7 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
         messages: p.messages,
         schema: ProposeEditSchema,
       })
-      return value.verdict === 'propose' ? value.edit : null
+      return editFromAnswer(value)
     },
   }
 }

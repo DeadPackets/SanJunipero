@@ -95,12 +95,18 @@ const SemanticHitSchema = z
       .nullable()
       .describe("The memoryRef in the record's header, or null if it has an eventSeq instead."),
     quote: z.string().min(1).describe("Copied from the record's text, character for character."),
-    quote2: z.string().min(1).optional().describe('For a lie only: the inner words, verbatim.'),
+    quote2: z
+      .string()
+      .min(1)
+      .nullable()
+      .describe('For a lie only: the inner words, verbatim; else null.'),
     provenance2: z
       .string()
       .min(1)
-      .optional()
-      .describe("For a lie only: the eventSeq or memoryRef of those inner words' record."),
+      .nullable()
+      .describe(
+        "For a lie only: the eventSeq or memoryRef of those inner words' record; else null.",
+      ),
     confidence: z.number().min(0).max(1),
     rationale: z.string().min(1).describe('One plain sentence for why this record shows it.'),
   })
@@ -281,7 +287,7 @@ export async function detectSemanticFirsts(deps: SemanticPassDeps): Promise<Mile
         void_('joke_on_the_same_words')
         continue
       }
-      if (hit.quote2 === undefined || hit.provenance2 === undefined) {
+      if (hit.quote2 == null || hit.provenance2 == null) {
         void_('one_sided_suspicion')
         continue
       }
