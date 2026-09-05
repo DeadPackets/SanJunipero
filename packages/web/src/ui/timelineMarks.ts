@@ -179,6 +179,18 @@ export type MarkSources = {
 
 const MINUTES_PER_DAY = 1440
 
+/** At most this many labelled ticks on the day track. One per sim-day is a label every 5.8px by
+ *  day 120, which is a grey band and 121 nodes rebuilt on every render. */
+export const DAY_TICKS_MAX = 12
+
+export function gridDays(span: number): number[] {
+  const days = Math.floor(span / MINUTES_PER_DAY) + 1
+  const step = Math.max(1, Math.ceil(days / DAY_TICKS_MAX))
+  const out: number[] = []
+  for (let d = 0; d < days; d += step) out.push(d)
+  return out
+}
+
 export function marksFrom(sources: MarkSources): Mark[] {
   const out: Mark[] = []
   const push = (tick: number, kind: MarkKind, words?: string): void => {

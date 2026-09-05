@@ -5,6 +5,7 @@ import {
   MARK_GLYPH_PX,
   MARK_GLYPH_SCALE,
   coalesceMarks,
+  gridDays,
   markLeft,
   markWindow,
   marksFrom,
@@ -117,8 +118,6 @@ function DayStripView({
     }
   }
 
-  const gridDays = Array.from({ length: Math.floor(span / MINUTES_PER_DAY) + 1 }, (_, d) => d)
-
   return (
     <div className="day-strip" role="group" aria-label="The days the town has lived">
       <p className="sheet-note">
@@ -166,7 +165,7 @@ function DayStripView({
           if (e.buttons === 1) pick(e.clientX)
         }}
       >
-        {gridDays.map((d) => (
+        {gridDays(span).map((d) => (
           <span
             key={d}
             className="day-tick"

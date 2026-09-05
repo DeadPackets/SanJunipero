@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  DAY_TICKS_MAX,
   MARK_COALESCE_TICKS,
   MARK_GLYPH,
   MARK_GLYPH_PALETTE,
@@ -10,6 +11,7 @@ import {
   MARK_STRUCTURE_INKS,
   MARK_WEIGHT,
   MARK_WORDS,
+  gridDays,
   coalesceMarks,
   markWindow,
   marksFrom,
@@ -355,5 +357,26 @@ describe('the ninth mark — a discovery', () => {
       events: [{ tick: 10, type: 'agent_died' }],
     })
     expect(without.map((m) => m.kind)).toEqual(['death'])
+  })
+})
+
+// A town that lives long enough puts one labelled tick per day on a 700px track: at day 120 that
+// is a label every 5.8px, and every one of them unreadable.
+describe('the day track’s labelled ticks', () => {
+  const DAY = 1440
+
+  it('labels every day while there are few of them', () => {
+    expect(gridDays(0)).toEqual([0])
+    expect(gridDays(11 * DAY)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+  })
+
+  it('thins them as the town ages, and always starts at the first day', () => {
+    for (const days of [12, 30, 120, 900]) {
+      const ticks = gridDays(days * DAY)
+      expect(ticks.length, `day ${String(days)}`).toBeLessThanOrEqual(DAY_TICKS_MAX)
+      expect(ticks[0]).toBe(0)
+      expect(ticks.at(-1)!).toBeLessThanOrEqual(days)
+      expect([...ticks].sort((a, b) => a - b)).toEqual(ticks)
+    }
   })
 })
