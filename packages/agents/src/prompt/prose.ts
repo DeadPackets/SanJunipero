@@ -695,13 +695,18 @@ const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))}
 const inSight = (self: { x: number; y: number }, at: { x: number; y: number }): string =>
   at.x === self.x && at.y === self.y ? 'where you stand' : wayTo(at.x - self.x, at.y - self.y)
 
-// A whole town read back every turn is a page of standing facts. Genesis raises twelve roofs and
-// the valley has three landmarks, so a founder's whole world fits with a slot to spare.
+// Six is what a person holds in their head: the three landmarks, the shared roof, and the two
+// nearest others. Rehearsal 29 read a sixteen-line gazetteer on 1417 of 1936 wakes.
 const PLACES_SHOWN = 6
 
+// The river, the rim and the storehouse are known by everyone and belong on the page wherever a
+// body stands; the rest of the town is nearest first.
+const anchored = (p: KnownPlace): boolean => (p.natural ?? false) || p.kind === 'storehouse'
+
 /** Where this mind could go without seeing it first: everything it knows of that is not already
- *  in front of it, landmarks first and then nearest first. A town of twelve roofs is twelve
- *  nearer things than the river, and sorting on distance alone drops the valley off the page. */
+ *  in front of it, the anchored places first and then nearest first. A town of twelve roofs is
+ *  twelve nearer things than the river, and sorting on distance alone drops the valley off the
+ *  page. */
 export function placesKnownLine(
   places: KnownPlace[],
   packet: PerceptionPacket,
@@ -714,9 +719,7 @@ export function placesKnownLine(
     .map((p) => ({ p, d: Math.hypot(p.x - x, p.y - y) }))
     .sort(
       (a, b) =>
-        Number(b.p.natural ?? false) - Number(a.p.natural ?? false) ||
-        a.d - b.d ||
-        (a.p.id < b.p.id ? -1 : 1),
+        Number(anchored(b.p)) - Number(anchored(a.p)) || a.d - b.d || (a.p.id < b.p.id ? -1 : 1),
     )
     .slice(0, PLACES_SHOWN)
     .map(({ p }) =>

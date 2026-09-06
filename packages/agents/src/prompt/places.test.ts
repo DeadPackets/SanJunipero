@@ -119,6 +119,19 @@ describe('★ the places a mind knows but cannot see', () => {
     expect(lines[2]).toContain('structure_00')
   })
 
+  // ★ The suites gate caught it on the way to rehearsal 31: at six places a founder forty tiles
+  // off lost the storehouse to nearer roofs, the one roof the whole town shares.
+  it('keeps the storehouse on the page however many roofs stand nearer', () => {
+    const roofs = Array.from({ length: 30 }, (_, i) =>
+      place({ id: `structure_${String(i).padStart(2, '0')}`, x: AT.x + 1 + i }),
+    )
+    const store = place({ id: 'structure_99', kind: 'storehouse', x: AT.x + 58 })
+    const lines = linesOf([...roofs, store])
+    expect(lines).toHaveLength(7)
+    expect(lines[1]).toBe('a storehouse (structure_99), far to the east')
+    expect(lines[2]).toContain('structure_00')
+  })
+
   // r27: Nadia read "the river (river), close to the west" from its own bank and walked to it
   // nine times in seven hours, told each time she was already there.
   it('★ a place the body already stands at is said so, and not as a bearing', () => {
