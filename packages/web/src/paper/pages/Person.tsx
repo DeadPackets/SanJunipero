@@ -334,7 +334,11 @@ export function PersonPage({ tab, subject, store }: PageProps) {
         <p className="person-story">
           {mood !== null && <span className="person-mood">{mood}</span>}
           {aim?.goal != null && <span>{aim.goal}</span>}
-          {aim?.worry != null && <span>Worries over {aim.worry}.</span>}
+          {aim?.worry != null && (
+            <span>
+              On {a.name}’s mind: {aim.worry}.
+            </span>
+          )}
           {tie !== null && (
             <span>
               {a.name} is {tie}.

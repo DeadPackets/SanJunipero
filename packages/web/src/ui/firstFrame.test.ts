@@ -104,6 +104,11 @@ describe('★ the two lines over the first shot', () => {
     // an author `display` beats the UA's `[hidden]`, so the sheet has to honour the attribute
     const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8')
     expect(CSS).toContain('.first-lines[hidden] { display: none; }')
+    // r31's first look: the lines stood over a deep-linked person page, and over the sleep card
+    expect(CSS).toContain("body:has(.app[data-paper='on']) .first-lines { display: none; }")
+    expect(CSS).toContain(
+      'body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden; }',
+    )
   })
 
   it('★ goes on the first cut, the first hand on the camera, or twenty seconds', () => {

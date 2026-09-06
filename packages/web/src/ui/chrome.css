@@ -1472,6 +1472,11 @@ body {
   text-shadow: var(--halo-deep);
 }
 .first-lines.gone { opacity: 0; }
+/* The lines are the town's first page, not the paper's: a deep link that opens a sheet, or a
+   sheet opened while they stand, takes them down. While they stand, the sleep card, which sits
+   on the same centre, waits its turn. */
+body:has(.app[data-paper='on']) .first-lines { display: none; }
+body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden; }
 
 .stage-exit, .stage-live {
   position: absolute; z-index: 25;
@@ -1774,8 +1779,10 @@ body {
     /* the column rule IS the page's spine, so it is drawn on the gap and not on a card */
     column-gap: var(--s-7);
   }
+  /* Half the gap each side: r31's first look had the lead's last italic letter touching the
+     spine, which stood on the lead's own edge. */
   .bs-column {
-    padding-left: var(--s-7); margin-left: calc(var(--s-7) * -1);
+    padding-left: calc(var(--s-7) / 2); margin-left: calc(var(--s-7) / -2);
     border-left: 1px solid var(--ink-quiet);
   }
 }
