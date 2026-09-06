@@ -75,6 +75,8 @@ export type RecipeVocabulary = {
   // What the rulebook already makes, for telling a second waterskin from a first.
   knownProducts?: ReadonlySet<string>
   knownRecipeIds?: ReadonlySet<string>
+  // The roofs the engine's own build verb raises.
+  buildableKinds?: ReadonlySet<string>
 }
 
 // What a recipe unlocked, as item kinds. Sorted and deduped so the same recipe always yields
@@ -100,12 +102,31 @@ const CHANGES_WORLD = new Set([
   'need_delta',
 ])
 
+// The engine's own build verb wearing a new name: r33 minted "build lamp post" and "start bridge
+// span" as recipes whose whole yield was a mark and some skill, and the lens counted making while
+// nothing stood.
+const BUILD_STEMS = /\b(build|built|rais|erect|construct|start|put(ting)? up)/i
+
+function shadowedRoof(recipe: Recipe, vocab: RecipeVocabulary): string | null {
+  const slug = recipe.id.replace(/^recipe:/, '')
+  if (!BUILD_STEMS.test(`${recipe.name} ${slug.replace(/_/g, ' ')}`)) return null
+  const said = new Set([...tokens(recipe.name), ...tokens(slug)])
+  for (const kind of vocab.buildableKinds ?? []) {
+    const parts = tokens(kind)
+    if (parts.length > 0 && parts.every((p) => said.has(p))) return kind
+  }
+  return null
+}
+
 // null when the recipe may be codified; otherwise the reason it may never be, in one line.
 export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}): string | null {
   const slug = recipe.id.replace(/^recipe:/, '')
   if (VERDICT_WORDS.has(slug)) return `${recipe.id} is a verdict word, not a craft`
   if (!recipe.outcomeTable.some((row) => row.effects.some((e) => CHANGES_WORLD.has(e.op))))
     return `${recipe.id} changes nothing in the world: that is looking, not a craft`
+  const roof = shadowedRoof(recipe, vocab)
+  if (roof !== null)
+    return `${recipe.id} is the town's own build verb wearing a new name: a ${roof.replace(/_/g, ' ')} is raised with build`
 
   // Every word of the id must be a word of the name, allowing a shortening or an ending. A word
   // with its HEAD eaten is a prefix of nothing, which is how a truncated id is caught.

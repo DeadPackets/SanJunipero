@@ -232,3 +232,39 @@ describe('the materials the arbiter is shown', () => {
     expect(without.system).not.toContain('has words for these things')
   })
 })
+
+describe('★ a roof the town already raises is not a new craft', () => {
+  const roofs = { ...vocab, buildableKinds: new Set(['lamp_post', 'bridge', 'house']) }
+  const shadow = (id: string, name: string): Recipe => ({
+    ...base,
+    id,
+    name,
+    costs: [{ kind: 'wood', qty: 2 }],
+    requires: [{ type: 'held_item', kind: 'wood', qty: 2 }],
+    outcomeTable: [
+      {
+        weight: 7,
+        success: true,
+        label: 'It stands.',
+        effects: [{ op: 'gain_skill', track: 'carpentry', xp: 5 }],
+      },
+    ],
+  })
+  it('refuses "build lamp post" and "start bridge span" toward the build verb', () => {
+    expect(
+      recipeSanityRefusal(shadow('recipe:build_lamp_post', 'build lamp post'), roofs),
+    ).toContain('a lamp post is raised with build')
+    expect(
+      recipeSanityRefusal(shadow('recipe:start_bridge_span', 'start bridge span'), roofs),
+    ).toContain('a bridge is raised with build')
+  })
+  it('lets a roof the engine cannot raise be invented', () => {
+    expect(recipeSanityRefusal(shadow('recipe:build_weir', 'build a weir'), roofs)).toBeNull()
+  })
+  it('does not fire without a build word, or without the list', () => {
+    expect(recipeSanityRefusal(shadow('recipe:bless_house', 'bless the house'), roofs)).toBeNull()
+    expect(
+      recipeSanityRefusal(shadow('recipe:build_lamp_post', 'build lamp post'), vocab),
+    ).toBeNull()
+  })
+})

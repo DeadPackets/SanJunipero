@@ -14,6 +14,7 @@ import {
   type SimEvent,
 } from '@sj/shared'
 import type { TickHandler } from '@sj/engine'
+import { makeables } from '@sj/engine'
 import {
   EngineBridge,
   PREFLIGHT_ROUNDS,
@@ -637,7 +638,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               llm: makeClient('arbiter'),
               embedder,
               tick: () => loop.state.tick,
-              vocabulary: STREAM_VOCABULARY,
+              vocabulary: {
+                ...STREAM_VOCABULARY,
+                buildableKinds: makeables(config).builds.map((b) => b.kind),
+              },
               // A codification is a world fact, so it goes in the world's log. The verb is
               // already minted by the time this runs, so nothing here can fail it.
               onCodified: (d: Codified) => {

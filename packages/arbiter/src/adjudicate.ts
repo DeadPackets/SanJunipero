@@ -208,7 +208,12 @@ export type ArbiterDeps = {
   tick?: () => number
   // Rendered into the prompt AND enforced against the answer, so the two can never disagree.
   // A caller that shows no table gets only the checks that need none.
-  vocabulary?: { itemKinds: readonly string[]; structureKinds: readonly string[] }
+  vocabulary?: {
+    itemKinds: readonly string[]
+    structureKinds: readonly string[]
+    // The roofs the engine's own build verb raises, so a recipe named after one is refused.
+    buildableKinds?: readonly string[]
+  }
   // Told what was just minted, so a caller that owns a world can put it in the record. The
   // arbiter itself never touches the world log — it does not have one.
   onCodified?: (d: Codified) => void
@@ -374,6 +379,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
               ...shown.structureKinds,
               ...(agentCtx.visible?.structures ?? []).map((s) => s.kind),
             ]),
+            buildableKinds: new Set(shown.buildableKinds ?? []),
           }),
       knownProducts,
       knownRecipeIds,
