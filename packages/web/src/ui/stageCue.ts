@@ -140,7 +140,11 @@ export function sceneCueFor(
   if (stage === null) return null
   const { scene } = stage
   if (stage.phase === 'summary') {
-    return { kind: scene.kind, text: scene.summary!.trim(), stakes: null, band: 'quiet' }
+    // The beat is the stage's line; the summary is the paper's paragraph, and stands in only
+    // for a close logged before there were beats.
+    const beat = scene.beat?.trim() ?? ''
+    const text = beat === '' ? scene.summary!.trim() : beat
+    return { kind: scene.kind, text, stakes: null, band: 'quiet' }
   }
   const who = sceneNames(scene.participants, agents)
   const topic = scene.topic === null ? '' : scene.topic.trim()

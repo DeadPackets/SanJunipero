@@ -35,11 +35,12 @@ export function makeSceneRelay(): (events: readonly SimEvent[]) => ServerScene[]
         open.set(scene.id, scene)
         out.push({ t: 'scene', scene })
       } else if (ev.type === 'scene_closed') {
-        const p = ev.payload as { id: string; summary: string }
+        const p = ev.payload as { id: string; summary: string; beat?: string }
         const was = open.get(p.id)
         if (was === undefined) continue
         open.delete(p.id)
-        out.push({ t: 'scene', scene: { ...was, open: false, summary: p.summary } })
+        const beat = p.beat === undefined || p.beat === '' ? {} : { beat: p.beat }
+        out.push({ t: 'scene', scene: { ...was, open: false, summary: p.summary, ...beat } })
       }
     }
     return out

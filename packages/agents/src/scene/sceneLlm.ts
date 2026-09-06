@@ -312,7 +312,11 @@ function sceneSystem(voice: SceneVoice): string {
 
 const CLOSE_SYSTEM = `A conversation in the valley of San Junipero has just ended. Write down what happened in it, and what it left between the people who were in it.
 
-The summary is two sentences at most, plain, naming people by name. It is what each of them will remember, so write what was said and what changed because of it, and nothing about how it reads.
+First the beat: one line of twelve words at most, present tense, naming people by name, saying what changed between them, the way a caption under a photograph would. "Omar sends Salma to eat first. Her shoulder is worse." Not a report of what was discussed.
+
+Then the summary: two sentences at most, plain, naming people by name. It is what each of them will remember, so write what was said and what changed because of it, and nothing about how it reads.
+
+Write nothing, in the beat or the summary, about how or why the conversation ended.
 
 Then the ties. A tie is one thing one person now holds about another: a promise, a debt, a slight, a grudge, an attraction, a secret, an alliance, or being family. Write one only where the talk itself made it or paid it off. Most conversations make none, and an invented tie is worse than a missing one. Mark a tie settled when the talk cleared something that was already owed.
 
@@ -320,6 +324,7 @@ Name nobody who was not in the conversation.`
 
 export const CloseAnswerSchema = z
   .object({
+    beat: z.string(),
     summary: z.string(),
     ties: z.array(
       z
@@ -418,7 +423,11 @@ export function makeSceneLlm(client: LlmClient, voice: SceneVoice): SceneLlm {
         schema: CloseAnswerSchema,
         bill: { blockTokens: { scene: estTokens(message) } },
       })
-      return { summary: value.summary.trim(), deltas: deltasFrom(value, ask.cast) }
+      return {
+        summary: value.summary.trim(),
+        beat: value.beat.trim(),
+        deltas: deltasFrom(value, ask.cast),
+      }
     },
   }
 }

@@ -129,7 +129,8 @@ export type TieDelta = {
 }
 
 export type SceneCloseAsk = { scene: Scene; cast: { id: string; name: string }[] }
-export type SceneClose = { summary: string; deltas: TieDelta[] }
+/** `beat` is the one line the stage shows; `summary` is what the people in it remember. */
+export type SceneClose = { summary: string; beat?: string; deltas: TieDelta[] }
 
 /** The one call a scene makes per line, and the one it makes at the end. Task 8b writes the
  *  prompts behind it; nothing here knows what a prompt looks like. */

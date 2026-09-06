@@ -233,6 +233,16 @@ describe('★ the lower third says what is happening', () => {
     expect(cue?.text).toBe('They agreed to dig deeper.')
   })
 
+  it('★ the beat takes the slot over the summary when the close carries one', () => {
+    const closed = scene({
+      open: false,
+      summary: 'Omar asked Salma to eat before working because her shoulder hurt.',
+      beat: ' Omar sends Salma to eat first. Her shoulder is worse. ',
+    })
+    const cue = sceneCueFor(sceneStageOf(closed, null), NAMES)
+    expect(cue?.text).toBe('Omar sends Salma to eat first. Her shoulder is worse.')
+  })
+
   it('★ clears eight seconds after the close, and not before', () => {
     expect(SCENE_SUMMARY_MS).toBe(8000)
     const closed = scene({ open: false, summary: 'They agreed.' })

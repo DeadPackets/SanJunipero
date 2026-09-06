@@ -143,6 +143,8 @@ export const ServerScene = z
         stakes: z.number().int().min(0).max(10),
         open: z.boolean(),
         summary: z.string().optional(),
+        /** the one line the stage shows for a close; the summary is the paper's */
+        beat: z.string().optional(),
       })
       .strict(),
   })

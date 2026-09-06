@@ -715,11 +715,13 @@ export class SceneCoordinator {
     const named = this.#named(cast)
     const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
     let summary = ''
+    let beat = ''
     let deltas: TieDelta[] = []
     if (teller !== null) {
       try {
         const answer = await teller.llm.close({ scene: structuredClone(scene), cast: named })
         summary = answer.summary
+        beat = answer.beat ?? ''
         deltas = answer.deltas
       } catch (err) {
         this.#onError('scene_close', err instanceof Error ? err.message : String(err))
@@ -733,6 +735,7 @@ export class SceneCoordinator {
     this.#bridge.announce('scene_closed', {
       id: scene.id,
       summary,
+      beat,
       deltas,
       closeReason: reason,
       participants: cast,

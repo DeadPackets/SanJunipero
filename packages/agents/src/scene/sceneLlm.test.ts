@@ -436,7 +436,11 @@ describe('the close', () => {
   }
 
   const answer = (ties: unknown[]): string =>
-    JSON.stringify({ summary: 'Yusuf promised Tamar a third loaf.', ties })
+    JSON.stringify({
+      beat: ' Yusuf owes Tamar a third loaf. ',
+      summary: 'Yusuf promised Tamar a third loaf.',
+      ties,
+    })
 
   it('reads the whole thread with everybody’s asides, and why it ended', async () => {
     const { model, prompts } = answering(answer([]))
@@ -456,6 +460,7 @@ describe('the close', () => {
     const llm = makeSceneLlm(client(model), voice())
     const out = await llm.close(closed())
     expect(out.summary).toBe('Yusuf promised Tamar a third loaf.')
+    expect(out.beat).toBe('Yusuf owes Tamar a third loaf.')
     expect(out.deltas).toEqual([
       { agentId: 'tamar', personId: 'yusuf', kind: 'promise', text: 'a third loaf' },
     ])

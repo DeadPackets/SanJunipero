@@ -335,6 +335,8 @@ export const SceneClosed = z
   .object({
     id: z.string().min(1),
     summary: z.string(),
+    // Optional: the one-line beat arrived after the first closes were logged.
+    beat: z.string().optional(),
     deltas: z.array(
       z
         .object({
