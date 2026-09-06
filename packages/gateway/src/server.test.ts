@@ -185,7 +185,7 @@ describe('gateway server', () => {
       .filter((m) => m.t === 'scrubbed' && m.reqId === 8)
     expect(clamped).toHaveLength(1)
     if (clamped[0]!.t !== 'scrubbed') throw new Error('unreachable')
-    expect(clamped[0]!.tick).toBe(loop.state.tick)
+    expect(clamped[0].tick).toBe(loop.state.tick)
 
     // live message → fresh snapshot
     a.send(JSON.stringify({ t: 'live' }))
