@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import { tickToMoment, type BondsResponse } from '@sj/shared'
 import { strongestPairs } from '../../ui/roster/tieLine.js'
+
+// Day 0 showed a key and no words: a page about people that named nobody.
+const STRANGERS_STILL = 'Nobody is more than a stranger to anybody yet. Give it a day.'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import { TEXT_MIN_PX } from '../../textFloor.js'
@@ -382,12 +385,14 @@ export function BondsGraph({
     <div className="bonds-sheet">
       <section className="bonds-section">
         <h3 className="feed-head">Everyone, and who they are to each other</h3>
-        {strongest.length > 0 && (
+        {strongest.length > 0 ? (
           <ol className="bonds-strongest" aria-label="Between them today">
             {strongest.map((p) => (
               <li key={p.id}>{p.words}</li>
             ))}
           </ol>
+        ) : (
+          api !== null && <p className="feed-empty">{STRANGERS_STILL}</p>
         )}
         <div className="bonds-graph">
           {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
