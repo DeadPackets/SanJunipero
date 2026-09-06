@@ -253,9 +253,12 @@ describe('★ the want the morning line names', () => {
     expect(delta).toBeGreaterThanOrEqual(17)
     expect(delta).toBeLessThanOrEqual(18)
     // Every kind costs within a token of every other, so no mind's morning costs more than
-    // another's.
+    // another's. Affection is the one exception: it carries its road (the walk-out), the way
+    // food and water carry theirs, and that is worth a morning's extra thirty tokens.
     for (const kind of WANT_KINDS) {
-      expect(Math.ceil((wantLine(kind).length + 1) / 4), kind).toBeLessThanOrEqual(18)
+      expect(Math.ceil((wantLine(kind).length + 1) / 4), kind).toBeLessThanOrEqual(
+        kind === 'affection' ? 48 : 18,
+      )
     }
   })
 
@@ -330,5 +333,19 @@ describe('the wants a relationship answers', () => {
   it('feeds affection off a partnership and legacy off a child', () => {
     expect(FED_BY.partnered).toBe('affection')
     expect(FED_BY.child).toBe('legacy')
+  })
+})
+
+describe('★ affection is the one want said with its road', () => {
+  it('names the walk-out and no person', () => {
+    const line = wantLine('affection')
+    expect(line).toContain('Today the thing you want most is affection. Who could give you that?')
+    expect(line).toContain('Walking out with somebody is how that starts')
+    expect(line).not.toMatch(/[A-Z][a-z]+ \(/)
+  })
+  it('the other wants keep the plain question', () => {
+    expect(wantLine('curiosity')).toBe(
+      'Today the thing you want most is curiosity. Who could give you that?',
+    )
   })
 })

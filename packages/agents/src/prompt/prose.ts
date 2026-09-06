@@ -890,7 +890,13 @@ export function absenceLine(company: readonly Company[], tick: number): string {
 /** What this mind is shortest of, said once at the morning wake and nowhere else. It names a
  *  want and asks for a person, because a want with no road is worse than no want at all. */
 export function wantLine(want: WantKind | null): string {
-  return want === null ? '' : `Today the thing you want most is ${want}. Who could give you that?`
+  if (want === null) return ''
+  const head = `Today the thing you want most is ${want}. Who could give you that?`
+  // The one want with a verb behind it and no road in front of it: r32's mornings named
+  // affection 33 times and nobody in 25 sim-days asked anyone to walk out. Names nobody.
+  return want === 'affection'
+    ? `${head} Walking out with somebody is how that starts: ask the person at your side, and they answer in their own time.`
+    : head
 }
 
 // #region work as a social want
