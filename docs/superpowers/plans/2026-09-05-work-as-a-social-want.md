@@ -253,7 +253,9 @@ any long row, so a world resumed with old long rows still gets its short forms.
 - `LIVE_PHYSICS`: energy awake 0.093 -> 0.065 a tick. r26 final: all seven collapses were energy (6 to 9 at the fall, hunger 9 to 97), between 20:18 and 04:48; at 0.093 a body has eighteen hours from rising to the floor and a founder up at six with a bedtime of eleven has seventeen.
 - `SJ_PROSE_TRACE` (compose row, deploy/README row, set by `scripts/rehearse.sh` to `rehearsals/prose.jsonl`): the one record the databases do not keep, so a rehearsal can show whether a line fired and what the mind did with it.
 
-**Not done here:** an `inspect`/`look` act (minds want one: r25 rulings, r26 `inspect_riverbank` x2 and Farida's 40 "checks"); a settled sleep/enter still reads "Nothing needed doing".
+**Follow-ups landed the same night:** `asMinted` (a `craft {recipe}` naming a verb the town minted as `recipe:<name>` is that verb; r26 refused it eight times as undiscovered) and a minted act remembered by its town name; the biography prompt carries the person's pronoun read off the body; the idle esteem repeat waits for `WANT_PRESSING` (12, half a day unfed) while the morning line stays once a day.
+
+**Not done here:** the roster block grows by one row per active ruling with no cap (48 -> 210 tokens over five days, inside the cached system block); a settled sleep/enter still reads "Nothing needed doing". No engine `inspect` verb: r26 shows minds minting their own inspect acts per target through the court.
 
 ## Out of scope, noted for later
 
