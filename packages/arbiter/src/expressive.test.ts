@@ -127,6 +127,16 @@ describe('isExpressive', () => {
     expect(isExpressive('I bow to Yusuf')).toBe(true)
   })
 
+  // r31: inspect the exterior, inspect the interior, examine a person: three recipes with no
+  // effects, eight runs a day, one custom. A look is a look.
+  it('★ hears a look for what it is: inspecting, checking and counting change nothing', () => {
+    // "building" carries the build stem and reads as mutating; that case is the sanity gate's
+    expect(isExpressive('Inspect the wall for cracks')).toBe(true)
+    expect(isExpressive("Examine Yusuf's breathing and count the pauses")).toBe(true)
+    expect(isExpressive('Tally the bundles on the shelf')).toBe(true)
+    expect(isExpressive('Check the roof and cut new thatch for it')).toBe(false)
+  })
+
   it('refuses a taking dressed as an expression', () => {
     expect(isExpressive('I dance on his grave and take his knife')).toBe(false)
     expect(isExpressive('I sing while I build the wall')).toBe(false)

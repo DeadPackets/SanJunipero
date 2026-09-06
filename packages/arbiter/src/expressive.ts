@@ -27,6 +27,17 @@ const EXPRESSIVE_STEMS: readonly string[] = [
   'honour',
   'honor',
   'rejoic',
+  // Looking is an act a body does for its own sake too: r31 minted "inspect a building
+  // exterior" as a recipe with no effects, minds ran it eight times a day, and the recognizer
+  // crowned it a custom. A look that also mends or moves something is caught below as mutating.
+  'inspect',
+  'examin',
+  'check',
+  'count',
+  'tally',
+  'tallie',
+  'survey',
+  'assess',
 ]
 
 // Whole words with their endings spelled out, because these five are the heads of humble,
