@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { scanForDirective } from '@sj/shared'
-import { stasisLine, stillnessAt, type Stillness } from './prose.js'
+import { quietMeadowPacket } from '../testutil/fixtures.js'
+import { bedtimeLine, stasisLine, stillnessAt, type Stillness } from './prose.js'
 
 const stand = (over: Partial<Stillness> = {}): Stillness => ({
   x: 10,
@@ -57,5 +58,25 @@ describe('★ the line an hour of standing still earns', () => {
     const line = stasisLine(stand({ sinceTick: 0, spoke: true }), 300)
     expect(scanForDirective(line)).toEqual([])
     expect(line).not.toMatch(/\byou (should|must|could|might)\b/i)
+  })
+})
+
+describe('bedtimeLine', () => {
+  const at = (hour: number, asleep = false) => ({
+    ...quietMeadowPacket,
+    time: { ...quietMeadowPacket.time, hour, isNight: hour >= 20 || hour < 6 },
+    self: { ...quietMeadowPacket.self, asleep },
+  })
+
+  it('says the hour once the body is up past it, and nothing before or in bed', () => {
+    expect(bedtimeLine(at(21), 22, 6)).toBe('')
+    expect(bedtimeLine(at(22), 22, 6)).toBe('It is past 22:00, the hour you usually turn in.')
+    expect(bedtimeLine(at(2), 22, 6)).toBe('It is past 22:00, the hour you usually turn in.')
+    expect(bedtimeLine(at(2, true), 22, 6)).toBe('')
+    expect(bedtimeLine(at(14), 22, 6)).toBe('')
+  })
+
+  it('a midnight card reads as 00:00', () => {
+    expect(bedtimeLine(at(1), 24, 9)).toBe('It is past 00:00, the hour you usually turn in.')
   })
 })

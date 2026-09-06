@@ -376,3 +376,41 @@ describe('PersonalityStore versioning', () => {
     }
   })
 })
+
+describe('editWindow: beliefs about once a week, values about once a month, nothing at first', () => {
+  it('is shut in the first days and opens both fields on day 3', async () => {
+    const { store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    expect(store.editWindow(0)).toEqual([])
+    expect(store.editWindow(2)).toEqual([])
+    expect(store.editWindow(3)).toEqual(['values', 'beliefs'])
+  })
+
+  it('a belief edit shuts beliefs for seven days and leaves values open', async () => {
+    const { mem, store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    const e = await insertMemory(mem, 3 * 1440 + 100)
+    expect(
+      store.applyNightlyEdit(
+        3,
+        { op: 'add', field: 'beliefs', text: 'rain comes early', evidence: [e] },
+        mem,
+      ).ok,
+    ).toBe(true)
+    expect(store.editWindow(5)).toEqual(['values'])
+    expect(store.editWindow(9)).toEqual(['values'])
+    expect(store.editWindow(10)).toEqual(['values', 'beliefs'])
+  })
+
+  it('a values edit shuts values for thirty days', async () => {
+    const { mem, store } = await makeStore()
+    store.init(BASE_DOC, 0)
+    const e = await insertMemory(mem, 3 * 1440 + 100)
+    expect(
+      store.applyNightlyEdit(3, { op: 'add', field: 'values', text: 'quiet', evidence: [e] }, mem)
+        .ok,
+    ).toBe(true)
+    expect(store.editWindow(20)).toEqual(['beliefs'])
+    expect(store.editWindow(33)).toEqual(['values', 'beliefs'])
+  })
+})

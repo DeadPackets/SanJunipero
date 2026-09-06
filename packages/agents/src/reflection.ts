@@ -4,6 +4,7 @@ import type { MemoryRow, MemoryStore } from './memory/store.js'
 import { GIST_SYSTEM, gistMemories, type GistBatch, type GistLlm } from './memory/gist.js'
 import { splitSentences } from './prompt/assemble.js'
 import {
+  type EditField,
   PersonalityEditSchema,
   type PersonalityDoc,
   type PersonalityStore,
@@ -28,7 +29,12 @@ export type ReflectionLlm = GistLlm & {
     people: readonly string[],
   ): Promise<{ about: string; kind: TieDelta['kind']; text: string; settled: boolean }[]>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
-  proposeEdit(daySummary: string, doc: PersonalityDoc, dayMemories: MemoryRow[]): Promise<unknown>
+  proposeEdit(
+    daySummary: string,
+    doc: PersonalityDoc,
+    dayMemories: MemoryRow[],
+    open: readonly EditField[],
+  ): Promise<unknown>
 }
 
 export type ReflectionResult = {
@@ -97,6 +103,13 @@ function heldSomethingToChangeFor(
 ): boolean {
   if (ties.some((t) => t.settled !== true && CONFLICT_TIES.includes(t.kind))) return true
   return dayMemories.some((m) => m.kind === 'action' && m.importance >= CHANGED_BY_ACT_IMPORTANCE)
+}
+
+// A well-formed edit to a part of the doc the window keeps shut tonight is set aside without a
+// word; a malformed one still reaches the store, which says why it was refused.
+function closedTonight(raw: unknown, open: readonly EditField[]): boolean {
+  const parsed = PersonalityEditSchema.safeParse(raw)
+  return parsed.success && !open.includes(parsed.data.field)
 }
 
 export const FALLBACK_DAY_TITLE = 'A long day'
@@ -232,9 +245,12 @@ export async function runSleepReflection(deps: {
 
   // 7. Personality edit — ≤1 by construction, drift-limiter validates. Only on a day that held
   //    something to change for: this one call resends the whole day at 6,598 tokens a time.
-  const proposal = heldSomethingToChangeFor(dayMemories, tieDeltas)
-    ? await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories))
-    : null
+  const open = personality.editWindow(day)
+  const proposed =
+    open.length > 0 && heldSomethingToChangeFor(dayMemories, tieDeltas)
+      ? await step(() => llm.proposeEdit(daySummaryText, personalityDoc, dayMemories, open))
+      : null
+  const proposal = closedTonight(proposed, open) ? null : (proposed ?? null)
 
   // 8. Gists — the day's long rows plus what a refused night left behind. Outside the latch on
   //    purpose: a degraded night is the one that grows that backlog, and the batch self-limits.
@@ -417,10 +433,16 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
 // the coordinate of lands out of range and is thrown away.
 const numbered = (lines: string[]): string => lines.map((t, i) => `[${i}] ${t}`).join('\n')
 
+const OPEN_WORDS: Record<EditField, string> = {
+  values: 'what you value',
+  beliefs: 'what you believe',
+}
+
 export function proposeEditPrompt(
   daySummary: string,
   doc: PersonalityDoc,
   dayMemories: MemoryRow[],
+  open: readonly EditField[] = ['values', 'beliefs'],
 ): LlmPrompt {
   const memoryLines = freshMemories(dayMemories)
     .map((m) => `[${m.id}] ${m.text}`)
@@ -429,8 +451,9 @@ export function proposeEditPrompt(
     // `ProposeEditSchema` is sent on every call, so only what it cannot say stays: `evidence`
     // is today's memory numbers, and temperament is not on the table.
     system: [
-      'Before sleep, you may change one thing about what you value or what you believe.',
+      `Before sleep, you may change one thing about ${open.map((f) => OPEN_WORDS[f]).join(' or ')}.`,
       'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',
+      'A day spent at a job is not that, and a job is never a belief. Keep your own words: add a line, or amend one by a clause; do not rewrite it into a rule, a procedure or a policy, and use no office words. Write it the way you would say it to a friend.',
       'Most days hold nothing like that. When yours does not, propose nothing and be done: an edit whose text says there is no change is not an answer.',
       'When you do propose, `evidence` is the memory numbers from today that show why.',
       'Never change your temperament: it is yours from birth.',
@@ -587,8 +610,8 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
       })
       return value.paragraph
     },
-    async proposeEdit(daySummary, doc, dayMemories) {
-      const p = proposeEditPrompt(daySummary, doc, dayMemories)
+    async proposeEdit(daySummary, doc, dayMemories, open) {
+      const p = proposeEditPrompt(daySummary, doc, dayMemories, open)
       const { value } = await editClient.object({
         system: p.system,
         messages: p.messages,

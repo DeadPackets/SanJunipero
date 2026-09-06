@@ -27,6 +27,9 @@ export type MindConfig = {
   // The hour this body lies down by itself when it is idle under its own roof. The town's own
   // hour unless a card says otherwise.
   bedHour: number
+  // How long a face out of view, or a voice not heard, stays the same company rather than news.
+  faceMemoryTicks: number
+  voiceMemoryTicks: number
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
@@ -50,6 +53,8 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   gatheringWant: 40,
   riseHour: WAKE_HOUR,
   bedHour: 22,
+  faceMemoryTicks: 120,
+  voiceMemoryTicks: 120,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }
@@ -82,11 +87,15 @@ export type MindClock = {
   // The day this mind last spent a turn on the dusk fire. Null is a mind that never has.
   gatheringDay: number | null
   wakeRetryAtTick: number
-  prevVisibleIds: string[]
   // The felt tags this mind has already been asked about. Optional: a checkpoint written before
   // it existed still resumes, and an absent latch costs one turn, not sixty-six.
   feltSeen?: string[] | undefined
   alarmAgainAtTick?: number | undefined
+  // When each face was last in view and each voice last heard, and the tick the last news of
+  // either broke. Optional for the same reason as `feltSeen`.
+  facesSeen?: Record<string, number> | undefined
+  voicesHeard?: Record<string, number> | undefined
+  newsAtTick?: number | undefined
 }
 
 type Intent = z.infer<typeof IntentSchema>
@@ -112,7 +121,7 @@ export type WakeReason =
 
 /** Where this mind stands in an open scene. A scene holds the talk now, so it outranks every
  *  other reason while it is open: a floor-holder who woke for a plan would never answer. */
-export type FloorState = { inScene: boolean; holdsFloor: boolean }
+export type FloorState = { inScene: boolean; holdsFloor: boolean; addressed?: boolean }
 const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
 
 /** The one reason that decides the turn: the head of the list below, and the same answer this
@@ -154,6 +163,7 @@ export function wakeReasons(
   // Fire and a blow reach a sleeper, so they reach a listener too: talk is a shallower state
   // than sleep, and it must not hold a mind still through the one thing sleep does not.
   const rousing = packet.feltEvents.some((e) => e === 'you_were_attacked' || e.startsWith('fire'))
+  if (noteNews(cfg, packet, clock, tick)) clock.newsAtTick = tick
 
   // Standing in a talk is hands at work, and the body breaks off both the same way. Nothing
   // closes a talk for being late any more, so this is the only thing that reaches anyone in one
@@ -216,7 +226,10 @@ export function wakeReasons(
   // Merely noticed: a word overheard, a face arriving or going. The scene machine is what
   // answers speech now — a mind spoken to becomes a participant and gets the floor, which is
   // gap-exempt — so hearing one buys a turn no sooner than an idle mind's own pacing allows.
-  if (!felt && noticed(packet, clock.prevVisibleIds)) reasons.push('salient_perception')
+  // Being named reaches you whatever the memory says; company is news once, until it is gone
+  // long enough to arrive again.
+  const news = floor.addressed === true || (clock.newsAtTick ?? -1) > (clock.lastTurnTick ?? -1)
+  if (!felt && news) reasons.push('salient_perception')
   if (plan.lastResult === 'done') reasons.push('plan_done')
   if (clock.reconsiderAtTick !== null && tick >= clock.reconsiderAtTick) reasons.push('reconsider')
   if (plan.queue.length === 0 && sinceLast >= cfg.boredomTicks) reasons.push('boredom')
@@ -289,13 +302,24 @@ export function disarmBodyAlarm(
     clock.alarmAgainAtTick = tick + cfg.alarmRepeatTicks
 }
 
-// What this mind only noticed, as against what happened to it. A word carries no claim on the
-// hearer: an audience of ten around a twelve-line scene would otherwise buy 120 turns at
-// $0.00079 apiece to overhear one that cost $0.00017 a line.
-function noticed(packet: PerceptionPacket, prevVisibleIds: string[]): boolean {
-  if (packet.heard.length > 0) return true
-  const ids = packet.visible.agents.map((a) => a.id)
-  if (ids.length !== prevVisibleIds.length) return true
-  const seen = new Set(ids)
-  return prevVisibleIds.some((id) => !seen.has(id))
+// A face back in view or a voice heard again inside the memory window is the same company, not
+// news; a departure never was. r29 bought 590 turns on faces and lines, a third of them silent.
+function noteNews(
+  cfg: MindConfig,
+  packet: PerceptionPacket,
+  clock: MindClock,
+  tick: number,
+): boolean {
+  let news = false
+  const faces = (clock.facesSeen ??= {})
+  for (const a of packet.visible.agents) {
+    if (tick - (faces[a.id] ?? Number.NEGATIVE_INFINITY) > cfg.faceMemoryTicks) news = true
+    faces[a.id] = tick
+  }
+  const voices = (clock.voicesHeard ??= {})
+  for (const h of packet.heard) {
+    if (tick - (voices[h.speakerId] ?? Number.NEGATIVE_INFINITY) > cfg.voiceMemoryTicks) news = true
+    voices[h.speakerId] = tick
+  }
+  return news
 }

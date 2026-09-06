@@ -427,6 +427,66 @@ describe('runSleepReflection pipeline', () => {
     expect(personality.current().doc.values).not.toContain('No change')
   })
 
+  it('asks for no edit in the first days of a life, whatever the day held', async () => {
+    const { db, mem, personality } = await makeStores()
+    await seedDay(mem, 2, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm(null)
+    llm.listTies = async () => {
+      llm.calls.push('listTies')
+      return [
+        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+      ]
+    }
+    await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: 2,
+      ties: { store: new TieStore(db, AGENT), cast: CAST, tick: 2 * TICKS_PER_DAY },
+    })
+    expect(llm.calls).not.toContain('proposeEdit')
+  })
+
+  it('sets aside a belief proposed while beliefs are shut, without an alert', async () => {
+    const { db, mem, personality } = await makeStores()
+    const earlier = await seedDay(mem, DAY, TWO_PERSON_DAY)
+    expect(
+      personality.applyNightlyEdit(
+        DAY,
+        { op: 'add', field: 'beliefs', text: 'rain comes early', evidence: [earlier[0]!.id] },
+        mem,
+      ).ok,
+    ).toBe(true)
+    const later = DAY + 2
+    const memories = await seedDay(mem, later, TWO_PERSON_DAY)
+    const llm = new ScriptedReflectionLlm({
+      op: 'add',
+      field: 'beliefs',
+      text: 'rain comes late',
+      evidence: [memories[0]!.id],
+    })
+    llm.listTies = async () => {
+      llm.calls.push('listTies')
+      return [
+        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+      ]
+    }
+    const alerts: string[] = []
+    const res = await runSleepReflection({
+      mem,
+      personality,
+      llm,
+      day: later,
+      ties: { store: new TieStore(db, AGENT), cast: CAST, tick: later * TICKS_PER_DAY },
+      alert: (kind) => alerts.push(kind),
+    })
+    expect(llm.calls).toContain('proposeEdit')
+    expect(res.editApplied).toBe(false)
+    expect(res.editSkipped).toBe(true)
+    expect(alerts).not.toContain('personality_edit_rejected')
+    expect(personality.current().version).toBe(2)
+  })
+
   it('proposeEdit -> null -> no version bump', async () => {
     const { mem, personality } = await makeStores()
     await seedDay(mem, DAY, SINGLE_PERSON_DAY)
@@ -805,7 +865,7 @@ describe('makeReflectionLlm prompts', () => {
     await llm.updateLedger('Nadia', null, memories)
     await llm.listTies(memories, ['Nadia'])
     await llm.autobiographyParagraph('The day was full of deals.', doc)
-    await llm.proposeEdit('The day was full of deals.', doc, memories)
+    await llm.proposeEdit('The day was full of deals.', doc, memories, ['values', 'beliefs'])
     await llm.gist('A very long moment that the night sets down in short.')
 
     expect(calls).toHaveLength(8)
@@ -1032,7 +1092,7 @@ describe('★ the night bills its personality edit under its own name', () => {
       new LlmClient({ model, db, caller: 'reflection', agentId: AGENT }),
     )
     await llm.extractFacts([])
-    await llm.proposeEdit('The day was full of deals.', baseDoc(), [])
+    await llm.proposeEdit('The day was full of deals.', baseDoc(), [], ['values', 'beliefs'])
 
     expect(
       db

@@ -61,6 +61,13 @@ function isNoOpEditText(text: string): boolean {
   )
 }
 
+export type EditField = 'values' | 'beliefs'
+// No belief moves in the first days of a life, then about one a week; values about one a month.
+// r28 rewrote a belief on 12 of the 13 nights it edited, three of them into the same register.
+export const EDITS_FROM_DAY = 3
+export const BELIEFS_EDIT_EVERY_DAYS = 7
+export const VALUES_EDIT_EVERY_DAYS = 30
+
 export type NightlyEditOutcome =
   | { ok: true; version: number }
   | { ok: false; reason: string; skipped?: true }
@@ -131,6 +138,21 @@ export class PersonalityStore {
     this.db
       .prepare('UPDATE personality_versions SET doc = ? WHERE agent_id = ? AND version = ?')
       .run(JSON.stringify(doc), this.agentId, row.version)
+  }
+
+  /** Which parts of the doc may change tonight. */
+  editWindow(day: number): EditField[] {
+    if (day < EDITS_FROM_DAY) return []
+    const last: Partial<Record<EditField, number>> = {}
+    for (const h of this.history()) {
+      if (h.edit !== null) last[h.edit.field] = Math.max(last[h.edit.field] ?? 0, h.day)
+    }
+    const open: EditField[] = []
+    if (day - (last.values ?? Number.NEGATIVE_INFINITY) >= VALUES_EDIT_EVERY_DAYS)
+      open.push('values')
+    if (day - (last.beliefs ?? Number.NEGATIVE_INFINITY) >= BELIEFS_EDIT_EVERY_DAYS)
+      open.push('beliefs')
+    return open
   }
 
   applyNightlyEdit(day: number, rawEdit: unknown, mem: MemoryStore): NightlyEditOutcome {

@@ -42,7 +42,6 @@ function clk(overrides: Partial<MindClock> = {}): MindClock {
     morningWokeDay: null,
     gatheringDay: null,
     wakeRetryAtTick: 0,
-    prevVisibleIds: [],
     ...overrides,
   }
 }
@@ -263,14 +262,80 @@ describe('decideWake — priority and floor', () => {
         ],
       },
     }
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 40, pln())).toBe(
-      'salient_perception',
-    )
-    expect(decideWake(cfg, packet, clk({ prevVisibleIds: ['nadia'] }), 40, pln())).toBe(null)
+    expect(decideWake(cfg, packet, clk(), 40, pln())).toBe('salient_perception')
+    expect(decideWake(cfg, packet, clk({ facesSeen: { nadia: 39 } }), 40, pln())).toBe(null)
     expect(
-      decideWake(cfg, packet, clk({ prevVisibleIds: [] }), 10, pln()),
+      decideWake(cfg, packet, clk(), 10, pln()),
       'a face arriving is noticed, and waits out the idle gap like anything else noticed',
     ).toBe(null)
+  })
+})
+
+// r29: 590 of 786 turns were bought by a face coming into view or a line overheard, a third of
+// them silent. Company is news once; a departure never was; being named always is.
+describe('company is news once', () => {
+  const nadia = {
+    id: 'nadia',
+    name: 'Nadia',
+    x: 16,
+    y: 10,
+    activityVerb: null,
+    collapsed: false,
+    asleep: false,
+  }
+  const company = pkt({ visible: { ...quietMeadowPacket.visible, agents: [nadia] } })
+  const alone = pkt()
+  const overheard = pkt({
+    heard: [{ speakerId: 'nadia', name: 'Nadia', text: 'Six planks, you said.', distance: 2 }],
+  })
+
+  it('a face that stays is noticed once, not on every turn after', () => {
+    const clock = clk()
+    expect(decideWake(cfg, company, clock, 40, pln())).toBe('salient_perception')
+    clock.lastTurnTick = 40
+    expect(decideWake(cfg, company, clock, 80, pln())).toBe(null)
+  })
+
+  it('a face gone and back inside the memory window is the same company', () => {
+    const clock = clk({ facesSeen: { nadia: 100 } })
+    expect(decideWake(cfg, company, { ...clock, lastTurnTick: 150 }, 200, pln())).toBe(null)
+    const long = clk({ facesSeen: { nadia: 100 } })
+    expect(
+      decideWake(
+        cfg,
+        company,
+        { ...long, lastTurnTick: 150 },
+        100 + cfg.faceMemoryTicks + 1,
+        pln(),
+      ),
+    ).toBe('salient_perception')
+  })
+
+  it('a departure is not news', () => {
+    const clock = clk({ facesSeen: { nadia: 39 }, lastTurnTick: 0 })
+    expect(decideWake(cfg, alone, clock, 40, pln())).toBe(null)
+  })
+
+  it('a voice is news once, and again only after the memory window', () => {
+    const clock = clk()
+    expect(decideWake(cfg, overheard, clock, 40, pln())).toBe('salient_perception')
+    clock.lastTurnTick = 40
+    expect(decideWake(cfg, overheard, clock, 80, pln())).toBe(null)
+    expect(decideWake(cfg, overheard, clock, 80 + cfg.voiceMemoryTicks + 1, pln())).toBe(
+      'salient_perception',
+    )
+  })
+
+  it('being named reaches you whatever the memory says', () => {
+    const clock = clk({ voicesHeard: { nadia: 39 }, lastTurnTick: 0 })
+    expect(decideWake(cfg, overheard, clock, 40, pln())).toBe(null)
+    expect(
+      decideWake(cfg, overheard, clock, 40, pln(), {
+        inScene: false,
+        holdsFloor: false,
+        addressed: true,
+      }),
+    ).toBe('salient_perception')
   })
 })
 

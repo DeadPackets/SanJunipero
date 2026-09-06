@@ -57,6 +57,7 @@ import {
   type WalkMark,
   standingWallsLine,
   stasisLine,
+  bedtimeLine,
   stillnessAt,
   stockLine,
   usefulLine,
@@ -100,7 +101,7 @@ import {
   type WakeReason,
 } from '../wake.js'
 import type { SceneCoordinator } from '../scene/coordinator.js'
-import type { Scene } from '../scene/scene.js'
+import { addressedIn, type Scene } from '../scene/scene.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, FinishedAct, Intent, SubmitResult } from './bridge.js'
@@ -387,7 +388,6 @@ function freshClock(): MindClock {
     morningWokeDay: null,
     gatheringDay: null,
     wakeRetryAtTick: 0,
-    prevVisibleIds: [],
   }
 }
 
@@ -588,7 +588,6 @@ export class AgentRuntime {
       clock: {
         ...this.#clock,
         alarmArmed: { ...this.#clock.alarmArmed },
-        prevVisibleIds: [...this.#clock.prevVisibleIds],
       },
       plan: {
         queue: this.#plan.queue.map((i) => ({ ...i })),
@@ -619,7 +618,6 @@ export class AgentRuntime {
     this.#clock = {
       ...s.clock,
       alarmArmed: { ...s.clock.alarmArmed },
-      prevVisibleIds: [...s.clock.prevVisibleIds],
     }
     this.#plan = {
       queue: s.plan.queue.map((i) => ({ ...i })),
@@ -724,7 +722,13 @@ export class AgentRuntime {
     if (this.#lieDownIfDue(tick, packet)) return
     if (this.#turnInFlight) return
     const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
-    const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
+    const floor = {
+      inScene: scene !== null,
+      holdsFloor: scene?.floor === this.#agentId,
+      addressed: packet.heard.some(
+        (h) => addressedIn(h.text, [this.#agentId], () => this.#identity.name) !== null,
+      ),
+    }
     // Read only at dusk: it is a query per mind per tick, and the gathering rung is the one
     // thing that reads it.
     const belonging =
@@ -1297,6 +1301,7 @@ export class AgentRuntime {
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       doorstep,
       stasisLine(this.#still, tick),
+      bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),
       inTalkLine(this.#talkingWith(packet)),
@@ -1443,7 +1448,6 @@ export class AgentRuntime {
     }
     this.#stats.turns += 1
     disarmBodyAlarm(this.#config, packet.self.body, this.#clock, tick)
-    this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
   }
 
   // One ask, and what came back of it: the parsed answer, plus the raw text when the answer

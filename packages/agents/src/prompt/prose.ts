@@ -825,6 +825,15 @@ export function stasisLine(still: Stillness | null, tick: number): string {
   return `You have been in this same spot for ${how}${words}. Nothing has come of it.`
 }
 
+/** A fact about the hour and this body's own habit, for a mind still up and out past it. Under its
+ *  own roof the reflex has already put it to bed; this reaches the one standing in the lane. */
+export function bedtimeLine(packet: PerceptionPacket, bedHour: number, riseHour: number): string {
+  if (packet.self.asleep || !packet.time.isNight) return ''
+  const { hour } = packet.time
+  if (hour < bedHour && hour >= riseHour) return ''
+  return `It is past ${String(bedHour % 24).padStart(2, '0')}:00, the hour you usually turn in.`
+}
+
 /** Somebody this mind has a tie to, when it last had them in sight or earshot, and how warm
  *  the tie stood when they parted. Warmth is read at the parting, not now: a tie that decays
  *  while the two are apart would take the line away exactly as the absence grew long. */
