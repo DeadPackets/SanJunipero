@@ -16,6 +16,7 @@ export type AdjudicationBlocks = {
       structures: { kind: string; x: number; y: number }[]
       ground: string[]
     }
+    people?: { id: string; name: string }[]
     // The asker's own sentence, verbatim. Fenced exactly like the intent, because it is the
     // same class of string: agent-authored text going into a prompt.
     saying?: string | undefined
@@ -138,8 +139,18 @@ function renderAgent(agent: AdjudicationBlocks['agent']): string {
     'Inventory:',
     inventory,
     `Position: ${agent.position.x}, ${agent.position.y}`,
+    ...renderPeople(agent.people),
     ...renderVisible(agent.visible),
   ].join('\n')
+}
+
+// A routine aimed at a person takes an id, and the only ids a ruling may use are these.
+function renderPeople(people: AdjudicationBlocks['agent']['people']): string[] {
+  if (people === undefined) return []
+  const beside = people.map((p) => `${p.name} (${p.id})`).join('; ')
+  return [
+    `Beside the asker: ${beside.length > 0 ? beside : 'nobody'}. A targetId is the id in brackets; a person not listed here is out of reach.`,
+  ]
 }
 
 // A ruling about a place is a ruling about ground the arbiter can see. Anything named here is

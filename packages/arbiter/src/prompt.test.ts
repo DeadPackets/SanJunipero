@@ -451,3 +451,23 @@ describe('token estimate', () => {
     expect(longerCanon.estTokens).toBeGreaterThan(base.estTokens)
   })
 })
+
+describe('the people beside the asker', () => {
+  it('★ names them with the id a targetId takes, and says nothing when the caller sent no list', () => {
+    const with_ = fixtureBlocks({
+      agent: { ...fixtureBlocks().agent, people: [{ id: 'omar', name: 'Omar' }] },
+    })
+    const user = assembleAdjudicationPrompt(with_).messages[0]!.content
+    expect(user).toContain('Beside the asker: Omar (omar). A targetId is the id in brackets')
+    expect(assembleAdjudicationPrompt(fixtureBlocks()).messages[0]!.content).not.toContain(
+      'Beside the asker',
+    )
+  })
+
+  it('an empty list says nobody, so a ruling cannot aim at someone out of sight', () => {
+    const alone = fixtureBlocks({ agent: { ...fixtureBlocks().agent, people: [] } })
+    expect(assembleAdjudicationPrompt(alone).messages[0]!.content).toContain(
+      'Beside the asker: nobody.',
+    )
+  })
+})

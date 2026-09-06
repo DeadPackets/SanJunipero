@@ -11,11 +11,17 @@ import {
 } from '@sj/engine'
 import { SimConfigSchema } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
-import { buildAgentCtx, humanizeIntent, wireArbiter, type SeamArbiter } from './arbiterSeam.js'
+import {
+  aimedAt,
+  buildAgentCtx,
+  humanizeIntent,
+  wireArbiter,
+  type SeamArbiter,
+} from './arbiterSeam.js'
 
 const AGENT = 'tamar'
 
-function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
+function world(opts: { well?: boolean; beside?: boolean; terrain?: TileId[][] } = {}) {
   const config = SimConfigSchema.parse({})
   const terrain: TileId[][] =
     opts.terrain ?? Array.from({ length: 24 }, () => Array.from({ length: 24 }, (): TileId => 0))
@@ -28,6 +34,8 @@ function world(opts: { well?: boolean; terrain?: TileId[][] } = {}) {
     state = fold(state, ev, config)
   }
   emit('agent_spawned', { id: AGENT, name: 'Tamar', x: 7, y: 4, ageDays: 30 })
+  if (opts.beside === true)
+    emit('agent_spawned', { id: 'omar', name: 'Omar', x: 8, y: 4, ageDays: 30 })
   emit('item_spawned', { id: 'item_1', kind: 'wood', qty: 3, loc: { t: 'agent', id: AGENT } })
   emit('skill_gained', { agentId: AGENT, track: 'carpentry', xp: 5 })
   if (opts.well === true) {
@@ -74,6 +82,7 @@ describe('buildAgentCtx', () => {
       skills: { carpentry: 5 },
       inventory: [{ kind: 'wood', qty: 3 }],
       position: { x: 7, y: 4 },
+      people: [],
       visible: { structures: [], ground: ['grass'] },
     })
   })
@@ -94,6 +103,13 @@ describe('buildAgentCtx', () => {
     rows[20]![20] = 5 // sand, far out of sight
     const { bridge } = world({ terrain: rows })
     expect(buildAgentCtx(bridge, AGENT).visible.ground).toEqual(['grass', 'water'])
+  })
+
+  // r33 day 3: the arbiter mapped "i sit beside omar, take his hand" to court with targetId
+  // "Omar", and the world, which knows only ids, answered "no one there to ask".
+  it('★ names who stands beside the asker, by the id a targeted routine takes', () => {
+    const { bridge } = world({ beside: true })
+    expect(buildAgentCtx(bridge, AGENT).people).toEqual([{ id: 'omar', name: 'Omar' }])
   })
 
   it('throws for a body the world does not have — an unknown asker is a bug, not a verdict', () => {
@@ -131,5 +147,20 @@ describe('wireArbiter', () => {
     const wired: SeamArbiter[] = []
     wireArbiter({ useArbiter: (a) => wired.push(a) }, arbiter)
     expect(wired).toEqual([arbiter])
+  })
+})
+
+describe('aimedAt', () => {
+  const seen = [{ id: 'omar', name: 'Omar Haddad' }]
+
+  it('★ a person named in a mapped verdict becomes their id', () => {
+    expect(aimedAt({ targetId: 'Omar' }, seen)).toEqual({ targetId: 'omar' })
+  })
+
+  it('an id stays an id, a name nobody in sight carries stays as written, and no target is no change', () => {
+    expect(aimedAt({ targetId: 'omar' }, seen)).toEqual({ targetId: 'omar' })
+    expect(aimedAt({ targetId: 'Yusuf' }, seen)).toEqual({ targetId: 'Yusuf' })
+    const untargeted: { targetId?: string; itemId: string } = { itemId: 'item_1' }
+    expect(aimedAt(untargeted, seen)).toEqual({ itemId: 'item_1' })
   })
 })

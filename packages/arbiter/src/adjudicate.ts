@@ -187,6 +187,9 @@ export type AgentCtx = {
     structures: { kind: string; x: number; y: number }[]
     ground: string[]
   }
+  // Who stands in sight, by the id a targeted routine takes. r33's first courtship was mapped
+  // to court with targetId "Omar": a name the world has no body for.
+  people?: { id: string; name: string }[]
   // The asker's own sentence behind the ask. Threaded to the prompt, never to a precedent key.
   saying?: string
 }

@@ -1,4 +1,5 @@
 import type { EngineBridge } from './bridge.js'
+import { idNamed } from '../scene/scene.js'
 import type { LawPredicate } from '@sj/engine'
 import type { DiscoveryCredit, RosterEntry } from '@sj/shared'
 
@@ -15,6 +16,8 @@ export type AgentCtx = {
     structures: { kind: string; x: number; y: number }[]
     ground: string[]
   }
+  // Who stands in sight, by the id a targeted routine takes: the arbiter writes what it is shown.
+  people: { id: string; name: string }[]
   // The thought that reached for the act, verbatim. It rides here and not in the intent string
   // because that string is a precedent key (see `humanizeIntent`).
   saying?: string
@@ -91,9 +94,25 @@ export function buildAgentCtx(bridge: EngineBridge, agentId: string, saying?: st
     skills: body.skills,
     inventory: packet.self.inventory.map((i) => ({ kind: i.kind, qty: i.qty })),
     position: { x: packet.self.x, y: packet.self.y },
+    people: packet.visible.agents.map((a) => ({ id: a.id, name: a.name })),
     visible: {
       structures: packet.visible.structures.map((s) => ({ kind: s.kind, x: s.x, y: s.y })),
       ground: bridge.groundKinds(agentId),
     },
   }
+}
+
+/** A mapped verdict's targetId as the world knows it: the arbiter writes the name it read in the
+ *  intent, and the engine answers only to ids. A name nobody in sight carries stays as written. */
+export function aimedAt<P extends { targetId?: unknown }>(
+  params: P,
+  seen: readonly { id: string; name: string }[],
+): P {
+  if (typeof params.targetId !== 'string') return params
+  const id = idNamed(
+    params.targetId,
+    seen.map((a) => a.id),
+    (id) => seen.find((a) => a.id === id)?.name ?? null,
+  )
+  return id === null ? params : { ...params, targetId: id }
 }
