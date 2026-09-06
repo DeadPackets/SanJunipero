@@ -95,6 +95,27 @@ function burningFireAdjacent(): WorldState {
     }),
     CFG,
   )
+  s = fold(s, ev('structure_fueled', { structureId: 's1', burnsUntilTick: 500 }), CFG)
+  return s
+}
+
+function buildingOnFireAdjacent(): WorldState {
+  let s = agentState()
+  s = fold(
+    s,
+    ev('structure_planned', {
+      id: 's1',
+      kind: 'campfire',
+      x: 6,
+      y: 5,
+      w: 1,
+      h: 1,
+      maxHp: 10,
+      flammable: true,
+      builderId: 'a1',
+    }),
+    CFG,
+  )
   s = fold(s, ev('fire_ignited', { structureId: 's1', cause: 'test' }), CFG)
   return s
 }
@@ -191,9 +212,18 @@ describe('codify', () => {
       expect(def.validate(agentState(), CFG, 'a1', {})).toBe('you need a fire nearby')
     })
 
-    it('validate passes an adjacent burning structure', () => {
+    it('validate passes a fed hearth beside you', () => {
       const def = asVerb(boilSaltRecipe)
       expect(def.validate(burningFireAdjacent(), CFG, 'a1', {})).toBeNull()
+    })
+
+    // r34 day 1: Salma stoked her hearth at 13:13 and at 13:23 her wooden rest was refused for
+    // want of a fire, twelve rulings long. The check read `burning`, which is a building on fire.
+    it('★ a building on fire is not a fire to work by, and a hearth burned down is not either', () => {
+      const def = asVerb(boilSaltRecipe)
+      expect(def.validate(buildingOnFireAdjacent(), CFG, 'a1', {})).toBe('you need a fire nearby')
+      const out = { ...burningFireAdjacent(), tick: 600 }
+      expect(def.validate(out, CFG, 'a1', {})).toBe('you need a fire nearby')
     })
   })
 

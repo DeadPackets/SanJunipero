@@ -232,7 +232,10 @@ export function verbFromCharter(charter: VerbCharter): VerbDef {
             break
           }
           case 'adjacent_fire': {
-            if (!anyStructureNear(state, agentId, (s) => s.burning)) return 'you need a fire nearby'
+            // A fire is a hearth somebody fed that has not burned down; `burning` is a building on
+            // fire. r34: Salma stoked her own hearth and was told all day she needed a fire nearby.
+            const fed = (s: Structure) => (s.fueledUntilTick ?? 0) > state.tick
+            if (!anyStructureNear(state, agentId, fed)) return 'you need a fire nearby'
             break
           }
         }

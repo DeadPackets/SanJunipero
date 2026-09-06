@@ -107,7 +107,7 @@ function makeWorld(): WorldState {
     }),
     CFG,
   )
-  s = fold(s, ev('fire_ignited', { structureId: 's1', cause: 'scripted' }), CFG)
+  s = fold(s, ev('structure_fueled', { structureId: 's1', burnsUntilTick: 500 }), CFG)
   return s
 }
 
