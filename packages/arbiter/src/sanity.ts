@@ -87,10 +87,25 @@ export function productsOf(recipe: Recipe): string[] {
   return [...kinds].sort()
 }
 
+// The effects that leave the world different. `none` and `witness` do not, and a recipe made of
+// nothing else is a look: r31 minted "inspect a building exterior" with no effects at all, minds
+// ran it eight times a day, and the recognizer crowned it a custom.
+const CHANGES_WORLD = new Set([
+  'spawn_item',
+  'gain_skill',
+  'hp_delta',
+  'mark',
+  'name_place',
+  'transfer',
+  'need_delta',
+])
+
 // null when the recipe may be codified; otherwise the reason it may never be, in one line.
 export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}): string | null {
   const slug = recipe.id.replace(/^recipe:/, '')
   if (VERDICT_WORDS.has(slug)) return `${recipe.id} is a verdict word, not a craft`
+  if (!recipe.outcomeTable.some((row) => row.effects.some((e) => CHANGES_WORLD.has(e.op))))
+    return `${recipe.id} changes nothing in the world: that is looking, not a craft`
 
   // Every word of the id must be a word of the name, allowing a shortening or an ending. A word
   // with its HEAD eaten is a prefix of nothing, which is how a truncated id is caught.

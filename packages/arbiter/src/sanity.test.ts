@@ -31,6 +31,26 @@ const vocab = {
 }
 
 describe('the codification sanity gate', () => {
+  // r31: inspect a building exterior, inspect an interior, examine a person: three recipes with
+  // no effects at all, run eight times a day and crowned a custom by the recognizer.
+  it('★ refuses a recipe that changes nothing in the world: looking is not a craft', () => {
+    const look: Recipe = {
+      ...base,
+      id: 'recipe:inspect_exterior',
+      name: 'Inspect a building exterior',
+      costs: [],
+      requires: [],
+      outcomeTable: [{ weight: 1, success: true, label: 'You look it over.', effects: [] }],
+    }
+    expect(recipeSanityRefusal(look)).toMatch(/changes nothing/)
+    const idle: Recipe = {
+      ...look,
+      outcomeTable: [{ weight: 1, success: true, label: 'Nothing.', effects: [{ op: 'none' }] }],
+    }
+    expect(recipeSanityRefusal(idle)).toMatch(/changes nothing/)
+    expect(recipeSanityRefusal(base)).toBeNull()
+  })
+
   it('lets an honest recipe through', () => {
     expect(recipeSanityRefusal(base)).toBeNull()
     expect(
