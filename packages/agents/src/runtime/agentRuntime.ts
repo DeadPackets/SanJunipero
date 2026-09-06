@@ -70,7 +70,13 @@ import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
 import { MemoryStore, type MemoryTags } from '../memory/store.js'
 import { TIE_PHRASE, type TieStore } from '../memory/ties.js'
-import { occasionsInPacket, WantStore, type WantBias, type WantOccasion } from '../memory/wants.js'
+import {
+  occasionsInPacket,
+  WANT_PRESSING,
+  WantStore,
+  type WantBias,
+  type WantOccasion,
+} from '../memory/wants.js'
 import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
 import { promptText } from '../memory/gist.js'
 import {
@@ -1205,9 +1211,12 @@ export class AgentRuntime {
     const known = this.#bridge.knownPlaces(this.#agentId)
     const morning = wake.includes('morning')
     const topWant = morning || wake.includes('boredom') ? (this.#wants?.top(tick) ?? null) : null
+    // The morning says the want once; a bored mind hears it again only once it presses.
+    const pressing = topWant !== null && (this.#wants?.levelOf(topWant, tick) ?? 0) >= WANT_PRESSING
+    const esteem = topWant === 'esteem' && (morning || pressing)
     // One read for both lines, so the numbers agree, and none at all on a turn that says
     // neither: counting the town is a walk over every item it holds.
-    const stock = morning || topWant === 'esteem' ? this.#bridge.townStock() : null
+    const stock = morning || esteem ? this.#bridge.townStock() : null
     const nowProse = [
       prose,
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
@@ -1225,8 +1234,8 @@ export class AgentRuntime {
       wantLine(morning && topWant !== 'esteem' ? topWant : null),
       // The esteem mind reads the same numbers inside its own line; twice in one breath is once
       // too many.
-      morning && stock !== null && topWant !== 'esteem' ? stockLine(stock) : '',
-      topWant === 'esteem' && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
+      morning && stock !== null && !esteem ? stockLine(stock) : '',
+      esteem && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
     ]
       .filter((p) => p.length > 0)
       .join(' ')

@@ -19,6 +19,10 @@ export const WANT_RISE_PER_TICK = 0.017
  *  reaches it, and past that more waiting says nothing a morning line could act on. */
 export const WANT_CAP = 100
 
+/** Half a day unfed at the common rate. Below it a want is a row in a table, not a feeling: r27's
+ *  first ten hours told three minds to be counted on at every idle wake while nothing had risen. */
+export const WANT_PRESSING = 12
+
 /** What feeds a want, one occasion per row of the contract. */
 export const FED_BY = {
   scene: 'belonging',

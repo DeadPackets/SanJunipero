@@ -106,7 +106,12 @@ function bridgeOver(before: (put: Put) => void = () => {}): EngineBridge {
 }
 
 /** A mind that wakes on the morning of `day` and answers wait to everything. */
-async function mind(opts: { before?: (put: Put) => void; fedButEsteem?: boolean }) {
+async function mind(opts: {
+  before?: (put: Put) => void
+  fedButEsteem?: boolean
+  /** When the wants began rising. Default 0, a day and a half before the mind wakes. */
+  wantsBeginAt?: number
+}) {
   const built = world((put) => {
     // Abed at the hour the world starts: the morning cue is what a body RISING is told.
     put(0, 'agent_slept', { agentId: AGENT })
@@ -137,7 +142,7 @@ async function mind(opts: { before?: (put: Put) => void; fedButEsteem?: boolean 
   const personality = new PersonalityStore(db, AGENT)
   personality.init(doc, 0)
   const wants = new WantStore(db, AGENT)
-  wants.begin(0)
+  wants.begin(opts.wantsBeginAt ?? 0)
   if (opts.fedButEsteem === true) wants.feed(NOT_ESTEEM, startTick)
 
   const prompts: string[] = []
@@ -344,6 +349,26 @@ describe('★ the short town in a mind’s morning', () => {
       expect(t.morning.split('The town has').length - 1).toBe(1)
       expect(t.morning).not.toContain('Today the thing you want most is esteem')
       expect(t.later).toContain('Today the thing you want most is to be counted on.')
+    } finally {
+      t.stop()
+    }
+  })
+
+  // r27's first ten sim-hours carried the line on 22 of 113 turns, to minds whose wants had not
+  // risen off the floor: the morning says it once, and the idle repeat waits for a want that presses.
+  it('★ says it in the morning, and when bored only once the want has risen', async () => {
+    const t = await mind({
+      fedButEsteem: true,
+      // An hour of rising by the wake: the top want, and nowhere near pressing.
+      wantsBeginAt: DAY + NOON - 60,
+      before: (put) => {
+        hearth(put, 'fire_1', 8, 8)
+      },
+    })
+    try {
+      expect(t.morning).toContain('Today the thing you want most is to be counted on.')
+      expect(t.later.length).toBeGreaterThan(0)
+      expect(t.later).not.toContain('Today the thing you want most')
     } finally {
       t.stop()
     }
