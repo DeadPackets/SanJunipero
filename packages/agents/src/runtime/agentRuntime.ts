@@ -1176,6 +1176,7 @@ export class AgentRuntime {
     const world: Required<ProseWorld> = {
       isWalkable: (x: number, y: number) => this.#bridge.isWalkable(x, y),
       canWalkTo: (mark: WalkMark) => this.#bridge.canWalkTo(this.#agentId, mark),
+      atPlace: (id: string) => this.#bridge.atPlace(this.#agentId, id),
       footingNear: (x: number, y: number) => this.#bridge.footingNear(this.#agentId, x, y),
       isEdible: (kind: string) => this.#bridge.isEdible(kind),
       waterAtHand: () => this.#bridge.waterAtHand(this.#agentId),
@@ -1222,7 +1223,7 @@ export class AgentRuntime {
       makeablesLine(canMake, this.#bridge.groundForBuilding()),
       roadLine(canMake, packet, world),
       valleyExtentLine(world),
-      placesKnownLine(known, packet),
+      placesKnownLine(known, packet, world),
       walkTargetsLine(known, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
       doorstep,

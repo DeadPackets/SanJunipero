@@ -488,6 +488,16 @@ export class EngineBridge {
     return !('refusal' in to) && !(to.x === a.x && to.y === a.y)
   }
 
+  /** Whether a walk that names this place would end on the tile underfoot: as near as a body
+   *  gets to it. The same seam as `canWalkTo`, read the other way round. */
+  atPlace(agentId: string, id: string): boolean {
+    const state = this.#loop.state
+    const a = state.agents[agentId]
+    if (a === undefined || a.insideId !== undefined) return false
+    const to = walkDestination(state, this.#simConfig, agentId, { structureId: id })
+    return !('refusal' in to) && to.x === a.x && to.y === a.y
+  }
+
   /** The nearest ground beside a spot that these legs can reach, and the spot itself when a foot
    *  can hold it. Water and a well are tiles nobody stands on, so the coordinates the roads name
    *  are marks a walk refuses. */

@@ -307,6 +307,9 @@ export type ProseWorld = {
   // Whether the legs would really start for this mark, asked of the walk verb's own seam so a
   // target the prose offers is a target the world takes.
   canWalkTo?: (mark: WalkMark) => boolean
+  // Whether a walk that names this place would end on the tile underfoot: the body is there.
+  // r27's Nadia read "the river, close to the west" from its own bank and walked to it nine times.
+  atPlace?: (id: string) => boolean
   // The nearest ground beside a spot that these legs can reach. Water and a well are both tiles
   // no foot can stand on, so the coordinates the roads name are not marks a walk can take.
   footingNear?: (x: number, y: number) => { x: number; y: number } | null
@@ -699,7 +702,11 @@ const PLACES_SHOWN = 16
 /** Where this mind could go without seeing it first: everything it knows of that is not already
  *  in front of it, landmarks first and then nearest first. A town of twelve roofs is twelve
  *  nearer things than the river, and sorting on distance alone drops the valley off the page. */
-export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket): string {
+export function placesKnownLine(
+  places: KnownPlace[],
+  packet: PerceptionPacket,
+  world?: ProseWorld,
+): string {
   const inSight = new Set(packet.visible.structures.map((s) => s.id))
   const { x, y } = packet.self
   const lines = places
@@ -712,7 +719,11 @@ export function placesKnownLine(places: KnownPlace[], packet: PerceptionPacket):
         (a.p.id < b.p.id ? -1 : 1),
     )
     .slice(0, PLACES_SHOWN)
-    .map(({ p }) => `${placeSaid(p)} (${p.id}), ${wayTo(p.x - x, p.y - y)}`)
+    .map(({ p }) =>
+      world?.atPlace?.(p.id) === true
+        ? `${placeSaid(p)} (${p.id}), right where you stand`
+        : `${placeSaid(p)} (${p.id}), ${wayTo(p.x - x, p.y - y)}`,
+    )
   return lines.length === 0 ? '' : `Places you know:\n${lines.join('\n')}`
 }
 

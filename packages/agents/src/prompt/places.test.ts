@@ -119,6 +119,31 @@ describe('★ the places a mind knows but cannot see', () => {
     expect(lines[2]).toContain('structure_00')
   })
 
+  // r27: Nadia read "the river (river), close to the west" from its own bank and walked to it
+  // nine times in seven hours, told each time she was already there.
+  it('★ a place the body already stands at is said so, and not as a bearing', () => {
+    const river = place({
+      id: 'river',
+      kind: 'river',
+      name: 'the river',
+      x: AT.x - 1,
+      natural: true,
+    })
+    const well = place({ id: 'structure_9', kind: 'well', x: AT.x + 20 })
+    const block = placesKnownLine([river, well], quietMeadowPacket, {
+      atPlace: (id) => id === 'river',
+    })
+    expect(block.split('\n')).toEqual([
+      'Places you know:',
+      'the river (river), right where you stand',
+      'a well (structure_9), a way to the east',
+    ])
+    // Without the seam the bearing stands, as it always did.
+    expect(placesKnownLine([river], quietMeadowPacket)).toContain(
+      'the river (river), close to the west',
+    )
+  })
+
   it('is a fact and nothing more: no machinery, no counsel', () => {
     const block = placesKnownLine(
       [place({ id: 'structure_1', x: 60, name: 'the old farmhouse' })],

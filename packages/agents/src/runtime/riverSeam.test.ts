@@ -111,6 +111,22 @@ describe('★ the valley a mind is born knowing', () => {
     expect(bank.x).toBeGreaterThan(GENESIS_RIVER_X)
   })
 
+  it('★ standing on the bank, the mind is told the river is right where it stands', () => {
+    const { loop, config } = valley(EAST_BANK)
+    const to = walkDestination(loop.state, config, AGENT, { structureId: 'river' })
+    const bank = to as { x: number; y: number }
+    const onBank = valley(bank)
+    expect(onBank.bridge.atPlace(AGENT, 'river')).toBe(true)
+    const packet = onBank.bridge.perception(AGENT)
+    const world = { atPlace: (id: string) => onBank.bridge.atPlace(AGENT, id) }
+    expect(placesKnownLine(onBank.bridge.knownPlaces(AGENT), packet, world)).toContain(
+      'the river (river), right where you stand',
+    )
+    // Thirty tiles off it is a bearing again.
+    const { bridge } = valley(EAST_BANK)
+    expect(bridge.atPlace(AGENT, 'river')).toBe(false)
+  })
+
   it('a mark this valley has no ground for names no place at all', () => {
     const { loop, config } = valley(EAST_BANK, true)
     expect(walkDestination(loop.state, config, AGENT, { structureId: 'river' })).toEqual({
