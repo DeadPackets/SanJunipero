@@ -38,6 +38,8 @@ import {
   REFUSAL_MEMORY_TICKS,
   TRIED_FREEFORM,
   actImportance,
+  actionMemoryText,
+  asMinted,
   reflectionOffsetTicks,
   refusalMemoryText,
   wantedWater,
@@ -2457,6 +2459,56 @@ describe('what the town has learned reaches every mind', () => {
     expect(second).toContain('Name it recipe:smoke_fish')
     expect(second.indexOf(ROSTER_HEAD)).toBeGreaterThan(second.indexOf(SPEECH_RULES))
     expect(second.indexOf(ROSTER_HEAD)).toBeLessThan(second.indexOf('Name: Tamar'))
+  })
+})
+
+// r26: eight refusals of "no such recipe: inspect_riverbank", each the day after the town had
+// minted recipe:inspect_riverbank. The old door and the new one open onto the same act.
+describe('★ a minted act asked for through craft is the minted act', () => {
+  const roster: RosterEntry[] = [
+    { id: 'recipe:inspect_riverbank', name: 'Inspect riverbank for signs', gloss: 'g', reads: [] },
+    { id: 'recipe:mend_rope', name: 'Mend rope', gloss: 'g', reads: ['itemId'] },
+  ]
+
+  it('rewrites craft {recipe} onto the minted verb, with or without the prefix', () => {
+    expect(asMinted({ verb: 'craft', params: { recipe: 'inspect_riverbank' } }, roster)).toEqual({
+      verb: 'recipe:inspect_riverbank',
+      params: {},
+    })
+    expect(
+      asMinted({ verb: 'craft', params: { recipe: 'recipe:inspect_riverbank' } }, roster),
+    ).toEqual({ verb: 'recipe:inspect_riverbank', params: {} })
+  })
+
+  it('keeps only the keys the minted verb reads', () => {
+    expect(
+      asMinted(
+        { verb: 'craft', params: { recipe: 'mend_rope', itemId: 'item_7', x: 3, y: 4 } },
+        roster,
+      ),
+    ).toEqual({ verb: 'recipe:mend_rope', params: { itemId: 'item_7' } })
+  })
+
+  it('leaves every other intent alone', () => {
+    const plank = { verb: 'craft', params: { recipe: 'plank' } }
+    expect(asMinted(plank, roster)).toBe(plank)
+    const walk = { verb: 'walk', params: { recipe: 'mend_rope' } }
+    expect(asMinted(walk, roster)).toBe(walk)
+    expect(asMinted({ verb: 'craft', params: {} }, [])).toEqual({ verb: 'craft', params: {} })
+  })
+
+  it('remembers a minted act by the name the town gave it', () => {
+    const done = { seq: 1, verb: 'recipe:inspect_riverbank', settled: false }
+    expect(actionMemoryText(done, 'Inspect riverbank for signs')).toBe(
+      'You have carried out "Inspect riverbank for signs".',
+    )
+    expect(actionMemoryText(done)).toBe('You have made inspect riverbank.')
+    expect(actionMemoryText({ seq: 2, verb: 'fish', settled: false, made: 'fish' })).toBe(
+      'You have fished, and come away with fish.',
+    )
+    expect(actionMemoryText({ seq: 3, verb: 'forage', settled: false })).toBe(
+      'You have foraged, and come away with nothing.',
+    )
   })
 })
 

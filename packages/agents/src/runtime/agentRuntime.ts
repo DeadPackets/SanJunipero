@@ -177,17 +177,34 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${said}${hint}`
 }
 
+/** `craft inspect_riverbank` for an act the town minted as `recipe:inspect_riverbank` is the
+ *  same act by its older door. r26 turned it away eight times as a recipe nobody had discovered,
+ *  the day after somebody had. The keys kept are the minted verb's own, as its roster row says. */
+export function asMinted(intent: Intent, roster: readonly RosterEntry[]): Intent {
+  if (intent.verb !== 'craft') return intent
+  const recipe = intent.params.recipe
+  if (typeof recipe !== 'string') return intent
+  const id = recipe.startsWith('recipe:') ? recipe : `recipe:${recipe}`
+  const entry = roster.find((r) => r.id === id)
+  if (entry === undefined) return intent
+  const params: Record<string, unknown> = {}
+  for (const key of entry.reads) if (key in intent.params) params[key] = intent.params[key]
+  return { verb: entry.id, params }
+}
+
 // What a pair of hands can come away from empty. Said with the outcome, because "you have
 // fished" after an empty cast reads as a fish.
 const GATHERING_VERBS: ReadonlySet<string> = new Set(['fish', 'forage', 'hunt', 'harvest', 'chop'])
 
 /** The other half of the same sentence: what the hands did do. All 402 action memories the
- *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. */
-function actionMemoryText(done: FinishedAct): string {
+ *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. A minted
+ *  act is remembered by the name the town gave it: "made inspect riverbank" is not a sentence. */
+export function actionMemoryText(done: FinishedAct, mintedName?: string): string {
   if (done.settled)
     return done.verb === 'walk'
       ? 'You were already there; no step was needed.'
       : 'Nothing needed doing; it already stood as you asked.'
+  if (mintedName !== undefined) return `You have carried out "${mintedName}".`
   const past = verbPhrasePast(done.verb)
   if (!GATHERING_VERBS.has(done.verb)) return `You have ${past}.`
   return done.made === undefined
@@ -1052,7 +1069,10 @@ export class AgentRuntime {
       // one of the two who can see it happen.
       if (done.verb === 'teach')
         this.#book(() => this.#wants?.feed(['taught'], this.#bridge.currentTick()))
-      void this.#writeActionMemory(actionMemoryText(done), actImportance(done.verb)).catch(
+      const minted = done.verb.startsWith('recipe:')
+        ? this.#roster?.().find((r) => r.id === done.verb)?.name
+        : undefined
+      void this.#writeActionMemory(actionMemoryText(done, minted), actImportance(done.verb)).catch(
         this.#sink('memory_write_failed'),
       )
     }
@@ -1462,12 +1482,13 @@ export class AgentRuntime {
           'freeform' in action
             ? { verb: 'experiment', params: { description: action.freeform } }
             : { verb: action.verb, params: action.params }
-        await this.#holdIntent(intent)
+        await this.#holdIntent(asMinted(intent, this.#roster?.() ?? []))
       }
     }
 
     if (turn.plan) {
-      this.#plan.queue = [...turn.plan]
+      const roster = this.#roster?.() ?? []
+      this.#plan.queue = turn.plan.map((step) => asMinted(step, roster))
       this.#plan.size = turn.plan.length
       this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
       this.#planHeadInFlight = false
