@@ -170,10 +170,10 @@ two only speak. None of them takes the viewer down.
 
 | Guard | Set at | What it does |
 |---|---|---|
-| Daily budget | `SJ_SPEND_DAILY_USD`, $3.00 per rolling 24 h | Stops every mind; the town keeps serving, and a restart boots it scripted until the window rolls. |
+| Daily budget | `SJ_SPEND_DAILY_USD`, $30.00 per rolling 24 h | Stops every mind; the town keeps serving, and a restart boots it scripted until the window rolls. |
 | Anomaly stop | `SJ_SPEND_CAP_USD`, $50 over the town's life; 0 turns it off | Stops every mind; the town keeps serving. The town on disk is intact. |
 | Rate tripwire | 22 calls/mind/sim-hour over 15 min | A runaway, never a price. Stops every mind; the town keeps serving. |
-| Operator alert | $0.40/sim-day over 15 min | Prints and files an alert. Stops nothing. |
+| Operator alert | $2.50/sim-day over 15 min | Prints and files an alert. Stops nothing. |
 | Provider mix | >70% of mind calls off the pinned provider | Prints and files an alert. Never stops. |
 
 Both dollar guards are per town, not per process: the ledger resumes with the world, so a

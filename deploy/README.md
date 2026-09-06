@@ -95,9 +95,14 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback operator channel. |
 | `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
 | `SJ_GIT_SHA` | unset | Stamped into `/admin/export`'s manifest. Without it a replay cannot know which code folded the events. |
-| `SJ_SPEND_DAILY_USD` | `3.00` | Dollars the live cast may burn in a rolling 24 real hours. |
+| `SJ_SPEND_DAILY_USD` | `30.00` | Dollars the live cast may burn in a rolling 24 real hours. |
 | `SJ_SPEND_CAP_USD` | `50.00` | Dollars over the town's whole life; `0` is no lifetime cap. |
 | `SJ_IDLE_GAP` | `15` | Sim-minutes a mind waits between turns when nothing is happening to it. Every call the town makes scales roughly inversely with it: raise it to halve the bill, lower it for a busier town. |
+| `SJ_IDLE_PACING` | `1` | `0` turns the pacing off: the clock keeps the operator's speed whether or not anybody is watching. |
+| `SJ_IDLE_AFTER_MS` | `300000` | Real milliseconds without a viewer before the town slows to `SJ_IDLE_SPEED`. |
+| `SJ_IDLE_SPEED` | `0.1` | The speed an unwatched town runs at. A tab in the background counts as unwatched after 15 s. |
+| `SJ_NIGHT_FACTOR` | `4` | How many times faster the clock runs while every living body is asleep, until one wakes or the operator moves the dial. |
+| `SJ_FLOOR_TIMEOUT_MS` | `90000` | Real milliseconds a talk waits for a spoken line before the floor passes on. |
 | `SJ_PUBLIC_ORIGIN` | unset | The origin printed into canonical links, og tags and the sitemap. Unset, the gateway trusts the proxy's forwarded host. |
 | `SJ_MAX_MINDS` | `20` | How many minds the town may hold, never fewer than the twelve founders. A birth past it is folded into the world with no mind booted for it. |
 | `SJ_ART_DAILY_USD` | `1.25` | Dollars a day the town may put into faces for the people it makes; a sheet is eight images, about $1.15. `0` draws none; the body wears the placeholder. |
