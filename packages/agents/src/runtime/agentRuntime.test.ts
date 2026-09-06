@@ -120,7 +120,13 @@ const FIRE_AT = [
 ]
 const WOOD_ID = 'item_wood'
 
-function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0, ownRoof = false) {
+function buildWorld(
+  simConfig?: SimConfig,
+  knownAfar = false,
+  hearths = 0,
+  ownRoof = false,
+  roofOwner = AGENT,
+) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -164,7 +170,7 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0, ownRo
       maxHp: 50,
       flammable: true,
       builderId: AGENT,
-      owner: AGENT,
+      owner: roofOwner,
     })
     emit('structure_completed', { id: HOUSE_ID })
     emit('agent_entered', { agentId: AGENT, structureId: HOUSE_ID })
@@ -432,8 +438,15 @@ async function setup(opts: {
   knownAfar?: boolean
   hearths?: number
   ownRoof?: boolean
+  roofOwner?: string
 }) {
-  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths, opts.ownRoof)
+  const world = buildWorld(
+    opts.simConfig,
+    opts.knownAfar,
+    opts.hearths,
+    opts.ownRoof,
+    opts.roofOwner,
+  )
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -1104,6 +1117,28 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
     expect(loop.state.agents[AGENT]!.asleep).toBe(true)
     expect(runtime.stats().turns).toBe(0)
+  })
+
+  // Half of r28's town slept under a roof in a spouse's name or nobody's, and the reflex never
+  // reached them: 20% of all turn prompts were bought between 21:00 and 05:00.
+  it('the roof it last slept under is a bed too, whoever owns it', async () => {
+    const { loop, runtime, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      simConfig: SLOW_BODY,
+      ownRoof: true,
+      roofOwner: 'kamal',
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    expect(loop.state.agents[AGENT]!.asleep, "another's roof is no bed until slept in").toBe(false)
+    void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    await stepUntil(loop, () => loop.tick >= 22 * 60 - 10, 2000)
+    expect(loop.state.agents[AGENT]!.asleep, 'up since the morning wake').toBe(false)
+    const turnsBeforeBed = runtime.stats().turns
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 60)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+    expect(runtime.stats().turns).toBe(turnsBeforeBed)
   })
 
   it('an idle body out of doors at night waits for its own turn to find a bed', async () => {

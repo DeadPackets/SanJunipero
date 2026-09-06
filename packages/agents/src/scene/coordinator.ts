@@ -95,6 +95,9 @@ export const EARSHOT_GRACE_TICKS = 8
 export const WALK_OFF_WINDOW_TICKS = 60
 // Three expressers on the plaza at dusk is a crowd, not a pair.
 const GATHERING_MINIMUM = 3
+// Under this energy a body starts and joins no talk: the level the body alarm rings at, so nobody
+// talks past their own bell. A talk already open keeps them until that alarm turn says goodbye.
+const TOO_TIRED_TO_TALK = 25
 // How many of its own last lines a mind is shown before it speaks again.
 const RECENT_LINES_KEPT = 4
 // A coordinator with nobody to tell drops what it would have reported.
@@ -234,11 +237,12 @@ export class SceneCoordinator {
       this.#recordLine(mine, agentId, said, '', 'none', null, tick)
       return mine
     }
+    if (!this.#canOpen(agentId)) return null
     const joined = this.#joinNearby(agentId, said, tick)
     if (joined !== null) return joined
     const heard = this.#bridge
       .earshot(agentId)
-      .filter((id) => this.#mindFor(id) !== null && this.#canTalk(id))
+      .filter((id) => this.#mindFor(id) !== null && this.#canOpen(id))
     if (heard.length + 1 < TALKERS_NEEDED) return null
     // A name opens a talk whatever the day has held; a remark to the air does not once the
     // speaker, or everyone near enough to answer, has talked their fill today.
@@ -649,6 +653,10 @@ export class SceneCoordinator {
    *  The hour is not in it — a talk that runs past midnight is a late night, not a fault. */
   #canTalk(agentId: string): boolean {
     return this.#bridge.isAlive(agentId) && this.#bridge.isAwake(agentId)
+  }
+
+  #canOpen(agentId: string): boolean {
+    return this.#canTalk(agentId) && this.#bridge.energyOf(agentId) >= TOO_TIRED_TO_TALK
   }
 
   /** Anyone out of the last speaker's earshot, dead, or gone to bed has left the talk, and the

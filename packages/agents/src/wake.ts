@@ -10,6 +10,9 @@ export type MindConfig = {
   // affliction at or above `affliction` severity is a body failing, and worth waking for.
   bodyAlarm: { hunger: number; energy: number; warmth: number; thirst: number; affliction: number }
   alarmHysteresis: number
+  // How long a spent alarm stays quiet while the body is still failing on it before it rings
+  // again, so a talk or a job that runs on cannot outlast the bell.
+  alarmRepeatTicks: number
   journalTicks: number
   dozeTicks: number
   wakeRetryTicks: number
@@ -34,6 +37,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   // lost ten of its eleven collapses to minds still up and talking at 23:00 with no way to a bed.
   bodyAlarm: { hunger: 15, energy: 25, warmth: 20, thirst: 25, affliction: 1 },
   alarmHysteresis: 10,
+  alarmRepeatTicks: 120,
   journalTicks: 10,
   dozeTicks: 60,
   wakeRetryTicks: 25,
@@ -82,6 +86,7 @@ export type MindClock = {
   // The felt tags this mind has already been asked about. Optional: a checkpoint written before
   // it existed still resumes, and an absent latch costs one turn, not sixty-six.
   feltSeen?: string[] | undefined
+  alarmAgainAtTick?: number | undefined
 }
 
 type Intent = z.infer<typeof IntentSchema>
@@ -153,7 +158,7 @@ export function wakeReasons(
   // Standing in a talk is hands at work, and the body breaks off both the same way. Nothing
   // closes a talk for being late any more, so this is the only thing that reaches anyone in one
   // running down: merely tired keeps listening, genuinely failing goes.
-  const failing = bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)
+  const failing = alarmRinging(cfg, packet.self.body, clock, tick)
 
   // An hour lain with somebody is chosen, and it is as deep a state as sleep: a boredom or a
   // plan wake out of it is a turn spent being refused for hands that are full.
@@ -199,7 +204,7 @@ export function wakeReasons(
   const spentFelt = clock.feltSeen ?? []
   const felt = heard.length > spentFelt.length || heard.some((e) => !spentFelt.includes(e))
   clock.feltSeen = [...heard]
-  if (bodyAlarmFired(cfg, packet.self.body, clock.alarmArmed)) reasons.push('body_alarm')
+  if (failing) reasons.push('body_alarm')
   if (felt) reasons.push('salient_perception')
   if (plan.lastResult === 'blocked') reasons.push('plan_blocked')
   // Above the gate on purpose, and affordable there because a scene resets belonging to 0: a
@@ -249,6 +254,13 @@ function bodyAlarmFired(cfg: MindConfig, body: AlarmBody, armed: MindClock['alar
   return ringing(cfg, body).some((key) => armed[key] ?? true)
 }
 
+// An armed rung rings at once; a spent one rings again every `alarmRepeatTicks` for as long as
+// the body stays on it. r28 lost Leyla to four talks after her one bell had been spent.
+function alarmRinging(cfg: MindConfig, body: AlarmBody, clock: MindClock, tick: number): boolean {
+  if (bodyAlarmFired(cfg, body, clock.alarmArmed)) return true
+  return tick >= (clock.alarmAgainAtTick ?? Infinity) && ringing(cfg, body).length > 0
+}
+
 // A need recovered past threshold + hysteresis re-arms, so oscillation cannot re-fire it. An
 // affliction has no scale to oscillate on: getting worse is not a second bell.
 export function rearmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
@@ -264,8 +276,17 @@ export function rearmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindCloc
 
 // Called after a successful turn: rungs the mind has now seen itself on stop ringing until
 // it climbs off them.
-export function disarmBodyAlarm(cfg: MindConfig, body: AlarmBody, clock: MindClock): void {
-  for (const key of ringing(cfg, body)) clock.alarmArmed[key] = false
+export function disarmBodyAlarm(
+  cfg: MindConfig,
+  body: AlarmBody,
+  clock: MindClock,
+  tick: number,
+): void {
+  const keys = ringing(cfg, body)
+  for (const key of keys) clock.alarmArmed[key] = false
+  // Counted from the bell's own turn: the floor turns a talker takes in between do not push it.
+  if (keys.length > 0 && tick >= (clock.alarmAgainAtTick ?? 0))
+    clock.alarmAgainAtTick = tick + cfg.alarmRepeatTicks
 }
 
 // What this mind only noticed, as against what happened to it. A word carries no claim on the

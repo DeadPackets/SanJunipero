@@ -810,6 +810,15 @@ describe('the night is a time of day, not an ending', () => {
     ).toEqual([NADIA, SALMA])
   })
 
+  it('a body under the alarm line neither opens a talk nor is opened on', () => {
+    const h = harness({})
+    h.emitNext('needs_changed', { id: NADIA, changes: [{ need: 'energy', delta: -80 }] })
+    h.loop.step()
+    expect(h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)).toBeNull()
+    expect(h.coordinator.noteSpoken(OMAR, 'Nadia. Six planks.', NOON)).toBeNull()
+    expect(h.coordinator.open()).toHaveLength(0)
+  })
+
   it('tells the floor-holder the hour and what its body has left', async () => {
     const h = harness({})
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
@@ -826,8 +835,8 @@ describe('the night is a time of day, not an ending', () => {
       // Nobody made them go; they read the hour and the weariness and answered it.
       script: () => (a, n) => fromCorpus(n, { leave: a.tick >= NIGHT && a.energy < 45 }),
     })
-    h.emitNext('needs_changed', { id: OMAR, changes: [{ need: 'energy', delta: -80 }] })
-    h.emitNext('needs_changed', { id: NADIA, changes: [{ need: 'energy', delta: -80 }] })
+    h.emitNext('needs_changed', { id: OMAR, changes: [{ need: 'energy', delta: -60 }] })
+    h.emitNext('needs_changed', { id: NADIA, changes: [{ need: 'energy', delta: -60 }] })
     h.loop.step()
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NIGHT)
     await play(h, NIGHT)

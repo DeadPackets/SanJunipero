@@ -17,6 +17,8 @@ const NeedsSchema = z
     warmthEqualizeFactorPerTick: z.number().default(0.05),
     debuffThreshold: z.number().default(30),
     collapseThreshold: z.number().default(5),
+    // Above this energy a body cannot fall asleep in daylight. 101 is off; the live town sets it.
+    daySleepAbove: z.number().default(101),
     // Four days of hungry drama before a death, so somebody can still be the one who fed them.
     deathAfterZeroHungerTicks: z.number().default(5760),
     eatRestoreHunger: z.number().default(60),

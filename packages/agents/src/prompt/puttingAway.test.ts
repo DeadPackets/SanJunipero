@@ -22,6 +22,7 @@ type Placed = {
   into?: string
   at?: { x: number; y: number }
   owner?: string
+  text?: string
 }
 
 function town(placed: Placed[] = []): EngineBridge {
@@ -59,6 +60,7 @@ function town(placed: Placed[] = []): EngineBridge {
       id: p.id,
       kind: p.kind,
       qty: p.qty,
+      ...(p.text === undefined ? {} : { text: p.text }),
       loc:
         p.into !== undefined
           ? { t: 'structure', id: p.into }
@@ -127,6 +129,14 @@ describe('the satchel is read out once, grouped by kind', () => {
   it('a single thing keeps its own mark, with nothing trailing it', () => {
     const said = proseFor(town([{ id: 'item_9', kind: 'bucket', qty: 1 }]))
     expect(said).toContain('Your hands hold bucket ×1 (item_9);')
+  })
+
+  // r28: Halim read the one note in his hand 56 times, because nothing else told him what it said.
+  it('a held note is read out in the hand, so nobody has to keep reading it', () => {
+    const said = proseFor(
+      town([{ id: 'item_9', kind: 'note', qty: 1, text: 'Two planks owed to Omar.' }]),
+    )
+    expect(said).toContain('Your hands hold note ×1 (item_9; it reads "Two planks owed to Omar.")')
   })
 
   it("another's thing is a tally of its own, and still says whose it is", () => {

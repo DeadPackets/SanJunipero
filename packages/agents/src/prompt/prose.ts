@@ -1106,7 +1106,7 @@ function heldPhrase(held: PerceptionItem[]): string {
   type Group = { kind: string; qty: number; id: string; claim: string; more: boolean }
   const groups = new Map<string, Group>()
   for (const i of held) {
-    const claim = claimPhrase(i)
+    const claim = `${claimPhrase(i)}${i.text === undefined ? '' : `; it reads "${i.text}"`}`
     const at = groups.get(`${i.kind}${claim}`)
     if (at === undefined) {
       groups.set(`${i.kind}${claim}`, { kind: i.kind, qty: i.qty, id: i.id, claim, more: false })

@@ -175,8 +175,27 @@ describe('the body reaches a mind in a talk', () => {
   it('rings once and then listens again, because a spent alarm is disarmed', () => {
     const failing = withNeeds(60, 5, 71)
     const clock = clk()
-    disarmBodyAlarm(cfg, failing.self.body, clock)
+    disarmBodyAlarm(cfg, failing.self.body, clock, 10)
     expect(decideWake(cfg, failing, clock, 10, pln(), LISTENS)).toBe(null)
+  })
+
+  it('rings again after alarmRepeatTicks for a body still failing, in the talk or out of it', () => {
+    const failing = withNeeds(60, 5, 71)
+    const clock = clk()
+    disarmBodyAlarm(cfg, failing.self.body, clock, 10)
+    const again = 10 + cfg.alarmRepeatTicks
+    expect(decideWake(cfg, failing, clock, again - 1, pln(), LISTENS)).toBe(null)
+    // Ordinary turns in between, each disarming again, do not push the repeat back.
+    disarmBodyAlarm(cfg, failing.self.body, clock, 60)
+    expect(decideWake(cfg, failing, clock, again, pln(), LISTENS)).toBe('body_alarm')
+    disarmBodyAlarm(cfg, failing.self.body, clock, again)
+    expect(decideWake(cfg, failing, clock, again + 1, pln(), LISTENS)).toBe(null)
+    expect(decideWake(cfg, failing, clock, again * 2 - 10, pln(), LISTENS)).toBe('body_alarm')
+    expect(
+      wakeReasons(cfg, failing, { ...clock, lastTurnTick: again * 2 - 11 }, again * 2 - 10, pln()),
+    ).toEqual(['body_alarm'])
+    // Recovered past the bell, the repeat has nothing to ring for.
+    expect(decideWake(cfg, withNeeds(60, 40, 71), clock, again, pln(), LISTENS)).toBe(null)
   })
 
   it('takes a failing listener out of the talk too', () => {
@@ -413,7 +432,7 @@ describe('decideWake — hysteresis', () => {
     }
 
     expect(run(14, 10)).toBe('body_alarm')
-    disarmBodyAlarm(cfg, { needs: { hunger: 14, energy: 78, warmth: 71 } }, clock)
+    disarmBodyAlarm(cfg, { needs: { hunger: 14, energy: 78, warmth: 71 } }, clock, 10)
 
     expect(run(14, 11)).toBe(null)
 
@@ -430,7 +449,7 @@ describe('decideWake — hysteresis', () => {
     // Regression: hunger 20 lies in (15, 25]; a turn snapshot there used to
     // permanently disarm body_alarm because 20 is not > threshold + hysteresis.
     const clock = clk()
-    disarmBodyAlarm(cfg, { needs: { hunger: 20, energy: 78, warmth: 71 } }, clock)
+    disarmBodyAlarm(cfg, { needs: { hunger: 20, energy: 78, warmth: 71 } }, clock, 10)
     expect(decideWake(cfg, withNeeds(14, 78, 71), clock, 10, pln())).toBe('body_alarm')
   })
 })
@@ -484,7 +503,7 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
     const clock = clk()
     const poisoned = withAffliction('poison', 2)
     expect(decideWake(cfg, poisoned, clock, 10, pln())).toBe('body_alarm')
-    disarmBodyAlarm(cfg, poisoned.self.body, clock)
+    disarmBodyAlarm(cfg, poisoned.self.body, clock, 10)
     expect(decideWake(cfg, poisoned, clock, 11, pln())).toBe(null)
 
     // Still poisoned, worse: no second bell. Only losing it re-arms the alarm.
@@ -497,7 +516,7 @@ describe('decideWake — the thirst rung and the affliction rung', () => {
   it('thirst disarms and re-arms on the same hysteresis as hunger', () => {
     const clock = clk()
     expect(decideWake(cfg, withThirst(24), clock, 10, pln())).toBe('body_alarm')
-    disarmBodyAlarm(cfg, withThirst(24).self.body, clock)
+    disarmBodyAlarm(cfg, withThirst(24).self.body, clock, 10)
     expect(decideWake(cfg, withThirst(24), clock, 11, pln())).toBe(null)
     rearmBodyAlarm(cfg, withThirst(30).self.body, clock)
     expect(decideWake(cfg, withThirst(24), clock, 12, pln())).toBe(null)

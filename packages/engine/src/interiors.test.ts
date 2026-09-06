@@ -192,6 +192,26 @@ describe('sleep is indoors-only (C9 T2b)', () => {
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok).toBe(true)
   })
 
+  // r28: one mind napped four times between 07:11 and 14:11 at full energy, each nap a wake
+  // turn and a fresh decision to lie down again.
+  it('in daylight, a body with energy to spare cannot fall asleep where the town says so', () => {
+    const rested = SimConfigSchema.parse({ needs: { daySleepAbove: 60 } })
+    let s = withAgent(withHouse(world()), 'a1', 2, 3)
+    s = fold(s, ev(12, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    s = { ...s, tick: 10 * 60 }
+    expect(submitIntent(s, rested, 'a1', 'sleep', {})).toMatchObject({
+      ok: false,
+      reason: 'it is daylight and you are not tired enough to sleep',
+    })
+    expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'sleep', {}).ok, 'off by default').toBe(true)
+    const tired = fold(
+      s,
+      ev(13, 'needs_changed', { id: 'a1', changes: [{ need: 'energy', delta: -50 }] }),
+    )
+    expect(submitIntent(tired, rested, 'a1', 'sleep', {}).ok).toBe(true)
+    expect(submitIntent({ ...s, tick: 22 * 60 }, rested, 'a1', 'sleep', {}).ok).toBe(true)
+  })
+
   // sleepableKinds used to say `house` and nothing else, so a body standing dry inside a
   // storehouse was refused a bed and walked back into the weather. Anything with a roof will do.
   it('checks the roof, not the owner — a storehouse and a cottage both do', () => {

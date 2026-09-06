@@ -122,6 +122,7 @@ export const DEFAULT_IDLE_GAP_TICKS = 15
 export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
   'needs.hungerDecayPerTick': 0.01,
   'needs.energyDecayAwakePerTick': 0.065,
+  'needs.daySleepAbove': 60,
   'light.fuelBurnTicks': 480,
 }
 

@@ -425,6 +425,7 @@ export class AgentRuntime {
   #dayLog: string[] = []
   #bedInFlight = false
   #bedRetryAtTick = 0
+  #bedRoof: string | null = null
   #prevMomentSentences = new Set<string>()
   #clock: MindClock = freshClock()
   #plan: PlanState = idlePlan()
@@ -774,13 +775,18 @@ export class AgentRuntime {
     this.#onMood({ tick: this.#bridge.currentTick(), agentId: this.#agentId, mood })
   }
 
-  // Bedtime is the body's own reflex and costs the mind nothing: idle under its own roof past
-  // its hour, it lies down without a turn, so a night holds no calls but a planned wake, a body
-  // failing, or fire. r27 spent 130 turns on minds standing about at night with nothing to do.
+  // Bedtime is the body's own reflex and costs the mind nothing: idle past its hour under its own
+  // roof, or the roof it last slept under (a spouse's house, nobody's cottage), it lies down
+  // without a turn, so a night holds no calls but a planned wake, a body failing, or fire.
   #lieDownIfDue(tick: number, packet: PerceptionPacket): boolean {
     if (this.#bedInFlight) return true
     const { asleep, activity, inside } = packet.self
-    if (asleep || activity !== null || inside?.yours !== true || !packet.time.isNight) return false
+    if (asleep) {
+      if (inside !== undefined) this.#bedRoof = inside.id
+      return false
+    }
+    const bed = inside !== undefined && (inside.yours === true || inside.id === this.#bedRoof)
+    if (!bed || activity !== null || !packet.time.isNight) return false
     const { hour } = packet.time
     if (hour < this.#config.bedHour && hour >= this.#config.riseHour) return false
     if (tick < this.#bedRetryAtTick) return false
@@ -1436,7 +1442,7 @@ export class AgentRuntime {
       this.#plan.lastResult = 'idle'
     }
     this.#stats.turns += 1
-    disarmBodyAlarm(this.#config, packet.self.body, this.#clock)
+    disarmBodyAlarm(this.#config, packet.self.body, this.#clock, tick)
     this.#clock.prevVisibleIds = packet.visible.agents.map((a) => a.id)
   }
 

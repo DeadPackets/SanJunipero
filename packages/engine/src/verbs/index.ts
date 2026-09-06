@@ -727,6 +727,8 @@ const sleep: VerbDef = makeVerb({
   validate(state, config, agentId) {
     const a = state.agents[agentId]!
     if (a.asleep) return 'already asleep'
+    if (!simTimeFromTick(state.tick).isNight && a.needs.energy > config.needs.daySleepAbove)
+      return 'it is daylight and you are not tired enough to sleep'
     if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
     if (s?.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
