@@ -471,6 +471,12 @@ export function makeablesLine(
         `The town keeps ground for a new building at (${groundForBuilding.x}, ${groundForBuilding.y}). You have to be standing there to start one.`,
       )
     }
+    // r32's Amara carried "the bridge once I find the right place" for two days: the kept
+    // ground is inland, and nothing said a bridge is started from a bank.
+    if (m.builds.some((b) => b.kind === 'bridge'))
+      parts.push(
+        'A bridge is the exception: it goes over water, started from the bank beside the spot you want it.',
+      )
   }
   if (m.crafts.length > 0) {
     parts.push(
@@ -480,6 +486,25 @@ export function makeablesLine(
     )
   }
   return parts.join(' ')
+}
+
+// The words a person uses for a thing they are making or mending. Nine of twelve r32 standing
+// lines named a project (a net, a float, a bridge) and the arbiter saw two attempts in two days.
+const PROJECT_WORDS =
+  /\b(mak|mend|build|fix|repair|put(ting)? together|rais|shap|sew|weav|carv|patch|rig)/i
+
+/** The goal that names a project, tied to the door it goes through: build or craft when the
+ *  thing is on a list this mind knows, experiment when it is not. Empty when no goal is one. */
+export function projectLine(goals: readonly string[], m: Makeables): string {
+  const project = goals.find((g) => PROJECT_WORDS.test(g))
+  if (project === undefined) return ''
+  const listed = [...m.builds.map((b) => words(b.kind)), ...m.crafts.map((c) => words(c.name))]
+  const named = listed.find((n) => project.toLowerCase().includes(n.toLowerCase()))
+  const road =
+    named === undefined
+      ? 'It is on no list you know. Try it anyway: name it experiment and say what your hands do, one step at a time. The world answers.'
+      : `That is on your list: ${named}. Make it now, with build or craft.`
+  return `You said you are making something: "${project}" ${road} A thing talked about for two days and never touched is a thing you have given up on.`
 }
 
 // What a source looks like when you get there, keyed off the engine's own roster so a node kind

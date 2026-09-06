@@ -37,6 +37,7 @@ import {
   heardKey,
   heardProse,
   makeablesLine,
+  projectLine,
   roadLine,
   doorstepLine,
   perceptionToProse,
@@ -1323,6 +1324,7 @@ export class AgentRuntime {
       // What the ground offers is for a turn choosing what to do next. A turn woken by a face
       // or a voice answers it; r29 read the gazetteer on 1417 of 1936 turns and talked timber.
       planning ? makeablesLine(canMake, this.#bridge.groundForBuilding()) : '',
+      planning ? projectLine(this.#personality.current().doc.current.goals, canMake) : '',
       planning ? roadLine(canMake, packet, world) : '',
       planning ? valleyExtentLine(world) : '',
       planning ? placesKnownLine(known, packet, world) : '',
