@@ -19,6 +19,7 @@ import {
   SkyArc,
   SleepCard,
   toggleFullscreen,
+  useSafeInsets,
   useStageKeys,
   type RingVerb,
   type Subject,
@@ -331,6 +332,7 @@ export function App() {
   useEffect(() => {
     scene?.bubbles?.setThoughts(thoughts)
   }, [scene, thoughts])
+  useSafeInsets(scene)
 
   // ONE label over the thing a viewer picked: the nameplate. The canvas layers read the pick
   // off the handle and stand down for it.

@@ -18,7 +18,10 @@ import {
   bubbleLife,
   bubbleShown,
   BUBBLE_CAP,
+  NAME_ROW_H,
+  bubbleBox,
   clampBubble,
+  safeView,
   dominantColor,
   inViewSpeakers,
   placeBubbles,
@@ -26,7 +29,7 @@ import {
   createBubbleLayer,
   wrapBubble,
 } from './bubbles.js'
-import { SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
+import { BUBBLE_PAD, SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './textFaces.js'
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
@@ -503,7 +506,8 @@ describe('★ the paper is not there until the first character is', () => {
       'b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)',
     )
     // and the box is still cut to the whole line: reflow would move paper under a reader
-    expect(SRC).toContain('const w = Math.ceil(label.width) + 2 * BUBBLE_PAD')
+    expect(SRC).toContain('{ w: label.width, h: label.height }')
+    expect(SRC).toContain("if (typed !== full.length) label.text = ''")
   })
 })
 
@@ -568,7 +572,7 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
     })
   })
 
-  type Body = { x: number; y: number; alive: boolean; insideId?: string }
+  type Body = { x: number; y: number; alive: boolean; name: string; insideId?: string }
 
   function harness(): {
     layer: ReturnType<typeof createBubbleLayer>
@@ -576,7 +580,7 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
     said: () => Container[]
   } {
     const bubbleLayer = new Container()
-    const amara: Body = { x: 4, y: 4, alive: true }
+    const amara: Body = { x: 4, y: 4, alive: true, name: 'Amara' }
     const scene = {
       layers: { bubbles: bubbleLayer },
       textScale: 1,
@@ -616,5 +620,48 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
     const h = harness()
     for (let i = 0; i < BUBBLE_CAP * 3; i++) h.layer.spawnSpeech('amara', `line ${String(i)}`)
     expect(h.said()).toHaveLength(BUBBLE_CAP)
+  })
+
+  // ★ Rehearsal 30's review: a box de-conflicted away from its speaker stood beside the wrong
+  // figure, and nothing on it said whose line it was.
+  it('★ a spoken line wears its speaker’s name; a thought wears none', () => {
+    const h = harness()
+    h.layer.spawnSpeech('amara', 'the iron is hot')
+    h.layer.spawnThought('amara', 'too hot')
+    const [speech, thought] = h.said().map((node) => node.children[0] as Container)
+    const last = speech!.children.at(-1) as { text?: string }
+    expect(last.text).toBe('Amara')
+    expect(thought!.children).toHaveLength(speech!.children.length - 1)
+  })
+})
+
+describe('★ the paper is cut for the name, and laid clear of the chrome', () => {
+  it('cuts the box to the wider of the name and the line, with the line under the name', () => {
+    expect(bubbleBox({ w: 100, h: 32 }, null)).toEqual({
+      w: 100 + 2 * BUBBLE_PAD,
+      h: 32 + 2 * BUBBLE_PAD,
+      textY: BUBBLE_PAD,
+    })
+    const named = bubbleBox({ w: 100, h: 32 }, { w: 140, h: 16 })
+    expect(named).toEqual({
+      w: 140 + 2 * BUBBLE_PAD,
+      h: 32 + NAME_ROW_H + 2 * BUBBLE_PAD,
+      textY: BUBBLE_PAD + NAME_ROW_H,
+    })
+  })
+
+  it('takes the chrome bands off the view in world px, and leaves an unbanded view alone', () => {
+    const view = { x: 0, y: 0, w: 1000, h: 800 }
+    expect(safeView(view, undefined, 2)).toBe(view)
+    expect(safeView(view, { top: 60, bottom: 40 }, 2)).toEqual({ x: 0, y: 30, w: 1000, h: 750 })
+    expect(safeView(view, { top: 5000, bottom: 0 }, 1).h).toBe(0)
+  })
+
+  it('★ the layer places the box in the safe view and reads who is in shot off the camera’s', () => {
+    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('safeView(view, scene.safeInsets, zoom)')
+    expect(SRC).toContain('const seen = inViewSpeakers(at, view)')
+    const ACTS = readFileSync(new URL('./acts.ts', import.meta.url), 'utf8')
+    expect(ACTS).toContain('safeView(view, scene.safeInsets, zoom)')
   })
 })

@@ -62,6 +62,9 @@ export type Scene = {
   /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
    *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
   textScale: number
+  /** The chrome's bands over the top and bottom of the canvas, in screen px: the sky bar and
+   *  the stamp above, the cue and the lower third below. No label is placed under them. */
+  safeInsets?: { top: number; bottom: number }
   /** What the viewer has picked, so a label layer can stand down for the one thing that already
    *  wears a nameplate. Written onto the handle rather than passed as a prop, the way
    *  `textScale` is: the layers live in a Pixi closure React never re-renders. */

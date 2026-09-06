@@ -20,6 +20,7 @@ import {
   GLYPH_DOT_R,
   GLYPH_H,
   GLYPH_W,
+  NAME_INK,
   RIM_DOT_R,
   SPEECH_FILL,
   SPEECH_INK,
@@ -225,6 +226,34 @@ export function bubbleAlpha(msLeft: number): number {
 const pin = (v: number, lo: number, hi: number): number =>
   lo > hi ? lo : Math.min(Math.max(v, lo), hi)
 
+/** The view a label may be placed in: the camera's, less the chrome's bands. The bands are
+ *  screen px and the view is world px, so they are divided by the zoom. */
+export function safeView(
+  view: Rect,
+  insets: { top: number; bottom: number } | undefined,
+  zoom: number,
+): Rect {
+  if (insets === undefined) return view
+  const k = zoom || 1
+  const top = insets.top / k
+  return { x: view.x, y: view.y + top, w: view.w, h: Math.max(0, view.h - top - insets.bottom / k) }
+}
+
+export const NAME_ROW_H = faceFor('name').size + 2
+
+/** The paper's cut: the spoken line under its speaker's name, both inside one pad. */
+export function bubbleBox(
+  text: { w: number; h: number },
+  name: { w: number; h: number } | null,
+): { w: number; h: number; textY: number } {
+  const nameRow = name === null ? 0 : NAME_ROW_H
+  return {
+    w: Math.ceil(Math.max(text.w, name?.w ?? 0)) + 2 * BUBBLE_PAD,
+    h: Math.ceil(text.h) + nameRow + 2 * BUBBLE_PAD,
+    textY: BUBBLE_PAD + nameRow,
+  }
+}
+
 /** ★ THE WHOLE BOX STAYS IN THE PICTURE. `placeTag` clamps and THEN steps clear, and its step is
  *  away from the anchor — so a tall box pinned at the top edge was pushed up, clamped back to the
  *  same place, and left composited over the box below it. This runs after that step, and a box
@@ -370,6 +399,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     agentId: string,
     text: string,
     isThought: boolean,
+    who: string,
   ): {
     node: Container
     box: Container
@@ -398,8 +428,23 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       lineHeight: BUBBLE_LINE_H,
       align: 'left',
     })
-    const w = Math.ceil(label.width) + 2 * BUBBLE_PAD
-    const h = Math.ceil(label.height) + 2 * BUBBLE_PAD
+    // Speech wears its speaker's name: de-confliction can stand a box beside the wrong figure,
+    // and a viewer arriving mid-talk has no other way to tell whose line it is. A thought is
+    // a different material and stays bare.
+    const nameFace = faceFor('name')
+    const name =
+      isThought || who === ''
+        ? null
+        : createWorldLabel(who, {
+            fontFamily: nameFace.family,
+            fontSize: nameFace.size,
+            fill: NAME_INK,
+          })
+    const cut = bubbleBox(
+      { w: label.width, h: label.height },
+      name === null ? null : { w: name.width, h: name.height },
+    )
+    const { w, h } = cut
     // A thought is not spoken, so it is not typed either.
     const typed = isThought ? full.length : 0
     if (typed !== full.length) label.text = ''
@@ -425,8 +470,12 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     if (!isThought) drawTail(tail, 'above', w, h, fill)
     box.addChildAt(tail, 0)
 
-    label.position.set(BUBBLE_PAD, BUBBLE_PAD)
+    label.position.set(BUBBLE_PAD, cut.textY)
     box.addChild(label)
+    if (name !== null) {
+      name.position.set(BUBBLE_PAD, BUBBLE_PAD)
+      box.addChild(name)
+    }
     const glyph = glyphNode(isThought)
     glyph.visible = false
     node.addChild(box, glyph)
@@ -452,7 +501,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         }
       }
     }
-    const built = build(agentId, text, isThought)
+    const built = build(agentId, text, isThought, speaker.name)
     scene.layers.bubbles.addChild(built.node)
     fadeArtIn(built.node) // NOTHING POPS IN — speech included
     bubbles.push({
@@ -534,7 +583,11 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         }
       })
       const boxes: Rect[] = []
-      for (const placed of placeBubbles(want, view, scene.tags.occupied('bubbles'))) {
+      for (const placed of placeBubbles(
+        want,
+        safeView(view, scene.safeInsets, zoom),
+        scene.tags.occupied('bubbles'),
+      )) {
         const i = Number(placed.id)
         const b = bubbles[i]!
         b.node.scale.set(inv) // the bubble is the reader's size, not the camera's

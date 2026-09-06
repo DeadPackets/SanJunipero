@@ -121,6 +121,11 @@ describe('★ the signpost and the paper hold their own shape', () => {
       /@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: calc\(100dvh - 64px\)/,
     )
     expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.signpost-post \{ display: none/)
+    // 390px wide: the closed arms go two by two and the cue stands above the row they make.
+    expect(BARE).toMatch(
+      /@media \(max-width: 699px\) \{[\s\S]*?\.signpost\[data-open='no'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
+    )
+    expect(BARE).toMatch(/@media \(max-width: 699px\) \{[\s\S]*?\.stage-cue \{[^}]*\+ 88px/)
   })
 
   it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {

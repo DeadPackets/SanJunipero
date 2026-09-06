@@ -11,7 +11,7 @@ import {
   faceFor,
   worldTextScale,
 } from './textFaces.js'
-import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles } from './bubbles.js'
+import { GLYPH_ZOOM, inViewSpeakers, onLeash, placeBubbles, safeView } from './bubbles.js'
 import { tileToScreen } from './iso.js'
 import { rendersOnMap } from './characters.js'
 import { fadeArtIn } from './textures.js'
@@ -270,7 +270,11 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
       // ── placed against the bubbles, never over them ─────────────────────────────────────
       const boxes: Rect[] = []
       const sized = new Map(want.map((w) => [w.id, w]))
-      for (const placed of placeBubbles(want, view, scene.tags.occupied('acts'))) {
+      for (const placed of placeBubbles(
+        want,
+        safeView(view, scene.safeInsets, zoom),
+        scene.tags.occupied('acts'),
+      )) {
         const chip = chips.get(placed.id)
         const p = sized.get(placed.id)
         if (chip === undefined || p === undefined) continue
