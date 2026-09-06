@@ -1,5 +1,5 @@
 import { bondLevel, bondWarmth, type Bond, type BondLevel, type BondsResponse } from '@sj/shared'
-import { bondArc } from '../bondModel2.js'
+import { bondArc, bondIndex, pairFacts, type LineageLike, type PeopleIndex } from '../bondModel2.js'
 
 /** In the words the Bonds key uses, lower-cased for the middle of a line. Strangers and
  *  acquaintances are not a tie worth a row's one line, so they say nothing. */
@@ -34,4 +34,31 @@ export function strongestTie(
   if (phrase === null) return null
   const other = best.bond.aId === id ? best.bond.bId : best.bond.aId
   return `${phrase} ${nameOf(other)}${ARC_PHRASE[bondArc(best.bond, nowTick).direction]}`
+}
+
+export type PairLine = { id: string; aId: string; bId: string; words: string }
+
+/** The pairs with the most feeling between them, warm or cold, as the sentences the Bonds page
+ *  already knows how to say. What that page says first, before the picture and before the key;
+ *  strangers are not a thing to say. */
+export function strongestPairs(
+  bonds: BondsResponse,
+  lineage: LineageLike,
+  people: PeopleIndex,
+  nowTick: number,
+  n = 5,
+): PairLine[] {
+  const index = bondIndex(bonds)
+  return bonds.bonds
+    .filter((b) => b.aId in people && b.bId in people)
+    .map((b) => ({ b, warmth: bondWarmth(b, nowTick) }))
+    .filter(({ warmth }) => bondLevel(warmth) !== 'strangers')
+    .sort((x, y) => Math.abs(y.warmth) - Math.abs(x.warmth) || (x.b.id < y.b.id ? -1 : 1))
+    .slice(0, n)
+    .map(({ b }) => ({
+      id: b.id,
+      aId: b.aId,
+      bId: b.bId,
+      words: pairFacts(b.aId, b.bId, index, lineage, bonds, people, nowTick).words,
+    }))
 }

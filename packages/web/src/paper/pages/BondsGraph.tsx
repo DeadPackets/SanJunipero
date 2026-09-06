@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import { tickToMoment, type BondsResponse } from '@sj/shared'
+import { strongestPairs } from '../../ui/roster/tieLine.js'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import { TEXT_MIN_PX } from '../../textFloor.js'
@@ -174,6 +175,11 @@ export function BondsGraph({
   const nameSig = useMemo(() => peopleSignature(state?.agents), [state])
 
   const people: PeopleIndex = useMemo(() => peopleFromSignature(nameSig), [nameSig])
+  // The five sentences a reader gets before the picture: who has the most between them today.
+  const strongest = useMemo(
+    () => (api === null ? [] : strongestPairs(api, lineage, people, api.asOfTick)),
+    [api, lineage, people],
+  )
 
   const ties = useMemo(
     () => toRelationGraph(api ?? EMPTY_API, lineage, people, api?.asOfTick ?? 0),
@@ -376,6 +382,13 @@ export function BondsGraph({
     <div className="bonds-sheet">
       <section className="bonds-section">
         <h3 className="feed-head">Everyone, and who they are to each other</h3>
+        {strongest.length > 0 && (
+          <ol className="bonds-strongest" aria-label="Between them today">
+            {strongest.map((p) => (
+              <li key={p.id}>{p.words}</li>
+            ))}
+          </ol>
+        )}
         <div className="bonds-graph">
           {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
               keys, and a second tablist nested in its panel would be one the keyboard cannot

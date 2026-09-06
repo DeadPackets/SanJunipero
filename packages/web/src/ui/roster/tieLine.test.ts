@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Bond } from '@sj/shared'
-import { strongestTie } from './tieLine.js'
+import { EMPTY_LINEAGE } from '../bondModel2.js'
+import { strongestPairs, strongestTie } from './tieLine.js'
 
 const NOW = 5000
 const NAMES: Record<string, string> = { amara: 'Amara', kamal: 'Kamal', tariq: 'Tariq' }
@@ -19,6 +20,35 @@ const bond = (aId: string, bId: string, warmth: number, priorWarmth = warmth): B
   warmth,
   priorWarmth,
   levelChangedTick: 0,
+})
+
+describe('what the Bonds page says first', () => {
+  const PEOPLE = {
+    amara: { name: 'Amara', alive: true },
+    kamal: { name: 'Kamal', alive: true },
+    tariq: { name: 'Tariq', alive: true },
+  }
+
+  it('names the pairs with the most feeling, cold or warm, as sentences, and skips strangers', () => {
+    const bonds = {
+      bonds: [bond('amara', 'kamal', 25), bond('amara', 'tariq', -30), bond('kamal', 'tariq', 1)],
+      asOfTick: NOW,
+    }
+    expect(strongestPairs(bonds, EMPTY_LINEAGE, PEOPLE, NOW).map((p) => p.words)).toEqual([
+      'Amara and Tariq are set against each other.',
+      'Amara and Kamal are close.',
+    ])
+  })
+
+  it('holds to the count it was asked for, and says nothing of people the roster does not know', () => {
+    const bonds = {
+      bonds: [bond('amara', 'kamal', 25), bond('amara', 'ghost', 40), bond('kamal', 'tariq', 9)],
+      asOfTick: NOW,
+    }
+    expect(strongestPairs(bonds, EMPTY_LINEAGE, PEOPLE, NOW, 1).map((p) => p.id)).toEqual([
+      'amara|kamal',
+    ])
+  })
 })
 
 describe('the one tie a roster row has room for', () => {
