@@ -406,6 +406,10 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
     case 'agent_spawned':
       return ev.tick <= FOUNDING_TICK ? null : `${look.agentName(str(p.id))} came to the town.`
     case 'scene_closed': {
+      // The beat is the line: what changed between them in twelve words. The summary stands in
+      // for a close logged before there were beats, and stays the paragraph the Moments keep.
+      const beat = str(p.beat).trim()
+      if (beat !== '') return beat
       const summary = str(p.summary).trim()
       return summary === '' ? null : summary
     }

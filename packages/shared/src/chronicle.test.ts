@@ -668,6 +668,18 @@ describe('a scene reaches the feed as the summary it closed on', () => {
     expect(chronicleLine(ev('scene_closed', { id: 'scene_8', summary: '  ' }), look)).toBeNull()
   })
 
+  it('★ prints the beat over the summary when the close carried one', () => {
+    const withBeat = ev('scene_closed', {
+      id: 'scene_9',
+      summary: SUMMARY,
+      beat: ' Rahel gives Tomas the fifth fish, and the count. ',
+      participants: ['a1', 'a2'],
+      deltas: [],
+      closeReason: 'ended',
+    })
+    expect(chronicleLine(withBeat, look)).toBe('Rahel gives Tomas the fifth fish, and the count.')
+  })
+
   it('frames the cast the scene carried, and nobody when it carried none', () => {
     const isAgent = (id: string): boolean => id in NAMES
     expect(chronicleCast(closed, isAgent)).toEqual(['a1', 'a2'])

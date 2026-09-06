@@ -135,6 +135,34 @@ function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
   )
 }
 
+/** The lead before the chronicler has written one: the newest beat as the headline and the two
+ *  before it as the deck. A front page whose lead read "nothing printed yet" for a whole day
+ *  was the first thing a viewer opened on. */
+function DaySoFar({ entries }: { entries: readonly ChronicleEntry[] }) {
+  const newest = [...entries].reverse()
+  const head = newest[0]!
+  const deck = newest.slice(1, 3)
+  return (
+    <article className="edition lead">
+      <p className="edition-head">
+        <span className="edition-day">{momentStamp(head.tick)}</span>
+        <span className="edition-temper">The day so far</span>
+      </p>
+      <h3 className="edition-title">{head.label}</h3>
+      {deck.length > 0 && (
+        <p className="edition-body">
+          {deck.map((e, i) => (
+            <span key={`${e.type}:${e.seq}`}>
+              {i > 0 ? ' ' : ''}
+              {e.label}
+            </span>
+          ))}
+        </p>
+      )}
+    </article>
+  )
+}
+
 function Today({ store, gapTicks, onPlay }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -182,6 +210,8 @@ function Today({ store, gapTicks, onPlay }: PageProps) {
           <h3 className="stage-sr">The day’s paper</h3>
           {latest === null && paper.failed ? (
             <OutOfReach onRetry={dispatchesFeed.retry} />
+          ) : latest === null && entries.length > 0 ? (
+            <DaySoFar entries={entries} />
           ) : latest === null ? (
             <p className="feed-empty">{EMPTY_COPY.paper}</p>
           ) : (
