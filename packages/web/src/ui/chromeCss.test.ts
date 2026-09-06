@@ -171,8 +171,8 @@ describe('★ the signpost and the paper hold their own shape', () => {
     )
   })
 
-  it('dims the town 28% behind the sheet, from one number', () => {
-    expect(BARE).toMatch(/--dim:\s*0\.28/)
+  it('dims the town 40% behind the sheet, from one number', () => {
+    expect(BARE).toMatch(/--dim:\s*0\.4/)
     expect(BARE).toMatch(/\.town-dim\[data-open='yes'\] \{[^}]*opacity:\s*var\(--dim\)/)
   })
 

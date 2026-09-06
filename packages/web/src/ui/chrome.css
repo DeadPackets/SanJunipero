@@ -97,7 +97,7 @@
   /* 78% of a phone is 304px, which no roster row fits in: the sheet takes the width there. */
   --paper-w-narrow: 96%;
   --paper-h-narrow: 80%;
-  --dim: 0.28;
+  --dim: 0.4;
 
   /* The stage marks hang off percentages, which is 15.6px on a landscape phone and 57.6px at
      2560. One inset, and it clears the notch on the phones that have one. */

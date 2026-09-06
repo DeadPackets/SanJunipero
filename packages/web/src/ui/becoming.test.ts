@@ -15,6 +15,7 @@ import {
   SKILLS_EMPTY,
   SUBSTANCE_FULL,
   SUBSTANCE_WEIGHTS,
+  STORY_EMPTY,
   THOUGHT_EMPTY,
   authoredIdentityOffenders,
   changeLog,
@@ -273,10 +274,21 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
   )
 
   it('says the record is empty rather than describing an empty person', () => {
-    expect(story).toContain(THOUGHT_EMPTY)
+    // Four empties in a row read as four failures: with every record read and empty, one line.
+    expect(story).toContain(STORY_EMPTY)
+    expect(story).not.toContain(THOUGHT_EMPTY)
+    expect(story).not.toContain(CHANGE_EMPTY)
     expect(ledger).toContain(SKILLS_EMPTY)
-    expect(story).toContain(CHANGE_EMPTY)
     for (const gone of REMOVED_PLACEHOLDERS) expect(story + ledger).not.toContain(gone)
+  })
+
+  it('keeps the sections, and their honest empties, while any record is still being read', () => {
+    const waiting = renderToStaticMarkup(
+      createElement(PersonStoryView, { thought: null, journal: null, changes: [] }),
+    )
+    expect(waiting).not.toContain(STORY_EMPTY)
+    expect(waiting).toContain(THOUGHT_EMPTY)
+    expect(waiting).toContain(CHANGE_EMPTY)
   })
 
   // WHAT THE BROWSER CAUGHT: the header badge prints the state and so did the Doing section,

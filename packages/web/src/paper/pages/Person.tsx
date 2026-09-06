@@ -24,6 +24,7 @@ import {
 import {
   CHANGE_EMPTY,
   SKILLS_EMPTY,
+  STORY_EMPTY,
   THOUGHT_EMPTY,
   changeLog,
   hasChanged,
@@ -107,6 +108,22 @@ export function PersonStoryView({
   /** The chronicler's write-up, from the PUBLIC record alone. Null until one is written. */
   biography?: { day: number; title: string; body: string } | null
 }) {
+  // Every record read and every one empty: one line says so. A read still out keeps its section,
+  // so a slow wire is never mistaken for a blank life.
+  const bare =
+    thought === null &&
+    journal !== null &&
+    journal.length === 0 &&
+    biography === null &&
+    changes !== null &&
+    !hasChanged(changes)
+  if (bare)
+    return (
+      <section className="block">
+        <h3 className="feed-head">The record</h3>
+        <p className="doc">{STORY_EMPTY}</p>
+      </section>
+    )
   return (
     <>
       <section className="block">
