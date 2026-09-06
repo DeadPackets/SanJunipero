@@ -405,10 +405,11 @@ describe('a mind in a talk is told so', () => {
 describe('★ the body on the page is the only body', () => {
   it('a mind may not invent an ailment for itself or anyone else', () => {
     expect(SPEECH_RULES).toContain(
-      'If the page does not say you are sick, hurt or worn out, you are well',
+      'A new sickness, hurt or weakness is not, unless the page says so',
     )
+    expect(SPEECH_RULES).toContain('A cough you have carried for years is yours to mention.')
     expect(SPEECH_RULES).toContain(
-      'another person is ill or hurt only when the page says so beside their name',
+      'another person is newly ill or hurt only when the page says so beside their name',
     )
   })
 })
