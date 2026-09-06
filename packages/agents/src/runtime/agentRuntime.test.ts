@@ -29,19 +29,20 @@ import {
 } from '@sj/shared'
 import { EngineBridge } from './bridge.js'
 import {
-  AgentRuntime,
-  BODY_WOULD_NOT_GO_ON,
-  brokeOffLine,
-  CRAFT_HINT,
-  CANNOT_BEGIN,
-  OPAQUE_REFUSAL,
-  REFUSAL_MEMORY_TICKS,
-  TRIED_FREEFORM,
   actImportance,
   actionMemoryText,
+  AgentRuntime,
   asMinted,
+  BODY_WOULD_NOT_GO_ON,
+  brokeOffLine,
+  CANNOT_BEGIN,
+  CRAFT_HINT,
+  OPAQUE_REFUSAL,
+  PLANNING_WAKES,
   reflectionOffsetTicks,
+  REFUSAL_MEMORY_TICKS,
   refusalMemoryText,
+  TRIED_FREEFORM,
   wantedWater,
 } from './agentRuntime.js'
 import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
@@ -1674,6 +1675,16 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // would compact the day out of the mind that lived it.
     expect(runtime.dayLogSnapshot().join(' ')).not.toContain('a house (10 wood)')
     expect(b.find((m) => m.role === 'user')!.text).not.toContain('a house (10 wood)')
+  })
+
+  // r29 read the gazetteer on 1417 of 1936 turns, most of them woken by a face or a voice, and
+  // talked timber. What the ground offers is for a turn that is choosing what to do next.
+  it('the gazetteer rides only the wakes on which a mind is choosing what to do next', () => {
+    expect([...PLANNING_WAKES].sort()).toEqual(
+      ['boredom', 'morning', 'plan_blocked', 'plan_done', 'reconsider'].sort(),
+    )
+    for (const answering of ['salient_perception', 'floor', 'body_alarm', 'gathering'] as const)
+      expect(PLANNING_WAKES.has(answering)).toBe(false)
   })
 
   it('the places a mind knows ride the volatile block and never the frozen prefix (C11 R-H)', async () => {

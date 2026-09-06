@@ -346,6 +346,16 @@ type Remembered = [string, { tick: number; reason: string }]
  *  this: a line the prompt said and the mind ignored is invisible to every query without it. */
 export type ProseTraceRow = { tick: number; agentId: string; wake: string[]; prose: string }
 
+/** The wakes on which a mind is picking its next thing to do, and so hears what the ground
+ *  offers: what it could make, where it could go. Every other wake is an answer to something. */
+export const PLANNING_WAKES: ReadonlySet<WakeReason> = new Set<WakeReason>([
+  'morning',
+  'boredom',
+  'plan_done',
+  'plan_blocked',
+  'reconsider',
+])
+
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
@@ -1284,6 +1294,7 @@ export class AgentRuntime {
     if (doorstep.length > 0) this.#doorstepSaidTick = tick
     const known = this.#bridge.knownPlaces(this.#agentId)
     const morning = wake.includes('morning')
+    const planning = wake.some((w) => PLANNING_WAKES.has(w))
     const topWant = morning || wake.includes('boredom') ? (this.#wants?.top(tick) ?? null) : null
     // The morning says the want once; a bored mind hears it again only once it presses.
     const pressing = topWant !== null && (this.#wants?.levelOf(topWant, tick) ?? 0) >= WANT_PRESSING
@@ -1308,10 +1319,12 @@ export class AgentRuntime {
       // too many.
       morning && stock !== null && !esteem ? stockLine(stock) : '',
       esteem && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
-      makeablesLine(canMake, this.#bridge.groundForBuilding()),
-      roadLine(canMake, packet, world),
-      valleyExtentLine(world),
-      placesKnownLine(known, packet, world),
+      // What the ground offers is for a turn choosing what to do next. A turn woken by a face
+      // or a voice answers it; r29 read the gazetteer on 1417 of 1936 turns and talked timber.
+      planning ? makeablesLine(canMake, this.#bridge.groundForBuilding()) : '',
+      planning ? roadLine(canMake, packet, world) : '',
+      planning ? valleyExtentLine(world) : '',
+      planning ? placesKnownLine(known, packet, world) : '',
       walkTargetsLine(known, packet, world),
       standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
     ]
