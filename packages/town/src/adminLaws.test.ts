@@ -92,9 +92,9 @@ describe('createLawsAdmin (T25b)', () => {
 
   it('400 on a path that is not a world law, naming the path', async () => {
     const { port, submitted } = await admin()
-    const r = await post(port, { path: 'needs.energyDecayAwakePerTick', value: 9 })
+    const r = await post(port, { path: 'needs.debuffThreshold', value: 9 })
     expect(r.status).toBe(400)
-    expect(r.body).toContain('needs.energyDecayAwakePerTick')
+    expect(r.body).toContain('needs.debuffThreshold')
     expect(submitted).toEqual([])
   })
 
