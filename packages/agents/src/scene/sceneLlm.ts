@@ -2,7 +2,13 @@
 // account of the whole thing. The system prefix is the ordinary turn's, byte for byte, so a
 // scene line lands on the cache the mind's own turns keep warm.
 import { z } from 'zod'
-import { dayPhaseFromTick, sanitizeSpokenText, simTimeFromTick, type RosterEntry } from '@sj/shared'
+import {
+  PLAIN_SPEECH,
+  dayPhaseFromTick,
+  sanitizeSpokenText,
+  simTimeFromTick,
+  type RosterEntry,
+} from '@sj/shared'
 import type { CallBill, LlmClient } from '@sj/llm'
 import type { PersonalityDoc } from '../personality.js'
 import { assemblePrompt, type IdentityCore } from '../prompt/assemble.js'
@@ -312,9 +318,11 @@ function sceneSystem(voice: SceneVoice): string {
 
 const CLOSE_SYSTEM = `A conversation in the valley of San Junipero has just ended. Write down what happened in it, and what it left between the people who were in it.
 
-First the beat: one line of twelve words at most, present tense, naming people by name, saying what changed between them, the way a caption under a photograph would. "Omar sends Salma to eat first. Her shoulder is worse." Not a report of what was discussed.
+First the beat: one line, twelve words at most, present tense, naming people by name. It is what you would tell a friend who asked what just happened between them: "Omar makes Salma eat first. Her shoulder's getting worse." Say what happened, not what it meant and not what was discussed. If nothing came of the talk, say what they got into: "Halim and Dilara argue about the cough again."
 
-Then the summary: two sentences at most, plain, naming people by name. It is what each of them will remember, so write what was said and what changed because of it, and nothing about how it reads.
+Then the summary: two sentences at most, naming people by name. It is what each of them will remember, so write what was said and what came of it.
+
+${PLAIN_SPEECH}
 
 Write nothing, in the beat or the summary, about how or why the conversation ended.
 

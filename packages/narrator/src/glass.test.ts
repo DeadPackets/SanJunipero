@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDb } from '@sj/engine/store'
-import { CONSTRUCT_VOCABULARY, FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
+import {
+  CONSTRUCT_VOCABULARY,
+  FORBIDDEN_FRAMING,
+  PLAIN_SPEECH,
+  scanPromptForGlassLeak,
+} from '@sj/shared'
 import { NARRATOR_CANON } from './canon.js'
 import { NARRATOR_TABLES, WORLD_TABLES, openNarratorDb, openNarratorWorld } from './schema.js'
 import { FIRST_DEFS } from './firsts.js'
@@ -70,6 +75,8 @@ describe('the canon the chronicler reads from', () => {
     // Long enough that a provider-side prefix cache has something to hold.
     expect(NARRATOR_CANON.length).toBeGreaterThan(1000)
     expect(FORBIDDEN_FRAMING.test(NARRATOR_CANON)).toBe(false)
+    // the owner's kitchen-table rule rides every narrator call
+    expect(NARRATOR_CANON).toContain(PLAIN_SPEECH)
   })
 
   it('places the chronicler in the century the town actually lives in', () => {

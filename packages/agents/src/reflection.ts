@@ -1,3 +1,4 @@
+import { PLAIN_SPEECH } from '@sj/shared'
 import { z } from 'zod'
 import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
@@ -374,6 +375,7 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       'not a count. The other two may be plain work.',
       'Leave `standing` empty rather than make one up. Write each line as something you are set',
       'on, not as a report of the day.',
+      PLAIN_SPEECH,
     ].join('\n'),
     messages: [{ role: 'user', content: `The day held these scenes:\n${JSON.stringify(scenes)}` }],
   }
@@ -421,6 +423,7 @@ export function autobiographyPrompt(daySummary: string, doc: PersonalityDoc): Ll
     system: [
       'Before sleep, you add one short paragraph to the story of your life.',
       'Tell what this day meant to you, in your own voice.',
+      PLAIN_SPEECH,
     ].join('\n'),
     messages: [
       {

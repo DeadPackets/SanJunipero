@@ -48,7 +48,7 @@ const user = (content: string) => [{ role: 'user' as const, content }]
 export const CHAPTER_MOMENTS =
   'Each scene lists moments with their numbers. Quote at most one line per person, word for word,' +
   ' inside double quotes, and say who said it; never a quoted line without its speaker. Write what' +
-  ' changed between people, not that people moved and spoke.'
+  ' people did to and for each other, not that people moved and spoke.'
 
 export const CHAPTER_TITLE =
   'The title names a person and what happened to them or between them, in six words or fewer.' +

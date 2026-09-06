@@ -101,8 +101,7 @@ export const THOUGHT_EMPTY = 'Nothing they have thought has been written down ye
 export const SKILLS_EMPTY = 'They have not taken up a craft yet.'
 export const CHANGE_EMPTY = 'Nothing about them has changed yet — they have only just arrived.'
 /** The whole page at once, on a first day: four honest empties in a row read as four failures. */
-export const STORY_EMPTY =
-  'Nothing has been written of them yet: no thought caught, no journal, no chapter, no change. It comes as the days do.'
+export const STORY_EMPTY = 'Nothing written about them yet. Give it a day.'
 
 // ── the Character tab, re-framed as WHAT MOVED ─────────────────────────────────────────────
 

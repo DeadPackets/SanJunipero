@@ -15,7 +15,8 @@ import {
   type SceneVoice,
 } from './sceneLlm.js'
 import { openScene, SceneTurnSchema, type SceneAsk, type SceneLine } from './scene.js'
-import { scanPromptForGlassLeak } from '@sj/shared'
+import { readFileSync } from 'node:fs'
+import { PLAIN_SPEECH, scanPromptForGlassLeak } from '@sj/shared'
 import { askPhrase } from './invitations.js'
 
 const ZERO_USAGE = {
@@ -621,5 +622,17 @@ describe('what the town has agreed reaches a scene line too', () => {
       expect(turnSystem).toContain('The town has agreed on these and holds each other to them:')
       expect(prompts[0]).toContain(turnSystem)
     })
+  })
+})
+
+// ★ Owner, 2026-09-06, on "Halim greets Dilara inside; nothing changes between them": the beat
+// is what you would tell a friend, and the caption voice that wrote that line is gone.
+describe('★ the beat is said the way a person would say it', () => {
+  const SRC = readFileSync(new URL('./sceneLlm.ts', import.meta.url), 'utf8')
+  it('carries the kitchen-table rule and no caption voice', () => {
+    expect(SRC).toContain('${PLAIN_SPEECH}')
+    expect(SRC).not.toContain('caption under a photograph')
+    expect(SRC).not.toContain('what changed between them')
+    expect(PLAIN_SPEECH).toContain('nothing changes between them')
   })
 })

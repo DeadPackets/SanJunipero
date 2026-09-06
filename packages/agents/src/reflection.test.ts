@@ -28,7 +28,12 @@ import {
   FALLBACK_DIGEST_CHARS,
   type ReflectionLlm,
 } from './reflection.js'
-import { FORBIDDEN_FRAMING, scanForLayoutLeak, scanPromptForGlassLeak } from '@sj/shared'
+import {
+  FORBIDDEN_FRAMING,
+  PLAIN_SPEECH,
+  scanForLayoutLeak,
+  scanPromptForGlassLeak,
+} from '@sj/shared'
 
 const AGENT = 'tamar'
 const DAY = 3
@@ -1103,5 +1108,14 @@ describe('★ the night bills its personality edit under its own name', () => {
       { caller: 'reflection.edit', calls: 1 },
     ])
     db.close()
+  })
+})
+
+// ★ Owner, 2026-09-06: "any human facing text ... sounds human and casual". The journal and the
+// life story reach the person page, so the kitchen-table rule rides both.
+describe('★ what reaches the page is said plainly', () => {
+  it('rides the day summary and the life story', () => {
+    expect(summarizeDayPrompt([]).system).toContain(PLAIN_SPEECH)
+    expect(autobiographyPrompt('a day', baseDoc()).system).toContain(PLAIN_SPEECH)
   })
 })
