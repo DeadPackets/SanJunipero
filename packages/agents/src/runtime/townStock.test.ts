@@ -167,6 +167,7 @@ async function mind(opts: {
               plan: null,
               journal: null,
               recall: null,
+              mood: null,
               reconsider_at: null,
               ...WAIT,
               action: { verb: 'wait', params: NO_PARAMS },

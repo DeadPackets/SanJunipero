@@ -16,6 +16,10 @@ export function ensureObserverTables(db: Database.Database): void {
     -- thought. Dropped, not just removed, so databases that already have it stop paying.
     DROP INDEX IF EXISTS idx_observer_thoughts_id;
     CREATE INDEX IF NOT EXISTS idx_observer_thoughts_tick ON observer_thoughts(tick);
+    CREATE TABLE IF NOT EXISTS observer_moods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tick INTEGER NOT NULL, agent_id TEXT NOT NULL, mood TEXT NOT NULL
+    );
   `)
   const cols = db.pragma('table_info(observer_thoughts)') as { name: string }[]
   if (!cols.some((c) => c.name === 'importance')) {
@@ -25,7 +29,13 @@ export function ensureObserverTables(db: Database.Database): void {
   }
 }
 
-type Stmts = { insert: Database.Statement; since: Database.Statement }
+type Stmts = {
+  insert: Database.Statement
+  since: Database.Statement
+  insertMood: Database.Statement
+  moodsSince: Database.Statement
+  latestMoods: Database.Statement
+}
 
 // Both run on the pump's per-poll path, so they are compiled once per database rather than
 // once per call — the same prepare-once shape `EventStore` holds on its own object.
@@ -40,6 +50,13 @@ function stmts(db: Database.Database): Stmts {
     ),
     since: db.prepare(
       'SELECT id, tick, agent_id, text, importance FROM observer_thoughts WHERE id > ? ORDER BY id',
+    ),
+    insertMood: db.prepare('INSERT INTO observer_moods (tick, agent_id, mood) VALUES (?, ?, ?)'),
+    moodsSince: db.prepare(
+      'SELECT id, tick, agent_id, mood FROM observer_moods WHERE id > ? ORDER BY id',
+    ),
+    latestMoods: db.prepare(
+      'SELECT id, tick, agent_id, mood FROM observer_moods WHERE id IN (SELECT MAX(id) FROM observer_moods GROUP BY agent_id) ORDER BY id',
     ),
   }
   prepared.set(db, fresh)
@@ -71,4 +88,30 @@ export function thoughtsSince(
     text: r.text,
     importance: r.importance,
   }))
+}
+
+export type MoodRow = { id: number; tick: number; agentId: string; mood: string }
+
+export function publishMood(
+  db: Database.Database,
+  m: { tick: number; agentId: string; mood: string },
+): void {
+  stmts(db).insertMood.run(m.tick, m.agentId, m.mood)
+}
+
+const moodRows = (rows: unknown[]): MoodRow[] =>
+  (rows as { id: number; tick: number; agent_id: string; mood: string }[]).map((r) => ({
+    id: r.id,
+    tick: r.tick,
+    agentId: r.agent_id,
+    mood: r.mood,
+  }))
+
+export function moodsSince(db: Database.Database, idExclusive: number): MoodRow[] {
+  return moodRows(stmts(db).moodsSince.all(idExclusive))
+}
+
+/** One row per mind, the word it holds now: what a late viewer is handed at the greeting. */
+export function latestMoods(db: Database.Database): MoodRow[] {
+  return moodRows(stmts(db).latestMoods.all())
 }

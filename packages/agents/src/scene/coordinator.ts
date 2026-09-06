@@ -51,6 +51,10 @@ export type SceneMind = {
   warmth(otherId: string): number
   /** The wants this mind's own runtime keeps. Absent, a relationship feeds none of them. */
   feed?(occasions: readonly WantOccasion[], tick: number): void
+  /** The word this mind holds about how it is. Absent, the line is asked with no mood. */
+  mood?(): string
+  /** A line said how the speaker feels now; the runtime keeps that word. */
+  feltMood?(mood: string, tick: number): void
 }
 
 type Proposal = NonNullable<Scene['proposal']>
@@ -380,6 +384,7 @@ export class SceneCoordinator {
         wrapUp: wrapUpDue(scene),
         tick,
         energy: this.#bridge.energyOf(agentId),
+        mood: mind.mood?.() ?? '',
       })
     } catch (err) {
       this.#onError('scene_line', err instanceof Error ? err.message : String(err))
@@ -392,6 +397,7 @@ export class SceneCoordinator {
     // Or the mouth left the talk while the provider was thinking: went to bed, or walked out of
     // earshot. Saying the line now would wake a sleeper with its own words.
     if (scene.closedTick !== null || !scene.participants.includes(agentId)) return
+    if (turn.mood !== null && turn.mood.trim().length > 0) mind.feltMood?.(turn.mood.trim(), tick)
 
     const said = turn.speech === null ? '' : sanitizeSpokenText(turn.speech)
     // One mouth leaving takes itself out, not the whole talk: a goodbye is said and remembered as

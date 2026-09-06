@@ -50,7 +50,7 @@ export async function rollDream(deps: {
 export const DREAM_PROMPT = [
   'You are asleep, and pieces of the last few days are coming back to you out of order.',
   'Let them run together into one short dream in your own voice, however little sense it makes.',
-  'Then name the mood it leaves you in, in a word or two.',
+  'Then say how you wake from it, in the one or two plain words you would give a friend who asked how you slept. Your own word, not a stock one.',
 ].join('\n')
 
 export function dreamFragmentsMessage(fragments: MemoryRow[]): string {

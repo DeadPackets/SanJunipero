@@ -4,7 +4,14 @@ export { adminOpsRoutes } from './adminOps.js'
 export { ADMIN_PORT_DEFAULT, adminChannelPort } from './adminProxy.js'
 export { frameText } from './http.js'
 export type { LiveCast, LiveOps } from './liveCast.js'
-export { ensureObserverTables, publishThought, thoughtsSince } from './observer.js'
+export {
+  ensureObserverTables,
+  latestMoods,
+  moodsSince,
+  publishMood,
+  publishThought,
+  thoughtsSince,
+} from './observer.js'
 export { createPacing, type Pacing } from './pacing.js'
 export { createGateway, type Gateway } from './server.js'
 export { WorldMirror } from './worldMirror.js'

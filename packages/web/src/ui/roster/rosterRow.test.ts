@@ -155,6 +155,13 @@ describe('rosterRows2 — the five required fields, on a person who has done not
   )
   const row = rosterRows2(state, [], null, 0)[0]!
 
+  it('says the mind’s own word for its mood when the town has sent one, else the face table’s', () => {
+    expect(row.moodWord).toBe('settled')
+    const told = rosterRows2(state, [], null, 0, [], undefined, () => 'fed up')[0]!
+    expect(told.moodWord).toBe('fed up')
+    expect(told.mood).toBe(row.mood)
+  })
+
   it('★ every one of U12’s five fields is non-empty on sim-day 0', () => {
     expect(row.portrait).not.toBeUndefined() // portrait
     expect(row.name).toBe('Amara') // name

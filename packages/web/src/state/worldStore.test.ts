@@ -179,6 +179,14 @@ describe('worldStore', () => {
     expect(store.getTick()).toBe(2)
   })
 
+  it('keeps the latest mood word per mind', () => {
+    const store = createWorldStore()
+    expect(store.latestMood('walker')).toBeNull()
+    store.applyServer({ t: 'mood', agentId: 'walker', tick: 3, mood: 'fine' })
+    store.applyServer({ t: 'mood', agentId: 'walker', tick: 40, mood: 'worn out' })
+    expect(store.latestMood('walker')).toBe('worn out')
+  })
+
   it('thoughts feed latestThought and a 200-entry capped log', () => {
     const store = createWorldStore()
     store.applyServer({ t: 'thought', agentId: 'walker', tick: 3, text: 'First.', importance: 5 })

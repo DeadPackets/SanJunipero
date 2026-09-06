@@ -66,6 +66,7 @@ const turnAnswer = (speaking: boolean): unknown => ({
   plan: null,
   journal: null,
   recall: null,
+  mood: null,
   reconsider_at: null,
   thought: 'Toward the well.',
   importance: 5,
@@ -83,6 +84,7 @@ const SCENE_TURN = {
   ask: null,
   leave: false,
   importance: 5,
+  mood: null,
 }
 const SCENE_CLOSE = { summary: 'They talked at the well.', ties: [] }
 

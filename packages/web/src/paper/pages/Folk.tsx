@@ -52,7 +52,10 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
   // The whole fold is one array allocation per person, so opening a row must not redo it.
   const byName = useMemo(
-    () => (state === null ? [] : rosterRows2(state, records, bonds, tick, events, earshot)),
+    () =>
+      state === null
+        ? []
+        : rosterRows2(state, records, bonds, tick, events, earshot, store.latestMood),
     [state, records, bonds, tick, events, earshot],
   )
 

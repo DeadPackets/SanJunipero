@@ -126,6 +126,7 @@ async function mind(opts: {
               plan: null,
               journal: null,
               recall: null,
+              mood: null,
               reconsider_at: null,
               ...raw,
               action:

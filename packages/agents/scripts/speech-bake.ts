@@ -76,6 +76,7 @@ async function main(): Promise<void> {
         wrapUp: i >= LINES - 2,
         tick,
         energy: 80,
+        mood: '',
       })
       if (turn.speech === null || turn.speech.trim() === '') {
         console.log(

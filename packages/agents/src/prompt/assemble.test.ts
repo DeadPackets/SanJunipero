@@ -95,7 +95,7 @@ describe('assemblePrompt stability gradient', () => {
         ...base.personality,
         doc: {
           ...base.personality.doc,
-          current: { ...base.personality.doc.current, mood: 'heavy' },
+          current: { ...base.personality.doc.current, goals: ['mend the west fence'] },
         },
       },
     })

@@ -78,6 +78,7 @@ function ask(overrides: Partial<SceneAsk> = {}): SceneAsk {
     recent: [],
     wrapUp: false,
     tick: MORNING,
+    mood: '',
     energy: 80,
     ...overrides,
   }
@@ -128,6 +129,7 @@ const TURN = JSON.stringify({
   ask: null,
   leave: false,
   importance: 4,
+  mood: null,
 })
 
 describe('the scene turn keeps the cached prefix', () => {
@@ -540,6 +542,7 @@ describe('what a scene turn may name', () => {
     ask: null,
     leave: false,
     importance: 4,
+    mood: null,
     ...over,
   })
 

@@ -407,6 +407,8 @@ export class AgentRuntime {
   readonly #onThought:
     | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
     | null
+  readonly #onMood: ((m: { tick: number; agentId: string; mood: string }) => void) | null
+  #moodTold: string | null = null
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
   readonly #wantBias: WantBias
@@ -497,6 +499,7 @@ export class AgentRuntime {
     onThought?:
       | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
       | undefined
+    onMood?: ((m: { tick: number; agentId: string; mood: string }) => void) | undefined
     adjudicator?: Adjudicator | undefined
     /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
     scenes?: SceneCoordinator | undefined
@@ -523,6 +526,7 @@ export class AgentRuntime {
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
+    this.#onMood = deps.onMood ?? null
     this.#adjudicator = deps.adjudicator ?? null
     this.#scenes = deps.scenes ?? null
     this.#ties = deps.ties ?? null
@@ -543,6 +547,8 @@ export class AgentRuntime {
     this.#clock = freshClock()
     this.#plan = idlePlan()
     this.#planHeadInFlight = false
+    this.#moodTold = null
+    this.#tellMood()
     this.#planSettled = 0
     this.#pendingIntent = null
     this.#pendingInFlight = false
@@ -742,6 +748,30 @@ export class AgentRuntime {
       }
       void this.#startTurn(wake)
     }
+  }
+
+  /** The word this mind holds about how it is right now. */
+  moodWord(): string {
+    return this.#personality.current().doc.current.mood
+  }
+
+  /** A turn or a scene line said how this mind feels now. It rides the volatile block, so a
+   *  change costs no cached prefix. */
+  feltMood(mood: string, _tick: number): void {
+    const cur = this.#personality.current().doc.current
+    if (cur.mood === mood) return
+    this.#personality.updateCurrent({ ...cur, mood })
+    this.#tellMood()
+  }
+
+  // The doc's mood is said outward only when it changes: the roster shows the word the mind
+  // holds about itself, and nobody hears the same word twice.
+  #tellMood(): void {
+    if (this.#onMood === null) return
+    const mood = this.#personality.current().doc.current.mood
+    if (mood === this.#moodTold) return
+    this.#moodTold = mood
+    this.#onMood({ tick: this.#bridge.currentTick(), agentId: this.#agentId, mood })
   }
 
   // Bedtime is the body's own reflex and costs the mind nothing: idle under its own roof past
@@ -1164,6 +1194,7 @@ export class AgentRuntime {
         const cur = this.#personality.current().doc.current
         this.#personality.updateCurrent({ ...cur, mood: this.#pendingDreamMood })
         this.#pendingDreamMood = null
+        this.#tellMood()
       }
       this.#dayLog = []
       this.#prevMomentSentences = new Set()
@@ -1269,6 +1300,7 @@ export class AgentRuntime {
       // too many.
       morning && stock !== null && !esteem ? stockLine(stock) : '',
       esteem && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
+      this.moodWord().length === 0 ? '' : `How you are right now: ${this.moodWord()}.`,
     ]
       .filter((p) => p.length > 0)
       .join(' ')
@@ -1480,6 +1512,7 @@ export class AgentRuntime {
       text: turn.thought,
       importance: turn.importance,
     })
+    if (turn.mood != null && turn.mood.trim().length > 0) this.feltMood(turn.mood.trim(), tick)
 
     // The beat is spent casting back: whatever else the answer carried is let go, plan aside.
     if (recalled !== null) {
@@ -1612,6 +1645,7 @@ export class AgentRuntime {
       this.#llm.alert('reflection_failed', messageOf(err))
     }
     this.#nightWritten = day
+    this.#tellMood()
     try {
       if (this.#dreamLlm !== null) {
         const dream = await rollDream({

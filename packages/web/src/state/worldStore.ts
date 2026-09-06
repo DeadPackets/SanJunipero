@@ -44,6 +44,8 @@ export type WorldStore = {
   /** the furthest tick the LIVE town has reached — scrubbing back must not walk it in */
   liveEdge: () => number
   latestThought: (agentId: string) => { tick: number; text: string } | null
+  /** The word the mind itself holds about how it is; null until the town has said one. */
+  latestMood: (agentId: string) => string | null
   thoughtsLog: () => Thought[]
   /** Every thought ever heard, the ones the capped log has already dropped included: an index
    *  into the log is reused the moment it is trimmed, so a reader counts from here. */
@@ -80,6 +82,7 @@ export function createWorldStore(): WorldStore {
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
   const latest = new Map<string, { tick: number; text: string }>()
+  const moods = new Map<string, string>()
   const events: SimEvent[] = []
   let scene: TownScene | null = null
   let director: ServerDirector | null = null
@@ -114,6 +117,7 @@ export function createWorldStore(): WorldStore {
     getTick: () => (mode.live ? (state?.tick ?? 0) : mode.tick),
     liveEdge: () => liveEdge,
     latestThought: (agentId) => latest.get(agentId) ?? null,
+    latestMood: (agentId) => moods.get(agentId) ?? null,
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
@@ -186,6 +190,9 @@ export function createWorldStore(): WorldStore {
           logSeq = msg.seq
           state = msg.state as WorldState
           mode = { live: false, replaying: true, tick: msg.tick }
+          break
+        case 'mood':
+          moods.set(msg.agentId, msg.mood)
           break
         case 'thought':
           thoughtsSeq++

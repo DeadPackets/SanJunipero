@@ -93,6 +93,8 @@ export type BootMindsOpts = {
   /** The sim day a first personality is stamped with. See `hasPersonality`. */
   day?: number
   onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
+  /** The word a mind holds about how it is, whenever that word changes. */
+  onMood?: (m: { tick: number; agentId: string; mood: string }) => void
   /** Per-mind runtime state to put back after `start`, which is what clears it. */
   restoring?: ReadonlyMap<string, RuntimeSnapshot>
   /** Adjudication and codification, injected because agents may not import the arbiter. */
@@ -187,6 +189,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         // Warmth lives in each runtime's own company map; a scene reads it through the runtime.
         warmth: (otherId) => runtimes.get(spec.id)?.warmthToward(otherId) ?? 0,
         feed: (occasions, tick) => runtimes.get(spec.id)?.feedWants(occasions, tick),
+        mood: () => runtimes.get(spec.id)?.moodWord() ?? '',
+        feltMood: (mood, tick) => runtimes.get(spec.id)?.feltMood(mood, tick),
       })
     }
     const runtime = new AgentRuntime({
@@ -202,6 +206,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         : { reflectionLlm: makeReflectionLlm(opts.reflectionLlm(spec.id)) }),
       ...(opts.dreamLlm === undefined ? {} : { dreamLlm: makeDreamLlm(opts.dreamLlm(spec.id)) }),
       ...(opts.onThought === undefined ? {} : { onThought: opts.onThought }),
+      ...(opts.onMood === undefined ? {} : { onMood: opts.onMood }),
       ...(scenes === null ? {} : { scenes }),
       ties: { store: ties, cast: livingCast },
       ...(spec.wantBias === undefined ? {} : { wantBias: spec.wantBias }),

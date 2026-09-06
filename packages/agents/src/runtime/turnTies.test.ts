@@ -35,6 +35,7 @@ const WAIT = {
   plan: null,
   journal: null,
   recall: null,
+  mood: null,
   reconsider_at: null,
   speech: null,
   action: { verb: 'wait', params: NO_PARAMS },

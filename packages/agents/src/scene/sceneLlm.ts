@@ -79,7 +79,7 @@ move says what this line is doing. tell: bring up something new, like news, a pl
 
 To ask the person you are talking to for something, put court, propose or lie_with in "ask"; otherwise leave it empty. If you were asked such a thing, put accept or refuse in "answer".
 
-thought is one short line nobody else hears.`
+thought is one short line nobody else hears. mood is how you feel right now, in one or two plain words of your own; null unless it has changed.`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what they had to say.',
@@ -272,6 +272,7 @@ export function sceneBlock(
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
     renderRecent(ask.recent),
     renderLateness(ask.tick, ask.energy),
+    ask.mood.length === 0 ? '' : `How you are right now: ${ask.mood}.`,
     renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
     renderTelling(ask.scene, ask.agentId, nameOf),
     renderProposal(ask.scene, ask.agentId, nameOf),

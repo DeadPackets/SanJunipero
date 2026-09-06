@@ -16,7 +16,7 @@ import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
-import { thoughtsSince } from './observer.js'
+import { latestMoods, type MoodRow, moodsSince, thoughtsSince } from './observer.js'
 import { makeSceneRelay } from './scenes.js'
 import { makeDirector } from './stakes.js'
 import { mountAssetRoutes } from './assetsHttp.js'
@@ -388,6 +388,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             sock.send(catchUpJson)
           }
         }
+        // The word each mind holds about itself, so a late roster does not guess from the body.
+        if (observerSeen) for (const m of latestMoods(db)) sock.send(moodJson(m))
         // The shot the town is already on. A replaying socket never gets one: a moment's own
         // cast owns that camera.
         if (directorJson !== null) sock.send(directorJson)
@@ -447,6 +449,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   /** The cut, the beat and the act without the tick, which moves every minute on its own. */
   let directorMark = ''
   let lastThoughtId = 0
+  let lastMoodId = 0
+  const moodJson = (m: MoodRow): string =>
+    JSON.stringify({ t: 'mood', agentId: m.agentId, tick: m.tick, mood: m.mood })
   let lastAssetSeq = 0
   let observerSeen = false
   /** One recorded minute per replaying socket per beat, at the live cadence. No fold and no
@@ -520,6 +525,10 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             importance: t.importance,
           }),
         )
+      }
+      for (const m of moodsSince(db, lastMoodId)) {
+        lastMoodId = m.id
+        hub.broadcast(moodJson(m))
       }
     }
     const cdx = getCodex()

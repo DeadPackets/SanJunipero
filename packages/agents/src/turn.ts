@@ -50,6 +50,13 @@ export const TurnSchema = z
       .describe('Words you say out loud. Anyone close enough hears them.'),
     action: z.union([IntentSchema, FreeformSchema]).nullish().describe(ACT_NOW),
     plan: z.array(IntentSchema).max(PLAN_MAX_STEPS).nullish().describe(A_PLAN),
+    mood: z
+      .string()
+      .min(1)
+      .nullish()
+      .describe(
+        'How you feel right now, in one or two plain words of your own. Null unless it has changed since you last said it.',
+      ),
     journal: z
       .string()
       .min(1)

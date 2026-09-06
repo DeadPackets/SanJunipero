@@ -206,7 +206,14 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0, ownRo
 
 // The closed schema a mind is asked in: every field present, every param key answered, and a
 // fixture that names no act saying `wait` out loud. Added here once, not at 20 fixture sites.
-const NOTHING_SAID = { speech: null, plan: null, journal: null, recall: null, reconsider_at: null }
+const NOTHING_SAID = {
+  speech: null,
+  plan: null,
+  journal: null,
+  recall: null,
+  reconsider_at: null,
+  mood: null,
+}
 const closedAct = (a: unknown): unknown =>
   a !== null && typeof a === 'object' && 'verb' in a
     ? {
@@ -419,6 +426,7 @@ async function setup(opts: {
   maxRetries?: number
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
+  onMood?: (m: { tick: number; agentId: string; mood: string }) => void
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
@@ -466,6 +474,7 @@ async function setup(opts: {
     reflectionLlm: opts.reflectionLlm,
     dreamLlm: opts.dreamLlm,
     onThought: opts.onThought,
+    onMood: opts.onMood,
     adjudicator: opts.adjudicator,
   })
   runtime.start(AGENT)
@@ -1680,6 +1689,18 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // FALLBACK_TURN used to be applied here as though the mind had really stood there musing.
     expect(thoughts).toEqual([])
     expect(alertKinds(agentDb)).toContain('blank_answer')
+  })
+
+  it('a turn that says how the mind feels lands on its doc at once and is told outward once', async () => {
+    const moods: string[] = []
+    const { loop, runtime, personality } = await setup({
+      model: turnModel([{ thought: 'Ow.', mood: 'sore but pleased', importance: 3 }]),
+      mindConfig: FAST_MIND,
+      onMood: (m) => moods.push(m.mood),
+    })
+    await stepUntil(loop, () => runtime.stats().turns >= 2, 60)
+    expect(personality.current().doc.current.mood).toBe('sore but pleased')
+    expect(moods).toEqual(['settled', 'sore but pleased'])
   })
 
   it('repairs an invalid generation with an assistant/user exchange instead of blind-retrying', async () => {

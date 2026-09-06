@@ -377,6 +377,7 @@ describe('the recorded corpus', () => {
         ask: null,
         leave: line.leave,
         importance: line.importance,
+        mood: null,
       })
       expect(parsed.success, JSON.stringify(line)).toBe(true)
     }

@@ -30,7 +30,7 @@ const FAST: Partial<MindConfig> = {
   bodyAlarm: { hunger: 0, energy: 0, warmth: 0, thirst: 0, affliction: Infinity },
 }
 
-const CLOSED = { plan: null, journal: null, recall: null, reconsider_at: null }
+const CLOSED = { plan: null, journal: null, recall: null, mood: null, reconsider_at: null }
 
 /** The turn model every mind here is on: it says one thing, then holds still. */
 function turnModel(speech: string | null, counter: { n: number }): MockLanguageModelV4 {
@@ -71,6 +71,7 @@ function sceneTurn(i: number): SceneTurn {
     ask: null,
     leave: false,
     importance: line.importance,
+    mood: null,
   }
 }
 

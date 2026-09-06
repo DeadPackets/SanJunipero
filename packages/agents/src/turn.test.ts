@@ -36,13 +36,22 @@ describe('TurnSchema', () => {
     expect(parsed.reconsider_at).toBe('14:30')
   })
 
-  it('rejects extra key mood via strict', () => {
-    expect(TurnSchema.safeParse({ ...validTurn, mood: 'sunny' }).success).toBe(false)
+  it('rejects an extra key via strict', () => {
+    expect(TurnSchema.safeParse({ ...validTurn, weather: 'sunny' }).success).toBe(false)
   })
 
   it('rejects importance 0 and 11', () => {
     expect(TurnSchema.safeParse({ ...validTurn, importance: 0 }).success).toBe(false)
     expect(TurnSchema.safeParse({ ...validTurn, importance: 11 }).success).toBe(false)
+  })
+
+  it('carries a mood only when one is said', () => {
+    expect(TurnSchema.parse(validTurn).mood).toBeUndefined()
+    expect(TurnSchema.parse({ ...validTurn, mood: null }).mood).toBeNull()
+    expect(TurnSchema.parse({ ...validTurn, mood: 'sore and pleased' }).mood).toBe(
+      'sore and pleased',
+    )
+    expect(TurnSchema.safeParse({ ...validTurn, mood: '' }).success).toBe(false)
   })
 
   it('rejects bad reconsider_at clock strings', () => {
@@ -187,6 +196,7 @@ const strictTurn = (verb: string, params: Record<string, unknown>): Record<strin
   plan: null,
   journal: null,
   recall: null,
+  mood: null,
   importance: 4,
   reconsider_at: null,
 })

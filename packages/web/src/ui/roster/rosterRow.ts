@@ -27,6 +27,9 @@ export type RosterRow2 = {
   portrait: RosterPortrait
   /** v1 task 2's `moodOf` — the ONE face table, reused, never a second one */
   mood: Expression
+  /** What the row says about the mood: the mind's own word when the town has sent one, else the
+   *  face table's word for the inferred expression. */
+  moodWord: string
   /** Exactly one word. */
   state: string
   /** A vocabulary disjoint from `state`. */
@@ -104,6 +107,8 @@ export function rosterRows2(
   recent: readonly SimEvent[] = [],
   /** The world's own `movement.earshotRadius`, off the snapshot. Absent falls back. */
   earshot?: number,
+  /** Each mind's own word for how it is, by id. */
+  moods?: (agentId: string) => string | null,
 ): RosterRow2[] {
   if (state === null) return []
   const rows: RosterRow2[] = []
@@ -127,6 +132,7 @@ export function rosterRows2(
       ageWords: ageWordsOf(a.ageDays),
       portrait: url !== null ? { url } : bust !== null ? { bust } : { token: a.name.slice(0, 1) },
       mood,
+      moodWord: moods?.(a.id) ?? MOOD_WORD[mood],
       state: stateWord(a, nowTick),
       conditions: conditionsOf(a),
       place: placeOf(state, a.id),

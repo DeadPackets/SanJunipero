@@ -26,6 +26,7 @@ const QUIET: SceneTurn = {
   ask: null,
   leave: false,
   importance: 5,
+  mood: null,
 }
 
 class Silent implements SceneLlm {
@@ -170,6 +171,7 @@ describe('★ the first talk a stranger stands in', () => {
       thread: scene.thread,
       recent: [],
       wrapUp: false,
+      mood: '',
       tick: NOON,
       energy: 90,
     })

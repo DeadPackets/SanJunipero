@@ -3,6 +3,9 @@ import Database from 'better-sqlite3'
 import {
   UNWEIGHED_IMPORTANCE,
   ensureObserverTables,
+  latestMoods,
+  moodsSince,
+  publishMood,
   publishThought,
   thoughtsSince,
 } from './observer.js'
@@ -85,5 +88,25 @@ describe('observer thought feed', () => {
     publishThought(db, { tick: 10, agentId: 'leyla', text: 'After it.', importance: 8 })
     expect(thoughtsSince(db, 1)[0]!.importance).toBe(8)
     db.close()
+  })
+})
+
+describe('observer mood feed', () => {
+  it('reads moods in id order, and the latest word per mind for a late viewer', () => {
+    const db = new Database(':memory:')
+    ensureObserverTables(db)
+    publishMood(db, { tick: 1, agentId: 'farmer', mood: 'fine' })
+    publishMood(db, { tick: 9, agentId: 'fisher', mood: 'sore' })
+    publishMood(db, { tick: 30, agentId: 'farmer', mood: 'cross' })
+    expect(moodsSince(db, 0).map((m) => `${m.agentId}:${m.mood}`)).toEqual([
+      'farmer:fine',
+      'fisher:sore',
+      'farmer:cross',
+    ])
+    expect(moodsSince(db, 2).map((m) => m.mood)).toEqual(['cross'])
+    expect(latestMoods(db).map((m) => `${m.agentId}:${m.mood}@${m.tick}`)).toEqual([
+      'fisher:sore@9',
+      'farmer:cross@30',
+    ])
   })
 })

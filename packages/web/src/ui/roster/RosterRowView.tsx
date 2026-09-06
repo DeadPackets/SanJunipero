@@ -1,5 +1,5 @@
 import { CONDITION_WORD } from '../status.js'
-import { MOOD_GLYPH_PX, MOOD_WORD, moodGlyph, type RosterRow2 } from './rosterRow.js'
+import { MOOD_GLYPH_PX, moodGlyph, type RosterRow2 } from './rosterRow.js'
 import type { Expression } from '../../render/mood.js'
 
 /** A 16-px face drawn at its own grid size read as a smudge in the corner: it needs the same 2× the
@@ -54,7 +54,7 @@ export function rowLabel(row: RosterRow2): string {
     `${row.name}, ${row.ageWords}`,
     row.state.toLowerCase(),
     ...conds,
-    MOOD_WORD[row.mood],
+    row.moodWord,
     row.place.words,
     company,
   ].join(', ')

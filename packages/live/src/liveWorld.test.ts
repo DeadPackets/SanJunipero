@@ -182,6 +182,7 @@ const closedTurn = (t: {
   plan: null,
   journal: null,
   recall: null,
+  mood: null,
   reconsider_at: null,
   ...t,
   action:

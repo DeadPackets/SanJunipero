@@ -127,7 +127,6 @@ function renderIdentity(id: IdentityCore): string {
 function renderPersonality(p: PromptBlocks['personality']): string {
   const doc = p.doc
   const lines = [
-    `Mood: ${doc.current.mood}`,
     `Values: ${doc.values.join('; ')}`,
     `Beliefs: ${doc.beliefs.join('; ')}`,
     `Worries: ${doc.current.worries.join('; ')}`,

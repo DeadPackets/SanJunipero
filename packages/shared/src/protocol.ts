@@ -88,6 +88,12 @@ export const ServerThought = z
     importance: z.number().int().min(1).max(10),
   })
   .strict()
+// The word a mind holds about how it is. Sent when it changes and once to each new viewer, so
+// the roster can say "worn down" in the mind's own words rather than guess from the body.
+export const ServerMood = z
+  .object({ t: z.literal('mood'), agentId: z.string().min(1), tick, mood: z.string().min(1) })
+  .strict()
+export type ServerMood = z.infer<typeof ServerMood>
 // An ARRAY, because a greeted socket is handed the whole codex: one frame per record was 189
 // sends per viewer on the thread that ticks the town. The png travels over HTTP, never the socket.
 export const ServerAssets = z
@@ -175,6 +181,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerScrubbed,
   ServerReplaying,
   ServerThought,
+  ServerMood,
   ServerAssets,
   ServerScene,
   ServerDirector,

@@ -80,6 +80,8 @@ export const SceneTurnSchema = z
     ask: z.enum(INVITATION_VERBS).nullable(),
     leave: z.boolean(),
     importance: z.number().int().min(1).max(10),
+    /** How the speaker feels now, in their own word or two. Null when nothing has changed. */
+    mood: z.string().nullable(),
   })
   .strict()
 export type SceneTurn = z.infer<typeof SceneTurnSchema>
@@ -100,6 +102,8 @@ export type SceneAsk = {
   tick: number
   /** What this body has left in it, 0–100. Said as weariness, never as a number. */
   energy: number
+  /** The word this mind holds about how it is right now. */
+  mood: string
   /** The last few things this mind said anywhere, newest last, so it does not say them again. */
   recent: readonly string[]
 }

@@ -66,6 +66,7 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
     ask: null,
     leave: line.leave,
     importance: line.importance,
+    mood: null,
     ...over,
   }
 }
@@ -196,6 +197,7 @@ function harness(opts: {
   const calls = new Map<string, number>()
   const remembered: { agentId: string; text: string; importance: number }[] = []
   const fed: { agentId: string; occasion: string }[] = []
+  const moods: { agentId: string; mood: string }[] = []
   const dbs = new Map<string, Database.Database>()
   const llms = new Map<string, FakeSceneLlm>()
   const minds = new Map<string, SceneMind>()
@@ -221,6 +223,10 @@ function harness(opts: {
       feed: (occasions) => {
         for (const o of occasions) fed.push({ agentId: w.id, occasion: o })
       },
+      mood: () => 'settled',
+      feltMood: (mood) => {
+        moods.push({ agentId: w.id, mood })
+      },
     })
   }
   const coordinator = new SceneCoordinator({
@@ -230,7 +236,7 @@ function harness(opts: {
     ...(opts.laws === undefined ? {} : { laws: opts.laws }),
     ...(opts.onError === undefined ? {} : { onError: opts.onError }),
   })
-  return { ...world, coordinator, calls, remembered, fed, llms, minds, dbs }
+  return { ...world, coordinator, calls, remembered, fed, moods, llms, minds, dbs }
 }
 
 /** Drive the scene the way the runtimes do: whoever holds the floor asks for a line. */
@@ -281,6 +287,21 @@ describe('a scene opens on a word somebody heard', () => {
     const scene = h.coordinator.noteSpoken(NADIA, 'Is anyone about?', NOON)
     expect(scene?.participants, 'Salma is one pace off and Omar seven').toEqual([NADIA, SALMA])
     expect(scene?.audience).toEqual([OMAR])
+  })
+
+  it('a line that says how the speaker feels hands the word back to that mind alone', async () => {
+    const h = harness({
+      script: (id) => (_ask, nth) =>
+        fromCorpus(nth, { leave: false, mood: id === NADIA ? 'rattled' : null }),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON, 4)
+    // Every one of her lines says it; dropping repeats is her own runtime's job.
+    expect(h.moods.length).toBeGreaterThan(0)
+    expect(new Set(h.moods.map((m) => `${m.agentId}:${m.mood}`))).toEqual(
+      new Set(['nadia:rattled']),
+    )
+    expect(h.llms.get(OMAR)?.asks.every((a) => a.mood === 'settled')).toBe(true)
   })
 
   it('does not open a second scene for a mind already in one', () => {
