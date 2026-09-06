@@ -216,22 +216,22 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       dispatchedAt = written
       const db = deps.narratorDb
       dispatched = {
-        papers: readOrEmpty(
+        papers: readOrEmpty<{ day: number; title: string; body: string }>(
           db,
           `SELECT day, title, body FROM publications WHERE kind = 'newspaper'
            ORDER BY day DESC LIMIT ${DISPATCH_MAX}`,
-        ),
+        ).map((p) => ({ ...p, body: stripFootnotes(p.body) })),
         captions: readOrEmpty(
           db,
           `SELECT day, body AS caption FROM publications WHERE kind = 'timelapse_caption'
            ORDER BY day DESC LIMIT ${DISPATCH_MAX}`,
         ),
         // Only the newest of each life: a biography is rewritten as its subject lives longer.
-        biographies: readOrEmpty(
+        biographies: readOrEmpty<{ subjectId: string; day: number; title: string; body: string }>(
           db,
           `SELECT subject_id AS subjectId, MAX(day) AS day, title, body FROM publications
            WHERE kind = 'biography' AND subject_id IS NOT NULL GROUP BY subject_id`,
-        ),
+        ).map((b) => ({ ...b, body: stripFootnotes(b.body) })),
         eras: readOrEmpty(
           db,
           `SELECT start_day AS startDay, end_day AS endDay, title, text FROM eras

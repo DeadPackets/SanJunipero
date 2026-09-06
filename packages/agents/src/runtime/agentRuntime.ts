@@ -1291,14 +1291,11 @@ export class AgentRuntime {
     // One read for both lines, so the numbers agree, and none at all on a turn that says
     // neither: counting the town is a walk over every item it holds.
     const stock = morning || esteem ? this.#bridge.townStock() : null
+    // How you are and who you are with come before what the ground offers: a mind reads the
+    // top of its turn hardest, and a gazetteer at the top made a town of surveyors.
     const nowProse = [
       prose,
-      makeablesLine(canMake, this.#bridge.groundForBuilding()),
-      roadLine(canMake, packet, world),
-      valleyExtentLine(world),
-      placesKnownLine(known, packet, world),
-      walkTargetsLine(known, packet, world),
-      standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
+      this.moodWord().length === 0 ? '' : `How you are right now: ${this.moodWord()}.`,
       doorstep,
       stasisLine(this.#still, tick),
       bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),
@@ -1311,7 +1308,12 @@ export class AgentRuntime {
       // too many.
       morning && stock !== null && !esteem ? stockLine(stock) : '',
       esteem && stock !== null ? usefulLine(topWant, stock, packet, world) : '',
-      this.moodWord().length === 0 ? '' : `How you are right now: ${this.moodWord()}.`,
+      makeablesLine(canMake, this.#bridge.groundForBuilding()),
+      roadLine(canMake, packet, world),
+      valleyExtentLine(world),
+      placesKnownLine(known, packet, world),
+      walkTargetsLine(known, packet, world),
+      standingWallsLine(this.#bridge.unfinishedWork(this.#agentId)),
     ]
       .filter((p) => p.length > 0)
       .join(' ')

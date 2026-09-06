@@ -4,6 +4,7 @@ import type { ChapterDigest, PublicRecord, SceneDigest } from '../types.js'
 import { FORBIDDEN_FRAMING } from '@sj/shared'
 import {
   CHAPTER_MOMENTS,
+  CHAPTER_TITLE,
   ChapterSummarySchema,
   EraSummarySchema,
   makeNarratorLlm,
@@ -71,6 +72,7 @@ describe('makeNarratorLlm', () => {
     for (const id of [3, 7, 11, 15, 21]) expect(last.content).toContain(String(id))
     expect(last.content.toLowerCase()).toContain('cite only ledger numbers listed')
     expect(last.content).toContain(CHAPTER_MOMENTS)
+    expect(last.content).toContain(CHAPTER_TITLE)
     expect(last.content).toContain('The wall stands on my plot')
   })
 

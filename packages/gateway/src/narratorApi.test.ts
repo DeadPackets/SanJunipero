@@ -178,10 +178,17 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     const publish = ndb.prepare(
       'INSERT INTO publications (day, kind, title, body, citations, subject_id) VALUES (?, ?, ?, ?, ?, ?)',
     )
-    publish.run(0, 'newspaper', 'The Fire', 'It burned all night.', null, null)
+    publish.run(0, 'newspaper', 'The Fire', 'It burned all night.\nSeen: 4, 5', null, null)
     publish.run(0, 'timelapse_caption', 'Day 0', 'Day 0: The First Morning', null, null)
     publish.run(0, 'biography', 'Alice', 'A first draft.', null, 'alice')
-    publish.run(1, 'biography', 'Alice, who woke first', 'She was seen early.', null, 'alice')
+    publish.run(
+      1,
+      'biography',
+      'Alice, who woke first',
+      'She was seen early. Seen: 9',
+      null,
+      'alice',
+    )
     ndb
       .prepare(
         'INSERT INTO eras (start_day, end_day, title, text, citations, chapter_ids) VALUES (?, ?, ?, ?, ?, ?)',

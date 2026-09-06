@@ -50,6 +50,11 @@ export const CHAPTER_MOMENTS =
   ' inside double quotes, and say who said it; never a quoted line without its speaker. Write what' +
   ' changed between people, not that people moved and spoke.'
 
+export const CHAPTER_TITLE =
+  'The title names a person and what happened to them or between them, in six words or fewer.' +
+  ' Never a time of day, the weather, or a mood on its own: "Farida Holds the Door", not' +
+  ' "Before First Light".'
+
 export function makeNarratorLlm(
   client: NarratorLlmClient,
   voice: NarratorVoice = NARRATOR_VOICE,
@@ -69,6 +74,7 @@ export function makeNarratorLlm(
               scenes.some((s) => s.cast.length > 0),
             )}\n` +
             "Write this day's chapter of the chronicle from the scene digests below, and give it a title.\n" +
+            `${CHAPTER_TITLE}\n` +
             `${speak.chapter}\n` +
             `${CHAPTER_MOMENTS}\n` +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +

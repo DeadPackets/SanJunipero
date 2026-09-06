@@ -94,9 +94,9 @@ describe('★ the places a mind knows but cannot see', () => {
       place({ id: `structure_${String(i).padStart(2, '0')}`, x: AT.x + 60 - i }),
     )
     const lines = linesOf(many)
-    expect(lines).toHaveLength(17) // the heading and sixteen places
+    expect(lines).toHaveLength(7) // the heading and six places
     expect(lines[1]).toContain('structure_29')
-    expect(lines.at(-1)).toContain('structure_14')
+    expect(lines.at(-1)).toContain('structure_24')
   })
 
   // ★ Genesis plants twelve roofs at x 67..98 and the channel runs at x 49: every one of them
@@ -113,7 +113,7 @@ describe('★ the places a mind knows but cannot see', () => {
       natural: true,
     })
     const lines = linesOf([...roofs, river])
-    expect(lines).toHaveLength(17)
+    expect(lines).toHaveLength(7)
     expect(lines[1]).toBe('the river (river), far to the east')
     // The roofs keep their own order behind it, and the cap still holds.
     expect(lines[2]).toContain('structure_00')

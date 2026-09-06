@@ -697,7 +697,7 @@ const inSight = (self: { x: number; y: number }, at: { x: number; y: number }): 
 
 // A whole town read back every turn is a page of standing facts. Genesis raises twelve roofs and
 // the valley has three landmarks, so a founder's whole world fits with a slot to spare.
-const PLACES_SHOWN = 16
+const PLACES_SHOWN = 6
 
 /** Where this mind could go without seeing it first: everything it knows of that is not already
  *  in front of it, landmarks first and then nearest first. A town of twelve roofs is twelve
