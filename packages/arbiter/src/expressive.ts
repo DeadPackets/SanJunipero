@@ -38,6 +38,12 @@ const EXPRESSIVE_STEMS: readonly string[] = [
   'tallie',
   'survey',
   'assess',
+  // Asking a person along is a line said to them, not a thing made: r33 minted "recruit
+  // companion" as a recipe whose whole yield was a mark.
+  'recruit',
+  'invit',
+  'persuad',
+  'convinc',
 ]
 
 // Whole words with their endings spelled out, because these five are the heads of humble,

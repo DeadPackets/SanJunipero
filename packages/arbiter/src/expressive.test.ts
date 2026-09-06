@@ -486,3 +486,11 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
     }
   })
 })
+
+describe('★ asking someone along is said, not made', () => {
+  it('hears recruiting, inviting and persuading as expressive', () => {
+    expect(isExpressive('Recruit Nadia to accompany me.')).toBe(true)
+    expect(isExpressive('Invite Salma to walk to the river with me')).toBe(true)
+    expect(isExpressive('Persuade Kamal to build the wall with me')).toBe(false)
+  })
+})
