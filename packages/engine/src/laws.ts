@@ -41,6 +41,7 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'constructs.minParticipants': z.number().int().positive(),
   // The dials tuning is expected to reach for.
   'needs.hungerDecayPerTick': z.number().positive(),
+  'needs.energyDecayAwakePerTick': z.number().positive(),
   'light.fuelBurnTicks': z.number().int().positive(),
   'mortality.poisonChanceSpoiled': z.number().min(0).max(1),
   'illness.dailyWorsenChance': z.number().min(0).max(1),

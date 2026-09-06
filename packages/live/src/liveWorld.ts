@@ -113,9 +113,15 @@ export const DEFAULT_IDLE_GAP_TICKS = 15
  *  and the stores were bare by day 3. At 0.02 r26 ate the whole founding stock by day 2 with two
  *  casts of gathering in between. Hunger did not make work; it made a body drop. Here a meal
  *  lasts four days and a log a night: twelve mouths need three fish a day, which is an hour or
- *  two of somebody's morning, and what work there is comes from wanting to be useful. */
+ *  two of somebody's morning, and what work there is comes from wanting to be useful.
+ *
+ *  Energy: at 0.093 a body has eighteen hours from rising to the floor, and a founder up at six
+ *  with a bedtime of eleven has seventeen. All seven of r26's collapses were energy at 6 to 9,
+ *  between 20:18 and 04:48, with hunger anywhere from 9 to 97. At 0.065 the same day ends at
+ *  "your legs are shaking", and a whole day and night awake still puts a body down. */
 export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
   'needs.hungerDecayPerTick': 0.01,
+  'needs.energyDecayAwakePerTick': 0.065,
   'light.fuelBurnTicks': 480,
 }
 

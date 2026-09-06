@@ -250,6 +250,7 @@ any long row, so a world resumed with old long rows still gets its short forms.
 - `agentRuntime.ts`: a settled walk is remembered as "You were already there; no step was needed."; a gathering act says what it came away with, or "nothing"; a plan of nothing but settled steps goes idle instead of waking the mind with plan_done; `foodSources` wired into the prose world; a `trace` sink writes each turn's prose.
 - Hunger road: at hunger under 50 with no food in hand and none known, "No food you know of is left in the town. Fish are in the river; the nearest bank to stand on is at (x, y), way. Berries grow at the edge of the woods; the nearest is at (x, y), way." The esteem road (`usefulLine`) falls back to the same sentence when no food is known.
 - `LIVE_PHYSICS`: hunger 0.02 -> 0.01 a tick (the schema default): twelve mouths need about three fish a day.
+- `LIVE_PHYSICS`: energy awake 0.093 -> 0.065 a tick. r26 final: all seven collapses were energy (6 to 9 at the fall, hunger 9 to 97), between 20:18 and 04:48; at 0.093 a body has eighteen hours from rising to the floor and a founder up at six with a bedtime of eleven has seventeen.
 - `SJ_PROSE_TRACE` (compose row, deploy/README row, set by `scripts/rehearse.sh` to `rehearsals/prose.jsonl`): the one record the databases do not keep, so a rehearsal can show whether a line fired and what the mind did with it.
 
 **Not done here:** an `inspect`/`look` act (minds want one: r25 rulings, r26 `inspect_riverbank` x2 and Farida's 40 "checks"); a settled sleep/enter still reads "Nothing needed doing".
