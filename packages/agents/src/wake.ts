@@ -21,6 +21,9 @@ export type MindConfig = {
   // The hour this body gets up. The town's own hour unless a card says otherwise, and night
   // still gates it, so nobody is up before the valley is light.
   riseHour: number
+  // The hour this body lies down by itself when it is idle under its own roof. The town's own
+  // hour unless a card says otherwise.
+  bedHour: number
 }
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
@@ -42,6 +45,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   // watches. Belonging resets to zero on any scene, so the lonely gather and then stop firing.
   gatheringWant: 40,
   riseHour: WAKE_HOUR,
+  bedHour: 22,
 }
 
 type BodyNeeds = { hunger: number; energy: number; warmth: number }

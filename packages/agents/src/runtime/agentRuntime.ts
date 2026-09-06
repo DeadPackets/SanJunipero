@@ -421,6 +421,8 @@ export class AgentRuntime {
   #agentId = ''
   #mem: MemoryStore | null = null
   #dayLog: string[] = []
+  #bedInFlight = false
+  #bedRetryAtTick = 0
   #prevMomentSentences = new Set<string>()
   #clock: MindClock = freshClock()
   #plan: PlanState = idlePlan()
@@ -514,7 +516,9 @@ export class AgentRuntime {
     this.#config = {
       ...DEFAULT_MIND_CONFIG,
       ...deps.config,
-      ...(deps.identity.hours === undefined ? {} : { riseHour: deps.identity.hours.rise }),
+      ...(deps.identity.hours === undefined
+        ? {}
+        : { riseHour: deps.identity.hours.rise, bedHour: deps.identity.hours.bed }),
     }
     this.#reflectionLlm = deps.reflectionLlm ?? null
     this.#dreamLlm = deps.dreamLlm ?? null
@@ -710,6 +714,7 @@ export class AgentRuntime {
     if (!packet.self.asleep && !packet.time.isNight) {
       this.#clock.morningWokeDay = Math.floor(tick / MINUTES_PER_DAY)
     }
+    if (this.#lieDownIfDue(tick, packet)) return
     if (this.#turnInFlight) return
     const scene = this.#scenes?.sceneFor(this.#agentId) ?? null
     const floor = { inScene: scene !== null, holdsFloor: scene?.floor === this.#agentId }
@@ -737,6 +742,33 @@ export class AgentRuntime {
       }
       void this.#startTurn(wake)
     }
+  }
+
+  // Bedtime is the body's own reflex and costs the mind nothing: idle under its own roof past
+  // its hour, it lies down without a turn, so a night holds no calls but a planned wake, a body
+  // failing, or fire. r27 spent 130 turns on minds standing about at night with nothing to do.
+  #lieDownIfDue(tick: number, packet: PerceptionPacket): boolean {
+    if (this.#bedInFlight) return true
+    const { asleep, activity, inside } = packet.self
+    if (asleep || activity !== null || inside?.yours !== true || !packet.time.isNight) return false
+    const { hour } = packet.time
+    if (hour < this.#config.bedHour && hour >= this.#config.riseHour) return false
+    if (tick < this.#bedRetryAtTick) return false
+    if (
+      this.#turnInFlight ||
+      this.#pendingIntent !== null ||
+      this.#pendingInFlight ||
+      this.#planHeadInFlight ||
+      this.#plan.lastResult === 'running' ||
+      (this.#scenes?.sceneFor(this.#agentId) ?? null) !== null
+    )
+      return false
+    this.#bedInFlight = true
+    void this.#bridge.submit(this.#agentId, { verb: 'sleep', params: {} }).then((res) => {
+      this.#bedInFlight = false
+      if (!res.ok) this.#bedRetryAtTick = tick + this.#config.boredomTicks
+    })
+    return true
   }
 
   // The hands come off the work now; the turn that follows is the alarm's, and opens by saying

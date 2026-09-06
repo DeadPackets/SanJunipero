@@ -108,6 +108,7 @@ function baseDoc(): PersonalityDoc {
 // A named place well out of sight that this mind has already been shown. Opt-in, because
 // anything in sight is named by the packet instead and would never reach the places block.
 const FAR_PLACE_ID = 'structure_2'
+const HOUSE_ID = 'house-tamar'
 const FAR_PLACE_NAME = 'the old farmhouse'
 
 // Cold fire pits either side of the body, and an armful of wood in its hands: everything
@@ -119,7 +120,7 @@ const FIRE_AT = [
 ]
 const WOOD_ID = 'item_wood'
 
-function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0) {
+function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0, ownRoof = false) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -152,6 +153,22 @@ function buildWorld(simConfig?: SimConfig, knownAfar = false, hearths = 0) {
     qty: 6,
     loc: { t: 'structure', id: STRUCTURE_ID },
   })
+  if (ownRoof) {
+    emit('structure_planned', {
+      id: HOUSE_ID,
+      kind: 'house',
+      x: 2,
+      y: 2,
+      w: 2,
+      h: 2,
+      maxHp: 50,
+      flammable: true,
+      builderId: AGENT,
+      owner: AGENT,
+    })
+    emit('structure_completed', { id: HOUSE_ID })
+    emit('agent_entered', { agentId: AGENT, structureId: HOUSE_ID })
+  }
   if (knownAfar) {
     emit('structure_planned', {
       id: FAR_PLACE_ID,
@@ -406,8 +423,9 @@ async function setup(opts: {
   budgetUsd?: number
   knownAfar?: boolean
   hearths?: number
+  ownRoof?: boolean
 }) {
-  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths)
+  const world = buildWorld(opts.simConfig, opts.knownAfar, opts.hearths, opts.ownRoof)
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
   const loop = new TickLoop({
@@ -1067,6 +1085,28 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   // Every archived run edited its founders' authored personalities minutes after boot, over a
   // day log of one line, because the clamp folded night -1 onto night 0.
+  it('an idle body under its own roof past its bedtime lies down without a turn', async () => {
+    const { loop, runtime } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      simConfig: SLOW_BODY,
+      ownRoof: true,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(true)
+    expect(runtime.stats().turns).toBe(0)
+  })
+
+  it('an idle body out of doors at night waits for its own turn to find a bed', async () => {
+    const { loop } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.asleep, 30)
+    expect(loop.state.agents[AGENT]!.asleep).toBe(false)
+  })
+
   it('does not reflect on the pre-dawn of a fresh world, which is a night nobody lived', async () => {
     const reflection = new ScriptedReflectionLlm()
     const { loop, runtime, mem, personality, bridge } = await setup({
