@@ -1284,8 +1284,14 @@ export class AgentRuntime {
       this.#llm.noteTurnOutcome({
         acted,
         spoke,
+        // A body mid-act that is left to finish is carried the same way a plan is: r25 counted
+        // a writer's "let the ink dry" turns as silence and rang the collapse bell 52 times.
         planContinued:
-          !acted && !spoke && (this.#plan.lastResult === 'running' || (turn.plan?.length ?? 0) > 0),
+          !acted &&
+          !spoke &&
+          (this.#plan.lastResult === 'running' ||
+            (turn.plan?.length ?? 0) > 0 ||
+            packet.self.activity !== null),
       })
     })
     // Read once: a cast back that has been answered is not answered again next turn, and a

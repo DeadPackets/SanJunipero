@@ -725,8 +725,8 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const { loop, agentDb } = await setup({
       model: turnModel([
         {
-          thought: 'The bread is right there.',
-          action: { verb: 'take', params: { itemId: BREAD_ID } },
+          thought: 'Somebody should know the bread is here.',
+          action: { verb: 'speak', params: { text: 'The bread is right there.' } },
           importance: 3,
         },
         { thought: 'I stand and think of nothing at all.', importance: 1 },
@@ -734,11 +734,34 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       mindConfig: FAST_MIND,
     })
     await stepUntil(loop, () => turnOutcomes(agentDb).length >= 2, 200)
-    // The second row is the honest idle: no plan, no act, no word, and it stays counted.
+    // The second row is the honest idle: hands free, no plan, no act, no word, and it stays counted.
     expect(turnOutcomes(agentDb).slice(0, 2)).toEqual([
-      { agent_id: AGENT, acted: 1, spoke: 0, plan_continued: 0 },
+      { agent_id: AGENT, acted: 1, spoke: 1, plan_continued: 0 },
       { agent_id: AGENT, acted: 0, spoke: 0, plan_continued: 0 },
     ])
+  })
+
+  // r25 rang the collapse bell 52 times on turns like Halim's "I'll let the ink dry": a body
+  // still at an act it was asked to keep at has nothing to add, and that is not silence.
+  it('books a thought while the hands are still at an act as carried, not as silence', async () => {
+    const { loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'Over to the far side.',
+          action: { verb: 'walk', params: { x: 5, y: 6 } },
+          importance: 3,
+        },
+        { thought: 'My legs are already at it.', importance: 1 },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => turnOutcomes(agentDb).length >= 2, 200)
+    expect(turnOutcomes(agentDb)[1]).toEqual({
+      agent_id: AGENT,
+      acted: 0,
+      spoke: 0,
+      plan_continued: 1,
+    })
   })
 
   // w1a put 35 of its 104 speeches through `action`, and every one of them booked spoke: 0.
