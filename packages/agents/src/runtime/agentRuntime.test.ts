@@ -46,6 +46,7 @@ import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from '
 import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
+import { GIST_MIN_CHARS } from '../memory/gist.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
 import { FakeEmbedder } from '@sj/llm/testutil'
@@ -1508,22 +1509,47 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   // The whole day log is re-sent every turn, and 82% of rehearsal 3's was already-read sentences.
   it('the day log drops what the last moment already said, and keeps what it did not', async () => {
-    const { loop, runtime, agentDb } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
-    await stepUntil(loop, () => runtime.stats().turns >= 6, 200)
-
-    const moments = memoriesOfKind(agentDb, 'perception').map((m) => m.text)
-    const logged = runtime.dayLogSnapshot().join(' ')
-    expect(moments.length).toBeGreaterThanOrEqual(4)
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    // Turn by turn, because what the log gained on a turn is only readable against that turn.
+    const added: string[][] = []
+    for (let turns = 1; turns <= 6; turns++) {
+      const before = runtime.dayLogSnapshot().length
+      await stepUntil(loop, () => runtime.stats().turns >= turns, 200)
+      added.push(runtime.dayLogSnapshot().slice(before).flatMap(splitSentences))
+    }
+    const nows = prompts.map((p) => p.filter((m) => m.role === 'user').at(-1)!.text)
+    expect(nows.length).toBeGreaterThanOrEqual(6)
 
     // It shrinks: a still scene renders the same sentences every turn and pays for them once.
-    expect(logged.length).toBeLessThan(moments.join(' ').length / 2)
+    const logged = runtime.dayLogSnapshot().join(' ')
+    expect(logged.length).toBeLessThan(nows.join(' ').length / 2)
+    expect(added[0]!.length).toBeGreaterThan(added.slice(1).flat().length)
 
-    const kept = new Set(splitSentences(logged))
-    for (const [i, moment] of moments.entries()) {
-      const before = new Set(i === 0 ? [] : splitSentences(moments[i - 1]!))
-      for (const s of splitSentences(moment)) {
-        if (!before.has(s)) expect(kept.has(s), s).toBe(true)
+    // Nothing is written twice, and what a turn wrote was said on that turn and not the one before.
+    const all = added.flat()
+    expect(new Set(all).size).toBe(all.length)
+    for (const [i, sentences] of added.entries()) {
+      for (const s of sentences) {
+        expect(nows[i], s).toContain(s)
+        if (i > 0) expect(nows[i - 1], s).not.toContain(s)
       }
+    }
+  })
+
+  // A perception row was the whole moment, 89% of a mind's memory bytes, and a night call each
+  // to shorten. It is written short now, and the marks a mind acts on are what it keeps.
+  it('remembers a moment short, with its marks, and never long enough to need a gist', async () => {
+    const { loop, runtime, agentDb } = await setup({ model: turnModel([]), mindConfig: FAST_MIND })
+    await stepUntil(loop, () => runtime.stats().turns >= 3, 200)
+
+    const rows = memoriesOfKind(agentDb, 'perception').map((m) => m.text)
+    expect(rows.length).toBeGreaterThanOrEqual(2)
+    for (const text of rows) {
+      expect(text.length).toBeLessThan(GIST_MIN_CHARS)
+      expect(text).toMatch(/^It is \w+, day \d+, .*, at \(3, 3\)\./)
+      expect(text).toContain(`Near: a storehouse (${STRUCTURE_ID})`)
+      expect(text).not.toContain('The air is')
     }
   })
 

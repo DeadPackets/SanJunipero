@@ -1413,3 +1413,40 @@ export function perceptionToProse(
 
   return lines.join(' ')
 }
+
+// What a moment leaves behind, capped. A busy scene still fits under `GIST_MIN_CHARS`, so no
+// night ever pays a call to shorten one of these rows.
+const MEMORY_REACH_MAX = 8
+const MEMORY_NEAR_MAX = 3
+
+/** The row a moment is remembered by: when and where the body was, who stood there, and the
+ *  marks it could act on. The scenery is left out, because nothing ever reads it back. */
+export function perceptionMemoryText(packet: PerceptionPacket): string {
+  const { x, y } = packet.self
+  const inside = packet.self.inside
+  const where =
+    inside === undefined ? `at (${x}, ${y})` : `inside ${roofSaid(inside)} (${inside.id})`
+  const lines = [`${calendarLine(packet.time).replace(/\.$/, '')}, ${where}.`]
+
+  const names = packet.visible.agents.map((a) => a.name)
+  if (names.length > 0) lines.push(`With ${names.join(', ')}.`)
+
+  const atHand = new Set(packet.reach?.atHand ?? [])
+  const near = packet.visible.items.filter((i) => atHand.has(i.id))
+  if (near.length > 0) {
+    const more = near.length - MEMORY_REACH_MAX
+    const said = near.slice(0, MEMORY_REACH_MAX).map(itemPhrase).join(', ')
+    lines.push(`Within reach: ${said}${more > 0 ? `, and ${more} more` : ''}.`)
+  }
+
+  const around = packet.visible.structures
+    .map((s) => ({ s, d: Math.hypot(s.x - x, s.y - y) }))
+    .sort((a, b) => a.d - b.d || (a.s.id < b.s.id ? -1 : 1))
+    .slice(0, MEMORY_NEAR_MAX)
+  if (around.length > 0)
+    lines.push(`Near: ${around.map(({ s }) => `${placeSaid(s)} (${s.id})`).join(', ')}.`)
+
+  if (packet.self.inventory.length > 0) lines.push(`In hand: ${heldPhrase(packet.self.inventory)}.`)
+
+  return lines.join(' ')
+}

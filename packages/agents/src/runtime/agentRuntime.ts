@@ -64,6 +64,7 @@ import {
   type Stillness,
   worldDay,
   type PerceptionPacket,
+  perceptionMemoryText,
 } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
 import { PersonalityStore } from '../personality.js'
@@ -1189,7 +1190,9 @@ export class AgentRuntime {
     await this.#mem!.insertMemory({
       tick,
       kind: 'perception',
-      text: moment,
+      // Short at the moment it is made: the whole prose was 89% of a mind's memory bytes and
+      // paid a night call each to be shortened again.
+      text: perceptionMemoryText(packet),
       importance: 3,
       tags: {
         people: packet.visible.agents.map((a) => a.name),
