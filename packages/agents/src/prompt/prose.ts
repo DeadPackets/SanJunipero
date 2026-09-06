@@ -833,6 +833,9 @@ export type TownStock = { wood: number; food: number; hearths: number; mouths: n
 
 // A log burns a night at the live physics; two nights in hand is the least a stocked town holds.
 const LOGS_PER_HEARTH = 2
+// Two days of meals, the way the wood rule holds two nights: r25 ran the shelves from 41 meals to
+// none in two days and no morning ever called them short.
+const MEALS_PER_MOUTH = 2
 
 /** The work each material comes out of, and how a body doing it is said. */
 const WORK_SAID: Readonly<Record<'wood' | 'food', Readonly<Record<string, string>>>> = {
@@ -848,7 +851,7 @@ const foodSaid = (s: TownStock): string =>
   `${countOf(s.food, 'meal')} for ${countOf(s.mouths, 'mouth')}`
 
 const woodIsShort = (s: TownStock): boolean => s.wood < LOGS_PER_HEARTH * s.hearths
-const foodIsShort = (s: TownStock): boolean => s.food < s.mouths
+const foodIsShort = (s: TownStock): boolean => s.food < MEALS_PER_MOUTH * s.mouths
 
 /** What the town is running out of, said flat to everybody in the morning and nowhere else.
  *  Only the short side, no urgency and nothing to do about it: r24 ran out on day 3 unseen. */
@@ -904,7 +907,9 @@ export function usefulLine(
   const food = foodIsShort(stock)
   if (!wood && !food) return `${head} Nobody is short of anything; who have you not helped lately?`
   const thinner =
-    stock.wood / (LOGS_PER_HEARTH * stock.hearths) <= stock.food / stock.mouths ? 'wood' : 'food'
+    stock.wood / (LOGS_PER_HEARTH * stock.hearths) <= stock.food / (MEALS_PER_MOUTH * stock.mouths)
+      ? 'wood'
+      : 'food'
   const short = wood && food ? thinner : wood ? 'wood' : 'food'
   const said = `The town has ${short === 'wood' ? woodSaid(stock) : foodSaid(stock)}.`
   return [head, said, workRoadLine(short, packet, world)].filter((p) => p.length > 0).join(' ')

@@ -5,7 +5,7 @@ import { stockLine, usefulLine, type PerceptionPacket, type TownStock } from './
 
 type Agent = PerceptionPacket['visible']['agents'][number]
 
-const STOCKED: TownStock = { wood: 12, food: 20, hearths: 5, mouths: 12 }
+const STOCKED: TownStock = { wood: 12, food: 30, hearths: 5, mouths: 12 }
 
 const stock = (over: Partial<TownStock> = {}): TownStock => ({ ...STOCKED, ...over })
 
@@ -34,7 +34,7 @@ describe('★ what the town is running out of, said to everybody', () => {
   it('says nothing while the shelves hold', () => {
     expect(stockLine(STOCKED)).toBe('')
     // Exactly two logs a hearth and one meal a mouth is stocked, not short.
-    expect(stockLine(stock({ wood: 10, food: 12 }))).toBe('')
+    expect(stockLine(stock({ wood: 10, food: 24 }))).toBe('')
   })
 
   it('names the wood alone when only the wood is thin', () => {
@@ -113,11 +113,11 @@ describe('★ the road a high esteem is given', () => {
   })
 
   it('names the thinner of the two sides, by ratio and not by count', () => {
-    // Wood is at 3 of 10 and food at 7 of 12: fewer meals than logs, thinner wood.
-    expect(usefulLine('esteem', stock({ wood: 3, food: 7 }), seeing([]), world)).toContain(
+    // Wood is at 3 of 10 and food at 9 of 24: thinner wood.
+    expect(usefulLine('esteem', stock({ wood: 3, food: 9 }), seeing([]), world)).toContain(
       '3 logs for 5 hearths',
     )
-    // Wood at 9 of 10 and food at 2 of 12 turns it round.
+    // Wood at 9 of 10 and food at 2 of 24 turns it round.
     expect(usefulLine('esteem', stock({ wood: 9, food: 2 }), seeing([]), world)).toContain(
       '2 meals for 12 mouths',
     )
