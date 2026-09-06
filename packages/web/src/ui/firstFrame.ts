@@ -90,8 +90,36 @@ export function peopleWords(count: number): string {
   return n === 1 ? `${word} person` : `${word} people`
 }
 
+/** A novel's first line, not a builder's: the people, the place, and that nothing between
+ *  them is settled yet. As true on day forty as on day one. */
 export const firstLinesHead = (count: number): string =>
-  `${peopleWords(count)}. Watch them make a town.`
+  `${peopleWords(count)}, one valley, and everything between them still to be settled.`
+
+/** The second line names one person and what is on their mind, in the words of their own card.
+ *  The worries arrive by feed a beat after the town does, so the line is added when they land,
+ *  and only while the first lines are still up. Chosen by the day, so a visit tomorrow opens on
+ *  somebody else. */
+export function firstWorryLine(
+  aims: readonly { agentId: string; worry: string | null }[],
+  nameOf: (id: string) => string | undefined,
+  day: number,
+): string | null {
+  const carried = aims.filter((a): a is { agentId: string; worry: string } => a.worry !== null)
+  if (carried.length === 0) return null
+  const pick = carried[((day % carried.length) + carried.length) % carried.length]!
+  const name = nameOf(pick.agentId)
+  if (name === undefined) return null
+  const worry = pick.worry.trim().replace(/\.$/, '')
+  return `On ${name}’s mind: ${worry}.`
+}
+
+export function tellFirstWorry(line: string | null): void {
+  if (lines === null || line === null) return
+  const el = lines.querySelector<HTMLElement>('.first-lines-worry')
+  if (el === null) return
+  el.textContent = line
+  el.hidden = false
+}
 
 /** A hand on the camera: the same three the director stands down for. */
 const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const

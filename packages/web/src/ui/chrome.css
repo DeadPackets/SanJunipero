@@ -1457,6 +1457,14 @@ body {
   color: var(--cream);
   text-shadow: var(--halo-deep);
 }
+/* the second line is a person: the head's face at the note's weight, in the head's ink */
+.first-lines .first-lines-worry {
+  font-family: var(--font-body); font-size: var(--f-4); font-weight: 500;
+  text-wrap: pretty; max-width: 44ch;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
+}
+.first-lines-worry[hidden] { display: none; }
 .first-lines-note {
   font-family: var(--font-body); font-size: var(--f-3); font-weight: 400;
   text-wrap: pretty;

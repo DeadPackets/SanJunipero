@@ -38,9 +38,13 @@ import {
   FIRST_FRAME_COPY,
   dismissFirstFrame,
   fadeFirstLines,
+  firstWorryLine,
+  tellFirstWorry,
   firstFrameNote,
   showFirstLines,
 } from './ui/firstFrame.js'
+import { aimsFeed } from './ui/feeds.js'
+import { useFeed } from './ui/useEndpoint.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { localStore, sessionStore } from './ui/storage.js'
@@ -163,15 +167,26 @@ export function App() {
     }
   }, [store])
 
+  // The worries ride the aims feed, a beat behind the town; the effect below runs again when
+  // they land, and the first lines gain their second sentence if they are still up.
+  const aims = useFeed(aimsFeed).data
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
     if (scene !== null && link === 'online') {
       dismissFirstFrame()
       // ...and the two lines take the card's place, over the town they are about.
       showFirstLines(livingCount(store.getState()?.agents))
+      if (aims !== null)
+        tellFirstWorry(
+          firstWorryLine(
+            aims.aims,
+            (id) => store.getState()?.agents[id]?.name,
+            tickToMoment(store.getTick()).day,
+          ),
+        )
     } else
       firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
-  }, [scene, link, store])
+  }, [scene, link, store, aims])
 
   // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
   // round turn is not one: it happens the instant the town arrives, before anybody has read them.

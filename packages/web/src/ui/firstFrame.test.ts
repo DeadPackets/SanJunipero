@@ -8,6 +8,7 @@ import {
   firstFrameNote,
   firstFrameStuck,
   firstLinesHead,
+  firstWorryLine,
   peopleWords,
 } from './firstFrame.js'
 import { MOTION } from './motion.js'
@@ -65,11 +66,33 @@ describe('★ the two lines over the first shot', () => {
   const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
 
   it('★ counts the town in words, because the first thing a visitor reads is prose', () => {
-    expect(firstLinesHead(12)).toBe('Twelve people. Watch them make a town.')
+    expect(firstLinesHead(12)).toBe(
+      'Twelve people, one valley, and everything between them still to be settled.',
+    )
     expect(peopleWords(1)).toBe('One person')
     expect(peopleWords(20)).toBe('Twenty people')
     // past the words the figure is honest rather than wrong
     expect(peopleWords(24)).toBe('24 people')
+  })
+
+  // The second line is a person, not a count: the one thing a first page owes a reader.
+  it('★ names one person and what is on their mind, by the day, in their card’s own words', () => {
+    const aims = [
+      { agentId: 'amara', worry: null },
+      { agentId: 'farida', worry: 'Bashir gives away what the two of them will need by winter.' },
+      { agentId: 'tariq', worry: "being Kamal's boy for the rest of his life" },
+    ]
+    const names: Record<string, string> = { farida: 'Farida', tariq: 'Tariq' }
+    const nameOf = (id: string): string | undefined => names[id]
+    expect(firstWorryLine(aims, nameOf, 0)).toBe(
+      'On Farida’s mind: Bashir gives away what the two of them will need by winter.',
+    )
+    expect(firstWorryLine(aims, nameOf, 1)).toBe(
+      "On Tariq’s mind: being Kamal's boy for the rest of his life.",
+    )
+    expect(firstWorryLine(aims, nameOf, 2)).toBe(firstWorryLine(aims, nameOf, 0))
+    expect(firstWorryLine([{ agentId: 'amara', worry: null }], nameOf, 0)).toBe(null)
+    expect(HTML).toMatch(/<p class="first-lines-worry" hidden><\/p>/)
   })
 
   it('★ stands outside `#root`, which React clears on mount, and starts hidden', () => {
