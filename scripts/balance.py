@@ -154,8 +154,9 @@ def cat_of(verb):
 def time_budget(ev, roster, max_tick):
     spawn = {n: 0 for n in roster}
     for t, ty, p in ev:
-        if ty in ('agent_born', 'stranger_arrived') and p.get('agentId') in spawn:
-            spawn[p['agentId']] = t
+        who = p.get('agentId') or p.get('id')
+        if ty in ('agent_born', 'stranger_arrived', 'agent_arrived') and who in spawn:
+            spawn[who] = t
     alive_to = {n: max_tick for n in roster}
     for t, ty, p in ev:
         if ty == 'agent_died' and p.get('agentId') in alive_to:
