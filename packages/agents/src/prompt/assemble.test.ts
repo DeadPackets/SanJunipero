@@ -652,7 +652,8 @@ describe('perceptionToProse', () => {
     }
     const prose = perceptionToProse(packet)
     expect(prose).toContain('storehouse (structure_1) stands close to the south-west')
-    expect(prose).toContain('2 tiles wide and 1 tile tall')
+    // a finished roof's size is the builder's business, not the walker's
+    expect(prose).not.toContain('tiles wide')
     // (12, 9) touches a footprint at (10..11, 10): this body is already as near as a walk gets.
     expect(prose).toContain('you are beside it now; there is nothing nearer to walk to.')
   })
@@ -811,7 +812,8 @@ describe('perceptionToProse', () => {
             w: 1,
             h: 2,
             burning: false,
-            stage: 'complete' as const,
+            stage: 'construction' as const,
+            raised: { done: 1, needs: 2 },
           },
         ],
         items: [],

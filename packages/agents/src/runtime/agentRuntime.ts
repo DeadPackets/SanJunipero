@@ -1305,8 +1305,8 @@ export class AgentRuntime {
     // How you are and who you are with come before what the ground offers: a mind reads the
     // top of its turn hardest, and a gazetteer at the top made a town of surveyors.
     const nowProse = [
-      prose,
       this.moodWord().length === 0 ? '' : `How you are right now: ${this.moodWord()}.`,
+      prose,
       doorstep,
       stasisLine(this.#still, tick),
       bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),

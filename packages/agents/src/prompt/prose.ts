@@ -1065,10 +1065,12 @@ function hearthClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): strin
   return s.hearth === 'lit' ? ' There is firelight inside it.' : ''
 }
 
-/** Said before the walk, not at the door: two roofs the same size are not the same night. */
-function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean): string {
+/** Said before the walk, not at the door: two roofs the same size are not the same night. From
+ *  dusk, or in the room itself; a bed count on every house in sight at noon is no news. */
+function bedClause(s: PerceptionStructure, isTheRoomYouAreIn: boolean, late: boolean): string {
   if (s.bed !== true) return ''
-  return isTheRoomYouAreIn ? ' There are beds in here.' : ' There are beds in it.'
+  if (isTheRoomYouAreIn) return ' There are beds in here.'
+  return late ? ' There are beds in it.' : ''
 }
 
 // Renders mechanics as fiction. Every clause here states a fact and names no act — no remedy,
@@ -1239,6 +1241,28 @@ export function perceptionToProse(
   )
   lines.push(...affordanceLines(packet))
 
+  // Who is here comes before how the body feels and long before what stands where: a mind reads
+  // the top of its turn hardest, and r31's now-prose gave people one line in a hundred.
+  for (const a of packet.visible.agents) {
+    const dressed = a.worn === undefined ? '' : `, ${a.worn}`
+    // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
+    // ailing is a body nobody tends, and the live run tended nobody at all.
+    const ails = a.condition === undefined ? '' : `, ${a.condition}`
+    // Said first, because it is the thing a pair of eyes lands on FIRST: a face nobody in the
+    // valley has seen before.
+    const road = a.stranger === true ? ', a stranger who came up the valley road,' : ''
+    const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
+    // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
+    // while sleeping is flagged both, and asleep-first told the town it was only resting.
+    const who = `${a.name} (${a.id})${road}`
+    if (a.collapsed)
+      lines.push(
+        `${who} lies collapsed ${where}. Hold food out to them and they will eat it from your hand.`,
+      )
+    else if (a.asleep) lines.push(`${who} sleeps ${where}.`)
+    else lines.push(`${who} stands ${where}.`)
+  }
+
   if (packet.self.collapsed)
     lines.push(
       'You have collapsed and cannot stand. You can still eat what is already in your hands, sleep, and drag yourself one tile. A fire or a roof one tile away is worth crawling to. Food, warmth and rest get you back on your feet.',
@@ -1359,26 +1383,8 @@ export function perceptionToProse(
       'You are at the edge of the valley, where the road comes in. The town is up the road.',
     )
 
-  for (const a of packet.visible.agents) {
-    const dressed = a.worn === undefined ? '' : `, ${a.worn}`
-    // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
-    // ailing is a body nobody tends, and the live run tended nobody at all.
-    const ails = a.condition === undefined ? '' : `, ${a.condition}`
-    // Said first, because it is the thing a pair of eyes lands on FIRST: a face nobody in the
-    // valley has seen before.
-    const road = a.stranger === true ? ', a stranger who came up the valley road,' : ''
-    const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
-    // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
-    // while sleeping is flagged both, and asleep-first told the town it was only resting.
-    const who = `${a.name} (${a.id})${road}`
-    if (a.collapsed)
-      lines.push(
-        `${who} lies collapsed ${where}. Hold food out to them and they will eat it from your hand.`,
-      )
-    else if (a.asleep) lines.push(`${who} sleeps ${where}.`)
-    else lines.push(`${who} stands ${where}.`)
-  }
-
+  // Beds are the night's question; the size of a roof is the builder's, and only while it rises.
+  const late = packet.time.isNight || dayPhaseFromTick(packet.time.tick) === 'dusk'
   for (const s of packet.visible.structures) {
     const state = s.burning
       ? ', and it is burning'
@@ -1415,16 +1421,22 @@ export function perceptionToProse(
     // Said at the wall instead of at the refusal: how far up the walls are never said that
     // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
+    const size = s.stage === 'construction' ? `, ${footprintPhrase(s.w, s.h)}` : ''
     lines.push(
-      `${opening(placeSaid(s))} (${s.id}) stands ${inSight(packet.self, s)}, ${footprintPhrase(s.w, s.h)}${state}; ${
+      `${opening(placeSaid(s))} (${s.id}) stands ${inSight(packet.self, s)}${size}${state}; ${
         approach
-      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id)}${markedPhrase(s.marks)}`,
+      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id, late)}${markedPhrase(s.marks)}`,
     )
   }
 
+  // A thing already named as within reach is not named again here unless somebody's claim on
+  // it is the news: r31 said each nearby item twice, and a third time as a walk.
+  const atHand = new Set(packet.reach?.atHand ?? [])
   for (const i of packet.visible.items) {
+    const claim = claimPhrase(i)
+    if (atHand.has(i.id) && claim === '') continue
     const pos = i.loc.t === 'tile' ? ` ${inSight(packet.self, i.loc)}` : ''
-    lines.push(`You can see ${itemPhrase(i)}${pos}${claimPhrase(i)}.`)
+    lines.push(`You can see ${itemPhrase(i)}${pos}${claim}.`)
   }
 
   for (const c of packet.visible.crops) {

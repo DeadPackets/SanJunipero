@@ -231,7 +231,8 @@ describe('★ every mark the prose shows is a mark `walkDestination` knows', () 
 
     const places = marksIn(prose, /\((structure_\d+)\) stands/g)
     const people = marksIn(prose, /\(([a-z]+)\) (?:stands|sleeps|lies collapsed)/g)
-    const things = marksIn(prose, /You can see [^.]*?\((item_\d+)\)/g)
+    // a thing within reach is named once, in the hands line, and never again as a sight
+    const things = marksIn(prose, /\((item_\d+)\)/g)
     expect(places.length).toBeGreaterThan(0)
     expect(people.length).toBeGreaterThan(0)
     expect(things.length).toBeGreaterThan(0)
