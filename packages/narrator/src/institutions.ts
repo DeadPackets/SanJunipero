@@ -22,7 +22,8 @@ type Completed = { seq: number; agentId: string; verb: string }
 
 // Body upkeep and moving about are what everybody does, not what a town has taken to; give is
 // a trade first, not a norm. r28's paper listed "people sleep" and "people enter" as rules, and
-// every run since has listed "people stoke": feeding a fire is upkeep too.
+// every run since has listed "people stoke": feeding a fire is upkeep too. Nor is work: r33's
+// paper listed "people chop", and what everybody does to live is not a way the town took to.
 const NOT_A_CUSTOM: ReadonlySet<string> = new Set([
   'give',
   'stoke',
@@ -42,6 +43,15 @@ const NOT_A_CUSTOM: ReadonlySet<string> = new Set([
   'walk',
   'wear',
   'doff',
+  'build',
+  'chop',
+  'craft',
+  'fish',
+  'forage',
+  'harvest',
+  'hunt',
+  'plant',
+  'till',
 ])
 
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a

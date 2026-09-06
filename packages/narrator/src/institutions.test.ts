@@ -33,18 +33,18 @@ const scenes: SceneSegment[] = [
   scene(2, [13], ['nadia']),
 ]
 
-// omar tends 3x (role); omar+yusuf fish 5x total (rule: 2 agents, 5 actions).
+// omar tends 3x (role); omar+yusuf court 5x total (rule: 2 agents, 5 actions).
 const events: SimEvent[] = [
   act(1, 0, 'omar', 'tend'),
-  act(2, 1, 'omar', 'fish'),
+  act(2, 1, 'omar', 'court'),
   act(3, 10, 'omar', 'tend'),
   ev(4, 11, 'agent_moved', { id: 'yusuf', x: 1, y: 1 }),
   act(5, 1440, 'omar', 'tend'),
   ev(6, 1441, 'agent_moved', { id: 'omar', x: 2, y: 2 }),
-  act(7, 2880, 'omar', 'fish'),
-  act(8, 2881, 'omar', 'fish'),
-  act(9, 2882, 'yusuf', 'fish'),
-  act(10, 2883, 'yusuf', 'fish'),
+  act(7, 2880, 'omar', 'court'),
+  act(8, 2881, 'omar', 'court'),
+  act(9, 2882, 'yusuf', 'court'),
+  act(10, 2883, 'yusuf', 'court'),
   ev(11, 2884, 'agent_moved', { id: 'omar', x: 3, y: 3 }),
   ev(12, 2885, 'agent_moved', { id: 'yusuf', x: 3, y: 4 }),
   ev(13, 2900, 'agent_moved', { id: 'nadia', x: 9, y: 9 }),
@@ -71,13 +71,13 @@ describe('detectInstitutions', () => {
     expect(group!.sourceEventIds).toEqual([1, 2]) // founding scene's eventIds
   })
 
-  it('emits the people-fish rule with 2 members and 5 source events', () => {
+  it('emits the people-court rule with 2 members and 5 source events', () => {
     const rule = out.find((i) => i.kind === 'rule')
     expect(rule).toBeDefined()
-    expect(rule!.name).toBe('people fish')
+    expect(rule!.name).toBe('people court')
     expect(rule!.memberIds).toEqual(['omar', 'yusuf'])
     expect(rule!.sourceEventIds).toEqual([2, 7, 8, 9, 10])
-    expect(rule!.foundingSceneIndex).toBe(0) // scene of the first fish (seq 2)
+    expect(rule!.foundingSceneIndex).toBe(0) // scene of the first court (seq 2)
   })
 
   it('nadia gets no role and no group; tend is not a rule (one agent)', () => {
@@ -100,6 +100,16 @@ describe('detectInstitutions', () => {
     const scenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ['omar', 'yusuf'])]
     expect(
       detectInstitutions(scenes, upkeep, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule'),
+    ).toEqual([])
+  })
+
+  it('★ work is not a custom: nobody reports that people chop, fish or build', () => {
+    const work = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) =>
+      act(n, n, n % 2 ? 'omar' : 'yusuf', n <= 4 ? 'chop' : n <= 8 ? 'fish' : 'build'),
+    )
+    const scenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ['omar', 'yusuf'])]
+    expect(
+      detectInstitutions(scenes, work, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule'),
     ).toEqual([])
   })
 
@@ -197,6 +207,6 @@ describe('past participles in institution descriptions', () => {
 
   it('the rule description uses the participle', () => {
     const rule = detectInstitutions(scenes, events).find((i) => i.kind === 'rule')
-    expect(rule!.description).toBe('2 people have fished 5 times')
+    expect(rule!.description).toBe('2 people have courted 5 times')
   })
 })
