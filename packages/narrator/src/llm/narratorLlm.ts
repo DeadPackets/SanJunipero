@@ -47,8 +47,8 @@ const user = (content: string) => [{ role: 'user' as const, content }]
 
 export const CHAPTER_MOMENTS =
   'Each scene lists moments with their numbers. Quote at most one line per person, word for word,' +
-  ' inside double quotes, and say who said it. Write what changed between people, not that people' +
-  ' moved and spoke.'
+  ' inside double quotes, and say who said it; never a quoted line without its speaker. Write what' +
+  ' changed between people, not that people moved and spoke.'
 
 export function makeNarratorLlm(
   client: NarratorLlmClient,
