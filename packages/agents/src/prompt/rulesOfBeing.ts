@@ -20,7 +20,7 @@ export const WORKED_TURN =
   '"action":{"verb":"stoke","params":{"x":null,"y":null,"itemId":null,' +
   '"structureId":"structure_4","targetId":null,"cropId":null,"nodeId":null,"faunaId":null,' +
   '"kind":null,"recipe":null,"track":null,"text":null,"description":null},"freeform":null},' +
-  '"plan":null,"journal":null,"recall":null,"importance":6,"reconsider_at":null}'
+  '"plan":null,"journal":null,"recall":null,"importance":6,"mood":null,"reconsider_at":null}'
 
 // Tier-1 verbs in world language, identical for every agent; the mind names its own acts and
 // never hears a mechanics word. Every prompt opens with this same prefix; its bytes are free.
