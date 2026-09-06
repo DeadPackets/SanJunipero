@@ -97,6 +97,17 @@ describe('makeNarratorLlm', () => {
     expect(await makeNarratorLlm(scripted(bio)).biography('omar', 'Omar', record)).toEqual(bio)
   })
 
+  it('a biography is asked for with the pronoun the town uses, when one is given', async () => {
+    const captured: Captured[] = []
+    const llm = makeNarratorLlm(scripted({ title: 't', body: 'b' }, captured))
+    await llm.biography('omar', 'Omar', record, 'he')
+    await llm.biography('nadia', 'Nadia', record)
+    expect(captured[0]!.messages.map((m) => m.content).join('\n')).toContain(
+      'Write of Omar as "he".',
+    )
+    expect(captured[1]!.messages.map((m) => m.content).join('\n')).not.toContain('Write of')
+  })
+
   it('FORBIDDEN_FRAMING is load-bearing: catches framing words, passes clean prose', () => {
     expect(FORBIDDEN_FRAMING.test('language model')).toBe(true)
     expect(FORBIDDEN_FRAMING.test('an AI wrote this')).toBe(true)

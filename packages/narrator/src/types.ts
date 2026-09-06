@@ -111,6 +111,7 @@ export type NarratorLlm = {
     agentId: string,
     name: string,
     record: PublicRecord[],
+    pronoun?: 'he' | 'she',
   ): Promise<{ title: string; body: string }>
 }
 

@@ -157,6 +157,8 @@ export async function writeBiography(deps: {
   name: string
   throughDay: number
   cast?: readonly CastMember[] | undefined
+  /** How the town says this person: absent, the life is written without a pronoun given. */
+  pronoun?: 'he' | 'she' | undefined
   alert?: (d: string) => void
 }): Promise<PublicationRow> {
   const record = collectPublicRecord(deps.world, deps.agentId, deps.throughDay)
@@ -165,8 +167,9 @@ export async function writeBiography(deps: {
   if (record.length > 0) {
     // Asked twice at most: the roster bans world words a true record can force, so one refused
     // draft is a sampling accident and two is the answer.
-    let bio = await deps.llm.biography(deps.agentId, deps.name, record)
-    if (framingViolated(bio)) bio = await deps.llm.biography(deps.agentId, deps.name, record)
+    let bio = await deps.llm.biography(deps.agentId, deps.name, record, deps.pronoun)
+    if (framingViolated(bio))
+      bio = await deps.llm.biography(deps.agentId, deps.name, record, deps.pronoun)
     if (framingViolated(bio)) {
       deps.alert?.(
         `framing_violation: biography of ${deps.agentId} broke the human framing law — not persisted`,

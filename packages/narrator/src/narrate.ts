@@ -310,6 +310,7 @@ export async function closeDay(deps: {
 
   const subject = cast.length === 0 ? undefined : cast[day % cast.length]
   if (subject !== undefined && !alreadyOn('biography')) {
+    const sex = deps.world?.state?.agents[subject.id]?.sex
     try {
       await writeBiography({
         store,
@@ -319,6 +320,7 @@ export async function closeDay(deps: {
         name: subject.name,
         throughDay: day,
         cast: roll,
+        ...(sex === undefined ? {} : { pronoun: sex === 'f' ? 'she' : 'he' }),
         ...(deps.alert === undefined ? {} : { alert: deps.alert }),
       })
     } catch (err) {

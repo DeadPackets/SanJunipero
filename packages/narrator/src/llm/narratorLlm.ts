@@ -106,11 +106,19 @@ export function makeNarratorLlm(
       })
       return value
     },
-    async biography(_agentId: string, name: string, record: PublicRecord[]) {
+    async biography(
+      _agentId: string,
+      name: string,
+      record: PublicRecord[],
+      pronoun?: 'he' | 'she',
+    ) {
+      // r26 wrote "The town saw them tend the hearth" of a man everybody in it called he: the
+      // roster never said, so the life was written without a pronoun.
+      const said = pronoun === undefined ? '' : ` Write of ${name} as "${pronoun}".`
       const { value } = await client.object({
         system: NARRATOR_CANON,
         messages: user(
-          `Write the life of ${name} from what the town saw, below. ` +
+          `Write the life of ${name} from what the town saw, below.${said} ` +
             'Only what was seen and heard in public is known; write nothing of their private mind.\n' +
             `${speak.biography}\n${FOOTNOTE_RULE}\n` +
             JSON.stringify(record),
