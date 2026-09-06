@@ -77,7 +77,7 @@ const checkpointAt = (tick: number): G11Checkpoint => ({
             morningWokeDay: 1,
             gatheringDay: 1,
             wakeRetryAtTick: 0,
-            prevVisibleIds: ['salma'],
+            facesSeen: { salma: tick - 6 },
           },
           plan: { queue: [{ verb: 'walk', params: { x: 62, y: 70 } }], lastResult: 'running' },
           stats: { turns: 27, dozes: 3, reflections: 2 },
@@ -243,7 +243,7 @@ describe('a mind comes back with its clock, not with a fresh one', () => {
     expect(back.clock.reconsiderAtTick).toBe(2920)
     // A dusk already spent comes back spent, or the resume buys the same gathering twice.
     expect(back.clock.gatheringDay).toBe(1)
-    expect(back.clock.prevVisibleIds).toEqual(['salma'])
+    expect(back.clock.facesSeen).toEqual({ salma: 2874 })
     expect(back.stats).toEqual({ turns: 27, dozes: 3, reflections: 2 })
     expect(back.pendingRecall).toEqual({
       query: 'the flood',

@@ -64,9 +64,9 @@ function isNoOpEditText(text: string): boolean {
 export type EditField = 'values' | 'beliefs'
 // No belief moves in the first days of a life, then about one a week; values about one a month.
 // r28 rewrote a belief on 12 of the 13 nights it edited, three of them into the same register.
-export const EDITS_FROM_DAY = 3
-export const BELIEFS_EDIT_EVERY_DAYS = 7
-export const VALUES_EDIT_EVERY_DAYS = 30
+const EDITS_FROM_DAY = 3
+const BELIEFS_EDIT_EVERY_DAYS = 7
+const VALUES_EDIT_EVERY_DAYS = 30
 
 export type NightlyEditOutcome =
   | { ok: true; version: number }

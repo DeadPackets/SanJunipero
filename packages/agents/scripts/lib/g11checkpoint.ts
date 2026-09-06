@@ -46,9 +46,14 @@ const MindClockZ = z
     // and the field the runtime reads back is still the clock's own `number | null`.
     gatheringDay: z.number().nullable().default(null),
     wakeRetryAtTick: z.number(),
-    prevVisibleIds: z.array(z.string()),
-    // Optional the way the clock's own field is: a checkpoint from before the felt latch resumes.
+    // Optional the way the clock's own fields are: a checkpoint from before each latch resumes,
+    // and one that still carries the retired `prevVisibleIds` is not refused for it.
+    prevVisibleIds: z.array(z.string()).optional(),
     feltSeen: z.array(z.string()).optional(),
+    alarmAgainAtTick: z.number().optional(),
+    facesSeen: z.record(z.string(), z.number()).optional(),
+    voicesHeard: z.record(z.string(), z.number()).optional(),
+    newsAtTick: z.number().optional(),
   })
   .strict()
 const MindSnapshot = z
