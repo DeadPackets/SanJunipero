@@ -69,7 +69,7 @@ propose: name it propose; give targetId, the person at your side you would take 
 lie_with: name it lie_with; give targetId, the person beside you, and only if they say yes. It takes a house that is yours or theirs, with the two of you inside it; no other kind of building will do, and neither will standing outside one. A child may come of it
 leave_partner: name it leave_partner; give targetId, the partner you are leaving. It needs no answer, and it is not forgotten
 leave_town: name it leave_town when you mean to go down the valley road for good; nothing more is needed. Your legs carry you to the valley's edge, and then out of it with whatever you hold. Nobody's leave is asked and there is no walking back
-experiment: name it experiment; give description, what you attempt
+experiment: name it experiment; give description, what you attempt with your hands to make or change something. Looking, checking, counting and inspecting are not experiments: what is in front of you, you already see
 
 A thing's mark (itemId, cropId, structureId) becomes known to you only once you
 stand beside where it rests and see it; until then you cannot name it. A place

@@ -413,3 +413,10 @@ describe('★ the body on the page is the only body', () => {
     )
   })
 })
+
+describe('★ looking is not an experiment', () => {
+  it('the experiment door is for hands, not eyes', () => {
+    expect(CAPABILITIES).toContain('what you attempt with your hands to make or change something')
+    expect(CAPABILITIES).toContain('Looking, checking, counting and inspecting are not experiments')
+  })
+})

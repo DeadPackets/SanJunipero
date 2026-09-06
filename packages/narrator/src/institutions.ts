@@ -138,7 +138,8 @@ export function detectInstitutions(
   // rules: a verb the town could take to, done by >= ruleMinAgents agents, >= ruleMinActions times
   const byVerb = new Map<string, { agents: Set<string>; seqs: number[] }>()
   for (const c of completed) {
-    if (NOT_A_CUSTOM.has(c.verb)) continue
+    // A gesture is not a custom either: r32's paper listed "people inspect".
+    if (NOT_A_CUSTOM.has(c.verb) || c.verb.startsWith('express:')) continue
     const entry = byVerb.get(c.verb) ?? { agents: new Set<string>(), seqs: [] }
     entry.agents.add(c.agentId)
     entry.seqs.push(c.seq)
