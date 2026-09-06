@@ -244,3 +244,8 @@ any long row, so a world resumed with old long rows still gets its short forms.
 
 Talking while working (a scene opening between two bodies at work without stopping the hands),
 a gift of what you made feeding the receiver's affection, and the day log fold threshold.
+
+Queued from r25 (2026-09-06): an invented act ruled by the arbiter still dies on adjacency
+(`attempt_beyond_adjacency`, ruling 7 wanted water under the body) instead of sending the body to
+the water first; a 2 by 2 storehouse holds two bodies, so a third waits outside for hours; a
+mind waiting on somebody to step out of a room is told nothing it could do instead.
