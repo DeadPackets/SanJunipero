@@ -352,7 +352,7 @@ describe('the naming law', () => {
   })
 
   it('has one copy for the unnamed case, and it is not a label', () => {
-    expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering not yet named')
+    expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering nobody has named yet')
     expect(scanPromptForGlassLeak(UNNAMED_CONSTRUCT_COPY)).toEqual([])
   })
 })

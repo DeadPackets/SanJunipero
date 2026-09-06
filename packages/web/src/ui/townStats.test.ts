@@ -58,16 +58,12 @@ describe('townStats', () => {
 
 describe('EMPTY_COPY', () => {
   it('tells the viewer what has not happened yet, in the town’s own voice', () => {
-    expect(EMPTY_COPY.chronicle).toBe(
-      'Day one is still unwritten. The town’s ledger fills as the townsfolk live it.',
-    )
+    expect(EMPTY_COPY.chronicle).toBe('Nothing written for today yet. It fills in as the day goes.')
     expect(EMPTY_COPY.bonds).toContain('No bonds yet.')
-    expect(EMPTY_COPY.moments).toBe(
-      'Nothing worth replaying yet — the first recorded day is still ahead.',
-    )
-    expect(EMPTY_COPY.roster).toBe(
-      'No one walks the town yet — the first footsteps are still to come.',
-    )
+    expect(EMPTY_COPY.moments).toBe('Nothing to replay yet. The first day is not over.')
+    expect(EMPTY_COPY.roster).toBe('Nobody is in town yet.')
+    // the owner's kitchen-table rule: no dash for effect anywhere a viewer reads
+    for (const [key, copy] of Object.entries(EMPTY_COPY)) expect(copy, key).not.toContain('—')
     expect(EMPTY_COPY.rosterSub).toBe('The founders arrive at dawn.')
   })
 

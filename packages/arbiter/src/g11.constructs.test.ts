@@ -223,7 +223,7 @@ describe('G11a-X2: the recognizer over the authored fixture', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]!.name).toBeNull()
     expect(rows[0]!.nameProvenance).toBeNull()
-    expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering not yet named')
+    expect(UNNAMED_CONSTRUCT_COPY).toBe('a gathering nobody has named yet')
   })
 
   it('the pass is idempotent: a second run over the same days recognizes nothing twice', async () => {

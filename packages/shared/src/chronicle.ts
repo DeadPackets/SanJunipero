@@ -273,7 +273,7 @@ export function faunaSightingLine(kind: string, farBank: boolean): string {
 
 // What a viewer reads where a name would be. The town has not named the thing, and saying so
 // is the truth; the alternative is a label, and labels are ours, not theirs.
-export const UNNAMED_CONSTRUCT_COPY = 'a gathering not yet named'
+export const UNNAMED_CONSTRUCT_COPY = 'a gathering nobody has named yet'
 
 // No world-facing string may name the machinery behind the agent, and this regex is the point it
 // is enforced. `(?!\w)` closes the boundary because a `\b` can never follow the final `.` of A.I.
@@ -287,7 +287,7 @@ export const CONSTRUCT_CHRONICLE_ICON = 'star'
 // the type, which is ours.
 export function constructLine(c: { name: string | null }): string {
   return c.name === null
-    ? `They have taken to gathering — ${UNNAMED_CONSTRUCT_COPY}.`
+    ? `They have taken to gathering, ${UNNAMED_CONSTRUCT_COPY}.`
     : `They have taken to gathering, and they call it ${c.name}.`
 }
 

@@ -28,27 +28,24 @@ export const GAMIFICATION_BAN = /progress|score|level|quest|points|badge|streak|
 // Real empty states: each one says what the town has not done yet and why that is fine.
 // Moments is defined here and rendered by Task 9, so the two cannot drift.
 export const EMPTY_COPY = {
-  roster: 'No one walks the town yet — the first footsteps are still to come.',
+  roster: 'Nobody is in town yet.',
   rosterSub: 'The founders arrive at dawn.',
-  chronicle: 'Day one is still unwritten. The town’s ledger fills as the townsfolk live it.',
+  chronicle: 'Nothing written for today yet. It fills in as the day goes.',
   // The live feed holds what has arrived since you joined. On a town that is days old, saying
   // day one is unwritten is a lie about the world rather than a description of the feed.
-  chronicleQuiet:
-    'Nothing has happened since you arrived. The whole record is under “What mattered”.',
+  chronicleQuiet: 'Nothing new since you got here. Everything so far is under “What mattered”.',
   // Describes rather than promises: the scripted founders perform none of the six acts, so this
   // ledger can be permanently and correctly empty.
   bonds:
-    'No bonds yet. A town braids its ties out of what people do to one another — a word, ' +
-    'a gift, a lesson, a blow, a partnership taken up, a child — and none of that is in the ' +
-    'record here.',
-  moments: 'Nothing worth replaying yet — the first recorded day is still ahead.',
+    'No bonds yet. Bonds come from what people do to each other: a word, a gift, a lesson, ' +
+    'a blow, a partnership taken up, a child. None of that has happened here.',
+  moments: 'Nothing to replay yet. The first day is not over.',
   discoveries: 'The town has not worked anything out yet.',
   // The read fold counts these four acts and nothing else, so a town of walkers is honestly empty.
-  traffic:
-    'Nothing has passed between anyone yet — no word within earshot, no gift, no lesson, no blow.',
-  paper: 'Nothing printed yet. The chronicler writes a day up once it has closed.',
-  firsts: 'No firsts yet. The chronicler adds one the night a thing happens for the first time.',
-  families: 'No families yet — nobody walking the town was born to anyone in it.',
+  traffic: 'Nothing has passed between anyone yet. No word, no gift, no lesson, no blow.',
+  paper: 'Nothing printed yet. The day gets written up once it ends.',
+  firsts: 'No firsts yet. One gets added the night something happens for the first time.',
+  families: 'No families yet. Nobody here was born to anyone else here.',
   places: 'Nothing stands here yet.',
   ties: 'No ties yet.',
   written: 'Nothing written yet.',
@@ -56,7 +53,7 @@ export const EMPTY_COPY = {
   provenance: 'No one remembers who began this.',
   room: 'This one has no room to stand in.',
   noPlace: 'No place is picked.',
-  noPerson: 'No such townsfolk.',
+  noPerson: 'No one by that name.',
   admin:
     'The operator’s page. Nothing here is shown to a mind, and nothing here opens without ' +
     'the law channel’s key.',
@@ -65,7 +62,7 @@ export const EMPTY_COPY = {
 // An empty state says what the TOWN has not done; this says what the WIRE has not carried.
 // A refused read printing the empty copy asserts something false.
 export const OUT_OF_REACH = {
-  says: 'The town’s record is out of reach. Nothing here is missing — it has not been read.',
+  says: 'Can’t reach the town’s record right now. Nothing is missing, it just hasn’t loaded.',
   again: 'Look again',
 } as const
 

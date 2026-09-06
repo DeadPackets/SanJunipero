@@ -29,7 +29,7 @@ const KIND_LINE: Readonly<Record<ConstructKind, string>> = {
   custom: 'Something they keep doing.',
 }
 
-const EMPTY = 'Nobody keeps anything yet — a custom is a place they keep coming back to.'
+const EMPTY = 'No customs yet. A custom is a place people keep coming back to.'
 
 /** Read-only, like every other pane: nothing on this page is ever shown to a mind. */
 export function CustomsPage({ store }: Pick<PageProps, 'store'>) {

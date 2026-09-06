@@ -99,7 +99,7 @@ export const REMOVED_PLACEHOLDERS: readonly string[] = [
  *  claim that the world has not begun. */
 export const THOUGHT_EMPTY = 'Nothing they have thought has been written down yet.'
 export const SKILLS_EMPTY = 'They have not taken up a craft yet.'
-export const CHANGE_EMPTY = 'Nothing about them has changed yet — they have only just arrived.'
+export const CHANGE_EMPTY = 'Nothing about them has changed yet. They only just got here.'
 /** The whole page at once, on a first day: four honest empties in a row read as four failures. */
 export const STORY_EMPTY = 'Nothing written about them yet. Give it a day.'
 
