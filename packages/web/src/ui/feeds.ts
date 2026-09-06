@@ -1,6 +1,8 @@
 import {
+  AimsResponseSchema,
   BondsResponseSchema,
   ChronicleResponseSchema,
+  type AimsResponse,
   type BondsResponse,
   type ChronicleEntry,
 } from '@sj/shared'
@@ -25,6 +27,14 @@ const parseLineage = (body: unknown): LineageLike | null => {
 
 /** One read of the ties for the whole page: the Bonds lens and the roster share it. */
 export const bondsFeed = endpoint('/api/bonds', parseBonds, BONDS_REFETCH_MS)
+/** A mood moves any hour; a goal moves once a night. The roster and the Person page read one
+ *  list between them. */
+const AIMS_REFETCH_MS = 20_000
+const parseAims = (body: unknown): AimsResponse | null => {
+  const parsed = AimsResponseSchema.safeParse(body)
+  return parsed.success ? parsed.data : null
+}
+export const aimsFeed = endpoint('/api/aims', parseAims, AIMS_REFETCH_MS)
 
 /** Who came from whom. A birth is rare and the answer is small, so the beat is slow — but it
  *  is a beat: a town gains a parent while the tab is open. */

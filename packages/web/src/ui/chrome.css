@@ -725,7 +725,7 @@ body {
   width: 100%; min-height: 56px; cursor: pointer; font: inherit; color: inherit;
   display: grid; align-items: center; text-align: left;
   grid-template-columns: 48px minmax(0, 1fr) 32px;
-  grid-template-areas: 'face who mood' 'face doing mood' 'face place mood' 'face with with';
+  grid-template-areas: 'face who mood' 'face doing mood' 'face place mood' 'face with with' 'face story story';
   gap: var(--s-1) var(--s-4);
   padding: var(--s-4);
   background: var(--cream) var(--grain);
@@ -794,6 +794,17 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rr-with { grid-area: with; font-size: var(--f-1); color: var(--ink-quiet); font-style: italic; }
+/* the three story lines: the mood word, the aim, the tie; the aim may be a whole sentence and
+   gets one line of it */
+.rr-story {
+  grid-area: story; min-width: 0; margin-top: var(--s-1);
+  display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap;
+  font-size: var(--f-2); color: var(--ink);
+}
+.rr-mood-word { font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-quiet); }
+.rr-aim { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rr-tie { color: var(--ink-quiet); font-style: italic; }
+.rr-tie::before { content: '· '; }
 
 /* ── who they have become, opened UNDER the row ──
    The list stays mounted behind it, so the way back is the row the viewer just clicked. */
@@ -1800,6 +1811,11 @@ body {
 }
 
 .person-head { display: flex; gap: var(--s-5); align-items: flex-start; margin: 0 0 var(--s-5); }
+.person-story {
+  margin: calc(-1 * var(--s-3)) 0 var(--s-5); max-width: 62ch; font-size: var(--f-3); text-wrap: pretty;
+  display: flex; flex-wrap: wrap; column-gap: var(--s-3); row-gap: var(--s-1);
+}
+.person-mood { font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-quiet); align-self: baseline; }
 
 .edges { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-4); }
 .edge { padding: var(--s-3) var(--s-4); background: var(--cream); box-shadow: var(--frame-tight); }

@@ -4,7 +4,8 @@ import { actsOf, becomingOf as buildBecoming, type Becoming } from '../../ui/ros
 import { rosterRows2, sortRoster, type RosterSort } from '../../ui/roster/rosterRow.js'
 import { EMPTY_LINEAGE } from '../../ui/bondModel2.js'
 import { changeLog, personalityRows, type PersonalityRow } from '../../ui/becoming.js'
-import { bondsFeed, lineageFeed } from '../../ui/feeds.js'
+import { aimsFeed, bondsFeed, lineageFeed } from '../../ui/feeds.js'
+import { strongestTie } from '../../ui/roster/tieLine.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
@@ -38,6 +39,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   const [sort, setSort] = useState<RosterSort>('name')
   const [openId, setOpenId] = useState<string | null>(null)
   const bonds = useFeed(bondsFeed).data
+  const aims = useFeed(aimsFeed).data
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   // Only the open row's document, and only while it is open — a roster does not fetch five.
   const changes =
@@ -51,13 +53,22 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   const earshot = store.getConfig()?.movement.earshotRadius
   // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.
   // The whole fold is one array allocation per person, so opening a row must not redo it.
-  const byName = useMemo(
-    () =>
-      state === null
-        ? []
-        : rosterRows2(state, records, bonds, tick, events, earshot, store.latestMood),
-    [state, records, bonds, tick, events, earshot],
-  )
+  const byName = useMemo(() => {
+    if (state === null) return []
+    const goals = new Map(aims?.aims.map((a) => [a.agentId, a.goal]) ?? [])
+    const nameOf = (id: string): string => agentName(state.agents, id)
+    return rosterRows2(
+      state,
+      records,
+      bonds,
+      tick,
+      events,
+      earshot,
+      store.latestMood,
+      (id) => goals.get(id) ?? null,
+      (id) => strongestTie(id, bonds, tick, nameOf),
+    )
+  }, [state, records, bonds, aims, tick, events, earshot])
 
   if (state === null) return <Skeleton rows={5} />
 

@@ -157,6 +157,23 @@ describe('observer data apis', () => {
         'INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)',
       )
       .run('alice', 2, 3, 'Patient, wry, wary of fire.', 'grew wary of fire')
+    adb
+      .prepare(
+        'INSERT INTO personality_versions (agent_id, version, day, doc, edit) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(
+        'alice',
+        3,
+        5,
+        JSON.stringify({
+          current: {
+            mood: 'wary',
+            goals: ['keep the fire in', 'owe Bob a loaf'],
+            worries: ['the roof'],
+          },
+        }),
+        'took the fire to heart',
+      )
     adb.close()
 
     gw = await createGateway({
@@ -187,7 +204,20 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/agent/alice/personality`)).json()).toEqual([
       { version: 1, day: 0, doc: 'Patient and wry.', edit: null },
       { version: 2, day: 3, doc: 'Patient, wry, wary of fire.', edit: 'grew wary of fire' },
+      {
+        version: 3,
+        day: 5,
+        doc: '{"current":{"mood":"wary","goals":["keep the fire in","owe Bob a loaf"],"worries":["the roof"]}}',
+        edit: 'took the fire to heart',
+      },
     ])
+    // The three lines a viewer meets a person through, off the newest document, for every mind
+    // that has one. Bob has no database and is simply not in it.
+    expect(await (await fetch(`${base}/api/aims`)).json()).toEqual({
+      aims: [
+        { agentId: 'alice', day: 5, mood: 'wary', goal: 'keep the fire in', worry: 'the roof' },
+      ],
+    })
     expect(await (await fetch(`${base}/api/agent/bob/journal`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/ledgers`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/personality`)).json()).toEqual([])

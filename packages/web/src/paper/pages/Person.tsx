@@ -11,7 +11,8 @@ import {
 import { resolveAssetId } from '../../render/textures.js'
 import { bustStyle } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
-import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
+import { aimsFeed, bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
+import { strongestTie } from '../../ui/roster/tieLine.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import {
   CONDITION_WORD,
@@ -271,6 +272,8 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const dispatches = useFeed(dispatchesFeed).data
+  const aims = useFeed(aimsFeed).data
+  const bonds = useFeed(bondsFeed).data
   const agentId = subject?.kind === 'agent' ? subject.id : null
   // A changed URL is a new read, so the page can never show the previous person's documents,
   // and a tab nobody opened reads `null` — the endpoint layer's own "do not read".
@@ -298,6 +301,9 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   const carrying = Object.values(state!.items).filter(
     (it) => it.loc.t === 'agent' && it.loc.id === a.id,
   )
+  const aim = aims?.aims.find((x) => x.agentId === a.id) ?? null
+  const mood = store.latestMood(a.id) ?? aim?.mood ?? null
+  const tie = strongestTie(a.id, bonds, tick, (id) => agentName(state?.agents, id))
 
   return (
     <>
@@ -322,6 +328,20 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           ))}
         </div>
       </header>
+      {/* The first page of a life: how they are, what they are about, what they fear, who they
+          are to somebody. In their own words, before anything has been written of them. */}
+      {(mood !== null || aim !== null || tie !== null) && (
+        <p className="person-story">
+          {mood !== null && <span className="person-mood">{mood}</span>}
+          {aim?.goal != null && <span>{aim.goal}</span>}
+          {aim?.worry != null && <span>Worries over {aim.worry}.</span>}
+          {tie !== null && (
+            <span>
+              {a.name} is {tie}.
+            </span>
+          )}
+        </p>
+      )}
       {tab === 'Bonds' ? (
         <Edges agentId={a.id} store={store} />
       ) : tab === 'Ledger' ? (

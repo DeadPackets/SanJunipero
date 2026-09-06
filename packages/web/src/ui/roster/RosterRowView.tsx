@@ -57,6 +57,8 @@ export function rowLabel(row: RosterRow2): string {
     row.moodWord,
     row.place.words,
     company,
+    ...(row.aim === null ? [] : [row.aim]),
+    ...(row.tie === null ? [] : [row.tie]),
   ].join(', ')
 }
 
@@ -109,6 +111,13 @@ export function RosterRowView({
           the same claim and filed the bond count as a lie. The count was right; the word was
           borrowed. Proximity and a bond are different things and the roster now says which. */}
       {row.with.length > 0 && <span className="rr-with">near {row.with.join(', ')}</span>}
+      {/* The three lines a novel gives a person on their first page: how they are, what they
+          are about, who they are to somebody. The mind's own words, never the machinery's. */}
+      <span className="rr-story">
+        <span className="rr-mood-word">{row.moodWord}</span>
+        {row.aim !== null && <span className="rr-aim">{row.aim}</span>}
+        {row.tie !== null && <span className="rr-tie">{row.tie}</span>}
+      </span>
     </button>
   )
 }

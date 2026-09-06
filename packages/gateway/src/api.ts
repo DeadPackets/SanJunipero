@@ -1,6 +1,14 @@
+import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import { agentName, type LawRow, type SimConfig, type SimEvent } from '@sj/shared'
+import {
+  agentName,
+  aimOfDoc,
+  type Aim,
+  type LawRow,
+  type SimConfig,
+  type SimEvent,
+} from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -218,6 +226,38 @@ export function mountDataApi(router: Router, deps: DataApiDeps): () => void {
         'SELECT person_id AS personId, doc, updated_day AS updatedDay FROM ledgers WHERE agent_id = ? ORDER BY person_id',
       ),
     )
+  })
+
+  // Every mind with a database of its own, by the file: the roster wants all of them in one
+  // read, and the world's roster and the minds' directory are the same set once a town is up.
+  const mindIds = (): string[] => {
+    if (!deps.agentDbDir) return []
+    try {
+      return readdirSync(deps.agentDbDir)
+        .filter((f) => f.endsWith('.db') && !f.startsWith('_'))
+        .map((f) => f.slice(0, -3))
+        .filter((id) => AGENT_ID.test(id))
+        .sort()
+    } catch {
+      return []
+    }
+  }
+  const aimsOf = (): Aim[] => {
+    const out: Aim[] = []
+    for (const id of mindIds()) {
+      const row = readAgentRows<{ doc: string; day: number }>(
+        id,
+        'SELECT doc, day FROM personality_versions WHERE agent_id = ? ORDER BY version DESC LIMIT 1',
+      )[0]
+      if (row === undefined) continue
+      out.push({ agentId: id, day: row.day, ...aimOfDoc(row.doc) })
+    }
+    return out
+  }
+  // What each mind is about, off its newest document: the mood word, the first line it carries
+  // into the day, the first worry. One read for the whole roster.
+  router.route('GET', '/api/aims', (_req, res) => {
+    sendJson(res, { aims: aimsOf() })
   })
 
   router.route('GET', '/api/agent/:id/personality', (_req, res, params) => {

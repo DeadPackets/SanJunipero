@@ -37,6 +37,10 @@ export type RosterRow2 = {
   place: Place
   /** names of people within earshot — run-produced company */
   with: string[]
+  /** the first line the mind carries into the day, in its own words; null before it has one */
+  aim: string | null
+  /** the one tie with the most feeling in it, as the Bonds key would say it */
+  tie: string | null
   /** 0 on day 0, rising with what they have done. NEVER printed. */
   substance: number
 }
@@ -109,6 +113,10 @@ export function rosterRows2(
   earshot?: number,
   /** Each mind's own word for how it is, by id. */
   moods?: (agentId: string) => string | null,
+  /** The first line each mind carries into the day, by id. */
+  aims?: (agentId: string) => string | null,
+  /** The one tie a row has room for, by id. */
+  ties?: (agentId: string) => string | null,
 ): RosterRow2[] {
   if (state === null) return []
   const rows: RosterRow2[] = []
@@ -137,6 +145,8 @@ export function rosterRows2(
       conditions: conditionsOf(a),
       place: placeOf(state, a.id),
       with: companyOf(state, a.id, earshot),
+      aim: aims?.(a.id) ?? null,
+      tie: ties?.(a.id) ?? null,
       substance: substanceFor(state, a.id, bonds, nowTick),
     })
   }
