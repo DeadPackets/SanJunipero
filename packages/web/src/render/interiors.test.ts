@@ -892,3 +892,13 @@ describe('★ a room open is not a room redrawn every frame', () => {
     expect(layout.indexOf('shadows.ellipse(')).toBeGreaterThan(guard)
   })
 })
+
+// ★ Rehearsal 31's first look: from inside the storehouse, two dimmed speech glyphs and half a
+// sentence from the square stood over the back wall.
+describe('★ the town’s words wait outside the room', () => {
+  it('hides the world text and bubble layers while the veil is up, and shows them after', () => {
+    const SRC = readFileSync(new URL('./interiorScene.ts', import.meta.url), 'utf8')
+    expect(SRC).toContain('scene.layers.worldText.visible = !root.visible')
+    expect(SRC).toContain('scene.layers.bubbles.visible = !root.visible')
+  })
+})

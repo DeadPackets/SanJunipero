@@ -851,6 +851,10 @@ export function createInteriorScene(
     }
 
     root.visible = veilAlpha > 0 || roomAlpha > 0
+    // The town keeps living behind the veil, but its words do not: dimmed speech and chips
+    // peeking over the back wall read as clutter, not life. They come back with the town.
+    scene.layers.worldText.visible = !root.visible
+    scene.layers.bubbles.visible = !root.visible
     if (!root.visible) return
     veil.alpha = veilAlpha
     room.alpha = roomAlpha
