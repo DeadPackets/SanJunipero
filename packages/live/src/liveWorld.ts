@@ -124,6 +124,8 @@ export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
   'needs.energyDecayAwakePerTick': 0.065,
   'needs.daySleepAbove': 60,
   'light.fuelBurnTicks': 480,
+  // A death is a story beat or nothing: a bad fish once a month, not one meal in three.
+  'mortality.poisonChanceSpoiled': 0.05,
 }
 
 /** Where each mind's turn prose goes when `SJ_PROSE_TRACE` names a file: one JSON line a turn.
