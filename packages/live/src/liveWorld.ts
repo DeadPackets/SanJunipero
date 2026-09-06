@@ -1,6 +1,6 @@
 // This is the whole live half. `@sj/town` reaches it only through serve.ts's dynamic import
 // behind SJ_LIVE=1, which is what keeps the mind stack off the scripted path.
-import { mkdirSync } from 'node:fs'
+import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type Database from 'better-sqlite3'
@@ -32,6 +32,7 @@ import {
   type BootedMinds,
   type MindConfig,
   type MindSpec,
+  type ProseTraceRow,
   type RuntimeSnapshot,
   type SeamArbiter,
 } from '@sj/agents'
@@ -109,11 +110,25 @@ export const DEFAULT_IDLE_GAP_TICKS = 15
 /** The physics a LIVE town runs on, laid down at Day 0 as laws so a replay carries them. At 0.12
  *  r16 counted 29 collapses in two days; at 0.03 with a four-hour log r24 counted 6 collapses in
  *  three days, 45 meals a day (a third of them herbs worth 3 hunger each) and 3 acts of gathering,
- *  and the stores were bare by day 3. Hunger did not make work; it made a body drop. Here a meal
- *  lasts two days and a log a night, so what work there is comes from wanting to be useful. */
+ *  and the stores were bare by day 3. At 0.02 r26 ate the whole founding stock by day 2 with two
+ *  casts of gathering in between. Hunger did not make work; it made a body drop. Here a meal
+ *  lasts four days and a log a night: twelve mouths need three fish a day, which is an hour or
+ *  two of somebody's morning, and what work there is comes from wanting to be useful. */
 export const LIVE_PHYSICS: Readonly<Record<string, number>> = {
-  'needs.hungerDecayPerTick': 0.02,
+  'needs.hungerDecayPerTick': 0.01,
   'light.fuelBurnTicks': 480,
+}
+
+/** Where each mind's turn prose goes when `SJ_PROSE_TRACE` names a file: one JSON line a turn.
+ *  A rehearsal reads it back to see what a mind was told; production leaves it unset. */
+export function proseTrace(
+  env: Record<string, string | undefined> = process.env,
+): ((row: ProseTraceRow) => void) | undefined {
+  const path = env.SJ_PROSE_TRACE
+  if (path === undefined || path.length === 0) return undefined
+  return (row) => {
+    appendFileSync(path, `${JSON.stringify(row)}\n`)
+  }
 }
 
 export function idleGapTicks(env: Record<string, string | undefined> = process.env): number {
@@ -643,6 +658,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               compileLaw: (ask) => built.compileLaw(ask),
             })
 
+      const trace = proseTrace()
       // A child still owed its household comes up the way a live birth does — household
       // first, then the mind — so `ensureChildren` below is what boots it.
       booted = bootMinds({
@@ -657,6 +673,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         mindConfig: { ...STREAM_MIND_CONFIG, idleGapTicks: idleGapTicks(), ...opts.mindConfig },
         day: Math.floor(worldTick / MINUTES_PER_DAY),
         restoring,
+        ...(trace === undefined ? {} : { trace }),
         ...(arbiter === undefined ? {} : { arbiter }),
         onThought: (t) => {
           if (!stopped) publishThought(db, t)

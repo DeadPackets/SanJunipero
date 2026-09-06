@@ -240,6 +240,20 @@ any long row, so a world resumed with old long rows still gets its short forms.
    in the text (up to the cap); the runtime writes the short text and the scene block renders
    the marks; `needsGist` is false for the new row.
 
+## Task 8: the body at a place it already is, and the road to food when none is stored
+
+**Why (r26 mid-run, 2.47 sim-days on 1fd1a8d4):** 77 of 85 walks of no length led to nothing within ten ticks. Farida walked to a fire pit she stood beside 37 times in 22 hours and collapsed at 23:07 still "checking the pit"; Amara 9 times at the same pit, Yusuf 12 and Nadia 6 at the river bank. Each walk came back "You have walked." and a plan_done wake, and the structure line still said "walk to it and you end up beside it". Separately the founding food (41 meals) was gone by day 2 with two casts of fishing in between; on day 2 twelve mouths said "I need actual food" and nothing in the prompt said where food comes from once no meal is stored.
+
+**What:**
+- `prose.ts`: a doorless structure the body touches reads "you are beside it now; there is nothing nearer to walk to." (the door fix of b71e132b, for walls with no door).
+- `bridge.ts`: `SubmitResult.settled` when the world already held the act (duration 0); `completedSince` returns `settled` and `made` (the kind this body's hands spawned on the same tick); `foodSources` names the nearest bank and wood's edge as footing.
+- `agentRuntime.ts`: a settled walk is remembered as "You were already there; no step was needed."; a gathering act says what it came away with, or "nothing"; a plan of nothing but settled steps goes idle instead of waking the mind with plan_done; `foodSources` wired into the prose world; a `trace` sink writes each turn's prose.
+- Hunger road: at hunger under 50 with no food in hand and none known, "No food you know of is left in the town. Fish are in the river; the nearest bank to stand on is at (x, y), way. Berries grow at the edge of the woods; the nearest is at (x, y), way." The esteem road (`usefulLine`) falls back to the same sentence when no food is known.
+- `LIVE_PHYSICS`: hunger 0.02 -> 0.01 a tick (the schema default): twelve mouths need about three fish a day.
+- `SJ_PROSE_TRACE` (compose row, deploy/README row, set by `scripts/rehearse.sh` to `rehearsals/prose.jsonl`): the one record the databases do not keep, so a rehearsal can show whether a line fired and what the mind did with it.
+
+**Not done here:** an `inspect`/`look` act (minds want one: r25 rulings, r26 `inspect_riverbank` x2 and Farida's 40 "checks"); a settled sleep/enter still reads "Nothing needed doing".
+
 ## Out of scope, noted for later
 
 Talking while working (a scene opening between two bodies at work without stopping the hands),

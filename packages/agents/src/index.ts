@@ -15,6 +15,7 @@ export {
   AgentRuntime,
   nightOf,
   OPAQUE_REFUSAL,
+  type ProseTraceRow,
   type RuntimeSnapshot,
   type RuntimeStats,
 } from './runtime/agentRuntime.js'

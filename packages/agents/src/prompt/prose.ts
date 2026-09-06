@@ -332,6 +332,13 @@ export type ProseWorld = {
     x: number,
     y: number,
   ) => { x: number; y: number; from: SourceKind } | null
+  // Where a meal is got when none is stored: ground a foot can hold beside the water and beside
+  // the woods. r26 ran its shelves bare on day 2 and twelve mouths talked about food for two
+  // days without one of them knowing where to walk for it.
+  foodSources?: (
+    x: number,
+    y: number,
+  ) => { bank: { x: number; y: number } | null; woods: { x: number; y: number } | null }
   // Whether the night now coming is one the cold gets into. Read off the season's own band, so
   // a summer evening is never told to go for wood.
   nightWillBeCold?: () => boolean
@@ -355,6 +362,14 @@ function openGroundBeside(
     }
   }
   return false
+}
+
+// Whether a body stands on the ring of tiles around a footprint, which is as near as a walk gets.
+function touching(
+  p: { x: number; y: number },
+  s: { x: number; y: number; w: number; h: number },
+): boolean {
+  return p.x >= s.x - 1 && p.x <= s.x + s.w && p.y >= s.y - 1 && p.y <= s.y + s.h
 }
 
 // Whose it is and whose hands made it, in the order prose wants them. Empty for
@@ -890,7 +905,27 @@ function workRoadLine(
       : `The nearest ${sourcePhrase(at.from, FUEL_ITEM)} is at (${at.x}, ${at.y}).`
   }
   const at = world?.nearestFood?.(x, y) ?? null
-  return at === null ? '' : `The nearest food you know of is ${at.kind} at (${at.x}, ${at.y}).`
+  return at === null
+    ? foodSourceRoad(packet, world)
+    : `The nearest food you know of is ${at.kind} at (${at.x}, ${at.y}).`
+}
+
+/** Where food comes from when nobody has any: the bank and the wood's edge, each as ground a
+ *  walk can end on. Places only; how long to stand there is the mind's to find out. */
+function foodSourceRoad(packet: PerceptionPacket, world?: ProseWorld): string {
+  const { x, y } = packet.self
+  const at = world?.foodSources?.(x, y)
+  if (at === undefined) return ''
+  const said: string[] = []
+  if (at.bank !== null)
+    said.push(
+      `Fish are in the river; the nearest bank to stand on is at (${at.bank.x}, ${at.bank.y}), ${wayTo(at.bank.x - x, at.bank.y - y)}.`,
+    )
+  if (at.woods !== null)
+    said.push(
+      `Berries grow at the edge of the woods; the nearest is at (${at.woods.x}, ${at.woods.y}), ${wayTo(at.woods.x - x, at.woods.y - y)}.`,
+    )
+  return said.join(' ')
 }
 
 /** Where the town is thin, and the road to it, for a mind that wants to be counted on. Never a
@@ -1240,15 +1275,21 @@ export function perceptionToProse(
 
   // The road thirst has had, given to the need that never had one. Hands first, then the
   // nearest thing worth walking to — and never as a refusal.
-  if (hunger < 30) {
+  if (hunger < 50) {
     const food =
       world?.isEdible === undefined
         ? undefined
         : packet.self.inventory.find((i) => world.isEdible!(i.kind))
-    if (food) roads.push(`You are carrying ${food.kind} (${food.id}). You could eat it now.`)
-    else {
-      const f = world?.nearestFood?.(x, y) ?? null
-      if (f !== null) roads.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
+    const f = food ? null : (world?.nearestFood?.(x, y) ?? null)
+    // Hands and the nearest meal wait for real hunger; the source road opens with the first
+    // pang, because a body that has none and knows of none has a walk ahead of it.
+    if (food && hunger < 30)
+      roads.push(`You are carrying ${food.kind} (${food.id}). You could eat it now.`)
+    else if (f !== null && hunger < 30)
+      roads.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
+    else if (!food && f === null) {
+      const source = foodSourceRoad(packet, world)
+      if (source.length > 0) roads.push(`No food you know of is left in the town. ${source}`)
     }
   }
 
@@ -1341,6 +1382,10 @@ export function perceptionToProse(
           : atDoor
             ? 'you are at its door; enter it and you are in.'
             : 'it has a doorway; walk to it and you can go in.'
+    } else if (inside === undefined && touching(packet.self, s)) {
+      // The same fact at a wall with no door. r26's Farida walked to a fire pit she stood
+      // beside 37 times in 22 hours, told each time that a walk would put her beside it.
+      approach = 'you are beside it now; there is nothing nearer to walk to.'
     } else if (world?.isWalkable && !openGroundBeside(s, world.isWalkable)) {
       approach = 'there is no open ground beside it.'
     }

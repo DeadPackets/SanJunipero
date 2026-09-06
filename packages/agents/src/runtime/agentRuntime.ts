@@ -97,7 +97,7 @@ import type { SceneCoordinator } from '../scene/coordinator.js'
 import type { Scene } from '../scene/scene.js'
 import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
-import type { EngineBridge, Intent, SubmitResult } from './bridge.js'
+import type { EngineBridge, FinishedAct, Intent, SubmitResult } from './bridge.js'
 import {
   buildAgentCtx,
   humanizeIntent,
@@ -177,10 +177,22 @@ export function refusalMemoryText(reason: string, impossibleClass?: string): str
   return `You realize you cannot: ${said}${hint}`
 }
 
+// What a pair of hands can come away from empty. Said with the outcome, because "you have
+// fished" after an empty cast reads as a fish.
+const GATHERING_VERBS: ReadonlySet<string> = new Set(['fish', 'forage', 'hunt', 'harvest', 'chop'])
+
 /** The other half of the same sentence: what the hands did do. All 402 action memories the
  *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. */
-function actionMemoryText(verb: string): string {
-  return `You have ${verbPhrasePast(verb)}.`
+function actionMemoryText(done: FinishedAct): string {
+  if (done.settled)
+    return done.verb === 'walk'
+      ? 'You were already there; no step was needed.'
+      : 'Nothing needed doing; it already stood as you asked.'
+  const past = verbPhrasePast(done.verb)
+  if (!GATHERING_VERBS.has(done.verb)) return `You have ${past}.`
+  return done.made === undefined
+    ? `You have ${past}, and come away with nothing.`
+    : `You have ${past}, and come away with ${done.made.replace(/_/g, ' ')}.`
 }
 
 // What a finished act is worth on the mind's own one to ten. A refusal is 3, so most doing
@@ -306,6 +318,10 @@ export type RuntimeStats = { turns: number; dozes: number; reflections: number; 
 /** One remembered key and what it stood for, in a shape that survives a JSON round trip. */
 type Remembered = [string, { tick: number; reason: string }]
 
+/** One turn's world prose as the mind read it, with what woke it. The databases never hold
+ *  this: a line the prompt said and the mind ignored is invisible to every query without it. */
+export type ProseTraceRow = { tick: number; agentId: string; wake: string[]; prose: string }
+
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
@@ -371,6 +387,7 @@ export class AgentRuntime {
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
   readonly #wantBias: WantBias
+  readonly #trace: ((row: ProseTraceRow) => void) | null
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
@@ -385,6 +402,9 @@ export class AgentRuntime {
   #clock: MindClock = freshClock()
   #plan: PlanState = idlePlan()
   #planHeadInFlight = false
+  // How many of this plan's steps the world already held. A plan of nothing else asked for the
+  // world as it is, and finishing it is not news.
+  #planSettled = 0
   #pendingIntent: Intent | null = null
   #pendingInFlight = false
   #turnInFlight = false
@@ -458,6 +478,8 @@ export class AgentRuntime {
     ties?: RuntimeTies | undefined
     /** How much faster than everybody else this mind feels a want, off its voice card. */
     wantBias?: WantBias | undefined
+    /** Every turn's world prose, for a rehearsal to read back what a mind was told. */
+    trace?: ((row: ProseTraceRow) => void) | undefined
   }) {
     this.#db = deps.db
     this.#llm = deps.llm
@@ -478,6 +500,7 @@ export class AgentRuntime {
     this.#scenes = deps.scenes ?? null
     this.#ties = deps.ties ?? null
     this.#wantBias = deps.wantBias ?? {}
+    this.#trace = deps.trace ?? null
   }
 
   start(agentId: string): void {
@@ -493,6 +516,7 @@ export class AgentRuntime {
     this.#clock = freshClock()
     this.#plan = idlePlan()
     this.#planHeadInFlight = false
+    this.#planSettled = 0
     this.#pendingIntent = null
     this.#pendingInFlight = false
     this.#turnInFlight = false
@@ -746,7 +770,7 @@ export class AgentRuntime {
       this.#plan.queue.shift()
       this.#planHeadInFlight = false
       if (this.#plan.queue.length === 0) {
-        this.#plan.lastResult = 'done'
+        this.#plan.lastResult = this.#planSettled >= (this.#plan.size ?? 1) ? 'idle' : 'done'
         return
       }
     }
@@ -829,6 +853,7 @@ export class AgentRuntime {
     this.#plan.queue = []
     this.#plan.size = 0
     this.#planHeadInFlight = false
+    this.#planSettled = 0
   }
 
   /** The plan this mind is partway through, in its own words for the act. A body mid-act with
@@ -1027,7 +1052,7 @@ export class AgentRuntime {
       // one of the two who can see it happen.
       if (done.verb === 'teach')
         this.#book(() => this.#wants?.feed(['taught'], this.#bridge.currentTick()))
-      void this.#writeActionMemory(actionMemoryText(done.verb), actImportance(done.verb)).catch(
+      void this.#writeActionMemory(actionMemoryText(done), actImportance(done.verb)).catch(
         this.#sink('memory_write_failed'),
       )
     }
@@ -1038,7 +1063,10 @@ export class AgentRuntime {
     // A head answered after the turn replaced the plan speaks for a queue that is gone: reading
     // it would wipe the plan the mind just paid for.
     if (this.#plan.queue[0] !== head) return
-    if (res.ok) return
+    if (res.ok) {
+      if (res.settled === true) this.#planSettled++
+      return
+    }
     // A word for standing still is a step spent, not a plan refused: the body was already doing
     // it, so the queue carries on from the next step instead of dying at this one.
     if (isBodyNoOp(res.reason, head.verb)) {
@@ -1129,6 +1157,7 @@ export class AgentRuntime {
       waterRefused: () => wantedWater(this.#lastOutcome),
       nearestFood: (x: number, y: number) => this.#bridge.nearestFood(x, y),
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
+      foodSources: (x: number, y: number) => this.#bridge.foodSources(this.#agentId, x, y),
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),
       nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
       distantWater: (x: number, y: number) => this.#bridge.distantWater(x, y),
@@ -1181,6 +1210,7 @@ export class AgentRuntime {
     ]
       .filter((p) => p.length > 0)
       .join(' ')
+    this.#trace?.({ tick, agentId: this.#agentId, wake: [...wake], prose: nowProse })
 
     // Retrieve BEFORE inserting this perception: a just-written row would win
     // recency and tag match, filling the scene with echoes of the present.
@@ -1441,6 +1471,7 @@ export class AgentRuntime {
       this.#plan.size = turn.plan.length
       this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
       this.#planHeadInFlight = false
+      this.#planSettled = 0
       this.#pumpPlan(this.#bridge.perception(this.#agentId).self.activity)
     }
 

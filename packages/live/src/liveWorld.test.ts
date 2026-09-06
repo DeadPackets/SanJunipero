@@ -38,6 +38,7 @@ import {
   dailyReachedRefusal,
   DEFAULT_IDLE_GAP_TICKS,
   idleGapTicks,
+  proseTrace,
   ledgerTotalUsd,
   MindsHeldError,
   preflightCostUsd,
@@ -1514,6 +1515,25 @@ describe('★ the liveliness dial', () => {
   it('defaults to acting four times an hour, not twice', () => {
     expect(idleGapTicks({})).toBe(DEFAULT_IDLE_GAP_TICKS)
     expect(DEFAULT_IDLE_GAP_TICKS).toBe(15)
+  })
+
+  it('writes a turn of prose to SJ_PROSE_TRACE as one JSON line, and nowhere when it is unset', () => {
+    expect(proseTrace({})).toBeUndefined()
+    expect(proseTrace({ SJ_PROSE_TRACE: '' })).toBeUndefined()
+    const dir = mkdtempSync(join(tmpdir(), 'sj-trace-'))
+    const path = join(dir, 'prose.jsonl')
+    const sink = proseTrace({ SJ_PROSE_TRACE: path })!
+    sink({ tick: 7, agentId: 'nadia', wake: ['morning'], prose: 'The town has 0 meals.' })
+    sink({ tick: 8, agentId: 'omar', wake: ['boredom'], prose: 'Nothing.' })
+    const rows = readFileSync(path, 'utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l) as unknown)
+    expect(rows).toEqual([
+      { tick: 7, agentId: 'nadia', wake: ['morning'], prose: 'The town has 0 meals.' },
+      { tick: 8, agentId: 'omar', wake: ['boredom'], prose: 'Nothing.' },
+    ])
+    rmSync(dir, { recursive: true, force: true })
   })
 
   it('takes SJ_IDLE_GAP, and ignores what cannot be a gap', () => {

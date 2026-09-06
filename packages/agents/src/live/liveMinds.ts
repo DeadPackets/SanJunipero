@@ -6,7 +6,7 @@ import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import type { IdentityCore } from '../prompt/assemble.js'
 import { makeDreamLlm } from '../dream.js'
 import { makeReflectionLlm } from '../reflection.js'
-import { AgentRuntime, type RuntimeSnapshot } from '../runtime/agentRuntime.js'
+import { AgentRuntime, type ProseTraceRow, type RuntimeSnapshot } from '../runtime/agentRuntime.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { wireArbiter, type SeamArbiter } from '../runtime/arbiterSeam.js'
 import { SceneCoordinator, type SceneMind } from '../scene/coordinator.js'
@@ -101,6 +101,8 @@ export type BootMindsOpts = {
    *  way it did before there were scenes. The voice is built here, from what only this function
    *  holds: the persona, the mind's own personality store, and the living cast. */
   sceneClient?: (agentId: string) => LlmClient
+  /** Every turn's world prose, for a rehearsal to read back what each mind was told. */
+  trace?: (row: ProseTraceRow) => void
 }
 
 /** `init` on a mind that already has version 1 writes a second one and `current()` then reads
@@ -203,6 +205,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       ...(scenes === null ? {} : { scenes }),
       ties: { store: ties, cast: livingCast },
       ...(spec.wantBias === undefined ? {} : { wantBias: spec.wantBias }),
+      ...(opts.trace === undefined ? {} : { trace: opts.trace }),
     })
     runtime.start(spec.id)
     const was = opts.restoring?.get(spec.id)

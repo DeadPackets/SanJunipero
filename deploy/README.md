@@ -102,6 +102,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_IDLE_AFTER_MS` | `300000` | Real milliseconds without a viewer before the town slows to `SJ_IDLE_SPEED`. |
 | `SJ_IDLE_SPEED` | `0.1` | The speed an unwatched town runs at. A tab in the background counts as unwatched after 15 s. |
 | `SJ_NIGHT_FACTOR` | `4` | How many times faster the clock runs while every living body is asleep, until one wakes or the operator moves the dial. |
+| `SJ_PROSE_TRACE` | unset | A file path. Set, every mind's turn prose is appended to it as one JSON line a turn, so a rehearsal can read back what each mind was told. Leave it unset in production. |
 | `SJ_FLOOR_TIMEOUT_MS` | `90000` | Real milliseconds a talk waits for a spoken line before the floor passes on. |
 | `SJ_PUBLIC_ORIGIN` | unset | The origin printed into canonical links, og tags and the sitemap. Unset, the gateway trusts the proxy's forwarded host. |
 | `SJ_MAX_MINDS` | `20` | How many minds the town may hold, never fewer than the twelve founders. A birth past it is folded into the world with no mind booted for it. |

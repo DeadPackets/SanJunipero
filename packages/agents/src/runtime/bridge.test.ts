@@ -604,3 +604,47 @@ describe('★ an expression aimed at one body', () => {
     expect(bridge.expressedAt('cass')).toEqual([])
   })
 })
+
+// r26: 77 of 85 walks of no length led to nothing within ten ticks, and the mind that asked for
+// each was told "You have walked." A walk the world already held is answered as what it is.
+describe('★ an act the world already held is answered as settled, and what the hands made rides with it', () => {
+  it('a walk to the tile underfoot comes back settled, and is read back as settled', async () => {
+    const { bridge, step } = buildBridge()
+    const seen: unknown[] = []
+    const p = bridge.submit(AGENT, { verb: 'walk', params: { x: 3, y: 3 } }, (r) => seen.push(r))
+    step()
+    expect(await p).toEqual({ ok: true, settled: true })
+    expect(seen).toEqual([{ ok: true, settled: true }])
+    // The window is read on a look, the way the runtime reads it after a perception.
+    bridge.perception(AGENT)
+    const done = bridge.completedSince(AGENT, 0)
+    expect(done.map(({ seq, ...act }) => act)).toEqual([{ verb: 'walk', settled: true }])
+    expect(typeof done[0]?.seq).toBe('number')
+  })
+
+  it('a real step is not settled, and a thing made on the tick an act finished is named with it', async () => {
+    const { bridge, store, loop, step } = ownedWorld()
+    const p = bridge.submit('cass', { verb: 'walk', params: { x: 6, y: 3 } })
+    step()
+    expect(await p).toEqual({ ok: true })
+    while (loop.state.agents.cass!.activity !== null) step()
+    bridge.perception('cass')
+    const done = bridge.completedSince('cass', 0)
+    expect(done.map(({ seq, ...act }) => act)).toEqual([{ verb: 'walk', settled: false }])
+    // A catch is logged after the cast completes, on the same tick.
+    store.append(loop.tick, 'item_spawned', {
+      id: 'item_9',
+      kind: 'fish',
+      qty: 1,
+      loc: { t: 'agent', id: 'cass' },
+      madeBy: 'cass',
+    })
+    step()
+    bridge.perception('cass')
+    expect(bridge.completedSince('cass', 0)).toEqual([
+      { seq: done[0]!.seq, verb: 'walk', settled: false, made: 'fish' },
+    ])
+    // Somebody else's catch is not this body's.
+    expect(bridge.completedSince('bex', 0)).toEqual([])
+  })
+})

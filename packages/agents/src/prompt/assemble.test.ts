@@ -653,7 +653,40 @@ describe('perceptionToProse', () => {
     const prose = perceptionToProse(packet)
     expect(prose).toContain('storehouse (structure_1) stands close to the south-west')
     expect(prose).toContain('2 tiles wide and 1 tile tall')
-    expect(prose).toContain('walk to it and you end up beside it')
+    // (12, 9) touches a footprint at (10..11, 10): this body is already as near as a walk gets.
+    expect(prose).toContain('you are beside it now; there is nothing nearer to walk to.')
+  })
+
+  // r26: Farida walked to a fire pit she stood beside 37 times in 22 hours, told each time that a
+  // walk would put her beside it, and went down at 23:07 still "checking the pit".
+  it('★ a doorless structure the body already touches is "beside it now", not a walk away', () => {
+    const packet = {
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, x: 12, y: 10 },
+      visible: {
+        agents: [],
+        structures: [
+          {
+            id: 'structure_1',
+            kind: 'fire_pit',
+            x: 10,
+            y: 10,
+            w: 2,
+            h: 1,
+            burning: false,
+            stage: 'complete' as const,
+          },
+        ],
+        items: [],
+        crops: [],
+      },
+    }
+    const prose = perceptionToProse(packet)
+    expect(prose).toContain('you are beside it now; there is nothing nearer to walk to.')
+    expect(prose).not.toContain('walk to it and you end up beside it')
+    // One tile further off and it is a walk again.
+    const off = { ...packet, self: { ...packet.self, x: 13 } }
+    expect(perceptionToProse(off)).toContain('walk to it and you end up beside it')
   })
 
   it('says when nothing beside a structure can hold a body, and offers no tile either way', () => {

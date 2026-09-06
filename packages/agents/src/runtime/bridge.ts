@@ -44,6 +44,8 @@ import {
   isHearthKind,
   isWet,
   isWoody,
+  T_FOREST,
+  T_WATER,
   MINUTES_PER_DAY,
   PRESENCE_EVENT_TYPES,
   RELATIONSHIP_EVENT_TYPES,
@@ -69,7 +71,23 @@ export const DEFAULT_RECENT_WINDOW_TICKS = Math.ceil(DEFAULT_MIND_CONFIG.boredom
 // The turn schema keeps `verb` a free string so a novel intent can round-trip to the engine;
 // the verb registry is what answers it in-world.
 export type Intent = { verb: string; params: Record<string, unknown> }
-export type SubmitResult = { ok: true } | { ok: false; reason: string }
+/** `settled`: the world already held what the act asked for, so it started and completed in one
+ *  breath at no length. The mind is told, because "done" is what it would otherwise read. */
+export type SubmitResult = { ok: true; settled?: true } | { ok: false; reason: string }
+
+/** An act the world finished for a body. `settled` as above; `made` is the kind of thing this
+ *  body's hands brought into the world on the same tick, when they did. */
+export type FinishedAct = { seq: number; verb: string; settled: boolean; made?: string }
+
+// How many candidate tiles of a kind get asked for footing before the road gives up on it.
+const FOOTING_TRIES = 12
+
+function acceptedAs(events: readonly { type: string; payload: unknown }[]): SubmitResult {
+  const start = events.find((e) => e.type === 'action_started')?.payload as
+    | { duration?: unknown }
+    | undefined
+  return start?.duration === 0 ? { ok: true, settled: true } : { ok: true }
+}
 
 export const ROLLED_BACK = 'nothing came of the moment'
 
@@ -224,7 +242,10 @@ export class EngineBridge {
             item.intent.params,
           )
           if (result.ok) for (const event of result.events) ctx.emit(event.type, event.payload)
-          settled.push([item, result.ok ? { ok: true } : { ok: false, reason: result.reason }])
+          settled.push([
+            item,
+            result.ok ? acceptedAs(result.events) : { ok: false, reason: result.reason },
+          ])
         }
         world(ctx)
       } catch (err) {
@@ -819,15 +840,70 @@ export class EngineBridge {
 
   /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same
    *  window perception is composed from, so nothing reaches a mind before it could have felt it. */
-  completedSince(agentId: string, afterSeq: number): { seq: number; verb: string }[] {
-    const done: { seq: number; verb: string }[] = []
+  completedSince(agentId: string, afterSeq: number): FinishedAct[] {
+    const done: (FinishedAct & { tick: number })[] = []
+    // What the hands brought into the world, by tick: a catch is logged after the cast completes.
+    const madeAt = new Map<number, string>()
+    let lastStartLength: unknown
     for (const ev of this.#window) {
-      if (ev.seq <= afterSeq || ev.type !== 'action_completed') continue
-      const p = ev.payload as { agentId?: unknown; verb?: unknown }
-      if (p.agentId !== agentId || typeof p.verb !== 'string') continue
-      done.push({ seq: ev.seq, verb: p.verb })
+      const p = ev.payload as {
+        agentId?: unknown
+        verb?: unknown
+        duration?: unknown
+        madeBy?: unknown
+        kind?: unknown
+      }
+      if (ev.type === 'item_spawned' && p.madeBy === agentId && typeof p.kind === 'string') {
+        if (!madeAt.has(ev.tick)) madeAt.set(ev.tick, p.kind)
+        continue
+      }
+      if (p.agentId !== agentId) continue
+      if (ev.type === 'action_started') {
+        lastStartLength = p.duration
+        continue
+      }
+      if (ev.type !== 'action_completed' || ev.seq <= afterSeq || typeof p.verb !== 'string')
+        continue
+      done.push({ seq: ev.seq, verb: p.verb, settled: lastStartLength === 0, tick: ev.tick })
     }
-    return done
+    return done.map(({ tick, ...act }) => {
+      const made = madeAt.get(tick)
+      return made === undefined ? act : { ...act, made }
+    })
+  }
+
+  /** Where a meal is got when none is stored, as ground a foot can hold: the nearest water a
+   *  cast reaches into and the nearest wood's edge a hand gathers from. Asked only of a mind
+   *  with no food that knows of none, so the box is the whole valley. */
+  foodSources(
+    agentId: string,
+    x: number,
+    y: number,
+  ): { bank: { x: number; y: number } | null; woods: { x: number; y: number } | null } {
+    return {
+      bank: this.#footingByTile(agentId, x, y, T_WATER),
+      woods: this.#footingByTile(agentId, x, y, T_FOREST),
+    }
+  }
+
+  #footingByTile(
+    agentId: string,
+    x: number,
+    y: number,
+    tile: number,
+  ): { x: number; y: number } | null {
+    const found: { x: number; y: number; d: number }[] = []
+    this.#loop.state.terrain.forEach((row, py) => {
+      row.forEach((t, px) => {
+        if (t === tile) found.push({ x: px, y: py, d: Math.abs(px - x) + Math.abs(py - y) })
+      })
+    })
+    found.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x)
+    for (const p of found.slice(0, FOOTING_TRIES)) {
+      const on = this.footingNear(agentId, p.x, p.y)
+      if (on !== null) return on
+    }
+    return null
   }
 
   // The log is appended to inside the tick, and every reader of the window runs after it: a

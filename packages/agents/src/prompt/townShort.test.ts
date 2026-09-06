@@ -106,6 +106,17 @@ describe('★ the road a high esteem is given', () => {
     )
   })
 
+  it('★ names the river and the woods when the town holds no food at all', () => {
+    const bare = {
+      ...world,
+      nearestFood: () => null,
+      foodSources: () => ({ bank: { x: 14, y: 27 }, woods: null }),
+    }
+    expect(usefulLine('esteem', stock({ food: 0 }), seeing([]), bare)).toContain(
+      'The town has 0 meals for 12 mouths. Fish are in the river; the nearest bank to stand on is at (14, 27),',
+    )
+  })
+
   it('stops at the numbers when there is no road to give', () => {
     expect(usefulLine('esteem', stock({ wood: 3 }), seeing([]), {})).toBe(
       'Today the thing you want most is to be counted on. The town has 3 logs for 5 hearths.',

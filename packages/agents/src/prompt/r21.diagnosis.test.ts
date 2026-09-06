@@ -323,6 +323,40 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     expect(fed).not.toContain('The nearest food you know of')
   })
 
+  // r26 ate its founding stock by day 2; twelve mouths then said "I need actual food" for two
+  // days and two casts were made, because nothing had ever said where a meal comes from.
+  it('★ a hungry body with no food and none known is told where food comes from', () => {
+    const s = genesisTown()
+    const bare: WorldState = {
+      ...s,
+      agents: {
+        ...s.agents,
+        nadia: { ...s.agents.nadia!, needs: { ...s.agents.nadia!.needs, hunger: 40 } },
+      },
+    }
+    const sources = {
+      ...WORLD,
+      nearestFood: () => null,
+      foodSources: () => ({ bank: { x: 14, y: 27 }, woods: { x: 71, y: 14 } }),
+    }
+    const prose = perceptionToProse(prosePacket(bare, 'nadia'), undefined, sources)
+    expect(prose).toContain('You are hungry. You should eat before long.')
+    expect(prose).toContain(
+      'No food you know of is left in the town. Fish are in the river; the nearest bank to stand on is at (14, 27),',
+    )
+    expect(prose).toContain('Berries grow at the edge of the woods; the nearest is at (71, 14),')
+    // A meal somebody knows of still outranks the river: the source road is for when there is none.
+    const stocked = perceptionToProse(prosePacket(bare, 'nadia'), undefined, {
+      ...sources,
+      nearestFood: () => ({ x: 68, y: 60, kind: 'bread' }),
+    })
+    expect(stocked).not.toContain('Fish are in the river')
+    // And a full body hears nothing about either.
+    expect(perceptionToProse(prosePacket(s, 'nadia'), undefined, sources)).not.toContain(
+      'Fish are in the river',
+    )
+  })
+
   it('loneliness is given a road, and it waits below the survival ones', () => {
     const s = genesisTown()
     const world = { ...WORLD, nearestPerson: () => ({ x: 62, y: 55, name: 'Omar' }) }

@@ -1385,6 +1385,26 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     expect(actImportance('recipe:plank')).toBe(actImportance('craft'))
   })
 
+  // r26: Farida's plan was "walk to the fire pit" 37 times from the tile beside it. Each came
+  // back "You have walked." and a plan_done wake, and she went down at 23:07 still checking it.
+  it('★ a plan the world already held is no news: the memory says so and no wake follows it', async () => {
+    const { loop, runtime, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'I will check the pit.',
+          plan: [{ verb: 'walk', params: { x: 3, y: 3 } }],
+          importance: 3,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+    })
+    await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 80)
+    expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
+      'You were already there; no step was needed.',
+    ])
+    expect(runtime.snapshot().plan.lastResult).toBe('idle')
+  })
+
   // kamal wrote 87 action memories with 9 texts between them; leyla 69 with 11. Every copy
   // competed in retrieval and could reach the prompt.
   it('★ writes the same refusal once inside the window, and again outside it', async () => {
