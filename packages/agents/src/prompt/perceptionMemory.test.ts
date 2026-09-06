@@ -201,6 +201,22 @@ describe('perceptionMemoryText: the moment, remembered short', () => {
       expect(scene).toContain(mark)
   })
 
+  it('keeps two overheard lines and no more, each cut short, so a passing word is not lost', () => {
+    const packet = fixture()
+    const long = 'x'.repeat(200)
+    packet.heard = [
+      { speakerId: 'nadia', name: 'Nadia', text: 'Has anyone seen Kamal today?', distance: 3 },
+      { speakerId: 'omar', name: 'Omar', text: long, distance: 4 },
+      { speakerId: 'halim', name: 'Halim', text: 'Four fish, no more.', distance: 5 },
+    ]
+    const text = perceptionMemoryText(packet)
+    expect(text).toContain('Heard: Nadia said "Has anyone seen Kamal today?"; Omar said "')
+    expect(text).toContain(`"${'x'.repeat(120)}"`)
+    expect(text).not.toContain('x'.repeat(121))
+    expect(text).not.toContain('Halim said')
+    expect(perceptionMemoryText(fixture())).not.toContain('Heard:')
+  })
+
   it('names at most three roofs, nearest first', () => {
     const said = perceptionMemoryText(busy())
     const near = said.slice(said.indexOf('Near: '))

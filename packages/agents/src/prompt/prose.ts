@@ -1418,6 +1418,8 @@ export function perceptionToProse(
 // night ever pays a call to shorten one of these rows.
 const MEMORY_REACH_MAX = 8
 const MEMORY_NEAR_MAX = 3
+const MEMORY_HEARD_MAX = 2
+const MEMORY_HEARD_CHARS = 120
 
 /** The row a moment is remembered by: when and where the body was, who stood there, and the
  *  marks it could act on. The scenery is left out, because nothing ever reads it back. */
@@ -1447,6 +1449,14 @@ export function perceptionMemoryText(packet: PerceptionPacket): string {
     lines.push(`Near: ${around.map(({ s }) => `${placeSaid(s)} (${s.id})`).join(', ')}.`)
 
   if (packet.self.inventory.length > 0) lines.push(`In hand: ${heldPhrase(packet.self.inventory)}.`)
+
+  // A remark overheard outside any talk has no other row: two of them, so a passer-by's word
+  // is not lost, and no more, so a loud square does not turn the row back into the prose.
+  const heard = packet.heard.slice(0, MEMORY_HEARD_MAX)
+  if (heard.length > 0)
+    lines.push(
+      `Heard: ${heard.map((h) => `${h.name} said "${h.text.slice(0, MEMORY_HEARD_CHARS)}"`).join('; ')}.`,
+    )
 
   return lines.join(' ')
 }
