@@ -166,3 +166,24 @@ describe('makeNarratorLlm', () => {
     ).toBe(60)
   })
 })
+
+describe('★ a title knows what the last two were', () => {
+  it('names the last titles and asks for a different person or matter', async () => {
+    const captured: Captured[] = []
+    const llm = makeNarratorLlm(scripted({ title: 'T', text: 'x', citations: [] }, captured))
+    await llm.summarizeChapter(digests, [], ['Halim Agrees to Rest', 'Dilara Keeps Yusuf Seated'])
+    const last = captured[0]!.messages.at(-1)!
+    expect(last.content).toContain(
+      'The last chapters were titled "Halim Agrees to Rest" and "Dilara Keeps Yusuf Seated".',
+    )
+    expect(last.content).toContain('a different person or a different matter')
+  })
+
+  it('says nothing about earlier chapters on the first day', async () => {
+    const captured: Captured[] = []
+    await makeNarratorLlm(
+      scripted({ title: 'T', text: 'x', citations: [] }, captured),
+    ).summarizeChapter(digests)
+    expect(captured[0]!.messages.at(-1)!.content).not.toContain('The last chapter')
+  })
+})

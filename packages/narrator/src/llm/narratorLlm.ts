@@ -55,6 +55,16 @@ export const CHAPTER_TITLE =
   ' Never a time of day, the weather, or a mood on its own: "Farida Holds the Door", not' +
   ' "Before First Light".'
 
+// r31 titled four days running after one sick man. The chronicle is a novel, and a novel moves.
+const priorTitlesLine = (titles: readonly string[]): string =>
+  titles.length === 0
+    ? ''
+    : `The last ${titles.length === 1 ? 'chapter was' : 'chapters were'} titled ${titles
+        .map((t) => `"${t}"`)
+        .join(
+          ' and ',
+        )}. Today's title turns on a different person or a different matter than those, unless the day truly hung on the same one.\n`
+
 export function makeNarratorLlm(
   client: NarratorLlmClient,
   voice: NarratorVoice = NARRATOR_VOICE,
@@ -64,6 +74,7 @@ export function makeNarratorLlm(
     async summarizeChapter(
       scenes: SceneDigest[],
       cast: readonly CastMember[] = [],
+      priorTitles: readonly string[] = [],
     ): Promise<ChapterSummary> {
       const { value } = await client.object({
         system: NARRATOR_CANON,
@@ -75,6 +86,7 @@ export function makeNarratorLlm(
             )}\n` +
             "Write this day's chapter of the chronicle from the scene digests below, and give it a title.\n" +
             `${CHAPTER_TITLE}\n` +
+            priorTitlesLine(priorTitles) +
             `${speak.chapter}\n` +
             `${CHAPTER_MOMENTS}\n` +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +

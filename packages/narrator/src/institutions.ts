@@ -21,9 +21,11 @@ export const ROLE_VERBS: Record<string, string> = {
 type Completed = { seq: number; agentId: string; verb: string }
 
 // Body upkeep and moving about are what everybody does, not what a town has taken to; give is
-// a trade first, not a norm. r28's paper listed "people sleep" and "people enter" as rules.
+// a trade first, not a norm. r28's paper listed "people sleep" and "people enter" as rules, and
+// every run since has listed "people stoke": feeding a fire is upkeep too.
 const NOT_A_CUSTOM: ReadonlySet<string> = new Set([
   'give',
+  'stoke',
   'drink',
   'drop',
   'eat',

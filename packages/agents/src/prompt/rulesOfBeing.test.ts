@@ -401,3 +401,14 @@ describe('a mind in a talk is told so', () => {
     expect(inTalkLine(['Omar', 'Salma', 'Nadia'])).toContain('with Omar, Salma and Nadia right now')
   })
 })
+
+describe('★ the body on the page is the only body', () => {
+  it('a mind may not invent an ailment for itself or anyone else', () => {
+    expect(SPEECH_RULES).toContain(
+      'If the page does not say you are sick, hurt or worn out, you are well',
+    )
+    expect(SPEECH_RULES).toContain(
+      'another person is ill or hurt only when the page says so beside their name',
+    )
+  })
+})

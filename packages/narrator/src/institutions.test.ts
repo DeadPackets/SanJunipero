@@ -93,11 +93,11 @@ describe('detectInstitutions', () => {
     ).toEqual([])
   })
 
-  it('body upkeep is not a custom: nobody reports that people sleep', () => {
-    const upkeep = [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
-      act(n, n, n % 2 ? 'omar' : 'yusuf', n <= 4 ? 'sleep' : 'enter'),
+  it('body upkeep is not a custom: nobody reports that people sleep, or that people stoke', () => {
+    const upkeep = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) =>
+      act(n, n, n % 2 ? 'omar' : 'yusuf', n <= 4 ? 'sleep' : n <= 8 ? 'enter' : 'stoke'),
     )
-    const scenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8], ['omar', 'yusuf'])]
+    const scenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ['omar', 'yusuf'])]
     expect(
       detectInstitutions(scenes, upkeep, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule'),
     ).toEqual([])

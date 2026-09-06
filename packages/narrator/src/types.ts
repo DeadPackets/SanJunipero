@@ -101,7 +101,11 @@ export type CastMember = { name: string; alive: boolean }
 export type PublicRecord = { eventSeq: number; day: number; text: string }
 
 export type NarratorLlm = {
-  summarizeChapter(scenes: SceneDigest[], cast?: readonly CastMember[]): Promise<ChapterSummary>
+  summarizeChapter(
+    scenes: SceneDigest[],
+    cast?: readonly CastMember[],
+    priorTitles?: readonly string[],
+  ): Promise<ChapterSummary>
   summarizeEra(chapters: ChapterDigest[]): Promise<EraSummary>
   newspaperCopy(
     day: number,

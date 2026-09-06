@@ -259,9 +259,12 @@ export async function renderChapter(deps: {
   const { store, llm, day, scenes } = deps
   // The rooms are written down only once the chapter is in hand: a render that fails would
   // otherwise leave them behind, and `chapters.day` — the idempotence — never sees them.
+  const prior =
+    day > 0 ? store.chaptersInRange(Math.max(0, day - 2), day - 1).map((c) => c.title) : []
   const summary = await llm.summarizeChapter(
     sceneDigests(scenes, deps.look ?? {}, deps.moments ?? []),
     deps.cast ?? [],
+    prior,
   )
   const valid = new Set(scenes.flatMap((s) => s.eventIds))
   const seen = applyFootnotes(summary.text, summary.citations, valid)
