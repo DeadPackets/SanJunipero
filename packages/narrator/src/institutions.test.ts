@@ -93,6 +93,16 @@ describe('detectInstitutions', () => {
     ).toEqual([])
   })
 
+  it('body upkeep is not a custom: nobody reports that people sleep', () => {
+    const upkeep = [1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+      act(n, n, n % 2 ? 'omar' : 'yusuf', n <= 4 ? 'sleep' : 'enter'),
+    )
+    const scenes = [scene(0, [1, 2, 3, 4, 5, 6, 7, 8], ['omar', 'yusuf'])]
+    expect(
+      detectInstitutions(scenes, upkeep, DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'rule'),
+    ).toEqual([])
+  })
+
   it('uses real past tense in descriptions (no "teached"/"builded")', () => {
     const teachBuild: SimEvent[] = [
       act(1, 0, 'omar', 'teach'),

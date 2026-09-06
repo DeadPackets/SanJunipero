@@ -20,6 +20,28 @@ export const ROLE_VERBS: Record<string, string> = {
 
 type Completed = { seq: number; agentId: string; verb: string }
 
+// Body upkeep and moving about are what everybody does, not what a town has taken to; give is
+// a trade first, not a norm. r28's paper listed "people sleep" and "people enter" as rules.
+const NOT_A_CUSTOM: ReadonlySet<string> = new Set([
+  'give',
+  'drink',
+  'drop',
+  'eat',
+  'enter',
+  'exit',
+  'fill',
+  'read',
+  'sleep',
+  'speak',
+  'stop',
+  'stow',
+  'take',
+  'wake',
+  'walk',
+  'wear',
+  'doff',
+])
+
 // `foundingSceneIndex` is an index into the scenes array, -1 when the founding event sits in a
 // dropped scene. The caller maps it to a store id and must never persist -1.
 export function detectInstitutions(
@@ -111,10 +133,10 @@ export function detectInstitutions(
     })
   }
 
-  // rules: a verb (excluding give) done by >= ruleMinAgents agents, >= ruleMinActions times
+  // rules: a verb the town could take to, done by >= ruleMinAgents agents, >= ruleMinActions times
   const byVerb = new Map<string, { agents: Set<string>; seqs: number[] }>()
   for (const c of completed) {
-    if (c.verb === 'give') continue
+    if (NOT_A_CUSTOM.has(c.verb)) continue
     const entry = byVerb.get(c.verb) ?? { agents: new Set<string>(), seqs: [] }
     entry.agents.add(c.agentId)
     entry.seqs.push(c.seq)
