@@ -3064,7 +3064,7 @@ describe('★ the morning line names what this mind wants', () => {
 
     const carried = prompts
       .map((_, i) => i)
-      .filter((i) => saidOn(prompts, i).includes('Today the thing you want most is'))
+      .filter((i) => saidOn(prompts, i).includes('Today what you want most is'))
     const mornings = wakeReasonsBilled(agentDb)
       .map((reason, i) => ({ reason, i }))
       .filter((r) => r.reason === 'morning')
@@ -3074,7 +3074,14 @@ describe('★ the morning line names what this mind wants', () => {
     expect(carried).toEqual(mornings)
     // Nothing fed a want overnight, so the seven stand level and the contract's order decides.
     expect(saidOn(prompts, carried[0]!)).toContain(
-      'Today the thing you want most is belonging. Who could give you that?',
+      'Today what you want most is to belong somewhere, to be one of them. Who could give you that?',
     )
+  })
+
+  it('★ a talk hears the want in a person’s words once it presses, and nothing before', async () => {
+    const { model } = capturingModel([BENIGN_TURN])
+    const { runtime } = await setup({ model, mindConfig: FAST_MIND, simConfig: STILL_BODY })
+    expect(runtime.wantSaid(0)).toBeNull()
+    expect(runtime.wantSaid(2880)).toBe('to belong somewhere, to be one of them')
   })
 })

@@ -176,6 +176,7 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         laws: () => opts.bridge.lawTexts(),
         ...(frontier === undefined ? {} : { frontier }),
         livingCast,
+        want: () => runtimes.get(spec.id)?.wantSaid(opts.bridge.currentTick()) ?? null,
       })
       minds.set(spec.id, {
         llm: {

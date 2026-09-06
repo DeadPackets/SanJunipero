@@ -887,11 +887,23 @@ export function absenceLine(company: readonly Company[], tick: number): string {
     : `You have not seen ${missed.name} for ${days} days.`
 }
 
+/** Each want as a person would say it, never the table's word: r33's Salma, told her want was
+ *  "affection", walked into Omar's house and said "Omar, I want affection now". */
+export const WANT_SAID: Record<WantKind, string> = {
+  belonging: 'to belong somewhere, to be one of them',
+  affection: 'to be close to somebody',
+  esteem: 'to be counted on',
+  curiosity: 'to find something out',
+  rivalry: 'to come out ahead of somebody',
+  order: 'for things to be done properly',
+  legacy: 'to leave something behind that lasts',
+}
+
 /** What this mind is shortest of, said once at the morning wake and nowhere else. It names a
  *  want and asks for a person, because a want with no road is worse than no want at all. */
 export function wantLine(want: WantKind | null): string {
   if (want === null) return ''
-  const head = `Today the thing you want most is ${want}. Who could give you that?`
+  const head = `Today what you want most is ${WANT_SAID[want]}. Who could give you that?`
   // The one want with a verb behind it and no road in front of it: r32's mornings named
   // affection 33 times and nobody in 25 sim-days asked anyone to walk out. Names nobody.
   return want === 'affection'

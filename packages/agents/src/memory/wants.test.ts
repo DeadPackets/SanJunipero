@@ -237,27 +237,29 @@ describe('★ the want the morning line names', () => {
 
   it('says the plan’s sentence, and nothing at all without a want', () => {
     expect(wantLine('belonging')).toBe(
-      'Today the thing you want most is belonging. Who could give you that?',
+      'Today what you want most is to belong somewhere, to be one of them. Who could give you that?',
     )
+    for (const kind of WANT_KINDS)
+      expect(wantLine(kind), kind).not.toMatch(/\b(belonging|esteem|curiosity|rivalry|legacy)\b/)
     expect(wantLine(null)).toBe('')
   })
 
-  it('costs at most 18 tokens of a 7,368-token turn', () => {
+  it('costs at most 24 tokens of a 7,368-token turn', () => {
     const blocks = fixtureBlocks()
     const withLine = {
       ...blocks,
       now: { ...blocks.now, prose: `${blocks.now.prose} ${wantLine('belonging')}` },
     }
-    // The estimate rounds the whole prompt once, so the same line lands at 17 or 18.
+    // The estimate rounds the whole prompt once, so the same line lands at 23 or 24.
     const delta = assemblePrompt(withLine).estTokens - assemblePrompt(blocks).estTokens
-    expect(delta).toBeGreaterThanOrEqual(17)
-    expect(delta).toBeLessThanOrEqual(18)
+    expect(delta).toBeGreaterThanOrEqual(23)
+    expect(delta).toBeLessThanOrEqual(24)
     // Every kind costs within a token of every other, so no mind's morning costs more than
     // another's. Affection is the one exception: it carries its road (the walk-out), the way
     // food and water carry theirs, and that is worth a morning's extra thirty tokens.
     for (const kind of WANT_KINDS) {
       expect(Math.ceil((wantLine(kind).length + 1) / 4), kind).toBeLessThanOrEqual(
-        kind === 'affection' ? 48 : 18,
+        kind === 'affection' ? 48 : 24,
       )
     }
   })
@@ -339,13 +341,15 @@ describe('the wants a relationship answers', () => {
 describe('★ affection is the one want said with its road', () => {
   it('names the walk-out and no person', () => {
     const line = wantLine('affection')
-    expect(line).toContain('Today the thing you want most is affection. Who could give you that?')
+    expect(line).toContain(
+      'Today what you want most is to be close to somebody. Who could give you that?',
+    )
     expect(line).toContain('Walking out with somebody is how that starts')
     expect(line).not.toMatch(/[A-Z][a-z]+ \(/)
   })
   it('the other wants keep the plain question', () => {
     expect(wantLine('curiosity')).toBe(
-      'Today the thing you want most is curiosity. Who could give you that?',
+      'Today what you want most is to find something out. Who could give you that?',
     )
   })
 })

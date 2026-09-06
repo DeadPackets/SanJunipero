@@ -62,6 +62,7 @@ import {
   stillnessAt,
   stockLine,
   usefulLine,
+  WANT_SAID,
   wantLine,
   type Stillness,
   worldDay,
@@ -107,6 +108,7 @@ import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
 import { rollDream, type DreamLlm } from '../dream.js'
 import type { EngineBridge, FinishedAct, Intent, SubmitResult } from './bridge.js'
 import {
+  aimedAt,
   buildAgentCtx,
   humanizeIntent,
   type Adjudicator,
@@ -771,6 +773,14 @@ export class AgentRuntime {
     return this.#personality.current().doc.current.mood
   }
 
+  /** What this mind is shortest of, in a person's words, once it presses. A scene line carries
+   *  it, because the ask a talk can hold (court, propose) is the road out of the want. */
+  wantSaid(tick: number): string | null {
+    const top = this.#wants?.top(tick) ?? null
+    if (top === null || (this.#wants?.levelOf(top, tick) ?? 0) < WANT_PRESSING) return null
+    return WANT_SAID[top]
+  }
+
   /** A turn or a scene line said how this mind feels now. It rides the volatile block, so a
    *  change costs no cached prefix. */
   feltMood(mood: string, _tick: number): void {
@@ -1092,7 +1102,13 @@ export class AgentRuntime {
       return
     }
     if (verdict.kind === 'map')
-      return this.#holdIntent({ verb: verdict.verb, params: namedParams(verdict.params) })
+      return this.#holdIntent({
+        verb: verdict.verb,
+        params: aimedAt(
+          namedParams(verdict.params),
+          this.#bridge.perception(this.#agentId).visible.agents,
+        ),
+      })
     if (verdict.kind === 'impossible') {
       this.#rememberRefusal(description, verdict.reason)
       this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
