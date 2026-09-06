@@ -1269,6 +1269,7 @@ export class AgentRuntime {
       nearestSource: (kind: string, x: number, y: number) => this.#bridge.nearestSource(kind, x, y),
       foodSources: (x: number, y: number) => this.#bridge.foodSources(this.#agentId, x, y),
       nearestPerson: (x: number, y: number) => this.#bridge.nearestPerson(this.#agentId, x, y),
+      warmthToward: (id: string) => this.warmthToward(id),
       nightWillBeCold: () => this.#bridge.nightWillBeCold(this.#agentId),
       distantWater: (x: number, y: number) => this.#bridge.distantWater(x, y),
       extent: () => this.#bridge.extent(),

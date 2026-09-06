@@ -1,4 +1,5 @@
 import {
+  type BondLevel,
   bondLevel,
   dayPhaseFromTick,
   DAYS_PER_SEASON,
@@ -328,6 +329,9 @@ export type ProseWorld = {
   // Who is out there. The same answer food and water have, for the last want that had none:
   // the low band said only that it was lonely.
   nearestPerson?: (x: number, y: number) => { x: number; y: number; name: string } | null
+  // How warm this mind stands toward a person in sight, so a friend reads as a friend and not
+  // as one more body at a bearing: r31's now-prose gave people 8 tokens in 600.
+  warmthToward?: (id: string) => number
   // Where a material comes from. The same answer food and water have; wanting to build was the
   // only drive left with a cost and no place to go.
   nearestSource?: (
@@ -1225,6 +1229,40 @@ function storeLine(s: PerceptionStore): string {
   return say(shown)
 }
 
+// What a tie is called to the person who holds it. Strangers and slight acquaintances get no
+// word: a clause on every body would be the roll-call this line replaces.
+const TIE_SAID: Readonly<Record<BondLevel, string>> = {
+  hatred: ', who you cannot stand,',
+  strained: ', who you are on bad terms with,',
+  strangers: '',
+  acquaintances: '',
+  friendly: ', a friend,',
+  close: ', a close friend,',
+}
+
+// What a body in sight is at, for the verbs a passer-by can read off it. A verb not here is
+// said as nothing, never as its id.
+const DOING_SAID: Readonly<Record<string, string>> = {
+  chop: 'chopping wood',
+  fish: 'fishing',
+  forage: 'foraging',
+  harvest: 'harvesting',
+  till: 'working the soil',
+  plant: 'planting',
+  build: 'building',
+  craft: 'making something',
+  fill: 'filling a waterskin',
+  stoke: 'feeding the fire',
+  eat: 'eating',
+  drink: 'drinking',
+  write: 'writing',
+  read: 'reading',
+  tend: 'tending someone',
+  teach: 'teaching',
+  take: 'picking something up',
+  stow: 'putting something away',
+}
+
 export function perceptionToProse(
   packet: PerceptionPacket,
   alert?: (detail: string) => void,
@@ -1244,6 +1282,9 @@ export function perceptionToProse(
   // Who is here comes before how the body feels and long before what stands where: a mind reads
   // the top of its turn hardest, and r31's now-prose gave people one line in a hundred.
   for (const a of packet.visible.agents) {
+    const tie = TIE_SAID[bondLevel(world?.warmthToward?.(a.id) ?? 0)]
+    const doing = a.activityVerb === null ? undefined : DOING_SAID[a.activityVerb]
+    const busy = doing === undefined ? '' : `, ${doing}`
     const dressed = a.worn === undefined ? '' : `, ${a.worn}`
     // Said last, because it is the thing a pair of eyes lands on: a body nobody can see is
     // ailing is a body nobody tends, and the live run tended nobody at all.
@@ -1254,13 +1295,13 @@ export function perceptionToProse(
     const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
-    const who = `${a.name} (${a.id})${road}`
+    const who = `${a.name} (${a.id})${road}${tie}`
     if (a.collapsed)
       lines.push(
         `${who} lies collapsed ${where}. Hold food out to them and they will eat it from your hand.`,
       )
     else if (a.asleep) lines.push(`${who} sleeps ${where}.`)
-    else lines.push(`${who} stands ${where}.`)
+    else lines.push(`${who} stands ${where}${busy}.`)
   }
 
   if (packet.self.collapsed)
