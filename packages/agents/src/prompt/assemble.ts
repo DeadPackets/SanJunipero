@@ -124,6 +124,8 @@ function renderIdentity(id: IdentityCore): string {
   return lines.join('\n')
 }
 
+const AUTOBIOGRAPHY_DAYS = 7
+
 function renderPersonality(p: PromptBlocks['personality']): string {
   const doc = p.doc
   const lines = [
@@ -132,9 +134,10 @@ function renderPersonality(p: PromptBlocks['personality']): string {
     `Worries: ${doc.current.worries.join('; ')}`,
     `Goals: ${doc.current.goals.join('; ')}`,
   ]
-  if (p.autobiography.length > 0) {
-    lines.push(`Your life so far:\n${p.autobiography.join('\n\n')}`)
-  }
+  // One paragraph a night, so the whole story would be 6,000 tokens of system prompt by day 60;
+  // a week of it rides in every prompt and the rest stays in the book, where recall reaches it.
+  const recent = p.autobiography.slice(-AUTOBIOGRAPHY_DAYS)
+  if (recent.length > 0) lines.push(`Your life so far:\n${recent.join('\n\n')}`)
   return lines.join('\n')
 }
 

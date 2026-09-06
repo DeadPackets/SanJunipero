@@ -1491,3 +1491,18 @@ describe('blockTokens', () => {
     expect(tamar.system.startsWith(RULES_OF_BEING)).toBe(true)
   })
 })
+
+describe('the autobiography in the prompt', () => {
+  // One paragraph a night: the whole story would be 6,000 tokens of system prompt by day 60.
+  it('keeps the last seven paragraphs and leaves the rest in the book', () => {
+    const paragraphs = Array.from({ length: 10 }, (_, i) => `Day ${i + 1} of my life.`)
+    const base = fixtureBlocks()
+    const p = assemblePrompt({
+      ...base,
+      personality: { ...base.personality, autobiography: paragraphs },
+    })
+    expect(p.system).toContain('Day 10 of my life.')
+    expect(p.system).toContain('Day 4 of my life.')
+    expect(p.system).not.toContain('Day 3 of my life.')
+  })
+})
