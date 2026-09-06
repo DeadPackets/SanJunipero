@@ -93,7 +93,7 @@ function actionsSystem(ctx: TickCtx): void {
 
 function collapseDeathSystem(ctx: TickCtx): void {
   const { collapseThreshold, deathAfterZeroHungerTicks } = ctx.config.needs
-  const { collapseHp, deathHp } = ctx.config.health
+  const { collapseHp, deathHp, downedPassOutTicks } = ctx.config.health
   for (const id of Object.keys(ctx.state().agents).sort()) {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
@@ -107,6 +107,20 @@ function collapseDeathSystem(ctx: TickCtx): void {
       // call for help or crawl. Lying down again while down is still its own choice.
       if (a.asleep) ctx.emit('agent_woke', { agentId: id })
       ctx.emit('agent_collapsed', { agentId: id })
+    }
+    // Except when sleep is the only road out: a body down for want of rest alone, fed and unhurt,
+    // is kept awake for an hour to eat, call or crawl, and then passes out where it lies.
+    const tiredOnly =
+      !fell &&
+      a.collapsedSinceTick !== null &&
+      !a.asleep &&
+      a.needs.energy < collapseThreshold &&
+      a.needs.hunger >= collapseThreshold &&
+      a.hp >= collapseHp &&
+      ctx.state().tick - a.collapsedSinceTick >= downedPassOutTicks
+    if (tiredOnly) {
+      if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'passed out' })
+      ctx.emit('agent_passed_out', { agentId: id })
     }
     const b = ctx.state().agents[id]!
     const starved =

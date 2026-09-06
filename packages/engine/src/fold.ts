@@ -43,6 +43,7 @@ import {
   AgentExpressed,
   DiscoveryMade,
   AgentRecovered,
+  AgentPassedOut,
   AgentSlept,
   AgentSpoke,
   AgentArrived,
@@ -760,6 +761,14 @@ export function fold(
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_slept for unknown agent ${p.agentId}`)
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...rested(a), asleep: true } } }
+    }
+    case 'agent_passed_out': {
+      const p = AgentPassedOut.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a) throw new Error(`agent_passed_out for unknown agent ${p.agentId}`)
+      // Not `rested`: the ladder and the cold still count, so a body that dies later is still
+      // named for what put it down.
+      return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
     }
     case 'agent_entered': {
       const p = AgentEntered.parse(event.payload)

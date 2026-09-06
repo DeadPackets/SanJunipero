@@ -55,6 +55,9 @@ const HealthSchema = z
     // the fall itself put on the body: it outruns the first rung and the second, and the third
     // outruns it. Resting off one fall is a road out; resting off a habit of falling is not.
     downedRecoveryHpPerTick: z.number().default(0.1),
+    // Down for want of sleep alone, fed and unhurt, and still awake an hour on: the body passes
+    // out where it lies. r34's Dilara lay awake 33 hours at a doorstep, fed by everyone, never rested.
+    downedPassOutTicks: z.number().int().default(60),
     deathHp: z.number().default(0),
   })
   .strict()

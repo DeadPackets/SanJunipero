@@ -72,6 +72,7 @@ export const PUBLIC_EVENT_TYPES = [
   'agent_recovered',
   'skill_gained',
   'agent_slept',
+  'agent_passed_out',
   'agent_woke',
   'agent_collapsed',
 ] as const
@@ -104,6 +105,8 @@ export function publicRecordText(ev: SimEvent): string {
       return `grew skilled at ${strOr(p.skill, 'a craft')}`
     case 'agent_slept':
       return 'was seen retiring to sleep'
+    case 'agent_passed_out':
+      return 'was seen passing out where they lay'
     case 'agent_woke':
       return 'was seen rising'
     case 'agent_collapsed':

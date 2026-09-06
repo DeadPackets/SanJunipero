@@ -243,6 +243,8 @@ export const SkillGained = z
   .strict()
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
 export const AgentSlept = z.object({ agentId: z.string() }).strict()
+// Sleep the body took, not the mind: a downed body passing out keeps its collapse bookkeeping.
+export const AgentPassedOut = z.object({ agentId: z.string() }).strict()
 export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
 // Places this body now knows of, whether its own eyes found them or another mouth named them.
 // The set only ever grows, so a repeat is harmless and an empty one is never emitted.

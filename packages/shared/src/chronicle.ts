@@ -119,6 +119,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'skill_gained',
   'agent_woke',
   'agent_slept',
+  'agent_passed_out',
   'agent_entered',
   'agent_exited',
   'agent_aged',

@@ -316,3 +316,38 @@ describe('worldTick: health replay safety', () => {
     expect(replayed).toEqual(out.state)
   })
 })
+
+describe('★ a body down for want of sleep alone passes out', () => {
+  const tired = (s: WorldState) =>
+    patchAgent(s, 'a1', { needs: { ...s.agents.a1!.needs, energy: 0 } })
+
+  // r34 day 1-2: Dilara went down tired at a doorstep and lay awake 33 hours choosing to crawl,
+  // fed by everyone who passed and never once asleep, so her energy never came back.
+  it('after an hour awake and down it falls asleep where it lies, and sleeps its way back up', () => {
+    const t1 = tickOnce(tired(makeWorld()))
+    expect(t1.events).toContainEqual({ type: 'agent_collapsed', payload: { agentId: 'a1' } })
+    const downAt = t1.state.agents.a1!.collapsedSinceTick!
+    const early = tickOnce(atTick(t1.state, downAt + CFG.health.downedPassOutTicks - 2))
+    expect(early.events.map((e) => e.type)).not.toContain('agent_passed_out')
+    const late = tickOnce(early.state)
+    expect(late.events).toContainEqual({ type: 'agent_passed_out', payload: { agentId: 'a1' } })
+    expect(late.state.agents.a1!.asleep).toBe(true)
+    // Passing out is not rest: the fall still counts against the body until it eats or sleeps.
+    expect(late.state.agents.a1!.collapsesWithoutRecovery).toBe(1)
+    let r = late
+    for (let i = 0; i < 60 && r.state.agents.a1!.collapsedSinceTick !== null; i++)
+      r = tickOnce(r.state)
+    expect(r.state.agents.a1!.collapsedSinceTick).toBeNull()
+    expect(r.state.agents.a1!.asleep).toBe(true)
+  })
+
+  it('a body down hungry stays awake past the hour, so it can still be fed', () => {
+    const base = makeWorld()
+    const hungry = patchAgent(base, 'a1', { needs: { ...base.agents.a1!.needs, hunger: 0 } })
+    const t1 = tickOnce(hungry)
+    expect(t1.events).toContainEqual({ type: 'agent_collapsed', payload: { agentId: 'a1' } })
+    const later = tickOnce(atTick(t1.state, t1.state.tick + CFG.health.downedPassOutTicks + 5))
+    expect(later.events.map((e) => e.type)).not.toContain('agent_passed_out')
+    expect(later.state.agents.a1!.asleep).toBe(false)
+  })
+})
