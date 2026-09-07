@@ -79,6 +79,48 @@ describe('WorldMirror', () => {
     db.close()
   })
 
+  // The town prunes needs_changed and thins snapshots behind a window (TickLoop `retain`); a scrub
+  // into those days folds forward from whatever snapshot is left, and never throws.
+  it('★ scrubs into a pruned day from the nearest kept snapshot', () => {
+    const dbPath = join(dir, 'pruned.db')
+    const db = openDb(dbPath)
+    const store = new EventStore(db)
+    const loop = new TickLoop({
+      store,
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('mirror-pruned'),
+      snapshotEveryTicks: 5,
+      retain: { keepTicks: 10, bulkTypes: ['needs_changed'] },
+      onTick: ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', {
+            id: 'walker',
+            name: 'walker',
+            x: 0,
+            y: 0,
+            ageDays: ADULT_AGE_DAYS,
+          })
+        if (tick > 1) {
+          emit('agent_moved', { id: 'walker', x: (tick - 1) % 8, y: 0 })
+          emit('needs_changed', { id: 'walker', changes: [{ need: 'hunger', delta: -0.01 }] })
+        }
+      },
+    })
+    for (let i = 0; i < 30; i++) loop.step()
+    expect(store.readTypeFrom(0, 'needs_changed')[0]!.tick).toBe(20)
+    expect(store.latestSnapshot()!.tick).toBe(30)
+
+    const mirror = new WorldMirror({
+      db: new Database(dbPath, { readonly: true }),
+      config: DEFAULT_CONFIG,
+      terrain: GRASS,
+    })
+    expect(stateHash(mirror.state())).toBe(stateHash(loop.state))
+    expect(mirror.stateAt(7).agents.walker!.x).toBe(6)
+    expect(mirror.stateAt(23).agents.walker!.x).toBe(22 % 8)
+    db.close()
+  })
+
   // Without idx_snapshots_tick this is a SCAN plus a temp b-tree over rows carrying ~30 KB of
   // state JSON each, and it slows as the world ages.
   it('finds the scrub snapshot through the index, never by scanning the table', () => {
