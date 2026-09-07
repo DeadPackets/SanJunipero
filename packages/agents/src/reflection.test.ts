@@ -11,6 +11,7 @@ import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } fro
 import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import { FOUNDER_MINDS } from './live/founderMinds.js'
+import { namesSelf } from './reflection.js'
 import {
   runSleepReflection,
   gistPrompt,
@@ -1141,5 +1142,20 @@ describe('★ what reaches the page is said plainly', () => {
     expect(system).toMatch(/afraid of/)
     expect(system).toMatch(/not about being loved/)
     expect(system).toMatch(/Do not begin it with "I want"/)
+    expect(system).toMatch(/never write your own name in it/)
+  })
+
+  // r39: Kamal wanted Kamal to ask him first. r41: Farida wanted to be the one Farida calls.
+  it('★ a want written about the person writing it leaves yesterday\u2019s want standing', () => {
+    expect(namesSelf('Be the one Farida calls when the household needs water.', 'Farida')).toBe(
+      true,
+    )
+    expect(namesSelf('be the one farida calls', 'Farida')).toBe(true)
+    expect(namesSelf('Be the one Nadia asks for when the river turns', 'Farida')).toBe(false)
+    expect(namesSelf('Stop dreading the river after dark', 'Yusuf')).toBe(false)
+    // A name inside a longer word is not the name: Kamal is not in Kamala's boy.
+    expect(namesSelf('walk out with Kamala once more', 'Kamal')).toBe(false)
+    expect(namesSelf(undefined, 'Farida')).toBe(false)
+    expect(namesSelf('anything at all', undefined)).toBe(false)
   })
 })

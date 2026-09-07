@@ -1723,6 +1723,7 @@ export class AgentRuntime {
         personality: this.#personality,
         llm: this.#reflectionLlm,
         day,
+        selfName: this.#identity.name,
         ...(ties === null
           ? {}
           : { ties: { store: ties.store, cast: ties.cast(), tick: this.#bridge.currentTick() } }),

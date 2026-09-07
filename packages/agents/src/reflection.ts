@@ -126,15 +126,23 @@ function dayDigest(dayMemories: MemoryRow[]): string {
   return full.length <= FALLBACK_DIGEST_CHARS ? full : `${full.slice(0, FALLBACK_DIGEST_CHARS)}…`
 }
 
+/** A want is said by the person whose want it is, so their own name has no place in it. */
+export function namesSelf(want: string | undefined, selfName: string | undefined): boolean {
+  if (want === undefined || selfName === undefined || selfName === '') return false
+  return new RegExp(`\\b${selfName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(want)
+}
+
 export async function runSleepReflection(deps: {
   mem: MemoryStore
   personality: PersonalityStore
   llm: ReflectionLlm
   day: number
   ties?: ReflectionTies
+  /** This mind's own name, so a want written about them in the third person is refused. */
+  selfName?: string
   alert?: (kind: string, detail: string) => void
 }): Promise<ReflectionResult> {
-  const { mem, personality, llm, day, ties, alert } = deps
+  const { mem, personality, llm, day, ties, selfName, alert } = deps
 
   // 1. Load the day's memories.
   const dayMemories = mem.memoriesOfDay(day)
@@ -222,7 +230,10 @@ export async function runSleepReflection(deps: {
   const daySummaryText = daySummary?.text ?? ''
   // What the mind is about rides the fluid layer of its own doc, beside its mood: one nightly
   // want-list in the stable prefix, not two.
-  if (daySummary !== null) {
+  // r39 and r41 both: a mind wrote its want about itself in the third person. Kamal wanted Kamal
+  // to ask him first, Farida wanted to be the one Farida calls. A night that comes back with that
+  // leaves yesterday's want standing rather than putting nonsense on the person's own page.
+  if (daySummary !== null && !namesSelf(daySummary.standing[0], selfName)) {
     personality.updateCurrent({ ...personality.current().doc.current, goals: daySummary.standing })
   }
 
@@ -383,7 +394,8 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       // The seeded wants are bare phrases and the written ones all opened "I want", so a roster
       // of twelve read as two different documents.
       'Write it as a bare phrase, beginning with the verb, the way it would sit under your name',
-      'on a list. Do not begin it with "I want".',
+      'on a list. Do not begin it with "I want", and never write your own name in it: it is',
+      'yours, and you do not speak about yourself from outside.',
       'Leave `standing` empty rather than make one up. Write each line as something you are set',
       'on, not as a report of the day.',
       PLAIN_SPEECH,
