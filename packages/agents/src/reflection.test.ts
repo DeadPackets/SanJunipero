@@ -1140,5 +1140,6 @@ describe('★ what reaches the page is said plainly', () => {
     expect(system).toMatch(/one place/)
     expect(system).toMatch(/afraid of/)
     expect(system).toMatch(/not about being loved/)
+    expect(system).toMatch(/Do not begin it with "I want"/)
   })
 })

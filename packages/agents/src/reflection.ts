@@ -380,6 +380,10 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       'alone for an evening. To stop being afraid of a place. To be the one somebody sends for.',
       'Most wants are not about being loved. Some are. Say the one that is actually yours, and',
       'take none of these words.',
+      // The seeded wants are bare phrases and the written ones all opened "I want", so a roster
+      // of twelve read as two different documents.
+      'Write it as a bare phrase, beginning with the verb, the way it would sit under your name',
+      'on a list. Do not begin it with "I want".',
       'Leave `standing` empty rather than make one up. Write each line as something you are set',
       'on, not as a report of the day.',
       PLAIN_SPEECH,
