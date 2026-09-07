@@ -81,6 +81,7 @@ export type FinishedAct = { seq: number; verb: string; settled: boolean; made?: 
 
 // How many candidate tiles of a kind get asked for footing before the road gives up on it.
 const FOOTING_TRIES = 12
+const REMEDY_KIND = 'herb'
 
 function acceptedAs(events: readonly { type: string; payload: unknown }[]): SubmitResult {
   const start = events.find((e) => e.type === 'action_started')?.payload as
@@ -429,8 +430,10 @@ export class EngineBridge {
     return isPassable(this.#loop.state, x, y)
   }
 
+  // A herb is on the food registry so a fever can eat one, and the world refuses it as a meal;
+  // r36 sent three well minds to the herbs for supper. The road to a meal passes remedies by.
   isEdible(kind: string): boolean {
-    return isFoodKind(this.#simConfig, kind)
+    return kind !== REMEDY_KIND && isFoodKind(this.#simConfig, kind)
   }
 
   // How big the valley is. No packet can say: terrain is the one thing perception never
@@ -617,7 +620,7 @@ export class EngineBridge {
   // The nearest thing worth walking to for a meal. Kind and place only: the mark is still
   // earned by going and looking, as `nearestWater` names a bank and never a well's id.
   nearestFood(x: number, y: number, radius = 24): { x: number; y: number; kind: string } | null {
-    const hit = this.#nearestYield(x, y, radius, (k) => isFoodKind(this.#simConfig, k))
+    const hit = this.#nearestYield(x, y, radius, (k) => this.isEdible(k))
     return hit === null ? null : { x: hit.x, y: hit.y, kind: hit.kind }
   }
 

@@ -351,6 +351,7 @@ function larder(plant?: (terrain: TileId[][]) => void): EngineBridge {
     loc: { t: 'structure', id: 'shed_1' },
   })
   put('item_spawned', { id: 'plank', kind: 'plank', qty: 1, loc: { t: 'tile', x: 21, y: 20 } })
+  put('item_spawned', { id: 'sprig', kind: 'herb', qty: 1, loc: { t: 'tile', x: 22, y: 20 } })
   put('forageable_spawned', {
     id: 'bush',
     kind: 'berry_bush',
@@ -386,6 +387,15 @@ describe('nearestFood: the nearest thing worth walking to for a meal', () => {
     const bridge = larder()
     // A plank one tile away and a stone outcrop two: neither is dinner.
     expect(bridge.nearestFood(20, 20)?.kind).toBe('bread')
+  })
+
+  // r36: Kamal, Tariq and Leyla each went for the herbs at suppertime and learned from the
+  // refusal, an hour each. The road names a meal, and a remedy is not one.
+  it('★ a herb two tiles off is a remedy, not the nearest meal', () => {
+    const bridge = larder()
+    expect(bridge.nearestFood(20, 20)?.kind).toBe('bread')
+    expect(bridge.isEdible('herb')).toBe(false)
+    expect(bridge.isEdible('bread')).toBe(true)
   })
 
   it('nothing beyond the horizon is a meal', () => {
