@@ -723,8 +723,14 @@ const wayTo = (dx: number, dy: number): string => `${howFar(Math.hypot(dx, dy))}
 
 // Where a thing in sight lies, said the way the places block says it. A named mark is what the
 // walk verb takes, so the tile it used to be given here was only ever the easier thing to copy.
-const inSight = (self: { x: number; y: number }, at: { x: number; y: number }): string =>
-  at.x === self.x && at.y === self.y ? 'where you stand' : wayTo(at.x - self.x, at.y - self.y)
+// r36: Tariq stood one tile from Amara and "walked to get beside her" four hours running, because
+// one tile and ten both read "close to the north". Arm's reach is its own word.
+const inSight = (self: { x: number; y: number }, at: { x: number; y: number }): string => {
+  const dx = at.x - self.x
+  const dy = at.y - self.y
+  if (dx === 0 && dy === 0) return 'where you stand'
+  return Math.hypot(dx, dy) < 2 ? `right beside you, to the ${bearing(dx, dy)}` : wayTo(dx, dy)
+}
 
 // Six is what a person holds in their head: the three landmarks, the shared roof, and the two
 // nearest others. Rehearsal 29 read a sixteen-line gazetteer on 1417 of 1936 wakes.

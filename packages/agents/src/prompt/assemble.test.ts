@@ -442,7 +442,9 @@ describe('perceptionToProse', () => {
         ],
       },
     })
-    expect(prose).toContain("basket (item_3) close to the south; Rahel's, marked by Yusuf")
+    expect(prose).toContain(
+      "basket (item_3) right beside you, to the south; Rahel's, marked by Yusuf",
+    )
     expect(prose).toContain("hold plank ×1 (item_9; Bex's)")
   })
 
@@ -454,7 +456,7 @@ describe('perceptionToProse', () => {
         items: [{ id: 'item_3', kind: 'basket', qty: 1, loc: { t: 'tile', x: 12, y: 10 } }],
       },
     })
-    expect(prose).toContain('You can see 1 basket (item_3) close to the south.')
+    expect(prose).toContain('You can see 1 basket (item_3) right beside you, to the south.')
     expect(prose).not.toContain('—')
   })
 
@@ -618,7 +620,7 @@ describe('perceptionToProse', () => {
     const prose = perceptionToProse(packet)
     expect(prose).toContain('You stand at (12, 9)')
     expect(prose).toContain('storehouse (structure_1) stands close to the east')
-    expect(prose).toContain('20 bread (item_1) close to the east')
+    expect(prose).toContain('20 bread (item_1) right beside you, to the east')
     // A crop is not nameable to a walk, so the ground it grows on is still the whole of the road.
     expect(prose).toContain('wheat (crop_1) at (12, 8)')
   })
