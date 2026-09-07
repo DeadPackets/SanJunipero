@@ -149,6 +149,8 @@ export type PerceptionPacket = {
       afflictions?: { kind: string; severity: number }[]
       // Since the last meal. Absent on a packet from before appetite kept time.
       hoursSinceMeal?: number
+      // How much this body eats against the town's mean of one; absent reads as one.
+      appetite?: number
     }
     x: number
     y: number
@@ -892,6 +894,10 @@ export function wordToTheAirLine(word: WordToTheAir | null): string {
     : "What you last said went to the air, and nobody took it up. A word with somebody's name on it gets an answer."
 }
 
+// The appetites a mind is told about: everybody in between eats like everybody else.
+const BIG_EATER = 1.25
+const LIGHT_EATER = 0.8
+
 export const TIMES_SAID = [
   '',
   'once',
@@ -1420,9 +1426,16 @@ export function perceptionToProse(
   // World one told five founders their stomachs ached on the exact tick they hit the floor: a
   // need fells at 5, so hunger and energy warn far above it. Thirst fells nobody and is left be.
   const { hunger, energy, warmth, social } = packet.self.body.needs
-  const MEAL_DUE_HOURS = 20
-  const MEAL_OVERDUE_HOURS = 40
+  // Owner 2026-09-07: eating traits. A big eater's meal comes due sooner, and a body most of the
+  // way to its next meal is pulled to the table by somebody eating in view, so meals drift apart
+  // by appetite and drift together by company.
+  const appetite = packet.self.body.appetite ?? 1
+  const MEAL_DUE_HOURS = 20 / appetite
+  const MEAL_OVERDUE_HOURS = 40 / appetite
   const RECENT_MEAL_HOURS = 6
+  const COMPANY_PULL = 0.6
+  if (appetite >= BIG_EATER) lines.push('You have always eaten more than most.')
+  else if (appetite <= LIGHT_EATER) lines.push('You have always eaten lightly.')
   if (hunger < 25)
     lines.push(
       'You are starving and can think about little else. Eat today, wherever the food is and whoever it belongs to, or you will be on the ground before tomorrow.',
@@ -1433,7 +1446,11 @@ export function perceptionToProse(
   const sinceMeal = packet.self.body.hoursSinceMeal
   // r37: the fact alone did not stop Salma, so the body refuses a second meal too (FULL_ABOVE).
   const full = hunger > FULL_ABOVE && sinceMeal !== undefined && sinceMeal < 24
-  const mealDue = !full && sinceMeal !== undefined && sinceMeal >= MEAL_DUE_HOURS
+  const companyEating = packet.visible.agents.some((a) => a.activityVerb === 'eat')
+  const mealDue =
+    !full &&
+    sinceMeal !== undefined &&
+    (sinceMeal >= MEAL_DUE_HOURS || (companyEating && sinceMeal >= COMPANY_PULL * MEAL_DUE_HOURS))
   // r36: Nadia ate eleven times in a day, "I said I'd eat" on every turn, because nothing on the
   // page said she had. A meal just had is the fact that closes it.
   if (full) lines.push('You are full. You have eaten today already.')
@@ -1443,7 +1460,9 @@ export function perceptionToProse(
     lines.push(
       sinceMeal >= MEAL_OVERDUE_HOURS
         ? 'It is two days since you last ate. Eat today, and go back to a meal a day.'
-        : 'It is a day since you last ate. A meal is due, and a meal is better with company.',
+        : sinceMeal >= MEAL_DUE_HOURS
+          ? 'It is a day since you last ate. A meal is due, and a meal is better with company.'
+          : 'Somebody near you is eating, and you could eat with them.',
     )
   }
   // The same ladder hunger uses. A packet from before thirst existed reads as a full body.

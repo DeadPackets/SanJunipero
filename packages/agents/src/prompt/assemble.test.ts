@@ -373,6 +373,61 @@ describe('perceptionToProse', () => {
         'It is two days since you last ate. Eat today, and go back to a meal a day.',
       )
     })
+    // Owner 2026-09-07: eating traits. A big eater's meal comes due sooner, a light one's later.
+    it('★ appetite sets the cadence, and the mind is told which kind of eater it is', () => {
+      const big = (h: number) => {
+        const f = fed(h)
+        return { ...f, self: { ...f.self, body: { ...f.self.body, appetite: 1.5 } } }
+      }
+      const light = (h: number) => {
+        const f = fed(h)
+        return { ...f, self: { ...f.self, body: { ...f.self.body, appetite: 0.75 } } }
+      }
+      expect(perceptionToProse(big(14), undefined, sources)).toContain('A meal is due')
+      expect(perceptionToProse(big(14), undefined, sources)).toContain(
+        'You have always eaten more than most.',
+      )
+      expect(perceptionToProse(fed(14), undefined, sources)).not.toContain('A meal is due')
+      expect(perceptionToProse(light(21), undefined, sources)).not.toContain('A meal is due')
+      expect(perceptionToProse(light(27), undefined, sources)).toContain('A meal is due')
+      expect(perceptionToProse(light(27), undefined, sources)).toContain(
+        'You have always eaten lightly.',
+      )
+      expect(perceptionToProse(fed(14), undefined, sources)).not.toContain('You have always eaten')
+    })
+    it('★ somebody eating in view pulls a body most of the way to its meal to the table', () => {
+      const company = (h: number) => {
+        const f = fed(h)
+        return {
+          ...f,
+          visible: {
+            ...f.visible,
+            agents: [
+              {
+                id: 'omar',
+                name: 'Omar',
+                x: 13,
+                y: 9,
+                activityVerb: 'eat',
+                collapsed: false,
+                asleep: false,
+                ageBand: 'grown' as const,
+              },
+            ],
+          },
+        }
+      }
+      expect(perceptionToProse(company(13), undefined, sources)).toContain(
+        'Somebody near you is eating, and you could eat with them.',
+      )
+      expect(perceptionToProse(company(13), undefined, sources)).toContain('You could eat it now')
+      expect(perceptionToProse(company(9), undefined, sources)).not.toContain(
+        'Somebody near you is eating',
+      )
+      expect(perceptionToProse(fed(13), undefined, sources)).not.toContain(
+        'Somebody near you is eating',
+      )
+    })
     it('a packet from before appetite kept time says nothing', () => {
       const { hoursSinceMeal: _h, ...body } = fed(21).self.body
       const prose = perceptionToProse(

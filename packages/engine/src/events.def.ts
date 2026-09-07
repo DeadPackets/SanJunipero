@@ -11,6 +11,10 @@ export const AgentSpawned = z
     y: z.number(),
     ageDays: z.number(),
     sex: z.enum(['f', 'm']).optional(),
+    // How much this body eats against the town's mean of one; absent reads as one.
+    appetite: z.number().positive().optional(),
+    // How long before arriving this body last ate; absent reads as ten hours.
+    ateHoursAgo: z.number().nonnegative().optional(),
   })
   .strict()
 export const CoSlept = z

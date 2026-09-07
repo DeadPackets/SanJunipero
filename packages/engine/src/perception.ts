@@ -56,6 +56,8 @@ export type SelfBody = {
   // How long since the last meal. Appetite keeps its own time: a body wants to eat once a day
   // long before the hunger bar, which is a starvation clock, has anything to say.
   hoursSinceMeal?: number
+  // How much this body eats against the town's mean of one; absent reads as one.
+  appetite?: number
 }
 
 export type PerceivedAgent = {
@@ -958,6 +960,7 @@ export function composePerception(
         thirst: thirstOf(self),
         afflictions: (self.afflictions ?? []).map((a) => ({ kind: a.kind, severity: a.severity })),
         hoursSinceMeal: (state.tick - (self.lastMealTick ?? state.tick)) / 60,
+        ...(self.appetite === undefined ? {} : { appetite: self.appetite }),
       },
       x: self.x,
       y: self.y,

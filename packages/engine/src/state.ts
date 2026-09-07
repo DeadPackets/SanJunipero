@@ -99,6 +99,9 @@ export type AgentBody = {
   // When this body last sat down to eat; a meal is due a day after it. Set at spawn, since a
   // body arrives fed, and absent only on a log from before appetite kept time.
   lastMealTick?: number
+  // How much this body eats against the town's mean of one: a meal comes due sooner for a big
+  // eater. Absent reads as one, so a town that never set it hashes as it always did.
+  appetite?: number
   // What the body is wearing. One slot in v1; absent until the first thing is put on, so a
   // town that never made a garment hashes exactly as it always did.
   equipped?: { body?: string }

@@ -66,6 +66,22 @@ describe('fold', () => {
     expect(s.agents.a!.lastMealTick).toBe(1500)
     s = fold(s, ev(3, 'action_completed', { agentId: 'a', verb: 'chop' }, 1600))
     expect(s.agents.a!.lastMealTick).toBe(1500)
+    expect(s.agents.a!.appetite).toBeUndefined()
+  })
+
+  // Owner 2026-09-07: eating traits. The spawn says how this body eats and when it last did.
+  it('★ a spawn may say how much this body eats and how long ago it last ate', () => {
+    const s = fold(
+      genesisState(DEFAULT_CONFIG),
+      ev(
+        1,
+        'agent_spawned',
+        { id: 'b', name: 'B', x: 0, y: 0, ageDays: 9000, appetite: 1.4, ateHoursAgo: 6 },
+        0,
+      ),
+    )
+    expect(s.agents.b!.appetite).toBe(1.4)
+    expect(s.agents.b!.lastMealTick).toBe(-360)
   })
 
   it('spawn applies the full v2 default body', () => {

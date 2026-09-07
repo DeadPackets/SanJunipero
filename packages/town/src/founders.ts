@@ -105,6 +105,25 @@ export const FOUNDERS: readonly FounderDef[] = [
 
 export type FounderBody = Pick<FounderDef, 'id' | 'name' | 'ageDays'>
 
+/** How each founder eats: appetite against a town mean of one, and how long before the founding
+ *  they last ate, so the first meals fall apart across the morning rather than on one tick.
+ *  Character, not plot: a card may say a person is a hearty eater, never whom they eat with. */
+export const FOUNDER_EATING: Readonly<Record<string, { appetite: number; ateHoursAgo: number }>> = {
+  omar: { appetite: 1.1, ateHoursAgo: 8 },
+  amara: { appetite: 1.0, ateHoursAgo: 12 },
+  yusuf: { appetite: 1.2, ateHoursAgo: 9 },
+  nadia: { appetite: 0.8, ateHoursAgo: 11 },
+  salma: { appetite: 0.8, ateHoursAgo: 14 },
+  mira: { appetite: 0.7, ateHoursAgo: 10 },
+  farida: { appetite: 1.0, ateHoursAgo: 7 },
+  bashir: { appetite: 1.4, ateHoursAgo: 6 },
+  kamal: { appetite: 1.2, ateHoursAgo: 13 },
+  leyla: { appetite: 0.9, ateHoursAgo: 8 },
+  tariq: { appetite: 1.3, ateHoursAgo: 9 },
+  halim: { appetite: 0.7, ateHoursAgo: 12 },
+  dilara: { appetite: 0.9, ateHoursAgo: 10 },
+}
+
 /** The whole founding, seated by `FOUNDER_SEATS` in `foundersFor`. */
 export const FOUNDER_ROSTER: readonly FounderBody[] = [
   ...FOUNDERS.map(({ id, name, ageDays }) => ({ id, name, ageDays })),
@@ -618,6 +637,7 @@ export function makeFoundersOnTick(
           x: f.spawn.x,
           y: f.spawn.y,
           ageDays: f.ageDays,
+          ...(FOUNDER_EATING[f.id] ?? {}),
         })
       }
       for (const s of structures) {

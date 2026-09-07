@@ -31,6 +31,8 @@ import {
   makeFoundersOnTick,
   townStructuresFor,
   walkEnergyCost,
+  FOUNDER_EATING,
+  FOUNDER_ROSTER,
 } from './founders.js'
 
 function townAtTick1(): WorldState {
@@ -512,5 +514,20 @@ describe('the storerooms hold something', () => {
   // The seed is OFF unless asked for: the scripted fixture is frozen and this is a demo larder.
   it('leaves the frozen scripted fixture exactly as every landed gate folded it', () => {
     expect(Object.keys(townAtTick1().items)).toEqual([])
+  })
+})
+
+// Owner 2026-09-07: eating traits. Different appetites, a mean of one so the larder's day is
+// still twelve meals, and first meals that fall apart across the morning.
+describe('★ how the founders eat', () => {
+  it('every founder has a trait, the town eats one on average, and no two share a first meal', () => {
+    const ids = FOUNDER_ROSTER.map((f) => f.id)
+    for (const id of ids) expect(FOUNDER_EATING[id]).toBeDefined()
+    const mean = ids.reduce((s, id) => s + FOUNDER_EATING[id]!.appetite, 0) / ids.length
+    expect(Math.abs(mean - 1)).toBeLessThan(0.03)
+    const hours = ids.map((id) => FOUNDER_EATING[id]!.ateHoursAgo)
+    expect(Math.min(...hours)).toBeGreaterThanOrEqual(6)
+    expect(Math.max(...hours)).toBeLessThanOrEqual(14)
+    expect(new Set(hours).size).toBeGreaterThanOrEqual(6)
   })
 })
