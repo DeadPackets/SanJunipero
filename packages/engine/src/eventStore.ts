@@ -16,6 +16,8 @@ export class EventStore {
   private selSnap
   private upsertRng
   private selRng
+  private delTypeBefore
+  private delSnapsBefore
   constructor(private db: Database.Database) {
     this.insertEv = db.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)')
     this.selFrom = db.prepare(
@@ -41,6 +43,10 @@ export class EventStore {
       'INSERT INTO rng_state (id, tick, rng) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET tick=excluded.tick, rng=excluded.rng',
     )
     this.selRng = db.prepare('SELECT tick, rng FROM rng_state WHERE id = 1')
+    this.delTypeBefore = db.prepare(
+      'DELETE FROM events WHERE seq IN (SELECT seq FROM events WHERE type = ? AND tick < ? ORDER BY seq LIMIT ?)',
+    )
+    this.delSnapsBefore = db.prepare('DELETE FROM snapshots WHERE tick < ? AND tick % ? != 0')
     // Left on, the autocheckpoint runs inside the COMMIT of whichever tick pushes the WAL past
     // 1,000 pages and puts a 20 ms tail on it (measured). PASSIVE off a timer never blocks a writer.
     if (db.pragma('journal_mode', { simple: true }) === 'wal') {
@@ -111,6 +117,16 @@ export class EventStore {
           rng: JSON.parse(r.rng) as Record<string, RngState>,
         }
       : null
+  }
+
+  /** Drops at most `limit` rows of one bulk type older than `beforeTick`. The type index walks
+   *  its rows in seq order, so the oldest go first and a drained backlog costs one short scan. */
+  pruneType(type: string, beforeTick: number, limit = 5000): number {
+    return this.delTypeBefore.run(type, beforeTick, limit).changes
+  }
+  /** Thins snapshots older than `beforeTick` to the ones on a `keepEveryTicks` boundary. */
+  pruneSnapshots(beforeTick: number, keepEveryTicks: number): number {
+    return this.delSnapsBefore.run(beforeTick, keepEveryTicks).changes
   }
 
   saveRngState(tick: number, rng: Record<string, RngState>): void {

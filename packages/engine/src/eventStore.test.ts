@@ -33,6 +33,30 @@ describe('EventStore', () => {
     expect(s.readTypeFrom(1, 'a').map((e) => e.seq)).toEqual([3])
     expect(s.readTypeFrom(0, 'c')).toEqual([])
   })
+  it('★ pruneType drops only the named type before the tick, oldest first, at most limit rows', () => {
+    const s = store()
+    for (let tick = 0; tick < 6; tick++) {
+      s.append(tick, 'needs_changed', { tick })
+      s.append(tick, 'agent_spoke', { tick })
+    }
+    expect(s.pruneType('needs_changed', 4, 2)).toBe(2)
+    expect(s.readTypeFrom(0, 'needs_changed').map((e) => e.tick)).toEqual([2, 3, 4, 5])
+    expect(s.pruneType('needs_changed', 4)).toBe(2)
+    expect(s.readTypeFrom(0, 'needs_changed').map((e) => e.tick)).toEqual([4, 5])
+    expect(s.readTypeFrom(0, 'agent_spoke')).toHaveLength(6)
+    expect(s.lastSeq()).toBe(12)
+  })
+  it('★ pruneSnapshots keeps the boundary ones and everything newer', () => {
+    const db = openDb(':memory:')
+    const s = new EventStore(db)
+    for (const tick of [60, 120, 1440, 1500, 2880, 2940]) s.saveSnapshot(tick, tick, {}, {})
+    expect(s.pruneSnapshots(2880, 1440)).toBe(3)
+    const left = db
+      .prepare('SELECT tick FROM snapshots ORDER BY tick')
+      .all()
+      .map((r) => (r as { tick: number }).tick)
+    expect(left).toEqual([1440, 2880, 2940])
+  })
   it('snapshot round-trips state and rng', () => {
     const s = store()
     s.append(0, 'a', null)

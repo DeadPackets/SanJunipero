@@ -7,6 +7,7 @@ import {
   TOWN_RINGS_GENESIS,
   simTimeFromTick,
   type SimConfig,
+  MINUTES_PER_DAY,
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
@@ -49,6 +50,9 @@ export const DEV_PORT = 8787
 export const DEV_MS_PER_TICK = TICK_REAL_MS
 export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
+// r34: needs_changed was 67% of the log's bytes (a row per body per tick) and hourly snapshots
+// another quarter. A scrub is exact inside the week (G6 sweeps three days); the story keeps whole.
+export const DEV_RETAIN = { keepTicks: 7 * MINUTES_PER_DAY, bulkTypes: ['needs_changed'] }
 
 // `construction.houseTicks` defaults to two sim days — 96 REAL MINUTES at the dev world's tick.
 // `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
@@ -277,6 +281,7 @@ export async function startDevWorld(
     rng,
     config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
+    retain: DEV_RETAIN,
     onTick: (ctx) => {
       handler?.(ctx)
     },

@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, TICK_REAL_MS, type SimConfig } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, TICK_REAL_MS, type SimConfig } from '@sj/shared'
 import type { EventStore } from './eventStore.js'
 import type { WorldState } from './state.js'
 import { fold } from './fold.js'
@@ -24,6 +24,7 @@ export class TickLoop {
   #realMs: number
   #speed: number
   #snapEvery: number
+  #retain: { keepTicks: number; bulkTypes: readonly string[] } | undefined
   #onTick: TickHandler
   #timer: NodeJS.Timeout | null = null
   #paused = false
@@ -40,6 +41,9 @@ export class TickLoop {
     realMsPerTick?: number
     speed?: number
     snapshotEveryTicks?: number
+    /** Behind this many ticks the bulk types are dropped and snapshots thinned to one a day, so
+     *  the log holds a window of the fine grain and the whole of the story. */
+    retain?: { keepTicks: number; bulkTypes: readonly string[] }
     onTick: TickHandler
     onError?: (err: unknown) => void
   }) {
@@ -51,6 +55,7 @@ export class TickLoop {
     this.#realMs = opts.realMsPerTick ?? TICK_REAL_MS
     this.#speed = opts.speed ?? 1
     this.#snapEvery = opts.snapshotEveryTicks ?? 60
+    this.#retain = opts.retain
     this.#onTick = opts.onTick
     this.#onError = opts.onError
   }
@@ -122,6 +127,11 @@ export class TickLoop {
     // a tick that holds a 60 KB write open holds every reader of the log open with it.
     if (snapshot !== null) {
       this.#store.saveSnapshot(this.#tick, snapshot.seq, snapshot.state, snapshot.rng)
+      if (this.#retain !== undefined) {
+        const before = this.#tick - this.#retain.keepTicks
+        for (const type of this.#retain.bulkTypes) this.#store.pruneType(type, before)
+        this.#store.pruneSnapshots(before, MINUTES_PER_DAY)
+      }
     }
   }
 

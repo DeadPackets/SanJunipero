@@ -10,6 +10,7 @@ import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, stateHash } from '@sj/
 function loop(
   onTick: ConstructorParameters<typeof TickLoop>[0]['onTick'],
   snapshotEveryTicks = 60,
+  retain?: ConstructorParameters<typeof TickLoop>[0]['retain'],
 ) {
   const store = new EventStore(openDb(':memory:'))
   return {
@@ -20,6 +21,7 @@ function loop(
       rng: new RngStreams('t'),
       onTick,
       snapshotEveryTicks,
+      ...(retain === undefined ? {} : { retain }),
     }),
   }
 }
@@ -62,6 +64,25 @@ describe('TickLoop', () => {
     expect(store.latestSnapshot()!.tick).toBe(10)
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
   })
+  // r34: one needs_changed per body per tick was 67% of the log; the story must not pay for it.
+  it('★ retain drops the bulk type behind the window at each snapshot and replay still matches', () => {
+    const { store, loop: l } = loop(
+      ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 0, ageDays: ADULT_AGE_DAYS })
+        else emit('needs_changed', { id: 'a1', changes: [{ need: 'hunger', delta: -0.01 }] })
+      },
+      5,
+      { keepTicks: 10, bulkTypes: ['needs_changed'] },
+    )
+    for (let i = 0; i < 25; i++) l.step()
+    const kept = store.readTypeFrom(0, 'needs_changed').map((e) => e.tick)
+    expect(Math.min(...kept)).toBe(15)
+    expect(kept).toHaveLength(11)
+    expect(store.readTypeFrom(0, 'agent_spawned')).toHaveLength(1)
+    expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
+  })
+
   it('writes the snapshot after the tick has committed, not inside it', () => {
     const db = openDb(':memory:')
     const store = new EventStore(db)
