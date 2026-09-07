@@ -320,6 +320,54 @@ describe('perceptionToProse', () => {
     expect(prose).toContain(FELT_EVENT_PROSE.rain_started)
   })
 
+  // Owner 2026-09-07: people eat once a sim-day. The bar is a starvation clock and says nothing
+  // for a week, so the day since the last meal has to speak, and open the road to food.
+  describe('★ a meal a day', () => {
+    const fed = (hoursSinceMeal: number) => ({
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        body: {
+          ...quietMeadowPacket.self.body,
+          needs: { ...quietMeadowPacket.self.body.needs, hunger: 92 },
+          hoursSinceMeal,
+        },
+        inventory: [
+          { id: 'item_bread', kind: 'bread', qty: 1, loc: { t: 'agent' as const, id: 'nadia' } },
+        ],
+      },
+    })
+    const sources = { isEdible: (k: string) => k === 'bread', nearestFood: () => null }
+    it('says nothing while the last meal is recent', () => {
+      const prose = perceptionToProse(fed(9), undefined, sources)
+      expect(prose).not.toContain('since you last ate')
+      expect(prose).not.toContain('You could eat it now')
+    })
+    it('a day on, the meal is due and the loaf in hand is offered', () => {
+      const prose = perceptionToProse(fed(21), undefined, sources)
+      expect(prose).toContain(
+        'It is a day since you last ate. A meal is due, and a meal is better with company.',
+      )
+      expect(prose).toContain('You are carrying bread (item_bread). You could eat it now.')
+      expect(prose).not.toContain('You are hungry.')
+    })
+    it('two days on, the line hardens', () => {
+      const prose = perceptionToProse(fed(41), undefined, sources)
+      expect(prose).toContain(
+        'It is two days since you last ate. Eat today, and go back to a meal a day.',
+      )
+    })
+    it('a packet from before appetite kept time says nothing', () => {
+      const { hoursSinceMeal: _h, ...body } = fed(21).self.body
+      const prose = perceptionToProse(
+        { ...fed(21), self: { ...fed(21).self, body } },
+        undefined,
+        sources,
+      )
+      expect(prose).not.toContain('since you last ate')
+    })
+  })
+
   it('renders every precipitation start tag the engine emits without alerting', () => {
     for (const tag of ['rain_started', 'storm_started', 'snow_started']) {
       const alert = vi.fn()

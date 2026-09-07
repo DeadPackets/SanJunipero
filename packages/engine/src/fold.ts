@@ -216,6 +216,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
+            lastMealTick: event.tick,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp,
             injuries: [],
@@ -717,7 +718,7 @@ export function fold(
       const p = ActionCompleted.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`action_completed for unknown agent ${p.agentId}`)
-      const rest = p.verb === 'eat' ? rested(a) : a
+      const rest = p.verb === 'eat' ? { ...rested(a), lastMealTick: event.tick } : a
       // A prerequisite done, or a tithe paid: only a standing law that names this verb leaves
       // anything behind, so a town that has agreed nothing never grows the field.
       const lawMarks = markLaw(state, p.agentId, p.verb, a.activity?.params ?? {}, event.tick)
@@ -852,6 +853,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
+            lastMealTick: event.tick,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             // Twelve years on this world's calendar, whose year is four weeks long.
             hp: config.health.maxHp,
@@ -1020,6 +1022,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
+            lastMealTick: event.tick,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp,
             injuries: [],

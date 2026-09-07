@@ -774,7 +774,9 @@ describe('eat rulings (Task 12)', () => {
     expect(submitIntent(s, CFG, 'a1', 'speak', { text: 'help' }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a1', 'walk', { x: 2, y: 0 }).ok).toBe(false)
-    expect(submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' }).ok).toBe(false)
+    // A downed body may lift what is within reach (r34: Yusuf died beside a bush), so the hands
+    // are refused on work, not on a loaf it already holds.
+    expect(submitIntent(s, CFG, 'a1', 'chop', {}).ok).toBe(false)
   })
 
   it('eat onComplete re-validates the item is still held (no event if given away)', () => {

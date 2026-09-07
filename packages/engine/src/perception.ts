@@ -52,6 +52,9 @@ export type SelfBody = {
   thirst: number // always a number here: absence is a storage fact, not something a body feels
   // A body knows what ails it and how badly. It does not know the tick it fell ill.
   afflictions: { kind: AfflictionKind; severity: number }[]
+  // How long since the last meal. Appetite keeps its own time: a body wants to eat once a day
+  // long before the hunger bar, which is a starvation clock, has anything to say.
+  hoursSinceMeal?: number
 }
 
 export type PerceivedAgent = {
@@ -950,6 +953,7 @@ export function composePerception(
         ill: self.ill,
         thirst: thirstOf(self),
         afflictions: (self.afflictions ?? []).map((a) => ({ kind: a.kind, severity: a.severity })),
+        hoursSinceMeal: (state.tick - (self.lastMealTick ?? state.tick)) / 60,
       },
       x: self.x,
       y: self.y,

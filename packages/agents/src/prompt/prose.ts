@@ -141,6 +141,8 @@ export type PerceptionPacket = {
       thirst?: number
       // What ails this body and how badly. Absent on a packet from before C11 named them.
       afflictions?: { kind: string; severity: number }[]
+      // Since the last meal. Absent on a packet from before appetite kept time.
+      hoursSinceMeal?: number
     }
     x: number
     y: number
@@ -1368,11 +1370,24 @@ export function perceptionToProse(
   // World one told five founders their stomachs ached on the exact tick they hit the floor: a
   // need fells at 5, so hunger and energy warn far above it. Thirst fells nobody and is left be.
   const { hunger, energy, warmth, social } = packet.self.body.needs
+  const MEAL_DUE_HOURS = 20
+  const MEAL_OVERDUE_HOURS = 40
   if (hunger < 25)
     lines.push(
       'You are starving and can think about little else. Eat today, wherever the food is and whoever it belongs to, or you will be on the ground before tomorrow.',
     )
   else if (hunger < 50) lines.push('You are hungry. You should eat before long.')
+  // Appetite, not starvation: a meal a day is the town's rhythm, and the bar above only speaks
+  // when days of meals have been missed. A packet from before appetite kept time says nothing.
+  const sinceMeal = packet.self.body.hoursSinceMeal
+  const mealDue = sinceMeal !== undefined && sinceMeal >= MEAL_DUE_HOURS
+  if (mealDue && hunger >= 50) {
+    lines.push(
+      sinceMeal >= MEAL_OVERDUE_HOURS
+        ? 'It is two days since you last ate. Eat today, and go back to a meal a day.'
+        : 'It is a day since you last ate. A meal is due, and a meal is better with company.',
+    )
+  }
   // The same ladder hunger uses. A packet from before thirst existed reads as a full body.
   const thirst = packet.self.body.thirst ?? 100
   if (thirst < 5) lines.push('You are very thirsty and your throat hurts.')
@@ -1406,17 +1421,18 @@ export function perceptionToProse(
 
   // The road thirst has had, given to the need that never had one. Hands first, then the
   // nearest thing worth walking to — and never as a refusal.
-  if (hunger < 50) {
+  if (hunger < 50 || mealDue) {
     const food =
       world?.isEdible === undefined
         ? undefined
         : packet.self.inventory.find((i) => world.isEdible!(i.kind))
     const f = food ? null : (world?.nearestFood?.(x, y) ?? null)
-    // Hands and the nearest meal wait for real hunger; the source road opens with the first
-    // pang, because a body that has none and knows of none has a walk ahead of it.
-    if (food && hunger < 30)
+    // Hands and the nearest meal wait for real hunger or a due meal; the source road opens with
+    // the first pang, because a body that has none and knows of none has a walk ahead of it.
+    const pressing = hunger < 30 || mealDue
+    if (food && pressing)
       roads.push(`You are carrying ${food.kind} (${food.id}). You could eat it now.`)
-    else if (f !== null && hunger < 30)
+    else if (f !== null && pressing)
       roads.push(`The nearest food you know of is ${f.kind} at (${f.x}, ${f.y}).`)
     else if (!food && f === null) {
       const source = foodSourceRoad(packet, world)

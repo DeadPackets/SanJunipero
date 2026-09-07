@@ -96,6 +96,9 @@ export type AgentBody = {
   // What this body has eaten lately, pruned to the variety window at every meal. Absent until
   // the first one, so a body that has never eaten hashes as it always did.
   recentFoods?: { kind: string; day: number }[]
+  // When this body last sat down to eat; a meal is due a day after it. Set at spawn, since a
+  // body arrives fed, and absent only on a log from before appetite kept time.
+  lastMealTick?: number
   // What the body is wearing. One slot in v1; absent until the first thing is put on, so a
   // town that never made a garment hashes exactly as it always did.
   equipped?: { body?: string }

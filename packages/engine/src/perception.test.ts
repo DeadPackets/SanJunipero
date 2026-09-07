@@ -1296,7 +1296,8 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          "injuries": [],
          "ill": false,
          "thirst": 100,
-         "afflictions": []
+         "afflictions": [],
+         "hoursSinceMeal": 12
         },
         "x": 6,
         "y": 6,
