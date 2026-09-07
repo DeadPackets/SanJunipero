@@ -10,6 +10,7 @@ import Sqlite from 'better-sqlite3'
 import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } from '@sj/llm'
 import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
+import { FOUNDER_MINDS } from './live/founderMinds.js'
 import {
   runSleepReflection,
   gistPrompt,
@@ -1117,5 +1118,17 @@ describe('★ what reaches the page is said plainly', () => {
   it('rides the day summary and the life story', () => {
     expect(summarizeDayPrompt([]).system).toContain(PLAIN_SPEECH)
     expect(autobiographyPrompt('a day', baseDoc()).system).toContain(PLAIN_SPEECH)
+  })
+
+  // r39: the want prompt gave one example and named a founder in it. Five of twelve minds wanted
+  // that same thing in those same words, and Kamal wanted it of himself.
+  it('★ the nightly want prompt names nobody the town could be holding', () => {
+    const system = summarizeDayPrompt([]).system
+    for (const m of FOUNDER_MINDS) {
+      expect(system, `${m.identity.name} is copyable out of the prompt`).not.toContain(
+        m.identity.name,
+      )
+      expect(system).not.toContain(m.id)
+    }
   })
 })

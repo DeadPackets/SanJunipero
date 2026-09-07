@@ -371,8 +371,12 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       'it to a friend in a dozen words. It names one person by name, or one thing by its name,',
       'and it comes out of something that happened today. Never the words safe, warm, home,',
       "courage or peace on their own: those are everyone's and say nothing about you.",
-      '"Kamal to ask me before he decides", not "a safe home". Not a task, not a repair,',
-      'not a count. The other two may be plain work.',
+      'Not a task, not a repair, not a count. The other two may be plain work.',
+      // r39: the one example this prompt used to give named a founder, and five of twelve minds
+      // came back wanting the same thing in the same words. Kamal wanted it of himself.
+      'Wants take many shapes. To be asked first. To be let alone for an evening. To hear one',
+      'person say a thing out loud. To stop being afraid of a place. To be the one somebody',
+      'sends for. Yours is your own: take none of these words, and no name out of them.',
       'Leave `standing` empty rather than make one up. Write each line as something you are set',
       'on, not as a report of the day.',
       PLAIN_SPEECH,
