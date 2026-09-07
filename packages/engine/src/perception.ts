@@ -61,6 +61,10 @@ export type SelfBody = {
   appetite?: number
   // How fast this heart lets somebody close; absent reads as steady.
   pace?: Pace
+  // The family this body has, by name. A mind that is never told it is married will act as if
+  // it is not, and then be refused by a rule it was never given.
+  partnerName?: string
+  parentNames?: readonly string[]
 }
 
 export type PerceivedAgent = {
@@ -911,6 +915,10 @@ export function structuresInSight(state: WorldState, config: SimConfig, agentId:
   return structuresSeen(lensFor(state, config, agentId)).map((s) => s.id)
 }
 
+// A body's own family is named however the world holds it, living or gone: a name outlives the
+// person here, and a mind that lost somebody still knows who they were.
+const nameOfBody = (state: WorldState, id: string): string => state.agents[id]?.name ?? id
+
 export function composePerception(
   state: WorldState,
   baseConfig: SimConfig,
@@ -969,6 +977,10 @@ export function composePerception(
         hoursSinceMeal: (state.tick - (self.lastMealTick ?? state.tick)) / 60,
         ...(self.appetite === undefined ? {} : { appetite: self.appetite }),
         ...(self.pace === undefined ? {} : { pace: self.pace }),
+        ...(self.partnerId === undefined ? {} : { partnerName: nameOfBody(state, self.partnerId) }),
+        ...(self.parents === undefined
+          ? {}
+          : { parentNames: self.parents.map((id) => nameOfBody(state, id)) }),
       },
       x: self.x,
       y: self.y,

@@ -1596,3 +1596,41 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
       `)
   })
 })
+
+describe('a packet names the family the world holds', () => {
+  const world = (): WorldState => {
+    let s = makeWorld([])
+    for (const [id, name, extra] of [
+      ['farida', 'Farida', { partnerId: 'bashir' }],
+      ['bashir', 'Bashir', { partnerId: 'farida' }],
+      ['tariq', 'Tariq', { parents: ['leyla', 'kamal'] }],
+      ['leyla', 'Leyla', {}],
+      ['kamal', 'Kamal', {}],
+    ] as const)
+      s = fold(
+        s,
+        ev('agent_spawned', { id, name, x: 1, y: 1, ageDays: 30 * DAYS_PER_YEAR, ...extra }),
+        DEFAULT_CONFIG,
+      )
+    return { ...s, tick: NOON }
+  }
+
+  it('a married body is handed its partner by name', () => {
+    const p = composePerception(world(), DEFAULT_CONFIG, 'farida', [])
+    expect(p.self.body.partnerName).toBe('Bashir')
+    expect(p.self.body.parentNames).toBeUndefined()
+  })
+
+  it('a body born of a family is handed both parents by name', () => {
+    expect(composePerception(world(), DEFAULT_CONFIG, 'tariq', []).self.body.parentNames).toEqual([
+      'Leyla',
+      'Kamal',
+    ])
+  })
+
+  it('a body with no family said is handed neither', () => {
+    const p = composePerception(world(), DEFAULT_CONFIG, 'leyla', [])
+    expect(p.self.body.partnerName).toBeUndefined()
+    expect(p.self.body.parentNames).toBeUndefined()
+  })
+})

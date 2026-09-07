@@ -154,6 +154,9 @@ export type PerceptionPacket = {
       appetite?: number
       // How fast this heart lets somebody close. Absent on a packet from before pace existed.
       pace?: Pace
+      // The family this body has, by name. Absent on a packet from before the world held one.
+      partnerName?: string
+      parentNames?: readonly string[]
     }
     x: number
     y: number
@@ -1431,6 +1434,20 @@ export function perceptionToProse(
           : `You are already walking toward (${toward.x}, ${toward.y}). You will get there if you keep going.`,
     )
   }
+
+  // r37: a married founder walked out with somebody else 13 times in ten days, because nothing
+  // ever told them they were married. The world refuses it now, so the mind has to know why.
+  const { partnerName, parentNames } = packet.self.body
+  if (partnerName !== undefined)
+    lines.push(
+      `You are married to ${partnerName}. That is the person you walk out with, and nobody else.`,
+    )
+  if (parentNames !== undefined && parentNames.length > 0)
+    lines.push(
+      parentNames.length === 1
+        ? `${parentNames[0]} is your parent.`
+        : `${parentNames[0]} and ${parentNames[1]} are your parents.`,
+    )
 
   // Owner 2026-09-07: courting is slow burn with real variance. A heart's pace is character,
   // said once a turn; a steady one needs no line.

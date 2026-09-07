@@ -344,6 +344,30 @@ describe('perceptionToProse', () => {
     })
   })
 
+  // r37: 13 of a married founder's 15 walk outs were with somebody else, because the mind was
+  // never told. The world refuses those now, so the refusal has to be one the mind can see coming.
+  describe('★ a mind is told its own family', () => {
+    const kin = (body: Record<string, unknown>) => ({
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, ...body } },
+    })
+    it('a married mind is told who it married', () => {
+      expect(perceptionToProse(kin({ partnerName: 'Bashir' }))).toContain(
+        'You are married to Bashir. That is the person you walk out with, and nobody else.',
+      )
+    })
+    it('one parent is named alone, two are named together', () => {
+      expect(perceptionToProse(kin({ parentNames: ['Halim'] }))).toContain('Halim is your parent.')
+      expect(perceptionToProse(kin({ parentNames: ['Leyla', 'Kamal'] }))).toContain(
+        'Leyla and Kamal are your parents.',
+      )
+    })
+    it('a mind with no family said, and a packet from before family existed, get no line', () => {
+      for (const prose of [perceptionToProse(kin({ parentNames: [] })), perceptionToProse(kin({}))])
+        expect(prose).not.toMatch(/You are married to|is your parent|are your parents/)
+    })
+  })
+
   // Owner 2026-09-07: people eat once a sim-day. The bar is a starvation clock and says nothing
   // for a week, so the day since the last meal has to speak, and open the road to food.
   describe('★ a meal a day', () => {
