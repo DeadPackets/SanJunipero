@@ -66,9 +66,9 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       earshot,
       store.latestMood,
       (id) => goals.get(id) ?? null,
-      (id) => strongestTie(id, bonds, tick, nameOf),
+      (id) => strongestTie(id, bonds, tick, nameOf, lineage),
     )
-  }, [state, records, bonds, aims, tick, events, earshot])
+  }, [state, records, bonds, aims, tick, events, earshot, lineage])
 
   if (state === null) return <Skeleton rows={5} />
 

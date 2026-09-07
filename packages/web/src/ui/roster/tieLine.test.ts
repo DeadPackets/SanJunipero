@@ -93,6 +93,18 @@ describe('the one tie a roster row has room for', () => {
       strongestTie('amara', { bonds: [bond('amara', 'kamal', 5)], asOfTick: NOW }, NOW, nameOf),
     ).toBe(null)
     expect(strongestTie('amara', null, NOW, nameOf)).toBe(null)
+  })
+
+  // r40 day 0: every row's tie slot was empty, on a morning when two of the twelve were married.
+  it('★ a marriage the world holds speaks on a row with no feeling to report yet', () => {
+    const kin = { parentOf: [], partnerOf: [{ aId: 'amara', bId: 'kamal' }] }
+    const small = { bonds: [bond('amara', 'kamal', 5)], asOfTick: NOW }
+    expect(strongestTie('amara', small, NOW, nameOf, kin)).toBe('married to Kamal')
+    expect(strongestTie('amara', null, NOW, nameOf, kin)).toBe('married to Kamal')
+    expect(strongestTie('tariq', small, NOW, nameOf, kin)).toBe(null)
+    // Feeling still wins: a row says the thing that changed, not the thing that always was.
+    const warm = { bonds: [bond('amara', 'tariq', 30)], asOfTick: NOW }
+    expect(strongestTie('amara', warm, NOW, nameOf, kin)).toBe('close to Tariq')
     expect(
       strongestTie('tariq', { bonds: [bond('amara', 'kamal', 25)], asOfTick: NOW }, NOW, nameOf),
     ).toBe(null)

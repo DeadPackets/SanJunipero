@@ -21,17 +21,23 @@ export function strongestTie(
   bonds: BondsResponse | null,
   nowTick: number,
   nameOf: (id: string) => string,
+  /** Given, a marriage the world holds speaks on a row that has no feeling to report yet. */
+  lineage?: LineageLike,
 ): string | null {
-  if (bonds === null) return null
+  const married = (): string | null => {
+    const e = lineage?.partnerOf?.find((x) => x.aId === id || x.bId === id)
+    return e === undefined ? null : `married to ${nameOf(e.aId === id ? e.bId : e.aId)}`
+  }
+  if (bonds === null) return married()
   let best: { bond: Bond; warmth: number } | null = null
   for (const bond of bonds.bonds) {
     if (bond.aId !== id && bond.bId !== id) continue
     const warmth = bondWarmth(bond, nowTick)
     if (best === null || Math.abs(warmth) > Math.abs(best.warmth)) best = { bond, warmth }
   }
-  if (best === null) return null
+  if (best === null) return married()
   const phrase = LEVEL_PHRASE[bondLevel(best.warmth)]
-  if (phrase === null) return null
+  if (phrase === null) return married()
   const other = best.bond.aId === id ? best.bond.bId : best.bond.aId
   return `${phrase} ${nameOf(other)}${ARC_PHRASE[bondArc(best.bond, nowTick).direction]}`
 }
