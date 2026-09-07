@@ -115,8 +115,10 @@ export function buildLineage(
 export type LineageDeps = { db: Database.Database; mirror: WorldMirror }
 
 export function mountLineageApi(router: Router, deps: LineageDeps): void {
-  const selBirths = deps.db.prepare(
-    "SELECT seq, tick, type, payload FROM events WHERE type = 'agent_born' ORDER BY seq",
+  // Both, because a founding child names its family on the spawn: reading births alone left the
+  // valley's own two families undrawable, which is what shipped on 2026-09-07.
+  const selKin = deps.db.prepare(
+    "SELECT seq, tick, type, payload FROM events WHERE type IN ('agent_born', 'agent_spawned') ORDER BY seq",
   )
   const cache = makeSeqCache(() => deps.mirror.seq())
   router.route('GET', '/api/lineage', (_req, res) => {
@@ -124,7 +126,7 @@ export function mountLineageApi(router: Router, deps: LineageDeps): void {
       res,
       cache.json('lineage', () => {
         try {
-          const events = (selBirths.all() as EventRow[]).map(toEvent)
+          const events = (selKin.all() as EventRow[]).map(toEvent)
           return buildLineage(events, deps.mirror.state().agents)
         } catch {
           return EMPTY_LINEAGE // a town with no ancestry is not an error

@@ -77,10 +77,33 @@ describe('observer data apis', () => {
       snapshotEveryTicks: 25,
       onTick: ({ tick, emit }) => {
         if (tick === 1) {
-          emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
-          emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 3, ageDays: ADULT_AGE_DAYS })
+          // Alice and Bob founded the place married, and Dan is theirs: a family the world was
+          // made with, named on the spawn rather than on a birth.
+          emit('agent_spawned', {
+            id: 'alice',
+            name: 'Alice',
+            x: 0,
+            y: 0,
+            ageDays: ADULT_AGE_DAYS,
+            partnerId: 'bob',
+          })
+          emit('agent_spawned', {
+            id: 'bob',
+            name: 'Bob',
+            x: 0,
+            y: 3,
+            ageDays: ADULT_AGE_DAYS,
+            partnerId: 'alice',
+          })
           emit('agent_spawned', { id: 'cara', name: 'Cara', x: 20, y: 20, ageDays: ADULT_AGE_DAYS })
-          emit('agent_spawned', { id: 'dan', name: 'Dan', x: 5, y: 5, ageDays: ADULT_AGE_DAYS })
+          emit('agent_spawned', {
+            id: 'dan',
+            name: 'Dan',
+            x: 5,
+            y: 5,
+            ageDays: ADULT_AGE_DAYS,
+            parents: ['alice', 'bob'],
+          })
         }
         if (tick === 2) {
           emit('agent_spoke', { agentId: 'alice', text: 'Morning.', x: 0, y: 0 })
@@ -221,6 +244,20 @@ describe('observer data apis', () => {
     expect(await (await fetch(`${base}/api/agent/bob/journal`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/ledgers`)).json()).toEqual([])
     expect(await (await fetch(`${base}/api/agent/bob/personality`)).json()).toEqual([])
+  })
+
+  // The reader was widened to spawns and the query was not, so the valley's own two families
+  // reached the viewer as no family at all.
+  it('★ the lineage feed draws a family the world was founded with, not only the born', async () => {
+    const kin = (await (await fetch(`${base}/api/lineage`)).json()) as {
+      partnerOf: { aId: string; bId: string }[]
+      parentOf: { parentId: string; childId: string }[]
+    }
+    expect(kin.partnerOf).toEqual([{ aId: 'alice', bId: 'bob' }])
+    expect(kin.parentOf.map((e) => `${e.parentId}>${e.childId}`).sort()).toEqual([
+      'alice>dan',
+      'bob>dan',
+    ])
   })
 
   /** Two prepares per journal GET, on the thread that ticks the town: a stranger looping the
