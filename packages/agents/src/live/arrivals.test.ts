@@ -373,11 +373,14 @@ describe('★ the person an arrival makes', () => {
 })
 
 describe('★ the gap between one walker and the next', () => {
-  it('is three, four or five sim-days, and is read off the world rather than rolled', () => {
-    for (let n = 0; n < 12; n += 1) {
-      expect(arrivalGap(n)).toBeGreaterThanOrEqual(3)
-      expect(arrivalGap(n)).toBeLessThanOrEqual(5)
+  it('★ is three to five sim-weeks, and is read off the world rather than rolled', () => {
+    const seen = new Set<number>()
+    for (let n = 0; n < 40; n += 1) {
+      expect(arrivalGap(n)).toBeGreaterThanOrEqual(21)
+      expect(arrivalGap(n)).toBeLessThanOrEqual(35)
       expect(arrivalGap(n)).toBe(arrivalGap(n))
+      seen.add(arrivalGap(n))
     }
+    expect(seen.size).toBe(15)
   })
 })

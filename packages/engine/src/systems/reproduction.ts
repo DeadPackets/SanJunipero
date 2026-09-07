@@ -11,9 +11,10 @@ export function sexOf(agent: AgentBody): Sex {
   return agent.sex ?? 'f'
 }
 
-/** One act in five makes a child. Not a dial: the cap on minds and the gestation clock are what
- *  bound the population, and a tuned chance is a town whose births an operator wrote. */
-export const CONCEPTION_CHANCE_PER_ACT = 0.2
+/** One act in twenty makes a child. Owner 2026-09-07: a birth is a rare event here, so a couple
+ *  that lies together every night waits weeks for one, and the gestation clock adds most of a
+ *  year on top. The cap on minds still bounds the population. */
+export const CONCEPTION_CHANCE_PER_ACT = 0.05
 
 const yearsOf = (a: AgentBody): number => Math.floor(a.ageDays / DAYS_PER_YEAR)
 
