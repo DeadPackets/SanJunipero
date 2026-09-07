@@ -35,7 +35,8 @@ const CFG: SimConfig = SimConfigSchema.parse(QUIET)
 // The only acceleration in this file, and that clock is not under test here. The chance of a
 // child is no longer a dial, so the roll is met with a seed instead: 'r3' draws under the 0.2.
 const FERTILE: SimConfig = SimConfigSchema.parse({ ...QUIET, reproduction: { gestationDays: 1 } })
-const CONCEIVES = 'r3'
+// A seed whose one reproduction draw lands under CONCEPTION_CHANCE_PER_ACT (r5 draws 0.002).
+const CONCEIVES = 'r5'
 
 const RNG = RngStream.seed('g9a', 'actions')
 
