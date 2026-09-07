@@ -359,6 +359,7 @@ export const FELT_TAGS: readonly string[] = [
   ...Object.values(SELF_EVENT_TAG),
   ...Object.values(WORK_USED_TAG),
   ...Object.values(INTERRUPT_TAG),
+  'you_nodded_off',
 ]
 
 // A felt event is something that happens *to* this agent (or ambient weather). Anything about
@@ -382,6 +383,9 @@ function feltTagFor(agentId: string, ev: SimEvent): string | null {
     const reason = (ev.payload as { reason?: unknown }).reason
     return typeof reason === 'string' ? (INTERRUPT_TAG[reason] ?? null) : null
   }
+  // Only the sleep a body took for itself is felt: a bed you chose needs no telling.
+  if (ev.type === 'agent_slept')
+    return (ev.payload as { how?: unknown }).how === 'nodded_off' ? 'you_nodded_off' : null
   return SELF_EVENT_TAG[ev.type] ?? null
 }
 

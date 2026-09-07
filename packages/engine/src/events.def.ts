@@ -249,7 +249,10 @@ export const SkillGained = z
   .object({ agentId: z.string(), track: z.string(), xp: z.number() })
   .strict()
 export const AgentWoke = z.object({ agentId: z.string() }).strict()
-export const AgentSlept = z.object({ agentId: z.string() }).strict()
+// `how` is present only on the sleep a body took for itself, so the mind can be told.
+export const AgentSlept = z
+  .object({ agentId: z.string(), how: z.literal('nodded_off').optional() })
+  .strict()
 // Sleep the body took, not the mind: a downed body passing out keeps its collapse bookkeeping.
 export const AgentPassedOut = z.object({ agentId: z.string() }).strict()
 export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()

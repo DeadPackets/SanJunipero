@@ -210,6 +210,7 @@ export const FELT_EVENT_PROSE: Record<string, string> = {
   snow_started: 'It has started snowing.',
   you_were_attacked: 'Someone has hit you. It hurts.',
   you_collapsed: 'Your legs give way and you go down. You cannot get back up.',
+  you_nodded_off: 'You nodded off where you were. Your body took the sleep you would not give it.',
   you_died: 'Everything goes quiet and far away, and then you stop feeling anything.',
   you_fell_ill: 'You have got sick. Your skin is hot and your arms and legs feel heavy.',
   you_were_infected: 'One of your wounds has gone bad. It is hot and the skin around it is red.',

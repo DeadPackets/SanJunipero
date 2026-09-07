@@ -29,7 +29,11 @@ const QUIET = {
   fauna: { enabled: false },
   regrowth: { enabled: false },
 }
-const CFG: SimConfig = SimConfigSchema.parse({ ...QUIET, aging: { deathOfOldAgeEnabled: false } })
+const CFG: SimConfig = SimConfigSchema.parse({
+  ...QUIET,
+  aging: { deathOfOldAgeEnabled: false },
+  mortality: { needsKill: true },
+})
 
 // Every cause this file actually produced, checked against DEATH_CAUSES in the last row.
 const CAUSES_SEEN = new Set<DeathCause>()
@@ -517,21 +521,41 @@ describe('G11a-M4: a blow struck by a hand, a death that names the hand, and a t
 // ------------------------------------------------------------------ the ladder, cold and warm
 
 describe('G11a-M5: the fatigue ladder, and the winter night that renames it', () => {
-  it('a body kept from sleep climbs the ladder and the last rung kills it', () => {
+  it('★ a body cannot be kept from sleep: out of energy it nods off, and climbs no rung', () => {
     let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'weary', x: 5, y: 5 })
-    // Empty the bar the ladder is climbed on, and leave the belly full so hunger is not the
-    // thing that takes her: this row is about the falling, not the fasting.
     s = fold(
       s,
       ev('needs_changed', { id: 'weary', changes: [{ need: 'energy', delta: -100 }] }, 1859),
       CFG,
     )
     s = { ...s, tick: 1859 }
-    const { state, log } = runUntil(s, CFG, 1860, 40000, (st) => !st.agents.weary!.alive, 'ladder')
-    const rungs = log
-      .filter((e) => e.type === 'agent_afflicted' || e.type === 'affliction_worsened')
-      .filter((e) => (e.payload as { kind?: string }).kind === 'fatigue')
-    expect(rungs.length).toBeGreaterThanOrEqual(1)
+    const { state, log } = runUntil(s, CFG, 1860, 300, () => false, 'ladder')
+    expect(log.some((e) => e.type === 'agent_slept')).toBe(true)
+    expect(log.some((e) => e.type === 'agent_collapsed')).toBe(false)
+    expect(state.agents.weary!.alive).toBe(true)
+    expect(state.agents.weary!.needs.energy).toBeGreaterThan(0)
+  })
+
+  it('the ladder is climbed by the falls hunger drives, and its last rung kills as tiredness', () => {
+    let s = spawn(genesisState(CFG, MAP()), CFG, { id: 'weary', x: 5, y: 5 })
+    const nudge = (st: WorldState, delta: number, tick: number): WorldState =>
+      fold(
+        st,
+        ev('needs_changed', { id: 'weary', changes: [{ need: 'hunger', delta }] }, tick),
+        CFG,
+      )
+    // Down at one hunger, up by a nudge that is not a meal, four times: the ladder stands.
+    for (let rung = 0; rung < 4; rung++) {
+      const tick = 1860 + rung * 10
+      const low = nudge({ ...s, tick: tick - 1 }, -(s.agents.weary!.needs.hunger - 1), tick - 1)
+      s = nudge(pass(low, CFG, tick).state, 50, tick)
+    }
+    expect(s.agents.weary!.afflictions?.find((x) => x.kind === 'fatigue')?.severity).toBe(4)
+    // Fed and awake with a sliver of hp: four rungs outrun the mending, and nothing else drains.
+    s = nudge(s, 100, 1900)
+    s = fold(s, ev('hp_changed', { agentId: 'weary', delta: -(s.agents.weary!.hp - 5) }, 1900), CFG)
+    s = { ...s, tick: 1900 }
+    const { state, log } = runUntil(s, CFG, 1901, 2000, (st) => !st.agents.weary!.alive, 'ladder')
     const death = died(log, 'weary')
     expect(death).toBeDefined()
     noteCause(death!.payload)

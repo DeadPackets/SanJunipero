@@ -17,16 +17,17 @@ import { ev, grid, roundTrips } from '../testutil/world.js'
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
   mystery: { chancePerDay: 0 },
+  mortality: { needsKill: true },
 })
 const OFF: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
   mystery: { chancePerDay: 0 },
-  mortality: { enabled: false },
+  mortality: { enabled: false, needsKill: true },
 })
 const NO_GRAVE: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
   mystery: { chancePerDay: 0 },
-  mortality: { graveEnabled: false },
+  mortality: { graveEnabled: false, needsKill: true },
 })
 
 const map = (): TileId[][] => grid(16)
@@ -321,6 +322,45 @@ describe('death has a cause', () => {
     for (const [cause, make] of SCENARIOS) {
       expect([cause, died(tickOnce(make()))]).toMatchObject([cause, { agentId: 'a1', cause }])
     }
+  })
+})
+
+describe('★ a death needs a cause: with the default dials no need spends hp', () => {
+  const TOWN: SimConfig = SimConfigSchema.parse({
+    weather: { hourlyChangeChance: 0 },
+    mystery: { chancePerDay: 0 },
+  })
+  const need = (s: WorldState, need: string, delta: number) =>
+    fold(s, ev('needs_changed', { id: 'a1', changes: [{ need, delta }] }), TOWN)
+  const ail = (s: WorldState, kind: string, severity: number, extra = {}) =>
+    fold(s, ev('agent_afflicted', { agentId: 'a1', kind, severity, ...extra }), TOWN)
+  const starving = () => ({
+    ...need(body(TOWN), 'hunger', -100),
+    tick: TOWN.mortality.hungerGraceTicks + 1,
+  })
+
+  it('an empty belly, a dry throat and a worn body spend nothing', () => {
+    expect(hpDeltas(tickOnce(starving(), TOWN))).toEqual([])
+    expect(hpDeltas(tickOnce(need(body(TOWN), 'thirst', -100), TOWN))).toEqual([])
+    expect(hpDeltas(tickOnce(ail(body(TOWN), 'fatigue', 3), TOWN))).toEqual([])
+  })
+
+  it('the long-starvation clock does not run', () => {
+    const s = starving()
+    const long = {
+      ...s,
+      tick: TOWN.needs.deathAfterZeroHungerTicks + 1,
+      agents: { a1: { ...s.agents.a1!, zeroHungerSinceTick: 0 } },
+    }
+    const r = tickOnce(long, TOWN)
+    expect(died(r)).toBeUndefined()
+    expect(r.state.agents.a1!.alive).toBe(true)
+  })
+
+  it('a fever still drains, and a wound with a hand behind it still kills as a slaying', () => {
+    expect(hpDeltas(tickOnce(ail(body(TOWN), 'illness', 2), TOWN))).toEqual([-0.08])
+    const struck = nearlyDead(ail(body(TOWN), 'injury', 2, { sourceId: 'a2' }))
+    expect(died(tickOnce(struck, TOWN))).toEqual({ agentId: 'a1', cause: 'slain', byId: 'a2' })
   })
 })
 

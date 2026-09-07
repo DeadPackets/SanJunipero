@@ -721,6 +721,21 @@ function mayLieDownRough(state: WorldState, config: SimConfig, agentId: string):
   return a.collapsedSinceTick !== null || a.needs.energy < config.needs.debuffThreshold
 }
 
+/** One body falling asleep: the sleep itself, and the fatigue ladder it lifts. A night lifts the
+ *  ladder as well as the counter, and lifts it every time — recovery that works once is a body
+ *  that can only ever wear out. `how` marks the sleep the body took for itself. */
+export function fallsAsleep(
+  state: WorldState,
+  agentId: string,
+  how?: 'nodded_off',
+): PendingEvent[] {
+  const weary = state.agents[agentId]?.afflictions?.some((x) => x.kind === 'fatigue') ?? false
+  return [
+    { type: 'agent_slept', payload: { agentId, ...(how === undefined ? {} : { how }) } },
+    ...(weary ? [{ type: 'affliction_recovered', payload: { agentId, kind: 'fatigue' } }] : []),
+  ]
+}
+
 const sleep: VerbDef = makeVerb({
   kind: 'sleep',
   takes: 'moment',
@@ -738,13 +753,7 @@ const sleep: VerbDef = makeVerb({
   },
   settled: (state, _config, agentId) => state.agents[agentId]!.asleep,
   onComplete(state, _config, agentId) {
-    // A night lifts the ladder as well as the counter, and lifts it every time — recovery that
-    // works once is a body that can only ever wear out.
-    const weary = state.agents[agentId]?.afflictions?.some((x) => x.kind === 'fatigue') ?? false
-    return [
-      { type: 'agent_slept', payload: { agentId } },
-      ...(weary ? [{ type: 'affliction_recovered', payload: { agentId, kind: 'fatigue' } }] : []),
-    ]
+    return fallsAsleep(state, agentId)
   },
 })
 
