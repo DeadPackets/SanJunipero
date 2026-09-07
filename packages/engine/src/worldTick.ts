@@ -4,8 +4,15 @@ import { fold } from './fold.js'
 import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import type { System, TickCtx } from './tickCtx.js'
-import { submitIntent } from './intent.js'
-import { chaseStep, stepBuild, stepWalk, VERBS, type PendingEvent } from './verbs/index.js'
+import { isLightWork, SPENT_ENERGY, submitIntent } from './intent.js'
+import {
+  chaseStep,
+  SPENT_OUT,
+  stepBuild,
+  stepWalk,
+  VERBS,
+  type PendingEvent,
+} from './verbs/index.js'
 import { needsSystem } from './systems/needs.js'
 import { flushNeedsSystem } from './systems/needsBatch.js'
 import { warmthSystem } from './systems/warmth.js'
@@ -91,6 +98,18 @@ function actionsSystem(ctx: TickCtx): void {
   }
 }
 
+// r37: the walls went up at six energy until the body fell. Spent hands stop before the act
+// steps, and the mind is told why.
+function spentSystem(ctx: TickCtx): void {
+  for (const id of Object.keys(ctx.state().agents).sort()) {
+    const a = ctx.state().agents[id]!
+    if (!a.alive || a.asleep || a.collapsedSinceTick !== null) continue
+    if (a.needs.energy >= SPENT_ENERGY || a.activity === null) continue
+    if (isLightWork(a.activity.verb)) continue
+    ctx.emit('action_interrupted', { agentId: id, reason: SPENT_OUT })
+  }
+}
+
 function collapseDeathSystem(ctx: TickCtx): void {
   const { collapseThreshold, deathAfterZeroHungerTicks } = ctx.config.needs
   const { collapseHp, deathHp, downedPassOutTicks } = ctx.config.health
@@ -166,6 +185,7 @@ const SYSTEMS: System[] = [
   regrowthSystem,
   reproductionSystem,
   agingSystem,
+  spentSystem,
   actionsSystem,
   collapseDeathSystem,
   // Last: the legs have already moved and the door has already opened, so what a body learned

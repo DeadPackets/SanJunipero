@@ -30,6 +30,23 @@ const DOWNED_VERBS: ReadonlySet<string> = new Set([
   'walk',
 ])
 
+// r37: Dilara built at six energy until she fell, slept, and was woken at six by dawn, by cold
+// and by her own plan, to fall again two hours on: twelve collapses in twenty-two hours. Below
+// this a body keeps only the light acts, and asleep under the debuff line it is not woken by
+// anything it wants itself.
+export const SPENT_ENERGY = 10
+const SPENT_VERBS: ReadonlySet<string> = new Set([
+  ...DOWNED_VERBS,
+  'drop',
+  'enter',
+  'give',
+  'stop',
+  'stow',
+  'wake',
+])
+export const isLightWork = (verb: string): boolean =>
+  SPENT_VERBS.has(verb) || verb.startsWith('express:')
+
 // The same act, hung on the end of the one that makes it possible.
 const carrying = (go: IntentResult, verb: string, params: Record<string, unknown>): IntentResult =>
   !go.ok
@@ -94,6 +111,16 @@ export function submitIntent(
   if (!a.alive) return { ok: false, reason: 'the dead do not act' }
   if (a.collapsedSinceTick !== null && !DOWNED_VERBS.has(verb))
     return { ok: false, reason: 'collapsed and unable to act' }
+  if (a.asleep && a.needs.energy < config.needs.debuffThreshold && verb !== 'sleep')
+    return {
+      ok: false,
+      reason: 'too spent to wake: the body sleeps on until it has something back',
+    }
+  if (a.collapsedSinceTick === null && a.needs.energy < SPENT_ENERGY && !isLightWork(verb))
+    return {
+      ok: false,
+      reason: 'your arms will not do it: you are past working, and only sleep brings it back',
+    }
   const def = VERBS[verb]
   if (!def) return { ok: false, reason: `unknown verb: ${verb}` }
   // A verb that declares `atOnce` does not use the hands: it never takes the activity slot and is

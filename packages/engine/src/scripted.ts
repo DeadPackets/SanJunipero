@@ -1,4 +1,4 @@
-import { ADULT_AGE_DAYS, isRoofedKind, type SimConfig } from '@sj/shared'
+import { ADULT_AGE_DAYS, isRoofedKind, type SimConfig, MINUTES_PER_DAY } from '@sj/shared'
 import { composePerception, type PerceptionPacket } from './perception.js'
 import { doorTile } from './interiors.js'
 import { submitIntent } from './intent.js'
@@ -106,8 +106,12 @@ export function makeFarmerPolicy(config: SimConfig): Policy {
 
 // Fisher: fish, eat, give surplus to a collapsed adjacent Idler, sleep.
 export function makeFisherPolicy(config: SimConfig): Policy {
+  // One rescue, as the fixture says, and read off the clock so a recovered run makes the same
+  // choice: with exhausted sleep no longer broken by the sleeper's own wants, the Idler naps its
+  // way to a second fresh fall beside the Fisher on day two, and was fed again.
   return (p) => {
     const needs = p.self.body.needs
+    const firstDay = p.time.tick < MINUTES_PER_DAY
     const fish = p.self.inventory.filter((i) => i.kind === 'fish')
     const idler = p.visible.agents.find((a) => a.id === IDLER)
 
@@ -117,6 +121,7 @@ export function makeFisherPolicy(config: SimConfig): Policy {
     }
     if (needs.energy < 20) return { verb: 'sleep', params: {} }
     if (
+      firstDay &&
       idler &&
       idler.collapsed &&
       cheb(p.self.x, p.self.y, idler.x, idler.y) <= 1 &&

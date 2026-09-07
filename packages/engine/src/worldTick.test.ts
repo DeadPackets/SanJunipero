@@ -268,6 +268,29 @@ describe('worldTick: sleep and eat flows', () => {
 })
 
 describe('worldTick: collapse', () => {
+  // r37: the walls went up at six energy until the body fell.
+  it('★ spent hands stop: a build at eight energy is interrupted before the body falls', () => {
+    const s = patchAgent(makeWorld(), 'a1', {
+      activity: { verb: 'build', ticksRemaining: 30, params: {} },
+      // FAST takes four a tick: nine lands on five, spent but not down.
+      needs: { hunger: 100, energy: 9, warmth: 100, social: 100 },
+    })
+    const t1 = tickOnce(s)
+    const reasons = t1.events
+      .filter((e) => e.type === 'action_interrupted')
+      .map((e) => (e.payload as { reason: string }).reason)
+    expect(reasons).toEqual(['spent'])
+    expect(t1.events.map((e) => e.type)).not.toContain('agent_collapsed')
+    expect(t1.state.agents.a1!.activity).toBeNull()
+    // The same body walking home is left to walk.
+    let w = makeWorld()
+    const r = submitIntent(w, FAST, 'a1', 'walk', { x: 3, y: 0 })
+    if (!r.ok) throw new Error(r.reason)
+    w = applyAll(w, r.events)
+    w = patchAgent(w, 'a1', { needs: { hunger: 100, energy: 9, warmth: 100, social: 100 } })
+    expect(tickOnce(w).events.some((e) => e.type === 'action_interrupted')).toBe(false)
+  })
+
   it('collapse interrupts an in-progress walk and stamps collapsedSinceTick', () => {
     let s = makeWorld()
     const r = submitIntent(s, FAST, 'a1', 'walk', { x: 4, y: 0 })
@@ -325,6 +348,13 @@ describe('worldTick: collapse recovery through sleep', () => {
     expect(t.state.agents.a1!.collapsedSinceTick).not.toBeNull()
     t = tickOnce(t.state) // asleep: energy regens past collapseThreshold
     expect(t.state.agents.a1!.collapsedSinceTick).toBeNull()
+    // r37: ten energy is off the ground but not a body that can stand. It sleeps on until the
+    // debuff line, and nothing it wants for itself wakes it before then.
+    const early = submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 })
+    expect(!early.ok && early.reason).toBe(
+      'too spent to wake: the body sleeps on until it has something back',
+    )
+    t = tickOnce(tickOnce(t.state).state) // 30: the debuff line
     expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 1, y: 0 }).ok).toBe(true)
   })
 })

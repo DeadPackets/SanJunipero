@@ -202,6 +202,7 @@ export type PerceptionPacket = {
 // Structured felt tags → fiction. Unknown tags fall through to a generic
 // sentence plus an alert, so a new C2 tag degrades to prose, never a crash.
 export const FELT_EVENT_PROSE: Record<string, string> = {
+  your_hands_gave_out: 'Your hands gave out and the work stopped. Only sleep brings them back.',
   rain_started: 'It has started raining.',
   storm_started: 'A storm has come in. Wind and heavy rain.',
   snow_started: 'It has started snowing.',
@@ -1449,7 +1450,10 @@ export function perceptionToProse(
   const thirst = packet.self.body.thirst ?? 100
   if (thirst < 5) lines.push('You are very thirsty and your throat hurts.')
   else if (thirst < 30) lines.push('Your mouth is dry.')
-  if (energy < 10) lines.push('You are about to drop. You will fall asleep where you stand.')
+  if (energy < 10)
+    lines.push(
+      'You are about to drop. Your hands will not work anymore, and only sleep brings them back. A bed is warmer than the ground.',
+    )
   else if (energy < 30)
     lines.push('Your legs are shaking. You can barely stand and your eyes keep closing.')
   else if (energy < 45) lines.push('You are worn out.')

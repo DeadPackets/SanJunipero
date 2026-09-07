@@ -2909,6 +2909,8 @@ const CHASE_GIVE_UP_GROWTH = 3
 
 /** What the mind is told when it stops following: a sentence, not a machinery word. */
 export const WALK_LOST_THEM = 'you lost them'
+// Why spent hands stopped: the one other interruption a mind is told about in words.
+export const SPENT_OUT = 'spent'
 
 /** One tick of a walk that named a person. They move, so the legs are re-aimed at where they
  *  are standing now; the walk ends the moment this body is beside them, and is given up when

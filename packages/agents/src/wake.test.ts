@@ -824,3 +824,17 @@ describe('an hour lain with somebody', () => {
     )
   })
 })
+
+// r37: Dilara, asleep at six energy, was asked at dawn, in the cold and for her plan, and every
+// answer stood her up to fall again two hours on.
+describe('★ a spent sleeper is asked nothing', () => {
+  it('no turn at dawn, cold or hungry while energy is under the line; a rested sleeper is asked as before', () => {
+    const cfg = DEFAULT_MIND_CONFIG
+    const spent = { ...withNeeds(5, 20, 10) }
+    spent.self = { ...spent.self, asleep: true }
+    expect(wakeReasons(cfg, spent, clk(), 600, pln())).toEqual([])
+    const rested = { ...withNeeds(5, 78, 71) }
+    rested.self = { ...rested.self, asleep: true }
+    expect(wakeReasons(cfg, rested, clk(), 600, pln())).toEqual(['body_alarm', 'morning'])
+  })
+})

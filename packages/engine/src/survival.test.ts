@@ -384,3 +384,50 @@ describe('death is still on the table', () => {
     expect(later.agents.a1!.hp).toBe(CFG.health.maxHp)
   })
 })
+
+// r37: Dilara built at six energy until she fell, slept, and was woken at six by dawn, by cold
+// and by her own plan, to fall again two hours on: twelve collapses in twenty-two hours.
+describe('★ spent is not down, and a spent sleeper sleeps on', () => {
+  const PAST_WORKING =
+    'your arms will not do it: you are past working, and only sleep brings it back'
+  const SLEEPS_ON = 'too spent to wake: the body sleeps on until it has something back'
+  const reasonOf = (
+    s: WorldState,
+    verb: string,
+    params: Record<string, unknown> = {},
+  ): string | null => {
+    const r = submitIntent(s, CFG, 'a1', verb, params)
+    return r.ok ? null : r.reason
+  }
+  const spent = (extra: Partial<AgentBody> = {}): WorldState =>
+    world(SPRING_DAY, { needs: { hunger: 80, energy: 8, warmth: 60, social: 60 }, ...extra })
+
+  it('refuses the hands at eight energy and keeps the light acts', () => {
+    const s = spent()
+    for (const verb of ['build', 'chop', 'fish', 'tend']) {
+      expect([verb, reasonOf(s, verb)]).toEqual([verb, PAST_WORKING])
+    }
+    expect(reasonOf(s, 'speak', { text: 'I need to lie down' })).toBe(null)
+    expect(reasonOf(s, 'sleep')).toBe(null)
+    expect(reasonOf(s, 'walk', { x: 1, y: 0 })).not.toBe(PAST_WORKING)
+  })
+
+  it('at ten energy the hands still work', () => {
+    const s = spent({ needs: { hunger: 80, energy: 10, warmth: 60, social: 60 } })
+    expect(reasonOf(s, 'chop')).not.toBe(PAST_WORKING)
+  })
+
+  it('asleep under the debuff line, nothing the sleeper wants wakes it; sleep itself is settled', () => {
+    const s = spent({ asleep: true, needs: { hunger: 80, energy: 20, warmth: 60, social: 60 } })
+    for (const verb of ['wake', 'walk', 'speak', 'build']) {
+      const params = verb === 'walk' ? { x: 1, y: 0 } : verb === 'speak' ? { text: 'up' } : {}
+      expect([verb, reasonOf(s, verb, params)]).toEqual([verb, SLEEPS_ON])
+    }
+    expect(reasonOf(s, 'sleep')).toBe(null)
+    const rested = spent({
+      asleep: true,
+      needs: { hunger: 80, energy: 31, warmth: 60, social: 60 },
+    })
+    expect(reasonOf(rested, 'wake')).not.toBe(SLEEPS_ON)
+  })
+})

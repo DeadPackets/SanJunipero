@@ -9,6 +9,9 @@ export type MindConfig = {
   // Four clocks that ring when they run low, and one rung that rings when it rises: a named
   // affliction at or above `affliction` severity is a body failing, and worth waking for.
   bodyAlarm: { hunger: number; energy: number; warmth: number; thirst: number; affliction: number }
+  // Asleep under this energy a body cannot be woken by its own mind (the engine refuses every
+  // act but sleep, config.needs.debuffThreshold), so no turn is asked of it at all.
+  sleepsOnBelow: number
   alarmHysteresis: number
   // How long a spent alarm stays quiet while the body is still failing on it before it rings
   // again, so a talk or a job that runs on cannot outlast the bell.
@@ -39,6 +42,7 @@ export const DEFAULT_MIND_CONFIG: MindConfig = {
   // late (D1). Energy rings at 25: at 10 the bell came an hour before the body dropped, and r18
   // lost ten of its eleven collapses to minds still up and talking at 23:00 with no way to a bed.
   bodyAlarm: { hunger: 15, energy: 25, warmth: 20, thirst: 25, affliction: 1 },
+  sleepsOnBelow: 30,
   alarmHysteresis: 10,
   alarmRepeatTicks: 120,
   journalTicks: 10,
@@ -185,6 +189,9 @@ export function wakeReasons(
 
   const reasons: WakeReason[] = []
   if (packet.self.asleep) {
+    // r37: Dilara, asleep at six energy, was asked at dawn, in the cold and for her plan, and
+    // every answer stood her up to fall again.
+    if (packet.self.body.needs.energy < cfg.sleepsOnBelow) return reasons
     if (rousing) reasons.push('salient_perception')
     // Asleep the one-shot flags give way to the backoff: a starving sleeper never recovers past
     // the re-arm point, so the alarm has to ring again until the body rises.

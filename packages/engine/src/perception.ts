@@ -36,6 +36,7 @@ import {
   itemWithinReach,
   isMapRim,
   VERBS,
+  SPENT_OUT,
   WALK_LOST_THEM,
   walkIsCapped,
   workPenalty,
@@ -344,7 +345,10 @@ const WORK_USED_TAG: Record<string, string> = {
 
 // The one interruption a mind is told about in words. Every other act cut short is read off the
 // body next turn — standing still, holding nothing — and needs no sentence of its own.
-const INTERRUPT_TAG: Record<string, string> = { [WALK_LOST_THEM]: 'you_lost_them' }
+const INTERRUPT_TAG: Record<string, string> = {
+  [WALK_LOST_THEM]: 'you_lost_them',
+  [SPENT_OUT]: 'your_hands_gave_out',
+}
 
 // Every tag `feltTagFor` can produce, so the prose map can be proven complete
 // rather than sampled. Mystery tags come from MYSTERIES.

@@ -692,7 +692,7 @@ describe('perceptionToProse', () => {
         },
       },
     }
-    expect(perceptionToProse(collapsing)).toContain('You will fall asleep where you stand')
+    expect(perceptionToProse(collapsing)).toContain('Your hands will not work anymore')
   })
 
   it('renders structure footprint and advises walking beside it', () => {
