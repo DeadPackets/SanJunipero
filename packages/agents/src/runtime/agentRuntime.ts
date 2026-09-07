@@ -57,8 +57,10 @@ import {
   type ProseWorld,
   type WalkMark,
   standingWallsLine,
+  repeatedActLine,
   silentTurnsLine,
   stasisLine,
+  TIMES_SAID,
   bedtimeLine,
   stillnessAt,
   stockLine,
@@ -210,12 +212,16 @@ const GATHERING_VERBS: ReadonlySet<string> = new Set(['fish', 'forage', 'hunt', 
 /** The other half of the same sentence: what the hands did do. All 402 action memories the
  *  phase 1 gate wrote were refusals, so no mind held a trace of anything that worked. A minted
  *  act is remembered by the name the town gave it: "made inspect riverbank" is not a sentence. */
-export function actionMemoryText(done: FinishedAct, mintedName?: string): string {
+export function actionMemoryText(done: FinishedAct, mintedName?: string, runsToday = 1): string {
   if (done.settled)
     return done.verb === 'walk'
       ? 'You were already there; no step was needed.'
       : 'Nothing needed doing; it already stood as you asked.'
-  if (mintedName !== undefined) return `You have carried out "${mintedName}".`
+  if (mintedName !== undefined) {
+    const again =
+      runsToday < 2 ? '' : ` That makes ${TIMES_SAID[runsToday] ?? `${runsToday} times`} today.`
+    return `You have carried out "${mintedName}".${again}`
+  }
   const past = verbPhrasePast(done.verb)
   if (!GATHERING_VERBS.has(done.verb)) return `You have ${past}.`
   return done.made === undefined
@@ -478,6 +484,11 @@ export class AgentRuntime {
   #still: Stillness | null = null
   // Turns in a row that ended in a wait: no act, no word, no plan carrying the body.
   #silentTurns = 0
+  // How many times each minted routine has been carried out today, by verb.
+  #recipeRuns: { day: number; counts: Map<string, { name: string; n: number }> } = {
+    day: -1,
+    counts: new Map(),
+  }
   // When the heap on this mind's own doorstep was last named. Null until it ever is.
   #doorstepSaidTick: number | null = null
   // Who this mind has been with and how warm the tie stood when they last parted. The engine
@@ -1180,10 +1191,28 @@ export class AgentRuntime {
       const minted = done.verb.startsWith('recipe:')
         ? this.#roster?.().find((r) => r.id === done.verb)?.name
         : undefined
-      void this.#writeActionMemory(actionMemoryText(done, minted), actImportance(done.verb)).catch(
-        this.#sink('memory_write_failed'),
-      )
+      const runs = minted === undefined ? 1 : this.#countRecipeRun(done.verb, minted)
+      void this.#writeActionMemory(
+        actionMemoryText(done, minted, runs),
+        actImportance(done.verb),
+      ).catch(this.#sink('memory_write_failed'))
     }
+  }
+
+  #countRecipeRun(verb: string, name: string): number {
+    const day = Math.floor(this.#bridge.currentTick() / MINUTES_PER_DAY)
+    if (day !== this.#recipeRuns.day) this.#recipeRuns = { day, counts: new Map() }
+    const n = (this.#recipeRuns.counts.get(verb)?.n ?? 0) + 1
+    this.#recipeRuns.counts.set(verb, { name, n })
+    return n
+  }
+
+  /** The minted routine done most often today, if today is the day the count is for. */
+  #repeatedToday(tick: number): { name: string; n: number } | null {
+    if (Math.floor(tick / MINUTES_PER_DAY) !== this.#recipeRuns.day) return null
+    let top: { name: string; n: number } | null = null
+    for (const r of this.#recipeRuns.counts.values()) if (top === null || r.n > top.n) top = r
+    return top
   }
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
@@ -1331,6 +1360,7 @@ export class AgentRuntime {
       doorstep,
       stasisLine(this.#still, tick),
       silentTurnsLine(this.#silentTurns),
+      repeatedActLine(this.#repeatedToday(tick)),
       bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),

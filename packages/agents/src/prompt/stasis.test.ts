@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { scanForDirective } from '@sj/shared'
 import { quietMeadowPacket } from '../testutil/fixtures.js'
-import { bedtimeLine, silentTurnsLine, stasisLine, stillnessAt, type Stillness } from './prose.js'
+import {
+  bedtimeLine,
+  repeatedActLine,
+  silentTurnsLine,
+  stasisLine,
+  stillnessAt,
+  type Stillness,
+} from './prose.js'
 
 const stand = (over: Partial<Stillness> = {}): Stillness => ({
   x: 10,
@@ -94,5 +101,20 @@ describe('★ turns that ended in a wait', () => {
   it('carries no directive and no semicolon', () => {
     expect(scanForDirective(silentTurnsLine(3))).toEqual([])
     expect(silentTurnsLine(3)).not.toContain(';')
+  })
+})
+
+// r35: Kamal carried out "scratch record into wood" eleven times in a day, "nearly done" each time.
+describe('★ a minted routine done again and again', () => {
+  it('is named from the third time, with the count as a word', () => {
+    expect(repeatedActLine(null)).toBe('')
+    expect(repeatedActLine({ name: 'scratch record into wood', n: 2 })).toBe('')
+    expect(repeatedActLine({ name: 'scratch record into wood', n: 3 })).toBe(
+      'You have carried out "scratch record into wood" three times today already.',
+    )
+    expect(repeatedActLine({ name: 'scratch record into wood', n: 11 })).toBe(
+      'You have carried out "scratch record into wood" 11 times today already.',
+    )
+    expect(scanForDirective(repeatedActLine({ name: 'lay hearth wood', n: 4 }))).toEqual([])
   })
 })

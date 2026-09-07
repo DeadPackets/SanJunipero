@@ -867,6 +867,23 @@ export function silentTurnsLine(silentTurns: number): string {
   return `${times} now you have chosen to wait, and nothing came of it. Nobody can see you waiting.`
 }
 
+export const TIMES_SAID = [
+  '',
+  'once',
+  'twice',
+  'three times',
+  'four times',
+  'five times',
+  'six times',
+]
+
+// r34 Salma's wooden_rest, r35 Kamal's board: a minted routine that leaves only a mark reads as
+// "nearly done" every time, and gets done again every half hour. The count is a fact it can see.
+export function repeatedActLine(repeat: { name: string; n: number } | null): string {
+  if (repeat === null || repeat.n < 3) return ''
+  return `You have carried out "${repeat.name}" ${TIMES_SAID[repeat.n] ?? `${repeat.n} times`} today already.`
+}
+
 /** A fact about the hour and this body's own habit, for a mind still up and out past it. Under its
  *  own roof the reflex has already put it to bed; this reaches the one standing in the lane. */
 export function bedtimeLine(packet: PerceptionPacket, bedHour: number, riseHour: number): string {

@@ -2609,6 +2609,12 @@ describe('★ a minted act asked for through craft is the minted act', () => {
     expect(actionMemoryText(done, 'Inspect riverbank for signs')).toBe(
       'You have carried out "Inspect riverbank for signs".',
     )
+    expect(actionMemoryText(done, 'Inspect riverbank for signs', 3)).toBe(
+      'You have carried out "Inspect riverbank for signs". That makes three times today.',
+    )
+    expect(actionMemoryText(done, 'Inspect riverbank for signs', 9)).toBe(
+      'You have carried out "Inspect riverbank for signs". That makes 9 times today.',
+    )
     expect(actionMemoryText(done)).toBe('You have made inspect riverbank.')
     expect(actionMemoryText({ seq: 2, verb: 'fish', settled: false, made: 'fish' })).toBe(
       'You have fished, and come away with fish.',
