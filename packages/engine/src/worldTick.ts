@@ -4,9 +4,10 @@ import { fold } from './fold.js'
 import { effectiveConfig, type LawQueue } from './laws.js'
 import type { RngStreams } from './rng.js'
 import type { System, TickCtx } from './tickCtx.js'
-import { isLightWork, SPENT_ENERGY, submitIntent } from './intent.js'
+import { isLightWork, NOD_OFF_ENERGY, SPENT_ENERGY, submitIntent } from './intent.js'
 import {
   chaseStep,
+  fallsAsleep,
   SPENT_OUT,
   stepBuild,
   stepWalk,
@@ -110,14 +111,31 @@ function spentSystem(ctx: TickCtx): void {
   }
 }
 
+// Owner 2026-09-07: a collapse needs a cause. A body that will not take itself to bed nods off
+// where it is once the last of its energy goes, and wakes rested instead of on the ground.
+const NODDED_OFF = 'nodded off'
+function nodOffSystem(ctx: TickCtx): void {
+  for (const id of Object.keys(ctx.state().agents).sort()) {
+    const a = ctx.state().agents[id]!
+    if (!a.alive || a.asleep || a.collapsedSinceTick !== null) continue
+    if (a.needs.energy >= NOD_OFF_ENERGY) continue
+    if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: NODDED_OFF })
+    for (const e of fallsAsleep(ctx.state(), id, 'nodded_off')) ctx.emit(e.type, e.payload)
+  }
+}
+
 function collapseDeathSystem(ctx: TickCtx): void {
   const { collapseThreshold, deathAfterZeroHungerTicks } = ctx.config.needs
   const { collapseHp, deathHp, downedPassOutTicks } = ctx.config.health
+  const { needsKill } = ctx.config.mortality
   for (const id of Object.keys(ctx.state().agents).sort()) {
     const a = ctx.state().agents[id]!
     if (!a.alive) continue
+    // A sleeper's energy only climbs, so under the floor asleep means it nodded off this tick.
     const down =
-      a.needs.hunger < collapseThreshold || a.needs.energy < collapseThreshold || a.hp < collapseHp
+      a.needs.hunger < collapseThreshold ||
+      (a.needs.energy < collapseThreshold && !a.asleep) ||
+      a.hp < collapseHp
     const fell = down && a.collapsedSinceTick === null
     if (fell) {
       if (a.activity) ctx.emit('action_interrupted', { agentId: id, reason: 'collapsed' })
@@ -143,6 +161,7 @@ function collapseDeathSystem(ctx: TickCtx): void {
     }
     const b = ctx.state().agents[id]!
     const starved =
+      needsKill &&
       b.zeroHungerSinceTick !== null &&
       ctx.state().tick - b.zeroHungerSinceTick > deathAfterZeroHungerTicks
     if (starved || b.hp <= deathHp) {
@@ -187,6 +206,7 @@ const SYSTEMS: System[] = [
   agingSystem,
   spentSystem,
   actionsSystem,
+  nodOffSystem,
   collapseDeathSystem,
   // Last: the legs have already moved and the door has already opened, so what a body learned
   // this tick is learned on the tick it happened.

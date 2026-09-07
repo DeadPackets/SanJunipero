@@ -7,6 +7,7 @@ import {
   type SimConfig,
 } from '@sj/shared'
 import { fold } from '../fold.js'
+import { NOD_OFF_ENERGY } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { genesisState, type AgentBody, type TileId, type WorldState } from '../state.js'
 import { createWorldTick, type WorldTickResult } from '../worldTick.js'
@@ -22,7 +23,7 @@ const quiet = {
   fauna: { enabled: false },
   desirePaths: { enabled: false },
 }
-const CFG: SimConfig = SimConfigSchema.parse(quiet)
+const CFG: SimConfig = SimConfigSchema.parse({ ...quiet, mortality: { needsKill: true } })
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, warmth: { enabled: false } })
 const DECAY = CFG.warmth.exposureDecayPerTick
 const AWAKE = CFG.needs.energyDecayAwakePerTick
@@ -267,16 +268,22 @@ describe('a body with no warmth left burns extra energy', () => {
     expect(Object.keys(slept.agents.a1!)).not.toContain('coldTicksSinceRecovery')
   })
 
-  it("the cold's share is what puts the body on the ground on the tick it falls", () => {
-    // 5.1 energy: the ordinary drain alone leaves it standing; the cold's share takes it under.
-    expect(5.1 - AWAKE).toBeGreaterThan(CFG.needs.collapseThreshold)
-    expect(5.1 - (1 + COLD_SHARE) * AWAKE).toBeLessThan(CFG.needs.collapseThreshold)
-    const cold = tickOnce(frozen(5.1, DECAY))
-    expect(cold.events.some((e) => e.type === 'agent_collapsed')).toBe(true)
+  it("★ the cold's share is what puts the body to sleep on the tick it nods off", () => {
+    // The ordinary drain alone leaves it standing; the cold's share takes it under the nod-off
+    // line, and a body under that line sleeps where it is rather than falling.
+    const E = NOD_OFF_ENERGY + AWAKE + (COLD_SHARE * AWAKE) / 2
+    expect(E - AWAKE).toBeGreaterThanOrEqual(NOD_OFF_ENERGY)
+    expect(E - (1 + COLD_SHARE) * AWAKE).toBeLessThan(NOD_OFF_ENERGY)
+    const cold = tickOnce(frozen(E, DECAY))
+    expect(cold.events).toContainEqual({
+      type: 'agent_slept',
+      payload: { agentId: 'a1', how: 'nodded_off' },
+    })
+    expect(cold.events.some((e) => e.type === 'agent_collapsed')).toBe(false)
     const warm = tickOnce(
-      bodyAt(SUMMER_DAY, CFG, { needs: { hunger: 100, energy: 5.1, warmth: 100, social: 100 } }),
+      bodyAt(SUMMER_DAY, CFG, { needs: { hunger: 100, energy: E, warmth: 100, social: 100 } }),
     )
-    expect(warm.events.some((e) => e.type === 'agent_collapsed')).toBe(false)
+    expect(warm.events.some((e) => e.type === 'agent_slept')).toBe(false)
   })
 
   it('a sleeper is chilled but not drained: sleep is the recovery, not the cost', () => {

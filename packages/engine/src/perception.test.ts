@@ -184,6 +184,14 @@ describe('composePerception: the doorway a body must stand on', () => {
 })
 
 describe('composePerception: felt events', () => {
+  it('★ nodding off is felt, and a bed you chose is not', () => {
+    const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
+    const nodded = [ev('agent_slept', { agentId: 'a', how: 'nodded_off' })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', nodded).feltEvents).toEqual(['you_nodded_off'])
+    const chosen = [ev('agent_slept', { agentId: 'a' })]
+    expect(composePerception(s, DEFAULT_CONFIG, 'a', chosen).feltEvents).toEqual([])
+  })
+
   it('maps a rain weather change to rain_started for every agent', () => {
     const s = makeWorld([{ id: 'a', x: 0, y: 0 }])
     const events = [ev('weather_changed', { kind: 'rain', temperatureC: 10 })]

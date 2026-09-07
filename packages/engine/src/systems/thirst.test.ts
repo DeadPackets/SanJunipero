@@ -16,7 +16,7 @@ import { createWorldTick, type WorldTickResult } from '../worldTick.js'
 import { ev, needChanges, roundTrips, runAct } from '../testutil/world.js'
 
 const quiet = { weather: { hourlyChangeChance: 0 }, mystery: { chancePerDay: 0 } }
-const CFG: SimConfig = SimConfigSchema.parse(quiet)
+const CFG: SimConfig = SimConfigSchema.parse({ ...quiet, mortality: { needsKill: true } })
 const OFF: SimConfig = SimConfigSchema.parse({ ...quiet, thirst: { enabled: false } })
 const DECAY = thirstDecayPerTick(CFG)
 

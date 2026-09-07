@@ -42,7 +42,7 @@ import { changesOf } from './testutil/world.js'
 // gate measures the machinery a dying body sets off — collapse, cause, grave — inside three days.
 const G2_CONFIG = SimConfigSchema.parse({
   needs: { hungerDecayPerTick: 0.021 },
-  mortality: { drainPerTick: { poison: 0.12 } },
+  mortality: { drainPerTick: { poison: 0.12 }, needsKill: true },
 })
 
 const SEED = 'g2-scripted'

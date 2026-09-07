@@ -41,6 +41,8 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
   // A fatal rung the cold drove is named for the cold; the drain itself is unchanged.
   const chilled = (a.coldTicksSinceRecovery ?? 0) > 0
   for (const x of a.afflictions ?? []) {
+    // Tiredness is the one affliction the town's own dials spare: a rung is bookkeeping, not hp.
+    if (x.kind === 'fatigue' && !mortality.needsKill) continue
     // A wound with a hand behind it is not an accident, and the death says so.
     const slain = x.kind === 'injury' && x.sourceId !== undefined
     out.push({
@@ -50,6 +52,7 @@ function drains(state: WorldState, config: SimConfig, agentId: string): Drain[] 
       ...(slain ? { byId: x.sourceId } : {}),
     })
   }
+  if (!mortality.needsKill) return out
   // An empty stomach is not a wound yet: the grace is what a body has to find a meal in before
   // hunger starts spending hp.
   const emptySince = a.zeroHungerSinceTick

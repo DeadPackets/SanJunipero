@@ -449,6 +449,9 @@ const FlagSchema = z.object({ enabled: z.boolean().default(true) }).strict()
 const MortalitySchema = z
   .object({
     enabled: z.boolean().default(true),
+    // Owner 2026-09-07: a death here needs a cause. Off, hunger, thirst and tiredness still fell
+    // a body and never spend its hp; a wound, a poison, a fever and age still do.
+    needsKill: z.boolean().default(false),
     drainPerTick: z
       .object({
         // At 0.05 a grave wound killed in 4.8 hours — less time than it takes to be seen across a meadow

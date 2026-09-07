@@ -21,6 +21,8 @@ const FAST: SimConfig = SimConfigSchema.parse({
   },
   // Bare 8x4 worlds with no house: the bed law is not what these rows test.
   structures: { sleepIndoorsOnly: false },
+  // The death rows below are about the clock, which the town's own dials keep off.
+  mortality: { needsKill: true },
 })
 
 // A meal is half a sim-hour; at FAST's five hunger a tick a body would starve inside its own
@@ -296,7 +298,8 @@ describe('worldTick: collapse', () => {
     const r = submitIntent(s, FAST, 'a1', 'walk', { x: 4, y: 0 })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)
-    s = patchAgent(s, 'a1', { needs: { hunger: 100, energy: 4, warmth: 100, social: 100 } })
+    // Hunger's fall: energy alone puts a body to sleep now, never on the ground.
+    s = patchAgent(s, 'a1', { needs: { hunger: 4, energy: 100, warmth: 100, social: 100 } })
     const t1 = tickOnce(s)
     const types = t1.events.map((e) => e.type)
     expect(types).toContain('action_interrupted')
@@ -321,22 +324,44 @@ describe('worldTick: collapse', () => {
     expect(t1.state.agents.a1!.activity).toBeNull()
   })
 
-  it('needs decay and collapse see the same tick sequentially: decay below threshold collapses same tick', () => {
-    const s = patchAgent(makeWorld(), 'a1', {
-      needs: { hunger: 100, energy: 8, warmth: 100, social: 100 },
+  it('★ a body at the end of its energy nods off where it stands, and never collapses', () => {
+    let s = makeWorld()
+    const r = submitIntent(s, FAST, 'a1', 'walk', { x: 4, y: 0 })
+    if (!r.ok) throw new Error(r.reason)
+    s = applyAll(s, r.events)
+    s = patchAgent(s, 'a1', { needs: { hunger: 100, energy: 8, warmth: 100, social: 100 } })
+    const t1 = tickOnce(s) // energy 8−4 = 4: under the floor, and asleep before it can fall
+    expect(t1.events).toContainEqual({
+      type: 'action_interrupted',
+      payload: { agentId: 'a1', reason: 'nodded off' },
     })
-    const t1 = tickOnce(s) // energy 8−4 = 4 < 5, folded before collapse system runs
-    expect(t1.events.map((e) => e.type)).toContain('agent_collapsed')
+    expect(t1.events).toContainEqual({
+      type: 'agent_slept',
+      payload: { agentId: 'a1', how: 'nodded_off' },
+    })
+    expect(t1.events.map((e) => e.type)).not.toContain('agent_collapsed')
+    const a = t1.state.agents.a1!
+    expect(a.asleep).toBe(true)
+    expect(a.collapsedSinceTick).toBeNull()
+    expect(a.activity).toBeNull()
+    // Hunger still fells a body, asleep or not: that floor is a famine, which is a cause.
+    const starving = patchAgent(makeWorld(), 'a1', {
+      needs: { hunger: 8, energy: 100, warmth: 100, social: 100 },
+    })
+    expect(tickOnce(starving).events.map((e) => e.type)).toContain('agent_collapsed')
   })
 })
 
 describe('worldTick: collapse recovery through sleep', () => {
   it('a collapsed agent may sleep; energy regen clears the collapse and it can act again', () => {
+    // Energy alone no longer fells a body (it nods off first), so the fall is set by hand: a
+    // body already down at no energy, the state the road out is built for.
     let s = patchAgent(makeWorld(), 'a1', {
-      needs: { hunger: 100, energy: 4, warmth: 100, social: 100 },
+      needs: { hunger: 100, energy: 0, warmth: 100, social: 100 },
+      collapsedSinceTick: 0,
     })
-    let t = tickOnce(s) // energy 4−4 = 0 < 5: collapses
-    expect(t.events.map((e) => e.type)).toContain('agent_collapsed')
+    let t = tickOnce(s)
+    expect(t.state.agents.a1!.collapsedSinceTick).not.toBeNull()
     // A tile it could touch is a crawl and is allowed; anything past that is not.
     expect(submitIntent(t.state, FAST, 'a1', 'walk', { x: 3, y: 3 }).ok).toBe(false)
     const r = submitIntent(t.state, FAST, 'a1', 'sleep', {})

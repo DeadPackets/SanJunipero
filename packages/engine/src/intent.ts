@@ -35,6 +35,9 @@ const DOWNED_VERBS: ReadonlySet<string> = new Set([
 // this a body keeps only the light acts, and asleep under the debuff line it is not woken by
 // anything it wants itself.
 export const SPENT_ENERGY = 10
+// Owner 2026-09-07: a collapse needs a cause. Under this a body that has not taken itself to
+// bed nods off where it is, and is asleep before the floor at five can take it.
+export const NOD_OFF_ENERGY = 7
 const SPENT_VERBS: ReadonlySet<string> = new Set([
   ...DOWNED_VERBS,
   'drop',

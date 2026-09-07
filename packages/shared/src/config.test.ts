@@ -213,6 +213,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.mortality.herbRelief).toBe(1)
     expect(c.mortality.tendMultiplier).toBe(2)
     expect(c.mortality.graveEnabled).toBe(true)
+    expect(c.mortality.needsKill).toBe(false)
     expect(c.illness.dailyWorsenChance).toBe(0.25)
     expect(c.illness.contagionEnabled).toBe(true)
     expect(c.illness.contagionChance).toBe(0.06)

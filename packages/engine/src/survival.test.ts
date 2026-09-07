@@ -23,7 +23,9 @@ const quiet = {
   fauna: { enabled: false },
   desirePaths: { enabled: false },
 }
-const CFG: SimConfig = SimConfigSchema.parse(quiet)
+const CFG: SimConfig = SimConfigSchema.parse({ ...quiet, mortality: { needsKill: true } })
+// The town's own dials, under which the owner ruled a death needs a cause.
+const TOWN: SimConfig = SimConfigSchema.parse(quiet)
 
 const map = (): TileId[][] => grid(12)
 const at = (day: number, hour: number): number => day * MINUTES_PER_DAY + hour * 60 + 30
@@ -357,6 +359,12 @@ describe('the world-one profile, rerun', () => {
     expect(a.needs.hunger).toBeGreaterThan(35)
   })
 
+  it('★ under the town dials a death needs a cause: three weeks of neglect leaves it alive', () => {
+    expect(run(sleeper(), 21 * DAY, TOWN).agents.a1!.alive).toBe(true)
+    const doomed = world(SPRING_DAY, { needs: { hunger: 0, energy: 50, warmth: 50, social: 50 } })
+    expect(run(doomed, 7 * DAY, TOWN).agents.a1!.alive).toBe(true)
+  })
+
   it('but a body that never eats at all still dies, because that is not a rate problem', () => {
     // The honest limit of retuning: world one's founders ate nothing for 11,681 ticks. No
     // survivable number saves that. What saves them is being warned, and being helped up.
@@ -410,6 +418,15 @@ describe('★ spent is not down, and a spent sleeper sleeps on', () => {
     expect(reasonOf(s, 'speak', { text: 'I need to lie down' })).toBe(null)
     expect(reasonOf(s, 'sleep')).toBe(null)
     expect(reasonOf(s, 'walk', { x: 1, y: 0 })).not.toBe(PAST_WORKING)
+  })
+
+  it('★ past the last of its energy a body nods off where it stands, and never falls', () => {
+    const s = spent({ needs: { hunger: 80, energy: 7.5, warmth: 60, social: 60 } })
+    const after = run(s, 60)
+    expect(after.agents.a1!.asleep).toBe(true)
+    expect(after.agents.a1!.collapsedSinceTick).toBeNull()
+    expect(after.agents.a1!.collapsesWithoutRecovery).toBeUndefined()
+    expect(after.agents.a1!.needs.energy).toBeGreaterThan(7.5)
   })
 
   it('at ten energy the hands still work', () => {
