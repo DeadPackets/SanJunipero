@@ -1266,7 +1266,70 @@ describe('★ a generation that answered but produced no output still bills what
     expect(
       (db.prepare('SELECT finish_reason AS r FROM llm_calls').get() as { r: string | null }).r,
     ).toBe('length')
-    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain('28000 output token ceiling')
+    expect(alertsOf(db, 'llm_output_truncated')[0]).toContain(
+      `${callSettingsFor('arbiter').maxOutputTokens} output token ceiling`,
+    )
+    // Two asks, not three: the second was the one fallback, and a runaway is never re-asked as is.
+    expect(alertsOf(db, 'reasoning_runaway')).toHaveLength(1)
+  })
+
+  // r37: 8 of 33 rulings burned the whole ceiling thinking, answered nothing, and were asked the
+  // same way again — a quarter of the town's inventions lost at four minutes and 3 cents each.
+  it('★ a ruling that thinks itself out of tokens is asked once more at the lower effort', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        emptyOutput: true,
+        finishReason: 'length',
+        usage: { inputTokens: 900, outputTokens: 16_000 },
+      },
+      { json: { mood: 'calm', count: 1 }, usage: { inputTokens: 900, outputTokens: 3000 } },
+    ])
+    const got = await new LlmClient({ model, db, caller: 'arbiter' }).object({
+      system: 's',
+      messages: [{ role: 'user', content: 'u' }],
+      schema: SCHEMA,
+    })
+    expect(got.value).toEqual({ mood: 'calm', count: 1 })
+    const logged = rows(db)
+    expect(logged.map((r) => r.ok)).toEqual([0, 1])
+    expect(alertsOf(db, 'reasoning_runaway')).toEqual([
+      'arbiter: 16000 tokens at xhigh and no answer; asking once more at high',
+    ])
+    expect(alertsOf(db, 'llm_call_failed')).toEqual([])
+  })
+
+  it('a caller with no fallback effort is not asked the identical runaway twice', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        emptyOutput: true,
+        finishReason: 'length',
+        usage: { inputTokens: 100, outputTokens: 7500 },
+      },
+      { json: { mood: 'calm', count: 1 } },
+    ])
+    await expect(
+      new LlmClient({ model, db, caller: 'turn' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow()
+    expect(rows(db)).toHaveLength(1)
+    expect(alertsOf(db, 'reasoning_runaway')).toEqual([])
+  })
+
+  it('the fallback body carries the lower effort and nothing else changes', () => {
+    const db = openDb()
+    const client = new LlmClient({ db, caller: 'arbiter' })
+    expect(client.requestBody().reasoning).toEqual({ effort: 'xhigh' })
+    const fallback = client.requestBody({ effort: 'high' })
+    expect(fallback.reasoning).toEqual({ effort: 'high' })
+    expect({ ...fallback, reasoning: undefined }).toEqual({
+      ...client.requestBody(),
+      reasoning: undefined,
+    })
   })
 })
 
@@ -1306,7 +1369,7 @@ describe('★ one unified call discipline, the arbiter included', () => {
     ).rejects.toThrow()
     expect(rows(db), 'a third attempt only spends the stall again').toHaveLength(2)
     expect(alertsOf(db, 'llm_call_failed')).toEqual([
-      'arbiter: 2 attempt(s) failed, the last bounded at 636s — scripted failure',
+      'arbiter: 2 attempt(s) failed, the last bounded at 455s — scripted failure',
     ])
   })
 

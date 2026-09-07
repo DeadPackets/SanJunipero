@@ -194,7 +194,8 @@ it('★ the three callers that write something permanent share one pin', () => {
     model: MIND_MODEL,
     providerOrder: PROVIDER_ORDER,
     reasoning: { effort: 'xhigh' },
-    maxOutputTokens: 28_000,
+    fallbackReasoning: { effort: 'high' },
+    maxOutputTokens: 20_000,
   })
   // The rails differ by what each of the three was measured spending; the route does not.
   for (const caller of RULING_CALLERS) {

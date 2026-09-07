@@ -1,6 +1,7 @@
 import {
   generateText,
   NoObjectGeneratedError,
+  NoOutputGeneratedError,
   Output,
   tool,
   type FinishReason,
@@ -87,6 +88,20 @@ function stepFacts(r: GeneratedStep): StepFacts {
 }
 
 export class BudgetExceededError extends Error {}
+
+/** A generation that spent its whole output ceiling and answered nothing: the model thought
+ *  itself out of tokens. Asking the same question the same way again buys the same silence. */
+class RunawayError extends Error {
+  constructor(
+    readonly outputTokens: number,
+    cause: unknown,
+  ) {
+    super(`no answer within the output ceiling after ${outputTokens} tokens`, { cause })
+  }
+}
+
+const effortWord = (r: ReasoningSetting | null): string =>
+  r === null ? 'the default effort' : 'enabled' in r ? 'no reasoning' : r.effort
 
 /** One caller has spent its own day. Its calls are refused and every other caller keeps going:
  *  a `turn` refusal dozes one mind, a `scene` refusal times one floor out, and the town runs. */
@@ -276,6 +291,7 @@ export class LlmClient {
   private readonly modelId: string
   private readonly allowProviderFallbacks: boolean
   private readonly reasoning: ReasoningSetting | null
+  private readonly fallbackReasoning: ReasoningSetting | null
   private readonly maxRetries: number
   private readonly rateLimitRetries: number
   private readonly requestTimeoutMs: number
@@ -292,6 +308,7 @@ export class LlmClient {
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
   private model: LanguageModel | undefined
+  private fallbackModel: LanguageModel | undefined
   private lastCallId: number | null = null
 
   constructor(opts: LlmClientOpts) {
@@ -304,6 +321,7 @@ export class LlmClient {
     this.modelId = pinned.model ?? MIND_MODEL
     this.allowProviderFallbacks = opts.allowProviderFallbacks ?? false
     this.reasoning = opts.reasoning === undefined ? (pinned.reasoning ?? null) : opts.reasoning
+    this.fallbackReasoning = pinned.fallbackReasoning ?? null
     this.maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES
     // An explicit count is the caller saying exactly how many; only the default defers to the pin.
     this.rateLimitRetries = opts.maxRetries ?? pinned.rateLimitRetries ?? this.maxRetries
@@ -578,8 +596,9 @@ export class LlmClient {
     exec: (model: LanguageModel, note: Note) => Promise<T>,
     bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
-    const model = this.resolveModel()
-    const modelName = typeof model === 'string' ? model : model.modelId
+    let model = this.resolveModel()
+    let modelName = typeof model === 'string' ? model : model.modelId
+    let fellBack = false
     let lastError: unknown
     let sends = 0
     // Two budgets, two counters: one shared attempt number lets a burst re-ask carry the counter
@@ -601,6 +620,20 @@ export class LlmClient {
         // Nothing was sent, so there is nothing to re-ask: another attempt only re-joins the
         // queue this one already timed out in.
         if (err instanceof RateLimitWaitError) break
+        // Thought itself out of tokens: once more at the lower effort if the pin names one,
+        // and never the identical ask again.
+        if (err instanceof RunawayError) {
+          if (this.fallbackReasoning === null || fellBack) break
+          fellBack = true
+          this.alert(
+            'reasoning_runaway',
+            `${this.caller}: ${err.outputTokens} tokens at ${effortWord(this.reasoning)} and no` +
+              ` answer; asking once more at ${effortWord(this.fallbackReasoning)}`,
+          )
+          model = this.resolveModel(this.fallbackReasoning)
+          modelName = typeof model === 'string' ? model : model.modelId
+          continue
+        }
         // An invalid generation is not a transient provider fault: retrying
         // the identical request wastes calls — surface it for a real repair.
         if (NoObjectGeneratedError.isInstance(err)) throw err
@@ -706,6 +739,8 @@ export class LlmClient {
         }),
       )
       this.warnIfTruncated(finishReason)
+      if (finishReason === 'length' && answeredNothing(err, dead))
+        throw new RunawayError(outputTokens, err)
       throw err
     }
   }
@@ -715,28 +750,43 @@ export class LlmClient {
   }
 
   /** Public so a test can prove what a live call sends without making one. */
-  requestBody(): RequestBody {
+  requestBody(reasoning: ReasoningSetting | null = this.reasoning): RequestBody {
     return defaultExtraBody(
       FALLBACK_MODELS,
       this.providerOrder,
       this.allowProviderFallbacks,
-      this.reasoning ?? undefined,
+      reasoning ?? undefined,
       this.modelId,
       sessionIdFor(this.agentId),
     )
   }
 
-  private resolveModel(): LanguageModel {
-    if (this.model !== undefined) return this.model
+  private resolveModel(reasoning: ReasoningSetting | null = this.reasoning): LanguageModel {
+    // An injected model answers every ask, the fallback included: tests script it that way.
+    if (this.opts.model !== undefined) return this.opts.model
+    const fallback = reasoning !== this.reasoning
+    const cached = fallback ? this.fallbackModel : this.model
+    if (cached !== undefined) return cached
     const key = process.env.OPENROUTER_API_KEY
     const openrouter = createOpenRouter(key === undefined ? {} : { apiKey: key })
-    this.model = openrouter(this.modelId, {
+    const built = openrouter(this.modelId, {
       // Without this OpenRouter omits `usage.cost` and the ledger has no second opinion.
       usage: { include: true },
-      extraBody: this.requestBody(),
+      extraBody: this.requestBody(reasoning),
     })
-    return this.model
+    if (fallback) this.fallbackModel = built
+    else this.model = built
+    return built
   }
+}
+
+// No text and no tool call: the SDK says so one way for the object path and another for the
+// tool path, where the refusal carries the stringified missing call.
+function answeredNothing(err: unknown, dead: NoObjectGeneratedError | null): boolean {
+  if (NoOutputGeneratedError.isInstance(err)) return true
+  if (dead === null) return false
+  const text = (dead.text ?? '').trim()
+  return text.length === 0 || text === 'null'
 }
 
 function toModelMessages(messages: LlmMessage[]): ModelMessage[] {

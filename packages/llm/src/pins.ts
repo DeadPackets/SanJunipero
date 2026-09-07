@@ -96,6 +96,9 @@ export type ReasoningSetting =
 // absent field leaves that dial exactly where it sat before the dial existed.
 export type CallSettings = {
   reasoning?: ReasoningSetting
+  // r37: 8 of 33 rulings thought for the whole 28k ceiling and answered nothing, then were re-asked
+  // the same way. A runaway is asked once more at this effort instead, and never identically.
+  fallbackReasoning?: ReasoningSetting
   maxOutputTokens?: number
   temperature?: number
   model?: string
@@ -119,7 +122,10 @@ const ON_LUNA = { model: MIND_MODEL, providerOrder: PROVIDER_ORDER, minTimeoutMs
 // Three efforts. r21 spent 58% of its bill on reasoning tokens: a ruling thinks hardest, a turn
 // or a line thinks, and a caller that only restates what it is handed does not — a gist reasoned
 // for 2,100 tokens to write 300 and was a third of the whole bill until it stopped.
-const JUDGES: CallSettings = { reasoning: { effort: 'xhigh' } }
+const JUDGES: CallSettings = {
+  reasoning: { effort: 'xhigh' },
+  fallbackReasoning: { effort: 'high' },
+}
 const THINKS: CallSettings = { reasoning: { effort: 'high' } }
 const RESTATES: CallSettings = { reasoning: { effort: 'minimal' } }
 
@@ -175,9 +181,10 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   'reflection.gist': { ...ON_LUNA, ...RESTATES, maxOutputTokens: 1500, dailyUsd: 13 },
   // The court writes what the town can never take back, so it thinks hardest: a ruling at max
   // spent 9,000 tokens thinking in r21 and overran a 10,000 ceiling twice.
-  arbiter: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 28_000, dailyUsd: 3 },
-  council: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 28_000, dailyUsd: RAIL_FLOOR_USD },
-  'law.compile': { ...ON_LUNA, ...JUDGES, maxOutputTokens: 28_000, dailyUsd: RAIL_FLOOR_USD },
+  // r37: 25 good rulings topped out at 10,045 tokens; the 8 that hit 28,000 were runaways; the pin law keeps 2x the measured p99 (9,819).
+  arbiter: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 20_000, dailyUsd: 3 },
+  council: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 20_000, dailyUsd: RAIL_FLOOR_USD },
+  'law.compile': { ...ON_LUNA, ...JUDGES, maxOutputTokens: 20_000, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
   // share one warm prefix. Medium was heard in r24: it reasoned as long as high and doubled a tic. p99 1,127 over 523 lines; bounded at 60 s, under the scene's own
   // 90 s floor timeout, so the call dies before the floor takes the line away.
