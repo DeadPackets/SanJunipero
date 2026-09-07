@@ -33,6 +33,7 @@ import {
   WEAPON_KINDS,
   weaponKindsFor,
   type VerbDef,
+  FULL_ABOVE,
 } from './verbs/index.js'
 import { FORAGEABLE_YIELD } from './data/forageables.js'
 
@@ -1203,6 +1204,26 @@ describe('food variety: the same meal twice is worth less than two meals', () =>
     const herb = eatOne(hurt, 'herb').restored
     expect(herb).toBe(FULL * nutritionOf(CFG, 'herb'))
     expect(herb).toBeLessThan((FULL * nutritionOf(CFG, 'bread')) / 4)
+  })
+
+  // r37: Salma ate bread six times in fourteen hours. The second loaf of a day is refused by
+  // the body, and only while the body is full.
+  it('★ a full body that has eaten today is refused a second meal', () => {
+    const s = larder(['bread'])
+    const params = { itemId: heldIdOf(s, 'bread') }
+    const body = (lastMealTick: number, hunger: number): WorldState => ({
+      ...s,
+      agents: {
+        ...s.agents,
+        a1: { ...s.agents.a1!, lastMealTick, needs: { ...s.agents.a1!.needs, hunger } },
+      },
+    })
+    expect(VERBS.eat!.validate(body(NOON - 120, 97), CFG, 'a1', params)).toBe(
+      'you are full, and you have eaten today already',
+    )
+    expect(VERBS.eat!.validate(body(NOON - MINUTES_PER_DAY, 97), CFG, 'a1', params)).toBe(null)
+    expect(VERBS.eat!.validate(body(NOON - 120, FULL_ABOVE), CFG, 'a1', params)).toBe(null)
+    expect(VERBS.eat!.validate(body(NOON - 120, 60), CFG, 'a1', params)).toBe(null)
   })
 
   it('prices the smaller catches below a full meal and a stew above one', () => {

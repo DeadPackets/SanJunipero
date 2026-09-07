@@ -350,6 +350,15 @@ describe('perceptionToProse', () => {
       expect(perceptionToProse(fed(3), undefined, sources)).toContain('You ate a few hours ago.')
       expect(perceptionToProse(fed(3), undefined, sources)).not.toContain('You could eat it now')
     })
+    // r37: Salma, six loaves in fourteen hours. The body refuses now, and the page says why.
+    it('★ a full body that ate today is told so, and offered nothing', () => {
+      const stuffed = fed(3)
+      stuffed.self.body.needs.hunger = 97
+      const prose = perceptionToProse(stuffed, undefined, sources)
+      expect(prose).toContain('You are full. You have eaten today already.')
+      expect(prose).not.toContain('You ate a few hours ago.')
+      expect(prose).not.toContain('You could eat it now')
+    })
     it('a day on, the meal is due and the loaf in hand is offered', () => {
       const prose = perceptionToProse(fed(21), undefined, sources)
       expect(prose).toContain(

@@ -938,6 +938,17 @@ function usedByAnother(
   ]
 }
 
+// r37: Salma ate bread six times in fourteen hours with "you have just eaten" on every page.
+// A meal a day is a rule of the body: full, and fed today, it will not take a second.
+export const FULL_ABOVE = 92
+function ateToday(state: WorldState, agentId: string): boolean {
+  const last = state.agents[agentId]?.lastMealTick
+  return (
+    last !== undefined &&
+    Math.floor(last / MINUTES_PER_DAY) === Math.floor(state.tick / MINUTES_PER_DAY)
+  )
+}
+
 const eat: VerbDef = makeVerb({
   kind: 'eat',
   params: EatParams,
@@ -954,6 +965,8 @@ const eat: VerbDef = makeVerb({
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     if (item.kind === HERB_KIND && !ailing(state, config, agentId))
       return 'a herb is a remedy, not a meal'
+    if (ateToday(state, agentId) && state.agents[agentId]!.needs.hunger > FULL_ABOVE)
+      return 'you are full, and you have eaten today already'
     return null
   },
   // The kind rides `action_completed`, which is what the fold counts the window by. It is

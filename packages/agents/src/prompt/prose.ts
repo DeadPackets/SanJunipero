@@ -9,7 +9,13 @@ import {
   heardLine,
   type SimTime,
 } from '@sj/shared'
-import { MYSTERIES, type ForageableKind, type MakeableRoad, type Makeables } from '@sj/engine'
+import {
+  FULL_ABOVE,
+  MYSTERIES,
+  type ForageableKind,
+  type MakeableRoad,
+  type Makeables,
+} from '@sj/engine'
 import { classMembers } from '@sj/shared'
 import type { WantKind } from '../memory/wants.js'
 
@@ -1424,10 +1430,13 @@ export function perceptionToProse(
   // Appetite, not starvation: a meal a day is the town's rhythm, and the bar above only speaks
   // when days of meals have been missed. A packet from before appetite kept time says nothing.
   const sinceMeal = packet.self.body.hoursSinceMeal
-  const mealDue = sinceMeal !== undefined && sinceMeal >= MEAL_DUE_HOURS
+  // r37: the fact alone did not stop Salma, so the body refuses a second meal too (FULL_ABOVE).
+  const full = hunger > FULL_ABOVE && sinceMeal !== undefined && sinceMeal < 24
+  const mealDue = !full && sinceMeal !== undefined && sinceMeal >= MEAL_DUE_HOURS
   // r36: Nadia ate eleven times in a day, "I said I'd eat" on every turn, because nothing on the
   // page said she had. A meal just had is the fact that closes it.
-  if (sinceMeal !== undefined && sinceMeal < RECENT_MEAL_HOURS)
+  if (full) lines.push('You are full. You have eaten today already.')
+  else if (sinceMeal !== undefined && sinceMeal < RECENT_MEAL_HOURS)
     lines.push(sinceMeal < 1 ? 'You have just eaten.' : 'You ate a few hours ago.')
   if (mealDue && hunger >= 50) {
     lines.push(
