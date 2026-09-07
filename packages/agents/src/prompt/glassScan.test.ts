@@ -367,3 +367,13 @@ describe('★ the words a relationship is asked for in', () => {
     expect(scanPromptForGlassLeak(SCENE_ANSWER)).toEqual([])
   })
 })
+
+// r40 day 1: Omar's ordinary "how are you feeling, Salma" became, over a day of turns, a woman
+// who could not keep food down. Salma was at full health and out searching a riverbank. Nothing
+// in the rules had ever told a mind to say it did not know.
+describe('★ a mind is told not to answer for what it has not seen', () => {
+  it('the rule of being asks for "I do not know" instead of what would sound right', () => {
+    expect(RULES_OF_BEING).toContain('say you do not know, or say who told you')
+    expect(RULES_OF_BEING).toContain('Never fill the gap with what would sound right')
+  })
+})
