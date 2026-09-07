@@ -17,12 +17,16 @@ export type IntentResult = { ok: true; events: PendingEvent[] } | { ok: false; r
 
 // The road out of a collapse. World one closed every one of these: Amara died ten feet from a
 // neighbour's door having tried fifteen times to shout, and been refused each time.
+// forage and take: r34's Yusuf, down and starving, crawled round a berry bush for six hours and
+// died with the berries a hand's reach away. What is within reach of the ground is reachable.
 const DOWNED_VERBS: ReadonlySet<string> = new Set([
   'drink',
   'eat',
   'exit',
+  'forage',
   'sleep',
   'speak',
+  'take',
   'walk',
 ])
 

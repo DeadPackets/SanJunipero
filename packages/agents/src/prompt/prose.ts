@@ -1349,7 +1349,7 @@ export function perceptionToProse(
 
   if (packet.self.collapsed)
     lines.push(
-      'You have collapsed and cannot stand. You can still eat what is already in your hands, sleep, and drag yourself one tile. A fire or a roof one tile away is worth crawling to. Food, warmth and rest get you back on your feet.',
+      'You have collapsed and cannot stand. You can still eat what is already in your hands, pick or take what is within reach, sleep, and drag yourself one tile. A fire, a roof or a bush one tile away is worth crawling to. Food, warmth and rest get you back on your feet.',
     )
 
   // What the body is already doing. A mind told it is standing still sets out again, and

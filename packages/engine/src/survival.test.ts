@@ -302,11 +302,33 @@ describe('a collapse has a road out of it', () => {
 
   it('still refuses the hands: a body on the ground does not build or chop', () => {
     const s = downed()
-    for (const verb of ['build', 'chop', 'take', 'give']) {
+    for (const verb of ['build', 'chop', 'give', 'fish']) {
       const r = submitIntent(s, CFG, 'a1', verb, {})
       expect([verb, r.ok]).toEqual([verb, false])
       expect(!r.ok && r.reason).toBe('collapsed and unable to act')
     }
+  })
+
+  // r34 day 7: Yusuf, down and starving, crawled round a berry bush for six hours and died with
+  // the berries a hand's reach away, because a body on the ground could only eat what it held.
+  it('★ but it can pick a bush or take a loaf that is within reach of the ground', () => {
+    let s = downed()
+    s = fold(
+      s,
+      ev('forageable_spawned', { id: 'node_1', kind: 'berry_bush', x: 5, y: 4, stock: 3 }, s.tick),
+      CFG,
+    )
+    s = fold(
+      s,
+      ev(
+        'item_spawned',
+        { id: 'item_9', kind: 'bread', qty: 1, loc: { t: 'tile', x: 4, y: 5 } },
+        s.tick,
+      ),
+      CFG,
+    )
+    expect(submitIntent(s, CFG, 'a1', 'forage', { nodeId: 'node_1' }).ok).toBe(true)
+    expect(submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_9' }).ok).toBe(true)
   })
 })
 
