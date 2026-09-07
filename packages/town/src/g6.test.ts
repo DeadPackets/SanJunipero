@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg, stateHash } from '@sj/shared'
+import { DEFAULT_CONFIG, MINUTES_PER_DAY, PROTOCOL_VERSION, ServerMsg, stateHash } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { fold, genesisState, makeFixtureMap } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
@@ -53,7 +53,13 @@ describe('GATE G6 — automated half', () => {
     const dbPath = join(dir, 'g6-run.db')
     // 5 ms, not 1: the socket is compressed and zlib finishes on the event loop, so a tick loop
     // that never yields starves those callbacks and the hub reads the backlog as a lagging viewer.
-    const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath })
+    // The sweep folds from genesis, so this run keeps every row: retention has its own test.
+    const dw = await startDevWorld({
+      realMsPerTick: 5,
+      port: 0,
+      dbPath,
+      retain: { keepTicks: 7 * MINUTES_PER_DAY, bulkTypes: [] },
+    })
     let finalTick = 0
     try {
       const a = await connect(dw.gateway.port)

@@ -1,8 +1,9 @@
 import type Database from 'better-sqlite3'
 import { EventEnvelope, type SimConfig, type SimEvent } from '@sj/shared'
 import { fold, genesisState, type TileId, type WorldState } from '@sj/engine'
+import { unpackState } from '@sj/engine/store'
 
-type SnapRow = { tick: number; seq: number; state: string }
+type SnapRow = { tick: number; seq: number; state: string | Buffer }
 type EvRow = { seq: number; tick: number; type: string; payload: string }
 
 const parseEv = (r: EvRow): SimEvent =>
@@ -53,7 +54,7 @@ export class WorldMirror {
 
     const snap = this.#selLatestSnap.get() as SnapRow | undefined
     this.#state = snap
-      ? (JSON.parse(snap.state) as WorldState)
+      ? (unpackState(snap.state) as WorldState)
       : genesisState(this.#config, this.#terrain)
     this.#seq = snap ? snap.seq : 0
     for (const row of this.#selEventsFrom.all(this.#seq) as EvRow[]) {
@@ -94,7 +95,7 @@ export class WorldMirror {
       throw new RangeError(`stateAt(${tick}): beyond live tick ${this.#state.tick}`)
     const snap = this.#selSnapAtOrBefore.get(tick) as SnapRow | undefined
     let state = snap
-      ? (JSON.parse(snap.state) as WorldState)
+      ? (unpackState(snap.state) as WorldState)
       : genesisState(this.#config, this.#terrain)
     let seq = snap ? snap.seq : 0
     for (const row of this.#selEventsRange.all(seq, tick) as EvRow[]) {

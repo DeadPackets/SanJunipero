@@ -20,6 +20,7 @@ import {
   type LawQueue,
   type TickHandler,
   type TileId,
+  type Retain,
   type WorldState,
 } from '@sj/engine'
 import { openForgeDb } from '@sj/forge'
@@ -52,7 +53,14 @@ export const DEV_SEED = 'g6'
 export const DEV_SNAPSHOT_EVERY_TICKS = 60
 // r34: needs_changed was 67% of the log's bytes (a row per body per tick) and hourly snapshots
 // another quarter. A scrub is exact inside the week (G6 sweeps three days); the story keeps whole.
-export const DEV_RETAIN = { keepTicks: 7 * MINUTES_PER_DAY, bulkTypes: ['needs_changed'] }
+// r37 (owner 2026-09-07): the needs rows keep two days, where hourly snapshots make a scrub exact
+// to the hour; the mechanical types keep the week; speech, scenes, acts and moves are the story
+// and are kept for good, moves included so a scrubbed scene still walks.
+export const DEV_RETAIN: Retain = {
+  keepTicks: 7 * MINUTES_PER_DAY,
+  bulkTypes: ['action_progressed', 'structure_progressed', 'fauna_moved', 'hp_changed'],
+  short: { keepTicks: 2 * MINUTES_PER_DAY, types: ['needs_ticked', 'needs_changed'] },
+}
 
 // `construction.houseTicks` defaults to two sim days — 96 REAL MINUTES at the dev world's tick.
 // `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
@@ -171,6 +179,8 @@ export async function startDevWorld(
     narratorDbPath?: string
     /** Present, this process serves world, socket and viewer on one port; absent, vite proxies. */
     staticDir?: string
+    /** What the log keeps of the fine grain. Absent, the town's own window (DEV_RETAIN). */
+    retain?: Retain
     /** Per-mind memory dbs (`<id>.db`), thrown away with the world when `fresh` is asked for. */
     agentDbDir?: string
     /** A FACTORY, not a cast: one built before this call has already opened the per-mind dbs
@@ -281,7 +291,7 @@ export async function startDevWorld(
     rng,
     config,
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
-    retain: DEV_RETAIN,
+    retain: opts.retain ?? DEV_RETAIN,
     onTick: (ctx) => {
       handler?.(ctx)
     },

@@ -1,8 +1,18 @@
+import { gunzipSync, gzipSync } from 'node:zlib'
 import type Database from 'better-sqlite3'
 import { EventEnvelope, type SimEvent } from '@sj/shared'
 import type { RngState } from './rng.js'
 
 const CHECKPOINT_EVERY_MS = 5_000
+
+// r37: a snapshot is 45 KB of JSON that packs to about a tenth. Rows written before this are
+// text and still read.
+export function packState(state: unknown): Buffer {
+  return gzipSync(JSON.stringify(state))
+}
+export function unpackState(raw: string | Buffer): unknown {
+  return JSON.parse(Buffer.isBuffer(raw) ? gunzipSync(raw).toString('utf8') : raw) as unknown
+}
 
 export class EventStore {
   private checkpointTimer: NodeJS.Timeout | null = null
@@ -103,17 +113,17 @@ export class EventStore {
   }
 
   saveSnapshot(tick: number, seq: number, state: unknown, rng: Record<string, RngState>): void {
-    this.insertSnap.run(tick, seq, JSON.stringify(state), JSON.stringify(rng))
+    this.insertSnap.run(tick, seq, packState(state), JSON.stringify(rng))
   }
   latestSnapshot() {
     const r = this.selSnap.get() as
-      | { tick: number; seq: number; state: string; rng: string }
+      | { tick: number; seq: number; state: string | Buffer; rng: string }
       | undefined
     return r
       ? {
           tick: r.tick,
           seq: r.seq,
-          state: JSON.parse(r.state) as unknown,
+          state: unpackState(r.state),
           rng: JSON.parse(r.rng) as Record<string, RngState>,
         }
       : null

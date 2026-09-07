@@ -33,6 +33,7 @@ export function needAfterQueued(ctx: TickCtx, a: AgentBody, need: NeedName): num
 }
 
 export function flushNeedsSystem(ctx: TickCtx): void {
-  for (const [id, changes] of ctx.needs) ctx.emit('needs_changed', { id, changes })
+  const bodies = [...ctx.needs].map(([id, changes]) => ({ id, changes }))
   ctx.needs.clear()
+  if (bodies.length > 0) ctx.emit('needs_ticked', { bodies })
 }

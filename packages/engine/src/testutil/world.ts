@@ -53,7 +53,11 @@ export function runAct(
 
 // One reader of the batch payload shape for the whole package.
 export const changesOf = (e: { type: string; payload: unknown }): NeedChange[] =>
-  e.type === 'needs_changed' ? (e.payload as { changes: NeedChange[] }).changes : []
+  e.type === 'needs_changed'
+    ? (e.payload as { changes: NeedChange[] }).changes
+    : e.type === 'needs_ticked'
+      ? (e.payload as { bodies: { changes: NeedChange[] }[] }).bodies.flatMap((b) => b.changes)
+      : []
 
 export const needChanges = (events: { type: string; payload: unknown }[]): NeedChange[] =>
   events.flatMap(changesOf)

@@ -83,6 +83,32 @@ describe('TickLoop', () => {
     expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
   })
 
+  // r37 (owner-approved): the needs rows keep two days, the mechanical types a week.
+  it('★ a short window drops its types sooner than the week, and replay still matches', () => {
+    const { store, loop: l } = loop(
+      ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', { id: 'a1', name: 'a1', x: 1, y: 0, ageDays: ADULT_AGE_DAYS })
+        else {
+          emit('agent_moved', { id: 'a1', x: tick % 4, y: 0 })
+          emit('needs_ticked', {
+            bodies: [{ id: 'a1', changes: [{ need: 'hunger', delta: -0.01 }] }],
+          })
+        }
+      },
+      5,
+      {
+        keepTicks: 20,
+        bulkTypes: ['agent_moved'],
+        short: { keepTicks: 10, types: ['needs_ticked'] },
+      },
+    )
+    for (let i = 0; i < 25; i++) l.step()
+    expect(Math.min(...store.readTypeFrom(0, 'needs_ticked').map((e) => e.tick))).toBe(15)
+    expect(Math.min(...store.readTypeFrom(0, 'agent_moved').map((e) => e.tick))).toBe(5)
+    expect(stateHash(replayLatest(store).state)).toBe(stateHash(l.state))
+  })
+
   it('writes the snapshot after the tick has committed, not inside it', () => {
     const db = openDb(':memory:')
     const store = new EventStore(db)

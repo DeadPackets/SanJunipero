@@ -115,6 +115,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'tick_advanced',
   'agent_moved',
   'needs_changed',
+  'needs_ticked',
   'hp_changed',
   'skill_gained',
   'agent_woke',

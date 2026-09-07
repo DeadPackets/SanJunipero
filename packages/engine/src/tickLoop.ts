@@ -16,6 +16,14 @@ export type TickHandler = (ctx: {
 
 // Not the world's cadence, despite the name: the beat is `arm()`/`beat()` in
 // `town/src/devWorld.ts`, which reads `paused` and `speed` off here. `start()` is tests only.
+/** Behind `keepTicks` the bulk types are dropped and snapshots thinned to one a day; the `short`
+ *  types go sooner still, where hourly snapshots inside the week keep a scrub exact to the hour. */
+export type Retain = {
+  keepTicks: number
+  bulkTypes: readonly string[]
+  short?: { keepTicks: number; types: readonly string[] }
+}
+
 export class TickLoop {
   #store: EventStore
   #state: WorldState
@@ -24,7 +32,7 @@ export class TickLoop {
   #realMs: number
   #speed: number
   #snapEvery: number
-  #retain: { keepTicks: number; bulkTypes: readonly string[] } | undefined
+  #retain: Retain | undefined
   #onTick: TickHandler
   #timer: NodeJS.Timeout | null = null
   #paused = false
@@ -43,7 +51,7 @@ export class TickLoop {
     snapshotEveryTicks?: number
     /** Behind this many ticks the bulk types are dropped and snapshots thinned to one a day, so
      *  the log holds a window of the fine grain and the whole of the story. */
-    retain?: { keepTicks: number; bulkTypes: readonly string[] }
+    retain?: Retain
     onTick: TickHandler
     onError?: (err: unknown) => void
   }) {
@@ -130,6 +138,10 @@ export class TickLoop {
       if (this.#retain !== undefined) {
         const before = this.#tick - this.#retain.keepTicks
         for (const type of this.#retain.bulkTypes) this.#store.pruneType(type, before)
+        const short = this.#retain.short
+        if (short !== undefined) {
+          for (const type of short.types) this.#store.pruneType(type, this.#tick - short.keepTicks)
+        }
         this.#store.pruneSnapshots(before, MINUTES_PER_DAY)
       }
     }

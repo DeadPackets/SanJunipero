@@ -107,3 +107,25 @@ describe('EventStore WAL checkpointer', () => {
     }
   })
 })
+
+// r37: a snapshot is 45 KB of JSON that packs to about a tenth.
+describe('★ a snapshot is stored packed, and one written as text still reads', () => {
+  it('round-trips the state through gzip and reads an old text row', () => {
+    const db = openDb(':memory:')
+    const s = new EventStore(db)
+    s.saveSnapshot(60, 1, { world: true, n: 3 }, {})
+    const raw = db.prepare('SELECT state FROM snapshots').get() as { state: unknown }
+    expect(Buffer.isBuffer(raw.state)).toBe(true)
+    expect((raw.state as Buffer).length).toBeLessThan(
+      JSON.stringify({ world: true, n: 3 }).length + 40,
+    )
+    expect(s.latestSnapshot()!.state).toEqual({ world: true, n: 3 })
+    db.prepare('INSERT INTO snapshots (tick, seq, state, rng) VALUES (?, ?, ?, ?)').run(
+      120,
+      2,
+      JSON.stringify({ old: 1 }),
+      '{}',
+    )
+    expect(s.latestSnapshot()!.state).toEqual({ old: 1 })
+  })
+})

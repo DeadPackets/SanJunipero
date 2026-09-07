@@ -108,6 +108,7 @@ import {
   ItemWorn,
   MysteryEvent,
   NeedsChanged,
+  NeedsTicked,
   type NeedChange,
   SkillGained,
   StructureCompleted,
@@ -256,6 +257,17 @@ export function fold(
       if (!a) throw new Error(`needs_changed for unknown agent ${p.id}`)
       for (const c of p.changes) a = applyNeed(a, c, event.tick, config)
       return { ...state, agents: { ...state.agents, [p.id]: a } }
+    }
+    case 'needs_ticked': {
+      const p = NeedsTicked.parse(event.payload)
+      const agents = { ...state.agents }
+      for (const b of p.bodies) {
+        let a = agents[b.id]
+        if (!a) throw new Error(`needs_ticked for unknown agent ${b.id}`)
+        for (const c of b.changes) a = applyNeed(a, c, event.tick, config)
+        agents[b.id] = a
+      }
+      return { ...state, agents }
     }
     case 'item_spawned': {
       const p = ItemSpawned.parse(event.payload)

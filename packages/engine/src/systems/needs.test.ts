@@ -172,11 +172,14 @@ describe('worldTick: social regen via conversation', () => {
   })
 })
 
-describe('one needs_changed per body per tick', () => {
-  it("carries every law's change on one event, and never two events for one body", () => {
+// r37: one row a tick for every body, where a row per body was 85% of the log.
+describe('one needs_ticked row a tick, a body once on it', () => {
+  it("carries every law's change on one row, and never two bodies' rows for one tick", () => {
     const s = atTick(makeWorld(), 100)
-    const batches = tickOnce(s).events.filter((e) => e.type === 'needs_changed')
-    expect(batches.map((e) => (e.payload as { id: string }).id)).toEqual(['a1', 'a2'])
+    const rows = tickOnce(s).events.filter((e) => e.type === 'needs_ticked')
+    expect(rows).toHaveLength(1)
+    const bodies = (rows[0]!.payload as { bodies: { id: string }[] }).bodies
+    expect(bodies.map((b) => b.id)).toEqual(['a1', 'a2'])
     expect(new Set(needChanges(tickOnce(s).events).map((c) => c.need))).toEqual(
       new Set(['hunger', 'energy', 'social', 'warmth', 'thirst']),
     )

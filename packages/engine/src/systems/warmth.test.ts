@@ -65,7 +65,13 @@ function tickOnce(s: WorldState, config = CFG): WorldTickResult {
 
 type NeedEv = { id: string; need: string; delta: number; reason?: string | undefined }
 const changed = (r: WorldTickResult): NeedEv[] =>
-  r.events.flatMap((e) => changesOf(e).map((c) => ({ id: (e.payload as { id: string }).id, ...c })))
+  r.events.flatMap((e) =>
+    e.type === 'needs_ticked'
+      ? (e.payload as { bodies: { id: string; changes: NeedEv[] }[] }).bodies.flatMap((b) =>
+          b.changes.map((c) => ({ ...c, id: b.id })),
+        )
+      : changesOf(e).map((c) => ({ id: (e.payload as { id: string }).id, ...c })),
+  )
 const needs = (r: WorldTickResult, need: string): NeedEv[] =>
   changed(r).filter((c) => c.need === need)
 const chills = (r: WorldTickResult): NeedEv[] => changed(r).filter((c) => c.reason === 'exposure')

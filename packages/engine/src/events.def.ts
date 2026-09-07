@@ -74,6 +74,9 @@ export const NeedsChanged = z
   })
   .strict()
 export type NeedChange = z.infer<typeof NeedsChanged>['changes'][number]
+// r37: a needs_changed per body per tick was 85% of the log's bytes. The tick's bodies ride one
+// row, in the order the systems queued them, and fold to exactly the state the separate rows left.
+export const NeedsTicked = z.object({ bodies: z.array(NeedsChanged).min(1) }).strict()
 
 export const ItemLoc = z.discriminatedUnion('t', [
   z.object({ t: z.literal('tile'), x: z.number(), y: z.number() }).strict(),
