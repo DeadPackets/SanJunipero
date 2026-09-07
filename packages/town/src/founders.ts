@@ -144,6 +144,21 @@ export const FOUNDER_PACE: Readonly<Record<string, Pace>> = {
   dilara: 'slow',
 }
 
+/** The families the valley was founded with, as the cards in `founderMinds` declare them. Until
+ *  2026-09-07 these lived only in each mind's memory, so the world let a married founder walk out
+ *  with anybody: 13 of r37's 15 married walk outs were with somebody who was not their spouse.
+ *  `parents` names only the parent a card gives; a body born here gets both from the birth. */
+export const FOUNDER_FAMILY: Readonly<
+  Record<string, { partnerId?: string; parents?: readonly string[] }>
+> = {
+  farida: { partnerId: 'bashir' },
+  bashir: { partnerId: 'farida' },
+  kamal: { partnerId: 'leyla' },
+  leyla: { partnerId: 'kamal' },
+  tariq: { parents: ['leyla', 'kamal'] },
+  dilara: { parents: ['halim'] },
+}
+
 export const FOUNDER_ROSTER: readonly FounderBody[] = [
   ...FOUNDERS.map(({ id, name, ageDays }) => ({ id, name, ageDays })),
   { id: 'farida', name: 'Farida', ageDays: 37 * DAYS_PER_YEAR },
@@ -658,6 +673,7 @@ export function makeFoundersOnTick(
           ageDays: f.ageDays,
           ...(FOUNDER_EATING[f.id] ?? {}),
           ...(FOUNDER_PACE[f.id] === undefined ? {} : { pace: FOUNDER_PACE[f.id] }),
+          ...(FOUNDER_FAMILY[f.id] ?? {}),
         })
       }
       for (const s of structures) {

@@ -18,6 +18,7 @@ import {
   DEV_FAST_FORWARD_FOR_INTERIORS,
   FOUNDERS,
   FOUNDERS_HOME_ID,
+  FOUNDER_FAMILY,
   FOUNDER_PACE,
   GO_HOME_BELOW,
   LEAVE_HOME_ABOVE,
@@ -541,5 +542,51 @@ describe('★ every founder has a pace, and most are slow', () => {
     const count = (pace: string) => Object.values(FOUNDER_PACE).filter((p) => p === pace).length
     expect([count('slow'), count('steady'), count('quick')]).toEqual([7, 3, 2])
     expect(Object.keys(FOUNDER_PACE).sort()).toEqual(FOUNDER_ROSTER.map((f) => f.id).sort())
+  })
+})
+
+// r37: Farida is married to Bashir on her card and walked out with Nadia and Yusuf, because the
+// world had never been told. The cards are the source; this table is what the world is told.
+describe('★ the founding families are world facts, not just something the minds remember', () => {
+  const ids = new Set(FOUNDER_ROSTER.map((f) => f.id))
+
+  it('names only founders, and every partnership is declared from both sides', () => {
+    for (const [id, fam] of Object.entries(FOUNDER_FAMILY)) {
+      expect([id, ids.has(id)]).toEqual([id, true])
+      if (fam.partnerId !== undefined) {
+        expect([id, ids.has(fam.partnerId)]).toEqual([id, true])
+        expect([id, FOUNDER_FAMILY[fam.partnerId]?.partnerId]).toEqual([id, id])
+        expect(fam.partnerId).not.toBe(id)
+      }
+      for (const p of fam.parents ?? []) {
+        expect([id, ids.has(p)]).toEqual([id, true])
+        expect(p).not.toBe(id)
+      }
+    }
+  })
+
+  it('marries nobody to their own blood, and gives no child a parent who is also their partner', () => {
+    for (const [id, fam] of Object.entries(FOUNDER_FAMILY)) {
+      const blood = new Set(fam.parents ?? [])
+      expect([id, fam.partnerId !== undefined && blood.has(fam.partnerId)]).toEqual([id, false])
+      for (const other of Object.keys(FOUNDER_FAMILY)) {
+        const share = (FOUNDER_FAMILY[other]?.parents ?? []).some((p) => blood.has(p))
+        if (other !== id && share)
+          expect([id, other, fam.partnerId]).not.toEqual([id, other, other])
+      }
+    }
+  })
+
+  it('the town spawns those bodies carrying them, and leaves everybody else free', () => {
+    const bodies = showcaseTownAtTick1().agents
+    for (const [id, fam] of Object.entries(FOUNDER_FAMILY)) {
+      expect([id, bodies[id]?.partnerId]).toEqual([id, fam.partnerId])
+      expect([id, bodies[id]?.parents]).toEqual([id, fam.parents])
+    }
+    for (const f of FOUNDER_ROSTER) {
+      if (FOUNDER_FAMILY[f.id] !== undefined) continue
+      expect([f.id, bodies[f.id]]).not.toHaveProperty('partnerId')
+      expect([f.id, bodies[f.id]]).not.toHaveProperty('parents')
+    }
   })
 })

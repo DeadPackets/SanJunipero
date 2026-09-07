@@ -68,7 +68,8 @@ export type AgentBody = {
   ageDays: number
   sex?: 'f' | 'm' // absent = 'f'; read through sexOf(), keeps pre-C9 hashes stable
   pregnant?: { sinceDay: number; byId: string }
-  parents?: [string, string] // [motherId, fatherId]; only ever set on the born
+  // [motherId, fatherId] for the born; a founding family may name only the parent it knows.
+  parents?: readonly string[]
   // The day this body came up the valley road, and the day it walked back down. Both absent on
   // every founder and every child, so a town nobody has come to hashes as it always did.
   arrived?: { day: number }

@@ -230,6 +230,8 @@ export function fold(
             ageDays: p.ageDays,
             ...(p.sex === undefined ? {} : { sex: p.sex }),
             ...(p.pace === undefined ? {} : { pace: p.pace }),
+            ...(p.partnerId === undefined ? {} : { partnerId: p.partnerId }),
+            ...(p.parents === undefined ? {} : { parents: p.parents }),
             skills: {},
             activity: null,
             collapsedSinceTick: null,

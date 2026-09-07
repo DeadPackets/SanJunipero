@@ -17,6 +17,9 @@ export const AgentSpawned = z
     ateHoursAgo: z.number().nonnegative().optional(),
     // How fast this heart lets somebody close; absent reads as steady.
     pace: z.enum(PACES).optional(),
+    // A family the world was founded with. The born get theirs from the birth instead.
+    partnerId: z.string().optional(),
+    parents: z.array(z.string()).min(1).max(2).optional(),
   })
   .strict()
 export const CoSlept = z
