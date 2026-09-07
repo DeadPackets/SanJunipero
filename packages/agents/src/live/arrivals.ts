@@ -20,11 +20,12 @@ const ROAD_KIT: readonly { kind: string; qty: number }[] = [
   { kind: 'bread', qty: 3 },
 ]
 
-/** Three sim-days at least and five at most, read off the world's own counter rather than
+/** Three sim-weeks at least and five at most, read off the world's own counter rather than
  *  rolled: the runtime holds no seed, and a cadence that drifts with the log is one nobody
- *  can replay. */
+ *  can replay. Owner 2026-09-07: an arrival is a rare event, and the founders get three weeks
+ *  to themselves before the first one. */
 export function arrivalGap(nextEntityId: number): number {
-  return 3 + (nextEntityId % 3)
+  return 21 + (nextEntityId % 15)
 }
 
 /** The day somebody last came up the road, or the founding day for a town nobody has. */
@@ -88,7 +89,7 @@ export type ArrivalsOpts = {
   log?: (line: string) => void
 }
 
-/** The road brings somebody up it every three to five sim-days while the valley has room. The
+/** The road brings somebody up it every three to five sim-weeks while the valley has room. The
  *  world does not know minds exist, so this is an announcement made from outside it and folded
  *  like any other — replay rebuilds the same body, and `resolveCast` the same person. */
 export function wireArrivals(opts: ArrivalsOpts): () => void {

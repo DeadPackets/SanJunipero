@@ -12,6 +12,7 @@ import { fold } from './fold.js'
 import { submitIntent, type IntentResult } from './intent.js'
 import { RngStream, RngStreams } from './rng.js'
 import { genesisState, type WorldState } from './state.js'
+import { CONCEPTION_CHANCE_PER_ACT } from './systems/reproduction.js'
 import { createWorldTick } from './worldTick.js'
 import {
   WALK_OUTS_BEFORE_PROPOSAL,
@@ -461,8 +462,8 @@ describe('the one roll', () => {
   const conceptions = (events: PendingEvent[]) => events.filter((e) => e.type === 'agent_conceived')
 
   it('draws once from the reproduction stream when the hour is out, and only then', () => {
-    const seed = 'r3'
-    expect(drawn(seed)).toBeLessThan(0.2)
+    const seed = 'r5'
+    expect(drawn(seed)).toBeLessThan(CONCEPTION_CHANCE_PER_ACT)
     const { state, events } = hour(lying(FERTILE), seed)
     expect(conceptions(events).map((e) => e.payload)).toEqual([
       { motherId: 'a1', fatherId: 'a2', day: 0 },
@@ -472,7 +473,7 @@ describe('the one roll', () => {
 
   it('lets the hour pass with nothing conceived when the same stream lands high', () => {
     const seed = 'r0'
-    expect(drawn(seed)).toBeGreaterThanOrEqual(0.2)
+    expect(drawn(seed)).toBeGreaterThanOrEqual(CONCEPTION_CHANCE_PER_ACT)
     expect(conceptions(hour(lying(FERTILE), seed).events)).toEqual([])
   })
 
