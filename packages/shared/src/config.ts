@@ -5,7 +5,9 @@ const NeedsSchema = z
   .object({
     // D1, survival is a backdrop: a full stomach empties in 6.9 sim-days and a loaf is four of
     // them, so hunger is a thread through a week and not the clock every turn is set by.
-    hungerDecayPerTick: z.number().default(0.01),
+    // Hunger shows in talk and does not kill (owner ruling). At 0.01 the r34 soak's thirteen ate
+    // the larder in five days and went down nine times in seven; a full stomach now lasts two weeks.
+    hungerDecayPerTick: z.number().default(0.005),
     energyDecayAwakePerTick: z.number().default(0.093),
     energyRegenAsleepPerTick: z.number().default(0.25),
     // Only ever a bonus, and what it shortens is the SHORT sleep: a full night fills the bar from
@@ -20,7 +22,7 @@ const NeedsSchema = z
     // Above this energy a body cannot fall asleep in daylight. 101 is off; the live town sets it.
     daySleepAbove: z.number().default(101),
     // Four days of hungry drama before a death, so somebody can still be the one who fed them.
-    deathAfterZeroHungerTicks: z.number().default(5760),
+    deathAfterZeroHungerTicks: z.number().default(8640),
     eatRestoreHunger: z.number().default(60),
   })
   .strict()
@@ -137,14 +139,14 @@ const WildlifeSchema = z
   .object({
     fishMax: z.number().default(100),
     fishRegenPerDay: z.number().default(5),
-    fishCatchBase: z.number().default(0.4),
+    fishCatchBase: z.number().default(0.55),
     deerMax: z.number().default(20),
     deerRegenPerDay: z.number().default(1),
     forageYieldBySeason: z
       .object({
-        spring: z.number().default(2),
-        summer: z.number().default(3),
-        autumn: z.number().default(2),
+        spring: z.number().default(3),
+        summer: z.number().default(4),
+        autumn: z.number().default(3),
         winter: z.number().default(0),
       })
       .strict()
@@ -487,7 +489,7 @@ const IllnessSchema = z
 const ThirstSchema = z
   .object({
     enabled: z.boolean().default(true),
-    decayFactorOfHunger: z.number().default(0.4),
+    decayFactorOfHunger: z.number().default(0.8),
     drinkRestore: z.number().default(60),
     waterskinCharges: z.number().int().positive().default(4),
   })

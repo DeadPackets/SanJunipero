@@ -33,8 +33,8 @@ const C11_FLAGS = [
 describe('SimConfigSchema', () => {
   it('defaults carry the binding values', () => {
     const c = SimConfigSchema.parse({})
-    expect(c.needs.hungerDecayPerTick).toBe(0.01)
-    expect(c.needs.deathAfterZeroHungerTicks).toBe(5760)
+    expect(c.needs.hungerDecayPerTick).toBe(0.005)
+    expect(c.needs.deathAfterZeroHungerTicks).toBe(8640)
     expect(c.movement.sightRadius).toBe(12)
     expect(c.health.injuryDamage.grave).toBe(60)
     expect(c.skills.tracks).toHaveLength(12)
@@ -217,7 +217,7 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     expect(c.illness.contagionEnabled).toBe(true)
     expect(c.illness.contagionChance).toBe(0.06)
     expect(c.illness.contagionRadius).toBe(3)
-    expect(c.thirst.decayFactorOfHunger).toBe(0.4)
+    expect(c.thirst.decayFactorOfHunger).toBe(0.8)
     expect(c.thirst.drinkRestore).toBe(60)
     expect(c.thirst.waterskinCharges).toBe(4)
   })

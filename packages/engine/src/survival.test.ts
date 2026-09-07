@@ -104,12 +104,13 @@ describe('the teeth: how long a body has, in ticks it can count', () => {
   const toCollapse = (100 - CFG.needs.collapseThreshold) / decay
   const toEmpty = 100 / decay
 
-  it('a body that never eats stays on its feet for six in-game days, not two', () => {
+  it('a body that never eats stays on its feet for thirteen in-game days, not two', () => {
     // World one: 100 / 0.035 put Amara on the ground at tick 2715, in-game day 2. D1 put the
-    // same fall a week out, so a hungry body is a thread a town has time to notice and pull.
+    // same fall a week out; the r34 balance put it two weeks out, after thirteen mouths went
+    // down nine times in seven days on a week's clock.
     expect(2715).toBeLessThan(3 * DAY)
-    expect(toCollapse).toBeGreaterThan(6 * DAY)
-    expect(Math.round(toCollapse)).toBe(9500)
+    expect(toCollapse).toBeGreaterThan(13 * DAY)
+    expect(Math.round(toCollapse)).toBe(19000)
   })
 
   it('and it is a whole day past the fall before the drain has taken the body', () => {
@@ -337,8 +338,9 @@ describe('the world-one profile, rerun', () => {
   it('but a body that never eats at all still dies, because that is not a rate problem', () => {
     // The honest limit of retuning: world one's founders ate nothing for 11,681 ticks. No
     // survivable number saves that. What saves them is being warned, and being helped up.
-    // D1 buys a week and a half before the grave; it does not buy forever.
-    expect(run(sleeper(), 10 * DAY).agents.a1!.alive).toBe(false)
+    // D1 bought a week and a half before the grave and the r34 balance just under three weeks;
+    // neither buys forever.
+    expect(run(sleeper(), 21 * DAY).agents.a1!.alive).toBe(false)
   })
 })
 

@@ -59,8 +59,8 @@ describe('thirst: absent means full', () => {
     expect(composePerception(clean, CFG, 'a1', []).self.body.thirst).toBe(100)
   })
 
-  it('decays at 0.4x the hunger rate, per tick, and not at all when the world says so', () => {
-    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * 0.4)
+  it('decays at the configured share of the hunger rate, per tick, and not at all when the world says so', () => {
+    expect(DECAY).toBe(CFG.needs.hungerDecayPerTick * CFG.thirst.decayFactorOfHunger)
     expect(thirsts(tickOnce(body()))).toEqual([-DECAY])
     expect(tickOnce(body()).state.agents.a1!.thirst).toBe(100 - DECAY)
     expect(thirsts(tickOnce(body(OFF), OFF))).toEqual([])

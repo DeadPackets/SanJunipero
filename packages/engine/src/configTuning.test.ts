@@ -13,27 +13,30 @@ const perDay = (perTick: number): number => perTick * MINUTES_PER_DAY
 describe('D1 — the death-time table', () => {
   const days = (ticks: number): number => ticks / MINUTES_PER_DAY
 
-  it('a full stomach takes 6.9 sim-days to empty, and an empty one 4 more to kill', () => {
-    expect(C.needs.hungerDecayPerTick).toBe(0.01)
-    expect(days(100 / C.needs.hungerDecayPerTick)).toBeCloseTo(6.94, 2)
-    expect(C.needs.deathAfterZeroHungerTicks).toBe(5760)
-    expect(days(C.needs.deathAfterZeroHungerTicks)).toBe(4)
-    // Eleven days from the last meal to the grave: long enough that a hungry body is a story
-    // somebody can notice, walk over to, and feed.
+  // r34 soak (2026-09-07): at 0.01 a town of thirteen ate its larder in five days and collapsed
+  // nine times in seven, and the chronicle turned into a famine. Hunger is meant to show in talk.
+  it('★ a full stomach takes 13.9 sim-days to empty, and an empty one 6 more to kill', () => {
+    expect(C.needs.hungerDecayPerTick).toBe(0.005)
+    expect(days(100 / C.needs.hungerDecayPerTick)).toBeCloseTo(13.89, 2)
+    expect(C.needs.deathAfterZeroHungerTicks).toBe(8640)
+    expect(days(C.needs.deathAfterZeroHungerTicks)).toBe(6)
+    // Twenty days from the last meal to the grave: a hungry body is a story the whole town has
+    // time to notice, walk over to, and feed, and a death by hunger is a choice the town made.
     expect(days(100 / C.needs.hungerDecayPerTick + C.needs.deathAfterZeroHungerTicks)).toBeCloseTo(
-      10.94,
+      19.89,
       2,
     )
   })
 
-  it('one loaf is four days of it, so the storehouse holds a season of meals', () => {
+  it('one loaf is eight days of it, so the storehouse holds a season of meals', () => {
     const loaf = C.needs.eatRestoreHunger * FOOD_NUTRITION.bread!
     expect(loaf).toBe(60)
-    expect(days(loaf / C.needs.hungerDecayPerTick)).toBeCloseTo(4.17, 2)
+    expect(days(loaf / C.needs.hungerDecayPerTick)).toBeCloseTo(8.33, 2)
   })
 
   it('thirst still tracks hunger and still outruns it', () => {
-    expect(C.thirst.decayFactorOfHunger).toBe(0.4)
+    // Hunger halved in the r34 balance; the factor doubled so the thirst clock did not move.
+    expect(C.thirst.decayFactorOfHunger).toBe(0.8)
     expect(days(100 / thirstDecayPerTick(C))).toBeCloseTo(17.36, 2)
   })
 

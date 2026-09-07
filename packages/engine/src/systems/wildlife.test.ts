@@ -43,7 +43,7 @@ function tickOnce(s: WorldState, config = CFG, rng = new RngStreams('t')): World
   const wt = createWorldTick(config, rng)
   return wt(fold(s, ev('tick_advanced', {}, s.tick + 1), config))
 }
-// seed 'w1' first wildlife roll ≈ 0.1445 (< fishCatchBase 0.4); 'w2' ≈ 0.9644 (miss)
+// seed 'w1' first wildlife roll ≈ 0.1445 (< fishCatchBase 0.55); 'w2' ≈ 0.9644 (miss)
 function castLine(s: WorldState, seed: string, config = CFG): WorldTickResult {
   const r = submitIntent(s, config, 'a1', 'fish', { x: 1, y: 0 })
   if (!r.ok) throw new Error(r.reason)
@@ -104,7 +104,7 @@ describe('verb: fish', () => {
     expect(r.state.items.item_1!.kind).toBe('fish')
   })
 
-  // Seed 'w9' rolls ≈ 0.290: under the spring chance of 0.4, over the winter 0.2.
+  // Seed 'w9' rolls ≈ 0.290: under the spring chance of 0.55, over the winter 0.275.
   it('halves the catch chance through winter — the same cast that lands in spring comes up empty', () => {
     const spring = castLine(atTick(makeWorld(), 1440), 'w9')
     expect(spring.events.map((e) => e.type)).toContain('item_spawned')
@@ -115,7 +115,7 @@ describe('verb: fish', () => {
   })
 
   it('still lands the easy winter cast — the dial narrows the water, it does not freeze it', () => {
-    const winter = castLine(atTick(makeWorld(), WINTER), 'w1') // roll ≈ 0.145 < 0.2
+    const winter = castLine(atTick(makeWorld(), WINTER), 'w1') // roll ≈ 0.145 < 0.275
     expect(winter.events.map((e) => e.type)).toContain('item_spawned')
   })
 
@@ -161,7 +161,7 @@ describe('verb: forage', () => {
       payload: {
         id: 'item_1',
         kind: 'berries',
-        qty: 2,
+        qty: CFG.wildlife.forageYieldBySeason.spring,
         loc: { t: 'agent', id: 'a1' },
         owner: 'a1',
         madeBy: 'a1',
