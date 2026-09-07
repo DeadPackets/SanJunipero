@@ -18,6 +18,8 @@ import {
   DEV_FAST_FORWARD_FOR_INTERIORS,
   FOUNDERS,
   FOUNDERS_HOME_ID,
+  FOUNDER_PACE,
+  FOUNDER_ROSTER,
   GO_HOME_BELOW,
   LEAVE_HOME_ABOVE,
   type FounderDef,
@@ -512,5 +514,16 @@ describe('the storerooms hold something', () => {
   // The seed is OFF unless asked for: the scripted fixture is frozen and this is a demo larder.
   it('leaves the frozen scripted fixture exactly as every landed gate folded it', () => {
     expect(Object.keys(townAtTick1().items)).toEqual([])
+  })
+})
+
+// Owner 2026-09-07: courting is slow burn with real variance.
+describe('★ every founder has a pace, and most are slow', () => {
+  it('names every body on the roster, seven slow, three steady, two quick', () => {
+    for (const f of FOUNDER_ROSTER)
+      expect([f.id, FOUNDER_PACE[f.id]]).not.toEqual([f.id, undefined])
+    const count = (pace: string) => Object.values(FOUNDER_PACE).filter((p) => p === pace).length
+    expect([count('slow'), count('steady'), count('quick')]).toEqual([7, 3, 2])
+    expect(Object.keys(FOUNDER_PACE).sort()).toEqual(FOUNDER_ROSTER.map((f) => f.id).sort())
   })
 })

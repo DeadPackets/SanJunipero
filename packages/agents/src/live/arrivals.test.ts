@@ -23,7 +23,7 @@ import type { PersonalityDoc } from '../personality.js'
 import { EngineBridge } from '../runtime/bridge.js'
 import { tamarIdentity } from '../testutil/fixtures.js'
 import { bootMinds, type MindSpec } from './liveMinds.js'
-import { arrivalGap, ensureArrivals, needsArrival, wireArrivals } from './arrivals.js'
+import { arrivalGap, ensureArrivals, needsArrival, roadPace, wireArrivals } from './arrivals.js'
 import { arrivalSpec, resolveCast, strangerSpec } from './resolveCast.js'
 import { TRAVELLER_MINDS } from './travellerMinds.js'
 
@@ -382,5 +382,19 @@ describe('★ the gap between one walker and the next', () => {
       seen.add(arrivalGap(n))
     }
     expect(seen.size).toBe(15)
+  })
+})
+
+describe('★ the pace of a heart off the road', () => {
+  it('is read off the id alone, and most of the road is slow', () => {
+    const seen = { slow: 0, steady: 0, quick: 0 }
+    for (let n = 0; n < 300; n += 1) {
+      const id = `agent_${n}`
+      expect(roadPace(id)).toBe(roadPace(id))
+      seen[roadPace(id)] += 1
+    }
+    expect(seen.slow).toBeGreaterThan(seen.steady)
+    expect(seen.steady).toBeGreaterThan(seen.quick)
+    expect(seen.quick).toBeGreaterThan(0)
   })
 })

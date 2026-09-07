@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 import { AgentArrived, BIRTH_NAMES, RngStream } from '@sj/engine'
 import type { EventStore } from '@sj/engine/store'
 import { insertAlert } from '@sj/llm'
-import { DAYS_PER_YEAR, MINUTES_PER_DAY, simTimeFromTick } from '@sj/shared'
+import { DAYS_PER_YEAR, MINUTES_PER_DAY, type Pace, simTimeFromTick } from '@sj/shared'
 import { MemoryStore } from '../memory/store.js'
 import type { EngineBridge } from '../runtime/bridge.js'
 import { hasPersonality, type BootedMinds, type MindSpec, type NewPerson } from './liveMinds.js'
@@ -26,6 +26,13 @@ const ROAD_KIT: readonly { kind: string; qty: number }[] = [
  *  to themselves before the first one. */
 export function arrivalGap(nextEntityId: number): number {
   return 21 + (nextEntityId % 15)
+}
+
+/** How fast a stranger off the road lets somebody close, read off the id alone so a replay
+ *  brings the same heart: half the road is slow, a third steady, the rest quick. */
+export function roadPace(id: string): Pace {
+  const r = RngStream.seed(id, 'pace').next()
+  return r < 0.5 ? 'slow' : r < 0.85 ? 'steady' : 'quick'
 }
 
 /** The day somebody last came up the road, or the founding day for a town nobody has. */
@@ -97,10 +104,7 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
   let stopped = false
   let seq = opts.store.lastSeq()
 
-  const whoIsComing = (rim: {
-    x: number
-    y: number
-  }): { id: string; name: string; sex: 'f' | 'm'; ageDays: number; x: number; y: number } => {
+  const whoIsComing = (rim: { x: number; y: number }): AgentArrivedPayload => {
     const traveller = TRAVELLER_MINDS.find((t) => !opts.bridge.hasBody(t.id))
     if (traveller !== undefined) {
       return {
@@ -110,6 +114,7 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
         ageDays: traveller.ageDays,
         x: rim.x,
         y: rim.y,
+        pace: traveller.pace,
       }
     }
     const id = opts.bridge.mintId('agent')
@@ -124,6 +129,7 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
       ageDays: (18 + rng.int(31)) * DAYS_PER_YEAR,
       x: rim.x,
       y: rim.y,
+      pace: roadPace(id),
     }
   }
 

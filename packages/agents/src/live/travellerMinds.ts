@@ -1,12 +1,14 @@
 // The four who may come up the valley road after the founding, in the order they arrive. Not
 // in `FOUNDER_MINDS`: an arrival draws the next one off this list.
-import { DAYS_PER_YEAR } from '@sj/shared'
+import { DAYS_PER_YEAR, type Pace } from '@sj/shared'
 import type { IdentityCore } from '../prompt/assemble.js'
 import type { Mind } from './founderMinds.js'
 
 export type Traveller = Mind & {
   /** Why they came up the valley road, in one line. */
   arrival: string
+  /** How fast this heart lets somebody close. */
+  pace: Pace
 }
 
 const voice = (
@@ -29,6 +31,7 @@ const voice = (
 export const TRAVELLER_MINDS: Traveller[] = [
   {
     id: 'mira',
+    pace: 'steady',
     sex: 'f',
     ageDays: 31 * DAYS_PER_YEAR,
     arrival:
@@ -72,6 +75,7 @@ export const TRAVELLER_MINDS: Traveller[] = [
   },
   {
     id: 'emre',
+    pace: 'quick',
     sex: 'm',
     ageDays: 27 * DAYS_PER_YEAR,
     arrival:
@@ -115,6 +119,7 @@ export const TRAVELLER_MINDS: Traveller[] = [
   },
   {
     id: 'reza',
+    pace: 'slow',
     sex: 'm',
     ageDays: 58 * DAYS_PER_YEAR,
     arrival:
@@ -158,6 +163,7 @@ export const TRAVELLER_MINDS: Traveller[] = [
   },
   {
     id: 'zeynep',
+    pace: 'slow',
     sex: 'f',
     ageDays: 24 * DAYS_PER_YEAR,
     arrival: 'Came up the road after dark with one bag and gave a name that may not be hers.',

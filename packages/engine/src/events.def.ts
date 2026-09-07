@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { InvitationVerbSchema, TOWN_FACINGS, SceneMove } from '@sj/shared'
+import { InvitationVerbSchema, PACES, TOWN_FACINGS, SceneMove } from '@sj/shared'
 import { LAW_TEXT_MAX, LawPredicateSchema } from './lawShapes.js'
 
 export const TickAdvanced = z.object({}).strict()
@@ -11,6 +11,8 @@ export const AgentSpawned = z
     y: z.number(),
     ageDays: z.number(),
     sex: z.enum(['f', 'm']).optional(),
+    // How fast this heart lets somebody close; absent reads as steady.
+    pace: z.enum(PACES).optional(),
   })
   .strict()
 export const CoSlept = z
@@ -461,6 +463,7 @@ export const AgentArrived = z
     ageDays: z.number().int().positive(),
     x: z.number().int(),
     y: z.number().int(),
+    pace: z.enum(PACES).optional(),
   })
   .strict()
 export const AgentDeparted = z.object({ agentId: z.string() }).strict()
