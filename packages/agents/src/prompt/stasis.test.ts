@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { scanForDirective } from '@sj/shared'
 import { quietMeadowPacket } from '../testutil/fixtures.js'
-import { bedtimeLine, stasisLine, stillnessAt, type Stillness } from './prose.js'
+import { bedtimeLine, silentTurnsLine, stasisLine, stillnessAt, type Stillness } from './prose.js'
 
 const stand = (over: Partial<Stillness> = {}): Stillness => ({
   x: 10,
@@ -78,5 +78,21 @@ describe('bedtimeLine', () => {
 
   it('a midnight card reads as 00:00', () => {
     expect(bedtimeLine(at(1), 24, 9)).toBe('It is past 00:00, the hour you usually turn in.')
+  })
+})
+
+// r35: Leyla "let him answer" for four boredom turns in a row, three hours at one call each.
+describe('★ turns that ended in a wait', () => {
+  it('says nothing after one wait, and speaks after two', () => {
+    expect(silentTurnsLine(0)).toBe('')
+    expect(silentTurnsLine(1)).toBe('')
+    expect(silentTurnsLine(2)).toBe(
+      'Twice now you have chosen to wait, and nothing came of it. Nobody can see you waiting.',
+    )
+    expect(silentTurnsLine(4)).toMatch(/^Again and again now you have chosen to wait/)
+  })
+  it('carries no directive and no semicolon', () => {
+    expect(scanForDirective(silentTurnsLine(3))).toEqual([])
+    expect(silentTurnsLine(3)).not.toContain(';')
   })
 })

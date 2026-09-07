@@ -57,6 +57,7 @@ import {
   type ProseWorld,
   type WalkMark,
   standingWallsLine,
+  silentTurnsLine,
   stasisLine,
   bedtimeLine,
   stillnessAt,
@@ -475,6 +476,8 @@ export class AgentRuntime {
   // Where the feet have been standing, and since when. Null while asleep and after any act
   // the world took that was not a walk or a word.
   #still: Stillness | null = null
+  // Turns in a row that ended in a wait: no act, no word, no plan carrying the body.
+  #silentTurns = 0
   // When the heap on this mind's own doorstep was last named. Null until it ever is.
   #doorstepSaidTick: number | null = null
   // Who this mind has been with and how warm the tie stood when they last parted. The engine
@@ -1327,6 +1330,7 @@ export class AgentRuntime {
       prose,
       doorstep,
       stasisLine(this.#still, tick),
+      silentTurnsLine(this.#silentTurns),
       bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),
@@ -1449,22 +1453,20 @@ export class AgentRuntime {
     // silence when a plan was already carrying the body.
     const acted = (turn.action ?? null) !== null
     const spoke = turnSpeaks(turn)
+    // A body mid-act that is left to finish is carried the same way a plan is: r25 counted
+    // a writer's "let the ink dry" turns as silence and rang the collapse bell 52 times.
+    const planContinued =
+      !acted &&
+      !spoke &&
+      (this.#plan.lastResult === 'running' ||
+        (turn.plan?.length ?? 0) > 0 ||
+        packet.self.activity !== null)
+    this.#silentTurns = !acted && !spoke && !planContinued ? this.#silentTurns + 1 : 0
     // The ledger must never cost the world a turn it has already paid for: a busy database here
     // would throw the mind's answer away between the model and the act.
     this.#book(() => {
       this.#llm.noteCallBill({ _planSize: turn.plan?.length ?? 0 })
-      this.#llm.noteTurnOutcome({
-        acted,
-        spoke,
-        // A body mid-act that is left to finish is carried the same way a plan is: r25 counted
-        // a writer's "let the ink dry" turns as silence and rang the collapse bell 52 times.
-        planContinued:
-          !acted &&
-          !spoke &&
-          (this.#plan.lastResult === 'running' ||
-            (turn.plan?.length ?? 0) > 0 ||
-            packet.self.activity !== null),
-      })
+      this.#llm.noteTurnOutcome({ acted, spoke, planContinued })
     })
     // Read once: a cast back that has been answered is not answered again next turn, and a
     // refusal the mind has now been told about is not told twice.

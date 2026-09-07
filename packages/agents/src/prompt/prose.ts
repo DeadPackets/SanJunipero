@@ -859,6 +859,14 @@ export function stasisLine(still: Stillness | null, tick: number): string {
   return `You have been in this same spot for ${how}${words}. Nothing has come of it.`
 }
 
+// r35: five minds spent an afternoon "letting him answer", one call an hour each and 28% of all
+// turns, while the screen showed nothing. A wait is a decision nobody in the world can see.
+export function silentTurnsLine(silentTurns: number): string {
+  if (silentTurns < 2) return ''
+  const times = silentTurns === 2 ? 'Twice' : 'Again and again'
+  return `${times} now you have chosen to wait, and nothing came of it. Nobody can see you waiting.`
+}
+
 /** A fact about the hour and this body's own habit, for a mind still up and out past it. Under its
  *  own roof the reflex has already put it to bed; this reaches the one standing in the lane. */
 export function bedtimeLine(packet: PerceptionPacket, bedHour: number, riseHour: number): string {
