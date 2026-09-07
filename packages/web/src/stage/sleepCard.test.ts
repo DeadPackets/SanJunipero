@@ -35,7 +35,7 @@ describe('★ the one honest empty frame', () => {
   it('★ says when the wait ends, and reads that hour off the world’s own clock', () => {
     expect(wakeTime()).toBe('06:00')
     expect(SLEEP_COPY.head).toBe('The town sleeps until 06:00.')
-    expect(SLEEP_COPY.note).toBe('It wakes with the light; the camera waits with it.')
+    expect(SLEEP_COPY.note).toBe('It wakes with the light, and the camera waits with it.')
     // ...the same hour `isNight` turns back over on, so the card and the light cannot disagree
     expect(WAKE_HOUR).toBe(6)
     expect(TIME).toContain('hour >= NIGHT_HOUR || hour < WAKE_HOUR')

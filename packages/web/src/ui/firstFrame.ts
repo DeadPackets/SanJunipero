@@ -56,7 +56,7 @@ function fade(el: HTMLElement): void {
 export const FIRST_LINES_MS = 20_000
 
 /** The half of the copy that is fixed. The other half counts the town, so it is built. */
-export const FIRST_LINES = { take: 'The camera finds the moments; drag to take it.' }
+export const FIRST_LINES = { take: 'The camera goes where things are happening. Drag to take it.' }
 
 /** Spelled, not counted: the first thing a visitor reads is prose, and a numeral in it reads as
  *  an instrument. Past twenty the town is bigger than the sentence and the figure is honest. */
