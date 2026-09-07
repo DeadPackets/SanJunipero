@@ -54,13 +54,14 @@ describe('fold', () => {
     expect(() => fold(genesisState(DEFAULT_CONFIG), ev(1, 'nope', {}))).toThrow(/unknown event/i)
   })
 
-  // Owner 2026-09-07: a meal a day. Appetite reads the last meal off the body, so the body keeps it.
-  it('★ a body arrives fed and remembers its last meal', () => {
+  // Owner 2026-09-07: a meal a day. Appetite reads the last meal off the body, so the body keeps
+  // it, and a body arrives ten hours from its last meal so the first due meal is a morning one.
+  it('★ a body arrives ten hours from a meal and remembers its next one', () => {
     let s = fold(
       genesisState(DEFAULT_CONFIG),
       ev(1, 'agent_spawned', { id: 'a', name: 'A', x: 0, y: 0, ageDays: 9000 }, 300),
     )
-    expect(s.agents.a!.lastMealTick).toBe(300)
+    expect(s.agents.a!.lastMealTick).toBe(300 - 600)
     s = fold(s, ev(2, 'action_completed', { agentId: 'a', verb: 'eat' }, 1500))
     expect(s.agents.a!.lastMealTick).toBe(1500)
     s = fold(s, ev(3, 'action_completed', { agentId: 'a', verb: 'chop' }, 1600))
@@ -79,7 +80,7 @@ describe('fold', () => {
       y: 3,
       alive: true,
       asleep: false,
-      lastMealTick: 0,
+      lastMealTick: -600,
       needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
       hp: DEFAULT_CONFIG.health.maxHp,
       injuries: [],
@@ -282,7 +283,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     ).toThrow(/unknown item/)
     golden(
       ev(5, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' }),
-      'ebce02d2762a16616761cd3a07e0d3692e8581708af424a60bff271a00979a13',
+      '15c5bba1869a6c91d0dce9e79c2ee2ae2004e1a5f6d25f65ff3030026667e04c',
     )
   })
 
@@ -298,7 +299,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     })
     const before = town()
     expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
-    golden(event, 'cde700a70ab89b8baa9d625e74547b86ba46c8b4b936bb6c37e894faaa654004')
+    golden(event, '7e444532b37dee82a793f40869c2507ddd3ff2d5f6e800e7296be35c931388ed')
   })
 
   // The camera and the viewer's frame read this one; the world only witnesses that the talk
@@ -369,14 +370,14 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     expect(fold(town(), event, DEFAULT_CONFIG).structures.structure_1!.name).toBe(
       "the Widow's Well",
     )
-    golden(event, 'c140a674ab8cd4dfcb5eee4a897cbfdb5d7f913191f792afff45216f84982f7d')
+    golden(event, '90ce46cb9a17dd6802229631b62b2db78cf79be75aab1ba86f6a69d19eeedabf')
   })
 
   it('transfer: title passes to the target, the thing stays where it is', () => {
     const event = ev(5, 'item_owner_changed', { id: 'item_1', owner: 'a2' })
     const after = fold(town(), event, DEFAULT_CONFIG)
     expect(after.items.item_1).toMatchObject({ owner: 'a2', loc: { t: 'agent', id: 'a1' } })
-    golden(event, '6c34af33bbc14971091f175d9a1356bfdcef9eedc352c36d9cde900328f6e54f')
+    golden(event, '8cd99532114e27dc0a654b48e6a1192e245208048ac5087a2b84b26921c41d84')
   })
 
   it('need_delta: one need moves by the charter’s number', () => {
@@ -390,7 +391,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
         event,
       ).agents.a1!.needs.social,
     ).toBe(60)
-    golden(event, 'bc384ac7d733f8627205e9ea49b3e59e305803d5c497403281d41b6b9feaa678')
+    golden(event, 'cabe5a7ec8bf51f92e181c48c0e89a1be8332f9378be8328c22ee703529580b3')
   })
 })
 

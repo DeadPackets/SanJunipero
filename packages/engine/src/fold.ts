@@ -190,6 +190,10 @@ function withoutKey<T>(rec: Record<string, T> | undefined, key: string): Record<
   return rest
 }
 
+// A body arrives ten hours from its last meal, so the first "a meal is due" of a fresh town lands
+// mid-morning and not at bedtime (r36 day 0: due at 20:00, four of twelve ate before sleep).
+const ARRIVED_SINCE_MEAL_TICKS = 600
+
 export function fold(
   state: WorldState,
   event: SimEvent,
@@ -216,7 +220,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
-            lastMealTick: event.tick,
+            lastMealTick: event.tick - ARRIVED_SINCE_MEAL_TICKS,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp,
             injuries: [],
@@ -853,7 +857,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
-            lastMealTick: event.tick,
+            lastMealTick: event.tick - ARRIVED_SINCE_MEAL_TICKS,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             // Twelve years on this world's calendar, whose year is four weeks long.
             hp: config.health.maxHp,
@@ -1022,7 +1026,7 @@ export function fold(
             y: p.y,
             alive: true,
             asleep: false,
-            lastMealTick: event.tick,
+            lastMealTick: event.tick - ARRIVED_SINCE_MEAL_TICKS,
             needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
             hp: config.health.maxHp,
             injuries: [],

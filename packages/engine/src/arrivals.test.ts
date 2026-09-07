@@ -67,7 +67,7 @@ describe('★ the fold of an arrival', () => {
         y: 4,
         alive: true,
         asleep: false,
-        lastMealTick: 0,
+        lastMealTick: -600,
         needs: { hunger: 100, energy: 100, warmth: 100, social: 100 },
         hp: CFG.health.maxHp,
         injuries: [],
