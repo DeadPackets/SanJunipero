@@ -105,8 +105,8 @@ const wooed = (s: WorldState, a = 'a1', b = 'a2'): WorldState => ({
   ...s,
   agents: {
     ...s.agents,
-    [a]: { ...s.agents[a]!, walkOuts: { [b]: WALK_OUTS_BEFORE_PROPOSAL.most } },
-    [b]: { ...s.agents[b]!, walkOuts: { [a]: WALK_OUTS_BEFORE_PROPOSAL.most } },
+    [a]: { ...s.agents[a]!, walkOuts: { [b]: WALK_OUTS_BEFORE_PROPOSAL.steady.most } },
+    [b]: { ...s.agents[b]!, walkOuts: { [a]: WALK_OUTS_BEFORE_PROPOSAL.steady.most } },
   },
 })
 /** The ask landed and folded — the state a second consent is judged against. */
@@ -305,9 +305,9 @@ describe('the answer', () => {
     expect(refusal(ask(s, 'a1', 'propose'))).toBe(
       'too soon: you have only walked out together 1 day',
     )
-    const needed = walkOutsBeforeProposal('a1', 'a2')
-    expect(needed).toBeGreaterThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.least)
-    expect(needed).toBeLessThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.most)
+    const needed = walkOutsBeforeProposal({ id: 'a1' }, { id: 'a2' })
+    expect(needed).toBeGreaterThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.steady.least)
+    expect(needed).toBeLessThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL.steady.most)
     for (let day = 1; day < needed; day++) s = walkOut(s, day * MINUTES_PER_DAY + 100)
     expect(s.agents.a2!.walkOuts).toEqual({ a1: needed })
     expect(ask(s, 'a1', 'propose').ok).toBe(true)
@@ -324,11 +324,53 @@ describe('the answer', () => {
       ['tariq', 'dilara'],
       ['halim', 'yusuf'],
     ]) {
-      const n = walkOutsBeforeProposal(pair[0]!, pair[1]!)
-      expect(n).toBe(walkOutsBeforeProposal(pair[1]!, pair[0]!))
+      const n = walkOutsBeforeProposal({ id: pair[0]! }, { id: pair[1]! })
+      expect(n).toBe(walkOutsBeforeProposal({ id: pair[1]! }, { id: pair[0]! }))
       seen.add(n)
     }
     expect(seen.size).toBeGreaterThan(1)
+  })
+
+  it('★ the slower heart sets the floor: slow with quick wants half a season, quick with quick days', () => {
+    const slow = { id: 'amara', pace: 'slow' as const }
+    const quick = { id: 'nadia', pace: 'quick' as const }
+    const steady = { id: 'kamal' }
+    const within = (n: number, pace: 'slow' | 'steady' | 'quick') => {
+      expect(n).toBeGreaterThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL[pace].least)
+      expect(n).toBeLessThanOrEqual(WALK_OUTS_BEFORE_PROPOSAL[pace].most)
+    }
+    within(walkOutsBeforeProposal(slow, quick), 'slow')
+    expect(walkOutsBeforeProposal(quick, slow)).toBe(walkOutsBeforeProposal(slow, quick))
+    within(walkOutsBeforeProposal(quick, { id: 'bashir', pace: 'quick' }), 'quick')
+    within(walkOutsBeforeProposal(steady, quick), 'steady')
+    within(walkOutsBeforeProposal(steady, { id: 'leyla' }), 'steady')
+    expect(WALK_OUTS_BEFORE_PROPOSAL.quick.most).toBeLessThan(
+      WALK_OUTS_BEFORE_PROPOSAL.steady.least,
+    )
+    expect(WALK_OUTS_BEFORE_PROPOSAL.steady.most).toBeLessThan(WALK_OUTS_BEFORE_PROPOSAL.slow.least)
+  })
+
+  it('★ one walk out a day, for either of them', () => {
+    const s = at(outside(), 100)
+    const today = Math.floor(s.tick / MINUTES_PER_DAY)
+    const been = (id: string): WorldState => ({
+      ...s,
+      agents: { ...s.agents, [id]: { ...s.agents[id]!, courted: { withId: 'a9', day: today } } },
+    })
+    expect(refusal(ask(been('a1'), 'a1', 'court'))).toBe(
+      'you walked out with somebody else today already',
+    )
+    expect(refusal(ask(been('a2'), 'a1', 'court'))).toBe(
+      'they walked out with somebody else today already',
+    )
+    const yesterday = {
+      ...s,
+      agents: {
+        ...s.agents,
+        a1: { ...s.agents.a1!, courted: { withId: 'a9', day: today - 1 } },
+      },
+    }
+    expect(ask(yesterday, 'a1', 'court').ok).toBe(true)
   })
 
   it('a stale ask is a fresh ask, not an answer', () => {

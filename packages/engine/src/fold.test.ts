@@ -84,6 +84,32 @@ describe('fold', () => {
     expect(s.agents.b!.lastMealTick).toBe(-360)
   })
 
+  it('★ a spawned or arrived body carries its pace, and one without hashes as before', () => {
+    const slow = fold(
+      genesisState(DEFAULT_CONFIG),
+      ev(1, 'agent_spawned', { id: 'a1', name: 'Ada', x: 2, y: 3, ageDays: 9125, pace: 'slow' }),
+    )
+    expect(slow.agents.a1!.pace).toBe('slow')
+    const plain = fold(
+      genesisState(DEFAULT_CONFIG),
+      ev(1, 'agent_spawned', { id: 'a1', name: 'Ada', x: 2, y: 3, ageDays: 9125 }),
+    )
+    expect(plain.agents.a1).not.toHaveProperty('pace')
+    const came = fold(
+      plain,
+      ev(2, 'agent_arrived', {
+        id: 'a2',
+        name: 'Bel',
+        sex: 'f',
+        ageDays: 9125,
+        x: 0,
+        y: 0,
+        pace: 'quick',
+      }),
+    )
+    expect(came.agents.a2!.pace).toBe('quick')
+  })
+
   it('spawn applies the full v2 default body', () => {
     const s = fold(
       genesisState(DEFAULT_CONFIG),

@@ -18,6 +18,7 @@ import {
   DEV_FAST_FORWARD_FOR_INTERIORS,
   FOUNDERS,
   FOUNDERS_HOME_ID,
+  FOUNDER_PACE,
   GO_HOME_BELOW,
   LEAVE_HOME_ABOVE,
   type FounderDef,
@@ -529,5 +530,16 @@ describe('★ how the founders eat', () => {
     expect(Math.min(...hours)).toBeGreaterThanOrEqual(6)
     expect(Math.max(...hours)).toBeLessThanOrEqual(14)
     expect(new Set(hours).size).toBeGreaterThanOrEqual(6)
+  })
+})
+
+// Owner 2026-09-07: courting is slow burn with real variance.
+describe('★ every founder has a pace, and most are slow', () => {
+  it('names every body on the roster, seven slow, three steady, two quick', () => {
+    for (const f of FOUNDER_ROSTER)
+      expect([f.id, FOUNDER_PACE[f.id]]).not.toEqual([f.id, undefined])
+    const count = (pace: string) => Object.values(FOUNDER_PACE).filter((p) => p === pace).length
+    expect([count('slow'), count('steady'), count('quick')]).toEqual([7, 3, 2])
+    expect(Object.keys(FOUNDER_PACE).sort()).toEqual(FOUNDER_ROSTER.map((f) => f.id).sort())
   })
 })

@@ -11,6 +11,7 @@ import {
   type SimConfig,
   type SimEvent,
   type SimTime,
+  type Pace,
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
@@ -58,6 +59,8 @@ export type SelfBody = {
   hoursSinceMeal?: number
   // How much this body eats against the town's mean of one; absent reads as one.
   appetite?: number
+  // How fast this heart lets somebody close; absent reads as steady.
+  pace?: Pace
 }
 
 export type PerceivedAgent = {
@@ -965,6 +968,7 @@ export function composePerception(
         afflictions: (self.afflictions ?? []).map((a) => ({ kind: a.kind, severity: a.severity })),
         hoursSinceMeal: (state.tick - (self.lastMealTick ?? state.tick)) / 60,
         ...(self.appetite === undefined ? {} : { appetite: self.appetite }),
+        ...(self.pace === undefined ? {} : { pace: self.pace }),
       },
       x: self.x,
       y: self.y,

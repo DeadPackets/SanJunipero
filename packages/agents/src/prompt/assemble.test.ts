@@ -320,6 +320,30 @@ describe('perceptionToProse', () => {
     expect(prose).toContain(FELT_EVENT_PROSE.rain_started)
   })
 
+  // Owner 2026-09-07: courting is slow burn with real variance, and a heart's pace is character.
+  describe('★ a heart has a pace', () => {
+    const paced = (pace?: 'slow' | 'steady' | 'quick') => ({
+      ...quietMeadowPacket,
+      self: {
+        ...quietMeadowPacket.self,
+        body: { ...quietMeadowPacket.self.body, ...(pace === undefined ? {} : { pace }) },
+      },
+    })
+    it('a slow heart is told it lets people close slowly', () => {
+      expect(perceptionToProse(paced('slow'))).toContain('You let people close slowly.')
+      expect(perceptionToProse(paced('slow'))).not.toContain('You fall fast')
+    })
+    it('a quick heart is told it falls fast', () => {
+      expect(perceptionToProse(paced('quick'))).toContain('You fall fast, and you know it')
+    })
+    it('a steady heart, and a packet from before pace existed, get no line', () => {
+      for (const prose of [perceptionToProse(paced('steady')), perceptionToProse(paced())]) {
+        expect(prose).not.toContain('You let people close slowly.')
+        expect(prose).not.toContain('You fall fast')
+      }
+    })
+  })
+
   // Owner 2026-09-07: people eat once a sim-day. The bar is a starvation clock and says nothing
   // for a week, so the day since the last meal has to speak, and open the road to food.
   describe('★ a meal a day', () => {

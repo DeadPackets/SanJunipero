@@ -8,6 +8,7 @@ import {
   T_PATH,
   T_ROAD,
   type SimConfig,
+  type Pace,
 } from '@sj/shared'
 import {
   BRIDGE_KIND,
@@ -125,6 +126,24 @@ export const FOUNDER_EATING: Readonly<Record<string, { appetite: number; ateHour
 }
 
 /** The whole founding, seated by `FOUNDER_SEATS` in `foundersFor`. */
+/** How fast each founder lets somebody close, read off the card's temperament. Character, not
+ *  plot: a card may say a person is slow to warm, never whom they warm to. Seven slow, three
+ *  steady, two quick, so most courtships take weeks and a couple do not. */
+export const FOUNDER_PACE: Readonly<Record<string, Pace>> = {
+  omar: 'slow',
+  amara: 'slow',
+  yusuf: 'slow',
+  nadia: 'quick',
+  salma: 'slow',
+  farida: 'slow',
+  bashir: 'quick',
+  kamal: 'steady',
+  leyla: 'steady',
+  tariq: 'steady',
+  halim: 'slow',
+  dilara: 'slow',
+}
+
 export const FOUNDER_ROSTER: readonly FounderBody[] = [
   ...FOUNDERS.map(({ id, name, ageDays }) => ({ id, name, ageDays })),
   { id: 'farida', name: 'Farida', ageDays: 37 * DAYS_PER_YEAR },
@@ -638,6 +657,7 @@ export function makeFoundersOnTick(
           y: f.spawn.y,
           ageDays: f.ageDays,
           ...(FOUNDER_EATING[f.id] ?? {}),
+          ...(FOUNDER_PACE[f.id] === undefined ? {} : { pace: FOUNDER_PACE[f.id] }),
         })
       }
       for (const s of structures) {

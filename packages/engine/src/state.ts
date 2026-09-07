@@ -8,6 +8,7 @@ import {
   T_WATER,
   sanitizeSpokenText,
   type InvitationVerb,
+  type Pace,
   type SimConfig,
   type TileId,
   type TownFacing,
@@ -77,6 +78,8 @@ export type AgentBody = {
   asked?: { byId: string; verb: InvitationVerb; tick: number }
   // The last walk out together: one a day per pair, or the same two ask each other all day.
   courted?: { withId: string; day: number }
+  // How fast this heart lets somebody close; absent reads as steady.
+  pace?: Pace
   // How many separate days this body has walked out with each person. A proposal is refused
   // until the pair has enough of them, so a partnership is weeks of evenings, not one ask.
   walkOuts?: Record<string, number>

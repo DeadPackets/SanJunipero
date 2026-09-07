@@ -8,6 +8,7 @@ import {
   MINUTES_PER_DAY,
   heardLine,
   type SimTime,
+  type Pace,
 } from '@sj/shared'
 import {
   FULL_ABOVE,
@@ -151,6 +152,8 @@ export type PerceptionPacket = {
       hoursSinceMeal?: number
       // How much this body eats against the town's mean of one; absent reads as one.
       appetite?: number
+      // How fast this heart lets somebody close. Absent on a packet from before pace existed.
+      pace?: Pace
     }
     x: number
     y: number
@@ -1423,6 +1426,17 @@ export function perceptionToProse(
           : `You are already walking toward (${toward.x}, ${toward.y}). You will get there if you keep going.`,
     )
   }
+
+  // Owner 2026-09-07: courting is slow burn with real variance. A heart's pace is character,
+  // said once a turn; a steady one needs no line.
+  if (packet.self.body.pace === 'slow')
+    lines.push(
+      'You let people close slowly. Walking out with someone is a real step for you, and you would rather know a person a good while first. You do not say yes to the first asking, and you do not ask on a whim.',
+    )
+  else if (packet.self.body.pace === 'quick')
+    lines.push(
+      'You fall fast, and you know it about yourself. When you like someone you say so, and you would say yes to a walk out without much asking.',
+    )
 
   // World one told five founders their stomachs ached on the exact tick they hit the floor: a
   // need fells at 5, so hunger and energy warn far above it. Thirst fells nobody and is left be.

@@ -386,6 +386,11 @@ const ReproductionSchema = z
 // off the road, the rest born here. The runtime keeps its own copy as the last line.
 export const POPULATION_MAX_DEFAULT = 20
 
+// Owner 2026-09-07: courting is slow burn with real variance. How fast a heart lets somebody
+// close. Absent reads as steady, so a town that never set it hashes as it always did.
+export const PACES = ['slow', 'steady', 'quick'] as const
+export type Pace = (typeof PACES)[number]
+
 const PopulationSchema = z
   .object({
     maxMinds: z.number().int().positive().default(POPULATION_MAX_DEFAULT),

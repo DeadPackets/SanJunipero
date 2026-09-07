@@ -92,6 +92,7 @@ import {
   type DurationWord,
   type InvitationVerb,
   type SimConfig,
+  type Pace,
 } from '@sj/shared'
 
 export type VerbKind =
@@ -2592,14 +2593,25 @@ function bloodKin(a: AgentBody, b: AgentBody): boolean {
     : false
 }
 
-/** Five to eight separate days walked out together before a proposal can be said yes to. Drawn
- *  from the pair's names, so every couple has its own number and the median sits near a week. */
-export const WALK_OUTS_BEFORE_PROPOSAL = { least: 5, most: 8 } as const
-export function walkOutsBeforeProposal(aId: string, bId: string): number {
+/** Separate days walked out together before a proposal can be said yes to, by the slower of the
+ *  two hearts: a slow one wants half a season of it, a quick one a few days. Drawn from the
+ *  pair's names inside that span, so every couple has its own number. */
+export const WALK_OUTS_BEFORE_PROPOSAL: Readonly<Record<Pace, { least: number; most: number }>> = {
+  slow: { least: 10, most: 14 },
+  steady: { least: 5, most: 8 },
+  quick: { least: 2, most: 4 },
+}
+const PACE_ORDER: readonly Pace[] = ['quick', 'steady', 'slow']
+export const paceOf = (a: { pace?: Pace }): Pace => a.pace ?? 'steady'
+export function slowerOf(a: { pace?: Pace }, b: { pace?: Pace }): Pace {
+  return PACE_ORDER.indexOf(paceOf(a)) >= PACE_ORDER.indexOf(paceOf(b)) ? paceOf(a) : paceOf(b)
+}
+type Heart = { id: string; pace?: Pace }
+export function walkOutsBeforeProposal(a: Heart, b: Heart): number {
   let h = 2166136261
-  for (const ch of [aId, bId].sort().join('+')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
-  const span = WALK_OUTS_BEFORE_PROPOSAL.most - WALK_OUTS_BEFORE_PROPOSAL.least + 1
-  return WALK_OUTS_BEFORE_PROPOSAL.least + ((h >>> 0) % span)
+  for (const ch of [a.id, b.id].sort().join('+')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619)
+  const { least, most } = WALK_OUTS_BEFORE_PROPOSAL[slowerOf(a, b)]
+  return least + ((h >>> 0) % (most - least + 1))
 }
 
 /** Everything the three invitation verbs refuse for, in one order, said in the town's words. */
@@ -2626,16 +2638,22 @@ function askable(
   }
   if (bloodKin(me, target)) return 'they are your own blood'
   if (verb === 'court') {
+    // One walk out a day, for either of them: a second on the same day with somebody else is
+    // the thing that read as a town of flirts (r37: 28 walk outs in ten days, 3 per person).
     const today = Math.floor(state.tick / MINUTES_PER_DAY)
-    if (me.courted?.withId === target.id && me.courted.day === today)
-      return 'you walked out together already today'
+    if (me.courted?.day === today)
+      return me.courted.withId === target.id
+        ? 'you walked out together already today'
+        : 'you walked out with somebody else today already'
+    if (target.courted?.day === today && target.courted.withId !== agentId)
+      return 'they walked out with somebody else today already'
     return null
   }
   if (verb === 'propose') {
     if (me.partnerId !== undefined) return 'you already have a partner'
     if (target.partnerId !== undefined) return 'they already have a partner'
     const together = me.walkOuts?.[target.id] ?? 0
-    if (together < walkOutsBeforeProposal(agentId, target.id))
+    if (together < walkOutsBeforeProposal(me, target))
       return together === 0
         ? 'too soon: you have never walked out together'
         : `too soon: you have only walked out together ${together} ${together === 1 ? 'day' : 'days'}`
