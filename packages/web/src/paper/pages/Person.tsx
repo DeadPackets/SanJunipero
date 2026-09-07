@@ -352,8 +352,9 @@ export function PersonPage({ tab, subject, store }: PageProps) {
       {(mood !== null || aim !== null || tie !== null || family !== null) && (
         <p className="person-story">
           {mood !== null && <span className="person-mood">{mood}</span>}
-          {family !== null && <span>{family}</span>}
+          {/* The aim is a fragment written to follow the mood word, so nothing goes between them. */}
           {aim?.goal != null && <span>{aim.goal}</span>}
+          {family !== null && <span>{family}</span>}
           {aim?.worry != null && (
             <span>
               On {a.name}’s mind: {aim.worry}.

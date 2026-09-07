@@ -140,7 +140,7 @@ export function pairFacts(
 
 /**
  * Directional, because "parent" and "child" are the same edge read from two ends. KIN OUTRANKS
- * PARTNER: a birth is a fact the world wrote down, a partnership is inferred from who slept where.
+ * PARTNER, and a marriage the world holds outranks one read off the nights a pair kept house.
  */
 export function bondTypeOf(
   aId: string,
