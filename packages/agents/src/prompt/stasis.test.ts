@@ -76,16 +76,27 @@ describe('bedtimeLine', () => {
     self: { ...quietMeadowPacket.self, asleep },
   })
 
-  it('says the hour once the body is up past it, and nothing before or in bed', () => {
+  it('★ says the body is up past its hour, and names no clock for it to read out', () => {
     expect(bedtimeLine(at(21), 22, 6)).toBe('')
-    expect(bedtimeLine(at(22), 22, 6)).toBe('It is past 22:00, the hour you usually turn in.')
-    expect(bedtimeLine(at(2), 22, 6)).toBe('It is past 22:00, the hour you usually turn in.')
+    expect(bedtimeLine(at(22), 22, 6)).toBe('You are usually in bed by about now.')
+    expect(bedtimeLine(at(23), 22, 6)).toBe('You are past your usual hour for bed.')
+    expect(bedtimeLine(at(2), 22, 6)).toBe(
+      'You are hours past the time you usually turn in, and your body knows it.',
+    )
     expect(bedtimeLine(at(2, true), 22, 6)).toBe('')
     expect(bedtimeLine(at(14), 22, 6)).toBe('')
+    for (const hour of [22, 23, 0, 2]) expect(bedtimeLine(at(hour), 22, 6)).not.toMatch(/\d/)
   })
 
-  it('a midnight card reads as 00:00', () => {
-    expect(bedtimeLine(at(1), 24, 9)).toBe('It is past 00:00, the hour you usually turn in.')
+  it('★ no bed hour in the cast is handed a clock reading to say out loud', () => {
+    // r38: Farida and Halim both turn in at 21:00, were both handed "It is past 21:00", and both
+    // said "it is past nine" that night. The line says how the body feels, and names no number.
+    for (const bed of [20, 21, 22, 23, 24]) {
+      for (const hour of [20, 21, 22, 23, 0, 1, 2, 3, 4, 5]) {
+        expect(bedtimeLine(at(hour), bed, 6)).not.toMatch(/\d/)
+      }
+    }
+    expect(bedtimeLine(at(1), 24, 9)).toBe('You are past your usual hour for bed.')
   })
 })
 

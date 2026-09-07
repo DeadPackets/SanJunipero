@@ -921,11 +921,16 @@ export function repeatedActLine(repeat: { name: string; n: number } | null): str
 
 /** A fact about the hour and this body's own habit, for a mind still up and out past it. Under its
  *  own roof the reflex has already put it to bed; this reaches the one standing in the lane. */
+// r38 night of day 0: four founders share a bed hour, were handed the same clock reading, and
+// four of them said "it is past nine" within the hour. A body feels the hour, it does not read it.
 export function bedtimeLine(packet: PerceptionPacket, bedHour: number, riseHour: number): string {
   if (packet.self.asleep || !packet.time.isNight) return ''
   const { hour } = packet.time
   if (hour < bedHour && hour >= riseHour) return ''
-  return `It is past ${String(bedHour % 24).padStart(2, '0')}:00, the hour you usually turn in.`
+  const past = (hour - bedHour + 24) % 24
+  if (past >= 3) return 'You are hours past the time you usually turn in, and your body knows it.'
+  if (past >= 1) return 'You are past your usual hour for bed.'
+  return 'You are usually in bed by about now.'
 }
 
 /** Somebody this mind has a tie to, when it last had them in sight or earshot, and how warm
