@@ -76,8 +76,10 @@ export function peopleFromSignature(sig: string): PeopleIndex {
  *  gateway (P1) and a typed empty is a perfectly good answer. */
 export type LineageLike = {
   parentOf: readonly { parentId: string; childId: string; tick: number }[]
+  /** The partnerships the world holds right now. Absent on a feed from before it said so. */
+  partnerOf?: readonly { aId: string; bId: string }[]
 }
-export const EMPTY_LINEAGE: LineageLike = { parentOf: [] }
+export const EMPTY_LINEAGE: LineageLike = { parentOf: [], partnerOf: [] }
 
 const parentsOf = (id: string, lineage: LineageLike): Set<string> =>
   new Set(lineage.parentOf.filter((e) => e.childId === id).map((e) => e.parentId))
@@ -153,6 +155,14 @@ export function bondTypeOf(
   if (mine.size > 0) {
     for (const p of parentsOf(bId, lineage)) if (mine.has(p)) return 'sibling'
   }
+  // A marriage the world holds is a marriage whether or not the pair has kept house yet: the
+  // valley was founded with two of them, and neither had an act to its name on the first tick.
+  if (
+    lineage.partnerOf?.some(
+      (e) => (e.aId === aId && e.bId === bId) || (e.aId === bId && e.bId === aId),
+    ) === true
+  )
+    return 'partner'
   const bond = bondBetween(aId, bId, bonds)
   // The rollup counts EVERY night the pair kept house, so a marriage older than the 24-act
   // window is still a marriage — which a truncated list on its own could not have said.

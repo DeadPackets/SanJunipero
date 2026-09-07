@@ -148,6 +148,17 @@ describe('a friendship is losable and hatred is earnable', () => {
 })
 
 // ── TYPE ───────────────────────────────────────────────────────────────────────────────────
+describe('★ a marriage the world holds is drawn before the pair has kept a single house', () => {
+  it('reads partnerOf, either way round, and falls back to the acts when it says nothing', () => {
+    const married = { parentOf: [], partnerOf: [{ aId: 'bashir', bId: 'farida' }] }
+    expect(bondTypeOf('bashir', 'farida', married, api([]))).toBe('partner')
+    expect(bondTypeOf('farida', 'bashir', married, api([]))).toBe('partner')
+    expect(bondTypeOf('bashir', 'amara', married, api([]))).toBe('none')
+    // A feed from before the world said so is not an error, it is a feed with nothing to add.
+    expect(bondTypeOf('bashir', 'farida', { parentOf: [] }, api([]))).toBe('none')
+  })
+})
+
 describe('bondTypeOf — the same edge read from two ends', () => {
   const fam = lineage([
     ['amara', 'kid'],
