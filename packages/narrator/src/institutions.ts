@@ -4,6 +4,9 @@ import type { DetectConfig, DetectedInstitution, SceneSegment } from './types.js
 export const DEFAULT_DETECT_CONFIG: DetectConfig = {
   groupMinCoScenes: 3,
   groupMinMembers: 2,
+  // r37: by day 3 every founder had shared three scenes with every other, and the town itself was
+  // named as a group. A group is a clique, and a clique is a few.
+  groupMaxMembers: 4,
   roleMinActions: 3,
   ruleMinAgents: 2,
   ruleMinActions: 4,
@@ -130,7 +133,7 @@ export function detectInstitutions(
       members.push(node)
       for (const next of adj.get(node) ?? []) if (!visited.has(next)) stack.push(next)
     }
-    if (members.length < cfg.groupMinMembers) continue
+    if (members.length < cfg.groupMinMembers || members.length > cfg.groupMaxMembers) continue
     members.sort()
     const named = members.map(nameOf)
     const memberSet = new Set(members)

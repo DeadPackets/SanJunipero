@@ -79,6 +79,7 @@ export type DetectedInstitution = Omit<Institution, 'foundingSceneId'> & {
 export type DetectConfig = {
   groupMinCoScenes: number
   groupMinMembers: number
+  groupMaxMembers: number
   roleMinActions: number
   ruleMinAgents: number
   ruleMinActions: number

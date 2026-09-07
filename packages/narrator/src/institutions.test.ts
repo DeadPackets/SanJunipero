@@ -85,6 +85,19 @@ describe('detectInstitutions', () => {
     expect(out.some((i) => i.kind === 'rule' && i.name === 'people tend')).toBe(false)
   })
 
+  it('★ the whole town is not a group: a component past groupMaxMembers is dropped, a trio kept', () => {
+    const town = ['amara', 'bashir', 'dilara', 'farida', 'halim']
+    const crowd = [0, 1, 2].map((d) => scene(d, [d + 1], town))
+    expect(
+      detectInstitutions(crowd, [], DEFAULT_DETECT_CONFIG).filter((i) => i.kind === 'group'),
+    ).toEqual([])
+    const trio = [0, 1, 2].map((d) => scene(d, [d + 1], town.slice(0, 3)))
+    const groups = detectInstitutions(trio, [], DEFAULT_DETECT_CONFIG).filter(
+      (i) => i.kind === 'group',
+    )
+    expect(groups.map((g) => g.memberIds)).toEqual([['amara', 'bashir', 'dilara']])
+  })
+
   it('give is excluded from rules (a trade first, not a norm)', () => {
     const gives = [1, 2, 3, 4].map((n) => act(n, n, n % 2 ? 'omar' : 'yusuf', 'give'))
     const giveScenes = [scene(0, [1, 2, 3, 4], ['omar', 'yusuf'])]
