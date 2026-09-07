@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Bond } from '@sj/shared'
 import { EMPTY_LINEAGE } from '../bondModel2.js'
-import { strongestPairs, strongestTie } from './tieLine.js'
+import { familyLine, strongestPairs, strongestTie } from './tieLine.js'
 
 const NOW = 5000
 const NAMES: Record<string, string> = { amara: 'Amara', kamal: 'Kamal', tariq: 'Tariq' }
@@ -74,5 +74,31 @@ describe('the one tie a roster row has room for', () => {
     expect(
       strongestTie('tariq', { bonds: [bond('amara', 'kamal', 25)], asOfTick: NOW }, NOW, nameOf),
     ).toBe(null)
+  })
+})
+
+describe('★ familyLine — who a person is to their own family', () => {
+  const name = (id: string) => id[0]!.toUpperCase() + id.slice(1)
+  const lineage = {
+    parentOf: [
+      { parentId: 'leyla', childId: 'tariq', tick: 1 },
+      { parentId: 'kamal', childId: 'tariq', tick: 1 },
+      { parentId: 'halim', childId: 'dilara', tick: 1 },
+    ],
+    partnerOf: [{ aId: 'kamal', bId: 'leyla' }],
+  }
+
+  it('names the marriage, the parents and the children, in that order', () => {
+    expect(familyLine('kamal', lineage, name)).toBe('Married to Leyla. Parent to Tariq.')
+    expect(familyLine('leyla', lineage, name)).toBe('Married to Kamal. Parent to Tariq.')
+    expect(familyLine('tariq', lineage, name)).toBe('Child of Leyla and Kamal.')
+    expect(familyLine('halim', lineage, name)).toBe('Parent to Dilara.')
+    expect(familyLine('dilara', lineage, name)).toBe('Child of Halim.')
+  })
+
+  it('says nothing about somebody with no family, and reads a feed that has no marriages', () => {
+    expect(familyLine('amara', lineage, name)).toBeNull()
+    expect(familyLine('kamal', { parentOf: lineage.parentOf }, name)).toBe('Parent to Tariq.')
+    expect(familyLine('amara', { parentOf: [] }, name)).toBeNull()
   })
 })

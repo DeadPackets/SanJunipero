@@ -62,3 +62,26 @@ export function strongestPairs(
       words: pairFacts(b.aId, b.bId, index, lineage, bonds, people, nowTick).words,
     }))
 }
+
+/** Who this person is to their own family, in the order a person would say it: the one they
+ *  married, the ones who made them, the ones they made. Says nothing about anybody else. */
+export function familyLine(
+  id: string,
+  lineage: LineageLike,
+  nameOf: (id: string) => string,
+): string | null {
+  const said: string[] = []
+  const partner = lineage.partnerOf?.find((e) => e.aId === id || e.bId === id)
+  if (partner !== undefined)
+    said.push(`Married to ${nameOf(partner.aId === id ? partner.bId : partner.aId)}.`)
+  const parents = lineage.parentOf.filter((e) => e.childId === id).map((e) => nameOf(e.parentId))
+  if (parents.length > 0) said.push(`Child of ${listed(parents)}.`)
+  const children = lineage.parentOf.filter((e) => e.parentId === id).map((e) => nameOf(e.childId))
+  if (children.length > 0) said.push(`Parent to ${listed([...new Set(children)])}.`)
+  return said.length === 0 ? null : said.join(' ')
+}
+
+const listed = (names: readonly string[]): string =>
+  names.length <= 1
+    ? (names[0] ?? '')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
