@@ -49,6 +49,28 @@ describe('what the Bonds page says first', () => {
       'amara|kamal',
     ])
   })
+
+  // r40 day 0: the town held two marriages and two children, and this page said nobody here was
+  // more than a stranger to anybody, because a founding family has no acts behind it.
+  it('★ says the families the world holds, on a morning where nobody has done anything yet', () => {
+    const people = { ...PEOPLE, leyla: { name: 'Leyla', alive: true } }
+    const kin = {
+      parentOf: [{ parentId: 'kamal', childId: 'tariq', tick: 1 }],
+      partnerOf: [{ aId: 'kamal', bId: 'leyla' }],
+    }
+    const said = strongestPairs({ bonds: [], asOfTick: NOW }, kin, people, NOW).map((p) => p.words)
+    expect(said.sort()).toEqual(['Kamal and Leyla are partners.', 'Kamal is Tariq’s parent.'])
+    expect(said.join(' ')).not.toContain('stranger')
+  })
+
+  it('a warm pair still outranks a family nobody has spoken to yet', () => {
+    const kin = { parentOf: [], partnerOf: [{ aId: 'kamal', bId: 'tariq' }] }
+    expect(
+      strongestPairs({ bonds: [bond('amara', 'kamal', 30)], asOfTick: NOW }, kin, PEOPLE, NOW).map(
+        (p) => p.words,
+      ),
+    ).toEqual(['Amara and Kamal are close.', 'Kamal and Tariq are partners.'])
+  })
 })
 
 describe('the one tie a roster row has room for', () => {

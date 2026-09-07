@@ -254,7 +254,11 @@ export function relationLine(
   const head =
     type === 'none'
       ? `${TYPE_CLAUSE.none(a, b)} ${LEVEL_CLAUSE[level]}.`
-      : `${TYPE_CLAUSE[type](a, b)}, and they ${LEVEL_CLAUSE[level]}.`
+      : // Nobody would forgive "Bashir and Farida are partners, and they are strangers to each
+        // other". A family with no acts behind it yet is a family, and that is the whole line.
+        level === 'strangers'
+        ? `${TYPE_CLAUSE[type](a, b)}.`
+        : `${TYPE_CLAUSE[type](a, b)}, and they ${LEVEL_CLAUSE[level]}.`
   const arcWords = ARC_CLAUSE[arc.direction]
   return arcWords === null ? head : `${head} ${arcWords} ${arc.sinceDay}.`
 }

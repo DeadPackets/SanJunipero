@@ -39,8 +39,10 @@ export function strongestTie(
 export type PairLine = { id: string; aId: string; bId: string; words: string }
 
 /** The pairs with the most feeling between them, warm or cold, as the sentences the Bonds page
- *  already knows how to say. What that page says first, before the picture and before the key;
- *  strangers are not a thing to say. */
+ *  already knows how to say. What that page says first, before the picture and before the key.
+ *  Strangers are not a thing to say, but a family the world holds is: the valley was founded
+ *  with two marriages and two children, and on the first morning none of them had an act to
+ *  their name, so the page said nobody here was more than a stranger. */
 export function strongestPairs(
   bonds: BondsResponse,
   lineage: LineageLike,
@@ -49,17 +51,32 @@ export function strongestPairs(
   n = 5,
 ): PairLine[] {
   const index = bondIndex(bonds)
-  return bonds.bonds
-    .filter((b) => b.aId in people && b.bId in people)
-    .map((b) => ({ b, warmth: bondWarmth(b, nowTick) }))
-    .filter(({ warmth }) => bondLevel(warmth) !== 'strangers')
-    .sort((x, y) => Math.abs(y.warmth) - Math.abs(x.warmth) || (x.b.id < y.b.id ? -1 : 1))
+  const key = (aId: string, bId: string): string => [aId, bId].sort().join('|')
+  const here = (aId: string, bId: string): boolean => aId in people && bId in people
+  const pairs = new Map<string, { aId: string; bId: string; warmth: number }>()
+  for (const b of bonds.bonds) {
+    if (!here(b.aId, b.bId)) continue
+    pairs.set(key(b.aId, b.bId), { aId: b.aId, bId: b.bId, warmth: bondWarmth(b, nowTick) })
+  }
+  const family: string[] = []
+  const hold = (aId: string, bId: string): void => {
+    if (!here(aId, bId)) return
+    const k = key(aId, bId)
+    family.push(k)
+    if (!pairs.has(k)) pairs.set(k, { aId, bId, warmth: 0 })
+  }
+  for (const e of lineage.partnerOf ?? []) hold(e.aId, e.bId)
+  for (const e of lineage.parentOf) hold(e.parentId, e.childId)
+  const held = new Set(family)
+  return [...pairs]
+    .filter(([k, p]) => held.has(k) || bondLevel(p.warmth) !== 'strangers')
+    .sort(([ka, a], [kb, b]) => Math.abs(b.warmth) - Math.abs(a.warmth) || (ka < kb ? -1 : 1))
     .slice(0, n)
-    .map(({ b }) => ({
-      id: b.id,
-      aId: b.aId,
-      bId: b.bId,
-      words: pairFacts(b.aId, b.bId, index, lineage, bonds, people, nowTick).words,
+    .map(([k, p]) => ({
+      id: k,
+      aId: p.aId,
+      bId: p.bId,
+      words: pairFacts(p.aId, p.bId, index, lineage, bonds, people, nowTick).words,
     }))
 }
 
