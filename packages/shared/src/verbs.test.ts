@@ -23,6 +23,10 @@ describe('pastParticiple', () => {
 describe('the present participle', () => {
   it('says lying, not lieing — the act two bodies are in the middle of', () => {
     expect(verbPhraseGerund('lie_with')).toBe('lying with')
+    // r40 day 0: the chip on Tariq read "Making make tally board".
+    expect(verbPhraseGerund('recipe:make_tally_board')).toBe('making tally board')
+    expect(verbPhrasePast('recipe:make_tally_board')).toBe('made tally board')
+    expect(verbPhraseGerund('recipe:plank')).toBe('making plank')
     expect(verbPhrasePast('lie_with')).toBe('lain with')
     expect(verbPhraseGerund('leave_partner')).toBe('leaving partner')
   })

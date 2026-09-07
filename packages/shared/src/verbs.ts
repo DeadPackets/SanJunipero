@@ -5,7 +5,10 @@ export const verbWords = (verb: string): [string, ...string[]] => {
   const bare = coined ? verb.slice('recipe:'.length) : verb.replace(/^express:/, '')
   const [head, ...rest] = bare.split(/[_:]/).filter((w) => w !== '')
   if (head === undefined) return [verb]
-  return coined ? ['make', head, ...rest] : [head, ...rest]
+  // The town names its own recipes, and it named one `make_tally_board`. Prepending a second
+  // "make" gave a viewer the chip "Making make tally board".
+  if (coined) return head === 'make' ? ['make', ...rest] : ['make', head, ...rest]
+  return [head, ...rest]
 }
 
 /** The slug said in the present, for a name rather than a count. */
