@@ -342,6 +342,13 @@ describe('perceptionToProse', () => {
       const prose = perceptionToProse(fed(9), undefined, sources)
       expect(prose).not.toContain('since you last ate')
       expect(prose).not.toContain('You could eat it now')
+      expect(prose).not.toContain('You ate')
+    })
+    // r36: Nadia ate eleven times in one day, "I said I'd eat" on every turn.
+    it('★ a meal just had is said, so it is not had again', () => {
+      expect(perceptionToProse(fed(0.5), undefined, sources)).toContain('You have just eaten.')
+      expect(perceptionToProse(fed(3), undefined, sources)).toContain('You ate a few hours ago.')
+      expect(perceptionToProse(fed(3), undefined, sources)).not.toContain('You could eat it now')
     })
     it('a day on, the meal is due and the loaf in hand is offered', () => {
       const prose = perceptionToProse(fed(21), undefined, sources)

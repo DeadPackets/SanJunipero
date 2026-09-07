@@ -1415,6 +1415,7 @@ export function perceptionToProse(
   const { hunger, energy, warmth, social } = packet.self.body.needs
   const MEAL_DUE_HOURS = 20
   const MEAL_OVERDUE_HOURS = 40
+  const RECENT_MEAL_HOURS = 6
   if (hunger < 25)
     lines.push(
       'You are starving and can think about little else. Eat today, wherever the food is and whoever it belongs to, or you will be on the ground before tomorrow.',
@@ -1424,6 +1425,10 @@ export function perceptionToProse(
   // when days of meals have been missed. A packet from before appetite kept time says nothing.
   const sinceMeal = packet.self.body.hoursSinceMeal
   const mealDue = sinceMeal !== undefined && sinceMeal >= MEAL_DUE_HOURS
+  // r36: Nadia ate eleven times in a day, "I said I'd eat" on every turn, because nothing on the
+  // page said she had. A meal just had is the fact that closes it.
+  if (sinceMeal !== undefined && sinceMeal < RECENT_MEAL_HOURS)
+    lines.push(sinceMeal < 1 ? 'You have just eaten.' : 'You ate a few hours ago.')
   if (mealDue && hunger >= 50) {
     lines.push(
       sinceMeal >= MEAL_OVERDUE_HOURS
