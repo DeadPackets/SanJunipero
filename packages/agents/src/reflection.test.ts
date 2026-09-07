@@ -1131,4 +1131,14 @@ describe('★ what reaches the page is said plainly', () => {
       expect(system).not.toContain(m.id)
     }
   })
+
+  // r39: the ask said the want names a person, and across three runs every want named one. By
+  // day 5 all twelve were about a partner.
+  it('★ the nightly want may be about a place or a thing, not only a person', () => {
+    const system = summarizeDayPrompt([]).system
+    expect(system).not.toMatch(/names one person/)
+    expect(system).toMatch(/one place/)
+    expect(system).toMatch(/afraid of/)
+    expect(system).toMatch(/not about being loved/)
+  })
 })

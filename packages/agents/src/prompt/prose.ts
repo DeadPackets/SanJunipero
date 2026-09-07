@@ -1449,16 +1449,17 @@ export function perceptionToProse(
         : `${parentNames[0]} and ${parentNames[1]} are your parents.`,
     )
 
-  // Owner 2026-09-07: courting is slow burn with real variance. A heart's pace is character,
-  // said once a turn; a steady one needs no line.
-  if (packet.self.body.pace === 'slow')
-    lines.push(
-      'You let people close slowly. Walking out with someone is a real step for you, and you would rather know a person a good while first. You do not say yes to the first asking, and you do not ask on a whim.',
-    )
-  else if (packet.self.body.pace === 'quick')
-    lines.push(
-      'You fall fast, and you know it about yourself. When you like someone you say so, and you would say yes to a walk out without much asking.',
-    )
+  // Owner 2026-09-07: courting is slow burn with real variance. r39: said every turn, this rode
+  // 76% of all prompts with nobody in sight, and by day 5 all twelve minds wanted a partner and
+  // nothing else. A heart's pace is only ever about the person standing in front of it.
+  if (packet.visible.agents.length > 0) {
+    if (packet.self.body.pace === 'slow')
+      lines.push(
+        'You let people close slowly. Walking out with someone is a real step for you, not a whim.',
+      )
+    else if (packet.self.body.pace === 'quick')
+      lines.push('You fall fast, and you know it about yourself. When you like someone you say so.')
+  }
 
   // World one told five founders their stomachs ached on the exact tick they hit the floor: a
   // need fells at 5, so hunger and energy warn far above it. Thirst fells nobody and is left be.

@@ -368,15 +368,18 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       'Then name what you carry into tomorrow, as `standing`: at most three short lines, one each',
       'for what you want, what you promised or owe, and what you are in the middle of making.',
       'The first line is what you want for yourself, in your own life, said the way you would say',
-      'it to a friend in a dozen words. It names one person by name, or one thing by its name,',
-      'and it comes out of something that happened today. Never the words safe, warm, home,',
-      "courage or peace on their own: those are everyone's and say nothing about you.",
-      'Not a task, not a repair, not a count. The other two may be plain work.',
+      'it to a friend in a dozen words. It is about one person, one place, one thing you are',
+      'making, or one thing you are afraid of, and it names that thing. It comes out of',
+      'something that happened today. Never the words safe, warm, home, courage or peace on',
+      "their own: those are everyone's and say nothing about you. Not a task, not a repair,",
+      'not a count. The other two may be plain work.',
       // r39: the one example this prompt used to give named a founder, and five of twelve minds
-      // came back wanting the same thing in the same words. Kamal wanted it of himself.
-      'Wants take many shapes. To be asked first. To be let alone for an evening. To hear one',
-      'person say a thing out loud. To stop being afraid of a place. To be the one somebody',
-      'sends for. Yours is your own: take none of these words, and no name out of them.',
+      // came back wanting the same thing in the same words. Kamal wanted it of himself. By day 5
+      // all twelve wanted a partner, because the ask had told them to name a person.
+      'Wants take many shapes. To be asked first. To finish the thing you started. To be let',
+      'alone for an evening. To stop being afraid of a place. To be the one somebody sends for.',
+      'Most wants are not about being loved. Some are. Say the one that is actually yours, and',
+      'take none of these words.',
       'Leave `standing` empty rather than make one up. Write each line as something you are set',
       'on, not as a report of the day.',
       PLAIN_SPEECH,

@@ -322,13 +322,17 @@ describe('perceptionToProse', () => {
 
   // Owner 2026-09-07: courting is slow burn with real variance, and a heart's pace is character.
   describe('★ a heart has a pace', () => {
-    const paced = (pace?: 'slow' | 'steady' | 'quick') => ({
-      ...quietMeadowPacket,
-      self: {
-        ...quietMeadowPacket.self,
-        body: { ...quietMeadowPacket.self.body, ...(pace === undefined ? {} : { pace }) },
-      },
-    })
+    // conversationPacket has Nadia in sight; quietMeadowPacket has nobody.
+    const paced = (pace?: 'slow' | 'steady' | 'quick', alone = false) => {
+      const base = alone ? quietMeadowPacket : conversationPacket
+      return {
+        ...base,
+        self: {
+          ...base.self,
+          body: { ...base.self.body, ...(pace === undefined ? {} : { pace }) },
+        },
+      }
+    }
     it('a slow heart is told it lets people close slowly', () => {
       expect(perceptionToProse(paced('slow'))).toContain('You let people close slowly.')
       expect(perceptionToProse(paced('slow'))).not.toContain('You fall fast')
@@ -338,6 +342,15 @@ describe('perceptionToProse', () => {
     })
     it('a steady heart, and a packet from before pace existed, get no line', () => {
       for (const prose of [perceptionToProse(paced('steady')), perceptionToProse(paced())]) {
+        expect(prose).not.toContain('You let people close slowly.')
+        expect(prose).not.toContain('You fall fast')
+      }
+    })
+    // r39: this line rode 76% of every turn prompt, nearly all of them alone, and by day 5 all
+    // twelve minds wanted a partner and nothing else.
+    it('★ a heart with nobody in sight is told nothing about letting people close', () => {
+      for (const pace of ['slow', 'quick'] as const) {
+        const prose = perceptionToProse(paced(pace, true))
         expect(prose).not.toContain('You let people close slowly.')
         expect(prose).not.toContain('You fall fast')
       }
