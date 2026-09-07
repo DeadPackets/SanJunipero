@@ -867,6 +867,18 @@ export function silentTurnsLine(silentTurns: number): string {
   return `${times} now you have chosen to wait, and nothing came of it. Nobody can see you waiting.`
 }
 
+/** What became of the last word said outside any talk: nobody near, or nobody taking it up. */
+export type WordToTheAir = { heardBy: number }
+
+// r36: Amara asked the air beside Tariq and waited four hours for an answer. Both had talked
+// their fill for the day, so no talk opened on a remark with no name on it, and nobody said so.
+export function wordToTheAirLine(word: WordToTheAir | null): string {
+  if (word === null) return ''
+  return word.heardBy === 0
+    ? 'What you last said, nobody was near enough to hear.'
+    : "What you last said went to the air, and nobody took it up. A word with somebody's name on it gets an answer."
+}
+
 export const TIMES_SAID = [
   '',
   'once',

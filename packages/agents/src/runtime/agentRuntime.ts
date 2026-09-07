@@ -61,6 +61,8 @@ import {
   silentTurnsLine,
   stasisLine,
   TIMES_SAID,
+  type WordToTheAir,
+  wordToTheAirLine,
   bedtimeLine,
   stillnessAt,
   stockLine,
@@ -484,6 +486,8 @@ export class AgentRuntime {
   #still: Stillness | null = null
   // Turns in a row that ended in a wait: no act, no word, no plan carrying the body.
   #silentTurns = 0
+  // The last word said outside any talk that opened none, until the next word or a talk.
+  #wordToTheAir: WordToTheAir | null = null
   // How many times each minted routine has been carried out today, by verb.
   #recipeRuns: { day: number; counts: Map<string, { name: string; n: number }> } = {
     day: -1,
@@ -970,8 +974,16 @@ export class AgentRuntime {
       if (typeof text === 'string') {
         this.#spoken.push(sanitizeSpokenText(text))
         if (this.#spoken.length > OWN_WORDS_SHOWN) this.#spoken.shift()
-        // A word anyone heard, said by a mind in no scene, is a scene starting.
-        this.#scenes?.noteSpoken(this.#agentId, text, this.#bridge.currentTick())
+        // A word anyone heard, said by a mind in no scene, is a scene starting. One that starts
+        // none is told so next turn, or a mind asks the air and waits all afternoon.
+        const scene =
+          this.#scenes === null
+            ? null
+            : this.#scenes.noteSpoken(this.#agentId, text, this.#bridge.currentTick())
+        this.#wordToTheAir =
+          this.#scenes === null || scene !== null
+            ? null
+            : { heardBy: this.#bridge.earshot(this.#agentId).length }
       }
       if (this.#still !== null) this.#still = { ...this.#still, spoke: true }
       return
@@ -1361,6 +1373,7 @@ export class AgentRuntime {
       stasisLine(this.#still, tick),
       silentTurnsLine(this.#silentTurns),
       repeatedActLine(this.#repeatedToday(tick)),
+      wordToTheAirLine(this.#scenes?.sceneFor(this.#agentId) ? null : this.#wordToTheAir),
       bedtimeLine(packet, this.#config.bedHour, this.#config.riseHour),
       absenceLine([...this.#company.values()], tick),
       gatheringLine(packet, tick),

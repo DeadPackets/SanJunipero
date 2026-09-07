@@ -8,6 +8,7 @@ import {
   stasisLine,
   stillnessAt,
   type Stillness,
+  wordToTheAirLine,
 } from './prose.js'
 
 const stand = (over: Partial<Stillness> = {}): Stillness => ({
@@ -116,5 +117,20 @@ describe('★ a minted routine done again and again', () => {
       'You have carried out "scratch record into wood" 11 times today already.',
     )
     expect(scanForDirective(repeatedActLine({ name: 'lay hearth wood', n: 4 }))).toEqual([])
+  })
+})
+
+// r36: a question asked beside somebody, with nobody's name on it, opened no talk, and the asker
+// waited four hours for an answer that had no way to come.
+describe('★ a word that opened no talk', () => {
+  it('says whether nobody heard it or nobody took it up', () => {
+    expect(wordToTheAirLine(null)).toBe('')
+    expect(wordToTheAirLine({ heardBy: 0 })).toBe(
+      'What you last said, nobody was near enough to hear.',
+    )
+    expect(wordToTheAirLine({ heardBy: 2 })).toBe(
+      "What you last said went to the air, and nobody took it up. A word with somebody's name on it gets an answer.",
+    )
+    expect(scanForDirective(wordToTheAirLine({ heardBy: 2 }))).toEqual([])
   })
 })
