@@ -573,9 +573,10 @@ describe('G11a-D1: a competent body comes through three days on the default worl
       ev('agent_spawned', { id: 'ada', name: 'ada', x: 5, y: 5, ageDays: ADULT_AGE_DAYS }),
       CFG,
     )
+    // Hunger's fall: energy alone puts a body to sleep now, never on the ground.
     s = fold(
       s,
-      ev('needs_changed', { id: 'ada', changes: [{ need: 'energy', delta: -96 }] }, 0),
+      ev('needs_changed', { id: 'ada', changes: [{ need: 'hunger', delta: -96 }] }, 0),
       CFG,
     )
     s = { ...s, tick: 0 }
@@ -703,8 +704,9 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     expect(drainPerDay).toBeGreaterThan(bestRecoveryPerDay * 3)
   })
 
-  it('and the same body given nothing to eat, drink or lie on does not — which is the difference', () => {
-    // The control: the script is what changed, not the physics.
+  it('★ and the same body given nothing to eat, drink or lie on nods off where it stands, and never falls', () => {
+    // The control: the script is what changed, not the physics. Owner 2026-09-07: a collapse
+    // needs a cause, and three days of neglect is not one.
     let s = genesisState(CFG, MAP())
     s = fold(
       s,
@@ -713,11 +715,15 @@ describe('G11a-D1: a competent body comes through three days on the default worl
     )
     s = { ...s, tick: 0 }
     let collapses = 0
+    let naps = 0
     for (let tick = 1; tick <= DAYS * MINUTES_PER_DAY; tick++) {
       const out = pass(s, CFG, tick, 'competent')
       s = out.state
       collapses += out.events.filter((e) => e.type === 'agent_collapsed').length
+      naps += out.events.filter((e) => e.type === 'agent_slept').length
     }
-    expect(collapses).toBeGreaterThan(0)
+    expect(collapses).toBe(0)
+    expect(naps).toBeGreaterThan(0)
+    expect(s.agents.ada!.alive).toBe(true)
   })
 })

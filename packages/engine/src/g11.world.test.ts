@@ -15,7 +15,7 @@ import {
 } from '@sj/shared'
 import { FAUNA_YIELD } from './data/faunaDefs.js'
 import { fold } from './fold.js'
-import { submitIntent } from './intent.js'
+import { NOD_OFF_ENERGY, submitIntent } from './intent.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { ambientTempAt, isExposed } from './systems/warmth.js'
@@ -446,11 +446,11 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
     })
   })
 
-  it('the coat is what decides an autumn dusk: bare goes down, clothed walks home', () => {
+  it('★ the coat is what decides an autumn dusk: bare nods off in the cold, clothed walks home', () => {
     const AUTUMN_DUSK = 2 * DAYS_PER_SEASON * MINUTES_PER_DAY + 19 * 60
     const DUSK_TICKS = 2 * 60
 
-    function dusk(garment: boolean): { collapsed: boolean; energyLeft: number } {
+    function dusk(garment: boolean): { asleep: boolean; collapsed: boolean; energyLeft: number } {
       let s = spawn(genesisState(CFG, MAP()), CFG, 'body', 4, 4)
       if (garment) {
         s = give(s, CFG, 'body', 'item_coat', 'garment')
@@ -482,14 +482,20 @@ describe('G11a-C1: the survivability arithmetic audit — each winter rung, with
       s = { ...s, tick: AUTUMN_DUSK - 1 }
       for (let t = AUTUMN_DUSK; t < AUTUMN_DUSK + DUSK_TICKS; t++) s = pass(s, CFG, t).state
       const a = s.agents.body!
-      return { collapsed: a.collapsedSinceTick !== null, energyLeft: a.needs.energy }
+      return {
+        asleep: a.asleep,
+        collapsed: a.collapsedSinceTick !== null,
+        energyLeft: a.needs.energy,
+      }
     }
 
     const bare = dusk(false)
     const clothed = dusk(true)
-    expect(bare.collapsed).toBe(true)
+    expect(bare.asleep).toBe(true)
+    expect(bare.collapsed).toBe(false)
+    expect(clothed.asleep).toBe(false)
     expect(clothed.collapsed).toBe(false)
-    expect(clothed.energyLeft).toBeGreaterThan(bare.energyLeft)
+    expect(clothed.energyLeft).toBeGreaterThan(NOD_OFF_ENERGY)
   })
 
   it('with the cold switched off nobody is ever exposed, whatever the season says', () => {

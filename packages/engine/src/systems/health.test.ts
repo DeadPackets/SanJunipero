@@ -324,10 +324,15 @@ describe('★ a body down for want of sleep alone passes out', () => {
   // r34 day 1-2: Dilara went down tired at a doorstep and lay awake 33 hours choosing to crawl,
   // fed by everyone who passed and never once asleep, so her energy never came back.
   it('after an hour awake and down it falls asleep where it lies, and sleeps its way back up', () => {
-    const t1 = tickOnce(tired(makeWorld()))
-    expect(t1.events).toContainEqual({ type: 'agent_collapsed', payload: { agentId: 'a1' } })
-    const downAt = t1.state.agents.a1!.collapsedSinceTick!
-    const early = tickOnce(atTick(t1.state, downAt + CFG.health.downedPassOutTicks - 2))
+    // Energy alone no longer fells a body (it nods off first), so the fall is set by hand: a
+    // body already down and counted, at no energy, the state this road out is built for.
+    const base = makeWorld()
+    const down = patchAgent(tired(base), 'a1', {
+      collapsedSinceTick: base.tick,
+      collapsesWithoutRecovery: 1,
+    })
+    const downAt = base.tick
+    const early = tickOnce(atTick(down, downAt + CFG.health.downedPassOutTicks - 2))
     expect(early.events.map((e) => e.type)).not.toContain('agent_passed_out')
     const late = tickOnce(early.state)
     expect(late.events).toContainEqual({ type: 'agent_passed_out', payload: { agentId: 'a1' } })
