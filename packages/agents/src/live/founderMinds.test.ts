@@ -77,6 +77,34 @@ describe('★ the streamed cast and the one-way glass', () => {
     }
   })
 
+  // Five of the twelve shipped with no worry at all and the goal "get through the day", which
+  // is a person with nothing at stake. A card may carry a fear; it may never carry a partner,
+  // a rival or an outcome (owner, seeds are character not plot).
+  it('★ every founder carries a worry and a goal of their own, and none of them names another person', () => {
+    const names = CAST.map((m) => m.identity.name)
+    for (const mind of CAST) {
+      const { worries, goals } = mind.personality.current
+      expect([mind.id, worries.length], `${mind.id} worries about nothing`).not.toEqual([
+        mind.id,
+        0,
+      ])
+      expect([mind.id, goals], `${mind.id} has no goal of its own`).not.toEqual([
+        mind.id,
+        ['get through the day'],
+      ])
+      expect(mind.personality.values.length + mind.personality.beliefs.length).toBeGreaterThan(2)
+      // Kin are declared canon and may be named; nobody else may.
+      const kin = new Set(
+        (mind.kin ?? []).map((k) => CAST.find((c) => c.id === k.id)?.identity.name),
+      )
+      const said = [...worries, ...goals].join(' ')
+      for (const name of names) {
+        if (name === mind.identity.name || kin.has(name)) continue
+        expect(said, `${mind.id} is pointed at ${name}`).not.toContain(name)
+      }
+    }
+  })
+
   // A literal tic string in a card is the mechanism, and `derivePersona` samples tics without
   // their surroundings, so the bound has to go on the card.
   it('no card demonstrates its own tic in opening position', () => {

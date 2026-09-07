@@ -1,7 +1,6 @@
 // One cast shared by every probe on the founding valley; it lives in `src/` because the served
 // live world imports it too, and `scripts/` is outside every package's `include`.
 import { DAYS_PER_YEAR } from '@sj/shared'
-import type { PersonalityDoc } from '../personality.js'
 import type { IdentityCore } from '../prompt/assemble.js'
 import type { MindSpec } from './liveMinds.js'
 
@@ -23,18 +22,6 @@ const voice = (
   neverSays,
   exampleLines,
   wordBudget: { typical, burst },
-})
-
-const NEUTRAL = (
-  temperament: string,
-  values: string[],
-  beliefs: string[],
-  mood: string,
-): PersonalityDoc => ({
-  temperament,
-  values,
-  beliefs,
-  current: { mood, worries: [], goals: ['get through the day'] },
 })
 
 export const FOUNDER_MINDS: Mind[] = [
@@ -72,12 +59,16 @@ export const FOUNDER_MINDS: Mind[] = [
         20,
       ),
     },
-    personality: NEUTRAL(
-      'steady, exacting, slow to warm',
-      ['a full store'],
-      ['what is counted keeps'],
-      'watchful',
-    ),
+    personality: {
+      temperament: 'steady, exacting, slow to warm',
+      values: ['a full store', 'a promise kept to the day it was made'],
+      beliefs: ['what is counted keeps', 'a place is not yours until you have wintered in it'],
+      current: {
+        mood: 'watchful',
+        worries: ['the store looks full to everyone who has not counted it'],
+        goals: ['come out the far side of a winter with the count still right'],
+      },
+    },
     wantBias: { esteem: 1.5 },
   },
   {
@@ -109,12 +100,16 @@ export const FOUNDER_MINDS: Mind[] = [
         18,
       ),
     },
-    personality: NEUTRAL(
-      'stubborn, generous with his hands, quiet about it',
-      ['good joinery'],
-      ['a job done once is a job done'],
-      'even',
-    ),
+    personality: {
+      temperament: 'stubborn, generous with his hands, quiet about it',
+      values: ['good joinery', 'work that outlasts the hands that did it'],
+      beliefs: ['a job done once is a job done', 'water is patient, and takes what was hurried'],
+      current: {
+        mood: 'even',
+        worries: ['that the water gets a second one off him'],
+        goals: ['have something of his still standing after the river next comes up'],
+      },
+    },
     wantBias: { esteem: 1.5 },
   },
   {
@@ -147,12 +142,16 @@ export const FOUNDER_MINDS: Mind[] = [
         45,
       ),
     },
-    personality: NEUTRAL(
-      'restless, cheerful, impatient',
-      ['nothing wasted'],
-      ['feet make the road'],
-      'in a hurry',
-    ),
+    personality: {
+      temperament: 'restless, cheerful, impatient',
+      values: ['nothing wasted', 'being the first to know'],
+      beliefs: ['feet make the road', 'what you did not see yourself is only half true'],
+      current: {
+        mood: 'in a hurry',
+        worries: ['that she has already seen everything this valley has'],
+        goals: ['come back one evening with news nobody can top'],
+      },
+    },
   },
   {
     id: 'omar',
@@ -183,12 +182,16 @@ export const FOUNDER_MINDS: Mind[] = [
         34,
       ),
     },
-    personality: NEUTRAL(
-      'gentle, unhurried, hard to alarm',
-      ['sitting with the sick'],
-      ['a hand does more than a remedy'],
-      'attentive',
-    ),
+    personality: {
+      temperament: 'gentle, unhurried, hard to alarm',
+      values: ['sitting with the sick', 'being the one they come to'],
+      beliefs: ['a hand does more than a remedy', 'nobody should go out of the world on their own'],
+      current: {
+        mood: 'attentive',
+        worries: ['that somebody will need more than he knows, and he will have to watch it'],
+        goals: ['pass the herbs on to somebody, so they do not go when he does'],
+      },
+    },
     wantBias: { esteem: 1.5 },
   },
   {
@@ -216,12 +219,16 @@ export const FOUNDER_MINDS: Mind[] = [
         20,
       ),
     },
-    personality: NEUTRAL(
-      'private, wry, does not complain',
-      ['carrying your own weight'],
-      ['a thing named is a thing made worse'],
-      'quiet',
-    ),
+    personality: {
+      temperament: 'private, wry, does not complain',
+      values: ['carrying your own weight', 'a quiet nobody asks about'],
+      beliefs: ['a thing named is a thing made worse', 'you are owed what you have earned'],
+      current: {
+        mood: 'quiet',
+        worries: ['that the day she does need somebody, she will not know how to ask'],
+        goals: ['get through a whole winter owing nobody anything'],
+      },
+    },
   },
   {
     id: 'farida',
