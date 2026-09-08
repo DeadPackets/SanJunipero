@@ -755,7 +755,7 @@ describe('★ the money, inside the served world', () => {
     expect(alertsOf(opsDb, 'spend_projection')).toHaveLength(0)
 
     // Art, which the rate tripwire excludes by design: only the operator alert can speak here.
-    // $1 in a 15-minute window projects to $3.20/sim-day, over the $2.50 threshold.
+    // $1 in a 15-minute window projects to $4.80/sim-day, over the $2.50 threshold.
     opsDb
       .prepare(
         `INSERT INTO llm_calls
@@ -768,7 +768,7 @@ describe('★ the money, inside the served world', () => {
     await run(world, 12)
     const alerts = alertsOf(opsDb, 'spend_projection')
     expect(alerts.length, 'the operator was never told').toBeGreaterThan(0)
-    expect(alerts[0]).toContain('projected $3.20/sim-day over a $2.50 threshold')
+    expect(alerts[0]).toContain('projected $4.80/sim-day over a $2.50 threshold')
   }, 40_000)
 
   // 9 of rehearsal 3's 309 calls were served off the pin: a cold prefix and an unpriced route
