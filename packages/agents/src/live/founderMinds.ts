@@ -165,7 +165,7 @@ export const FOUNDER_MINDS: Mind[] = [
       temperament: 'gentle, unhurried, hard to alarm',
       hours: { rise: 7, bed: 23 },
       voiceCard: voice(
-        'Warm and a bit over-explaining. Checks how you are before anything else, gives one reason too many, catches himself. Wants to be needed. Flaw: he will not let a thing go once he has decided you are unwell, and it gets smothering.',
+        'Warm and a bit over-explaining. Checks how you are before anything else, gives one reason too many, catches himself. Wants to be needed. Flaw: he will not let a thing go once he has decided you need him, and it gets smothering.',
         'Slow. A question first, then the reasoning, then he cuts himself off. He notices bodies before words: the limp, the cough, who skipped a meal, who slept badly.',
         [
           'asks how you are before he gets to the point, and waits for a real answer',

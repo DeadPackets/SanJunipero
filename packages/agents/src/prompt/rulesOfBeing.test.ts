@@ -404,13 +404,25 @@ describe('a mind in a talk is told so', () => {
 
 describe('★ the body on the page is the only body', () => {
   it('a mind may not invent an ailment for itself or anyone else', () => {
+    expect(SPEECH_RULES).toContain('Your body is what the page says it is, and nothing else.')
     expect(SPEECH_RULES).toContain(
-      'A new sickness, hurt or weakness is not, unless the page says so',
+      'another person is ill or hurt only when the page says so beside their name',
     )
-    expect(SPEECH_RULES).toContain('A cough you have carried for years is yours to mention.')
-    expect(SPEECH_RULES).toContain(
-      'another person is newly ill or hurt only when the page says so beside their name',
-    )
+  })
+
+  // r45 invented a back and r47 a cough. The cough came from this very rule, which used to say
+  // "a cough you have carried for years is yours to mention" and then "a cough nobody's body
+  // has is a story that never ends". Name an ailment in a mind's prompt and the town catches it.
+  it('★ names no ailment of its own, because a named one gets caught', () => {
+    for (const ailment of ['cough', 'fever', 'ache', 'limp', 'wound'])
+      expect(SPEECH_RULES.toLowerCase(), ailment).not.toContain(ailment)
+  })
+
+  // The loophole that let it last seven days: a condition the world cannot hold can never be
+  // cured, so the scenes about it never stop.
+  it('★ allows no long-carried trouble the world has no way to end', () => {
+    expect(SPEECH_RULES).not.toContain('plus whatever has always been true of you')
+    expect(SPEECH_RULES).toContain('there is no old trouble you have carried for years either')
   })
 })
 
