@@ -377,3 +377,23 @@ describe('★ a mind is told not to answer for what it has not seen', () => {
     expect(RULES_OF_BEING).toContain('Never fill the gap with what would sound right')
   })
 })
+
+describe('★ how a line is allowed to sound', () => {
+  // r44: 942 spoken lines carried no exclamation mark and no line that tailed off, and 90% of
+  // them ended in a full stop. Every line was a finished, comma-joined thought. The rules said
+  // "half a sentence is fine" and nothing about what a person sounds like when something is
+  // actually happening, so nothing ever did.
+  it('says a line need not be finished, and warns off a town of exclaimers', () => {
+    expect(SPEECH_RULES).toMatch(/Not every line is a finished thought/)
+    expect(SPEECH_RULES).toMatch(/One word is a whole answer/)
+    expect(SPEECH_RULES).toMatch(/how much you have in you to say/)
+    expect(SPEECH_RULES).toMatch(/always exclaiming is worse/)
+  })
+  it('keeps semicolons and dashes out of a spoken line', () => {
+    expect(SPEECH_RULES).toMatch(/No dashes and no semicolons in what you say out loud/)
+  })
+  // The whole block rides the cached shared prefix, so its size is paid once per mind per run.
+  it('stays small enough to ride the cached prefix', () => {
+    expect(SPEECH_RULES.length).toBeLessThan(4000)
+  })
+})
