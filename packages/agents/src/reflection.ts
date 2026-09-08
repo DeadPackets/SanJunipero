@@ -246,7 +246,7 @@ export async function runSleepReflection(deps: {
     const relevant = dayMemories.filter((m) => m.tags.people.includes(person))
     const doc = await step(() => llm.updateLedger(person, existing, relevant))
     if (doc === null) break
-    mem.upsertLedger(person, doc, day)
+    mem.upsertLedger(person, boundedLedger(doc), day)
     ledgersUpdated.push(person)
   }
 
@@ -404,6 +404,20 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
   }
 }
 
+/** What a private note about one person may cost the prompt it rides in. r37 held these to no
+ *  bound at all and they reached 4,611 characters by day 9, three of them in view at a time. */
+export const LEDGER_MAX_CHARS = 1000
+
+/** The note cut back to its budget at a sentence end, because a mind reads this and half a
+ *  sentence is not something anybody wrote. Kept from the front: the rewrite leads with what it
+ *  thinks matters. */
+export function boundedLedger(doc: string, max = LEDGER_MAX_CHARS): string {
+  if (doc.length <= max) return doc
+  const cut = doc.slice(0, max)
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '))
+  return (end > max / 2 ? cut.slice(0, end + 1) : cut.trimEnd()).trimEnd()
+}
+
 export function updateLedgerPrompt(
   personName: string,
   existing: string | null,
@@ -414,6 +428,11 @@ export function updateLedgerPrompt(
       'Before sleep, you go back to your private note about one person.',
       'Rewrite that note from the day, keeping what still holds and adding what changed.',
       'The note is yours alone: your opinion, your trust, what they owe you and what you owe them.',
+      // r37 day 9: these notes had grown to 4,600 characters, because the ask never said to
+      // forget anything and a rewrite that only ever adds is a note nobody can read.
+      'Keep it short enough to read at a glance, six lines at the very most. When you add',
+      'something, let go of whatever now matters least. A note you cannot read is no use to you,',
+      'and what drops out of it you still remember when you need it.',
     ].join('\n'),
     messages: [
       {

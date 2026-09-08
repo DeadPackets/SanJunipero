@@ -11,7 +11,7 @@ import { BudgetExceededError, LlmClient, migrateLlmTables, type LlmMessage } fro
 import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import { PersonalityStore, type PersonalityDoc } from './personality.js'
 import { FOUNDER_MINDS } from './live/founderMinds.js'
-import { namesSelf } from './reflection.js'
+import { boundedLedger, LEDGER_MAX_CHARS, namesSelf } from './reflection.js'
 import {
   runSleepReflection,
   gistPrompt,
@@ -1143,6 +1143,25 @@ describe('★ what reaches the page is said plainly', () => {
     expect(system).toMatch(/not about being loved/)
     expect(system).toMatch(/Do not begin it with "I want"/)
     expect(system).toMatch(/never write your own name in it/)
+  })
+
+  // r37 day 9: one mind's private note about another had reached 4,611 characters, and three of
+  // them ride a prompt at once. Nothing had ever told the note to forget.
+  it('★ a private note about one person is bounded, and cut where a sentence ends', () => {
+    expect(boundedLedger('Short note about Farida.')).toBe('Short note about Farida.')
+    const long = `${'She keeps the count and she is right about it. '.repeat(40)}Trust her.`
+    const cut = boundedLedger(long)
+    expect(cut.length).toBeLessThanOrEqual(LEDGER_MAX_CHARS)
+    expect(cut.endsWith('.')).toBe(true)
+    expect(cut).toContain('She keeps the count')
+    // A note with no sentence end in it is still cut, rather than riding at any length.
+    expect(boundedLedger('x'.repeat(4611)).length).toBeLessThanOrEqual(LEDGER_MAX_CHARS)
+  })
+
+  it('the ask tells the note to let go of what matters least', () => {
+    const system = updateLedgerPrompt('Farida', null, []).system
+    expect(system).toContain('six lines at the very most')
+    expect(system).toContain('let go of whatever now matters least')
   })
 
   // r39: Kamal wanted Kamal to ask him first. r41: Farida wanted to be the one Farida calls.
