@@ -204,32 +204,26 @@ describe('what the town will not let you ask', () => {
     )
   })
 
-  // Reversed 2026-09-07: courting somebody else's partner used to be allowed, which was never
-  // exercised because no founder had a partner. Once the founding families became world facts,
-  // 13 of r37's 15 married walk outs were affairs, so the exclusive partnership now covers the
-  // asking too. Leaving is the road out, and remarrying is what it opens.
-  it('★ refuses every ask from or to somebody already partnered, and leaving opens them again', () => {
+  // Owner ruling 2026-09-08: an affair is the town's business, not the engine's. The world says
+  // who is married and refuses a second marriage; wanting somebody else it leaves alone.
+  it('★ a married body may still ask, and only a second marriage is refused', () => {
     let s = town([
       { id: 'a1', x: 1, y: 1 },
       { id: 'a2', x: 2, y: 1 },
       { id: 'a3', x: 3, y: 1 },
     ])
     s = fold(s, ev('partnership_formed', { aId: 'a2', bId: 'a3' }), CFG)
-    for (const verb of ['court', 'propose', 'lie_with']) {
-      expect([verb, refusal(ask(s, 'a1', verb, 'a2'))]).toEqual([
-        verb,
-        'they have a partner, and it is not you',
-      ])
-      expect([verb, refusal(ask(s, 'a2', verb, 'a1'))]).toEqual([
-        verb,
-        'you have a partner, and this is not them',
-      ])
-    }
-    // The pair themselves are never refused for being a pair.
-    expect(ask(s, 'a2', 'court', 'a3').ok).toBe(true)
+    expect(ask(s, 'a1', 'court', 'a2').ok).toBe(true)
+    expect(ask(s, 'a2', 'court', 'a1').ok).toBe(true)
+    // A bedding still wants a roof of your own, and that is the only thing left refusing it.
+    expect(refusal(ask(s, 'a2', 'lie_with', 'a1'))).toBe('not under a roof of your own')
+    expect(refusal(ask(s, 'a2', 'propose', 'a1'))).toBe('you are already married')
+    expect(refusal(ask(s, 'a1', 'propose', 'a2'))).toBe('they are already married')
     expect(refusal(ask(s, 'a2', 'propose', 'a3'))).toBe('they are already your partner')
     const freed = fold(s, ev('partnership_dissolved', { aId: 'a2', bId: 'a3', byId: 'a2' }), CFG)
-    expect(ask(freed, 'a1', 'court', 'a2').ok).toBe(true)
+    expect(refusal(ask(freed, 'a1', 'propose', 'a2'))).toBe(
+      'too soon: you have never walked out together',
+    )
   })
 
   it('★ a body founded with a family carries it: a partner the world knows, and blood it refuses', () => {
@@ -248,12 +242,8 @@ describe('what the town will not let you ask', () => {
     expect(s.agents.tariq!.parents).toEqual(['leyla', 'kamal'])
     expect(refusal(ask(s, 'tariq', 'court', 'leyla'))).toBe('they are your own blood')
     expect(refusal(ask(s, 'dilara', 'court', 'halim'))).toBe('they are your own blood')
-    expect(refusal(ask(s, 'kamal', 'court', 'nadia'))).toBe(
-      'you have a partner, and this is not them',
-    )
-    expect(refusal(ask(s, 'nadia', 'court', 'kamal'))).toBe(
-      'they have a partner, and it is not you',
-    )
+    expect(ask(s, 'kamal', 'court', 'nadia').ok).toBe(true)
+    expect(refusal(ask(s, 'kamal', 'propose', 'nadia'))).toBe('you are already married')
     expect(ask(s, 'kamal', 'court', 'leyla').ok).toBe(true)
     // A body founded with nobody hashes as it always did.
     const plain = fold(

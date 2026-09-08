@@ -223,6 +223,8 @@ export type ChronicleLookup = {
   agentName(id: string): string
   structureKind(id: string): string
   mysteryProse(kind: string): string | null
+  // Who this body married, if anybody. Absent in the older callers, which then say nothing.
+  partnerOf?(id: string): string | null
 }
 
 // Cause is a fact and the sentence says it plainly; what it MEANT is nobody's to write down.
@@ -319,6 +321,22 @@ function invitationLine(type: string, verb: string, asker: string, invitee: stri
   }
   if (verb === 'court') return `${invitee} would not walk out with ${asker}.`
   return verb === 'propose' ? `${invitee} refused ${asker} a life together.` : null
+}
+
+// Owner 2026-09-08: nothing in the world stops a married body asking somebody else, so the paper
+// names the marriage when the pair asking is not the marriage. A reader who is not told that is
+// watching an ordinary courtship instead of the thing that is actually happening.
+function vowsElsewhere(look: ChronicleLookup, aId: string, bId: string): string {
+  const said: string[] = []
+  for (const [id, other] of [
+    [aId, bId],
+    [bId, aId],
+  ] as const) {
+    const spouse = look.partnerOf?.(id) ?? null
+    if (spouse !== null && spouse !== other && spouse !== id)
+      said.push(`${look.agentName(id)} is married to ${look.agentName(spouse)}`)
+  }
+  return said.length === 0 ? '' : ` ${said.join(', and ')}.`
 }
 
 /** A reason is a thing somebody said, not a paragraph; past this the feed is a transcript. */
@@ -424,13 +442,15 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} kept house together.`
     case 'invited':
     case 'invitation_accepted':
-    case 'invitation_refused':
-      return invitationLine(
+    case 'invitation_refused': {
+      const line = invitationLine(
         ev.type,
         str(p.verb),
         look.agentName(str(p.byId)),
         look.agentName(str(p.agentId)),
       )
+      return line === null ? null : line + vowsElsewhere(look, str(p.byId), str(p.agentId))
+    }
     case 'partnership_formed':
       return `${look.agentName(str(p.aId))} and ${look.agentName(str(p.bId))} are partners now.`
     case 'partnership_dissolved': {

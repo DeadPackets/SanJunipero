@@ -346,6 +346,58 @@ describe('the acts two people choose', () => {
     ).toBeNull()
   })
 
+  // Owner 2026-09-08: an affair is allowed to happen and has to be visible when it does. The
+  // paper never judges it, it just says who is already married.
+  describe('★ a walk out with somebody who is married', () => {
+    const married: ChronicleLookup = {
+      ...look,
+      partnerOf: (id) => ({ a1: 'a3', a3: 'a1' })[id] ?? null,
+    }
+    it('names the marriage the pair is not', () => {
+      expect(
+        chronicleLine(ev('invited', { agentId: 'a2', byId: 'a1', verb: 'court' }), married),
+      ).toBe('Rahel asked Tomas to walk out. Rahel is married to Mira.')
+      expect(
+        chronicleLine(
+          ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'court' }),
+          married,
+        ),
+      ).toBe('Tomas said yes to Rahel. Rahel is married to Mira.')
+      expect(
+        chronicleLine(
+          ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'lie_with' }),
+          married,
+        ),
+      ).toBe('Rahel and Tomas went in and shut the door. Rahel is married to Mira.')
+    })
+    it('says nothing when the pair is the marriage, or when nobody is married', () => {
+      expect(
+        chronicleLine(
+          ev('invitation_accepted', { agentId: 'a3', byId: 'a1', verb: 'court' }),
+          married,
+        ),
+      ).toBe('Mira said yes to Rahel.')
+      expect(
+        chronicleLine(
+          ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'court' }),
+          look,
+        ),
+      ).toBe('Tomas said yes to Rahel.')
+    })
+    it('names both when both are married elsewhere', () => {
+      const bothWed: ChronicleLookup = {
+        ...look,
+        partnerOf: (id) => ({ a1: 'a3', a2: 'a4' })[id] ?? null,
+      }
+      expect(
+        chronicleLine(
+          ev('invitation_accepted', { agentId: 'a2', byId: 'a1', verb: 'court' }),
+          bothWed,
+        ),
+      ).toBe('Tomas said yes to Rahel. Rahel is married to Mira, and Tomas is married to a4.')
+    })
+  })
+
   it('weighs a parting above a night kept under one roof, and names nobody by id', () => {
     expect(CHRONICLE_WEIGHTS.partnership_dissolved!).toBeGreaterThan(CHRONICLE_WEIGHTS.co_slept!)
     expect(CHRONICLE_WEIGHTS.partnership_formed!).toBeGreaterThan(CHRONICLE_WEIGHTS.invited!)

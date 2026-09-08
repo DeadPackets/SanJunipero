@@ -16,6 +16,7 @@ export function chronicleLabel(ev: SimEvent, state: WorldState | null): string |
     // R4: prose to a viewer, never the engine's slug
     structureKind: (id) => kindWords(state?.structures[id]?.kind ?? 'building'),
     mysteryProse: () => null,
+    partnerOf: (id) => state?.agents[id]?.partnerId ?? null,
   }
   return chronicleLine(ev, look)
 }

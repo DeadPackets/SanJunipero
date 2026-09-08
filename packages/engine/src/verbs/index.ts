@@ -2637,13 +2637,6 @@ function askable(
     if (ageBand(config, body.ageDays) === 'child') return 'that is not for a child'
   }
   if (bloodKin(me, target)) return 'they are your own blood'
-  // r37: 13 of the 15 walk outs a married founder took were with somebody who was not their
-  // spouse, because the world had never been told they were married. Leaving is still the road
-  // out, and it is the only one.
-  if (me.partnerId !== undefined && me.partnerId !== target.id)
-    return 'you have a partner, and this is not them'
-  if (target.partnerId !== undefined && target.partnerId !== agentId)
-    return 'they have a partner, and it is not you'
   if (verb === 'court') {
     // One walk out a day, for either of them: a second on the same day with somebody else is
     // the thing that read as a town of flirts (r37: 28 walk outs in ten days, 3 per person).
@@ -2657,8 +2650,13 @@ function askable(
     return null
   }
   if (verb === 'propose') {
-    // The pair rule above already refuses anyone else's partner; this is the pair themselves.
-    if (me.partnerId === target.id) return 'they are already your partner'
+    // A body cannot hold two marriages, so this one stays. Wanting somebody else is the town's
+    // business and not the engine's: court and lie_with ask nothing about who you married.
+    if (me.partnerId !== undefined)
+      return me.partnerId === target.id
+        ? 'they are already your partner'
+        : 'you are already married'
+    if (target.partnerId !== undefined) return 'they are already married'
     const together = me.walkOuts?.[target.id] ?? 0
     if (together < walkOutsBeforeProposal(me, target))
       return together === 0

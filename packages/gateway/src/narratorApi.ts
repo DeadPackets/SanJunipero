@@ -99,6 +99,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       agentName: (id) => agentName(state.agents, id),
       structureKind: (id) => kindWords(state.structures[id]?.kind ?? 'building'),
       mysteryProse: (kind) => MYSTERY_BY_KIND[kind]?.prose ?? null,
+      partnerOf: (id) => state.agents[id]?.partnerId ?? null,
     }
   }
 

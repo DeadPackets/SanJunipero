@@ -1438,10 +1438,7 @@ export function perceptionToProse(
   // r37: a married founder walked out with somebody else 13 times in ten days, because nothing
   // ever told them they were married. The world refuses it now, so the mind has to know why.
   const { partnerName, parentNames } = packet.self.body
-  if (partnerName !== undefined)
-    lines.push(
-      `You are married to ${partnerName}. That is the person you walk out with, and nobody else.`,
-    )
+  if (partnerName !== undefined) lines.push(`You are married to ${partnerName}.`)
   if (parentNames !== undefined && parentNames.length > 0)
     lines.push(
       parentNames.length === 1

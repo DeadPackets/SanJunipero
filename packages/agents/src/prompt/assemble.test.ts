@@ -400,10 +400,12 @@ describe('perceptionToProse', () => {
       ...quietMeadowPacket,
       self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, ...body } },
     })
-    it('a married mind is told who it married', () => {
-      expect(perceptionToProse(kin({ partnerName: 'Bashir' }))).toContain(
-        'You are married to Bashir. That is the person you walk out with, and nobody else.',
-      )
+    // Owner 2026-09-08: the fact, and nothing about what to do with it. Who a married person
+    // wants is theirs to decide, and an affair is a story the town tells, not a rule it breaks.
+    it('a married mind is told who it married, and told nothing else about it', () => {
+      const prose = perceptionToProse(kin({ partnerName: 'Bashir' }))
+      expect(prose).toContain('You are married to Bashir.')
+      expect(prose).not.toMatch(/nobody else|only person|faithful/i)
     })
     it('one parent is named alone, two are named together', () => {
       expect(perceptionToProse(kin({ parentNames: ['Halim'] }))).toContain('Halim is your parent.')
