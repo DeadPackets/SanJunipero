@@ -427,7 +427,14 @@ export function updateLedgerPrompt(
     system: [
       'Before sleep, you go back to your private note about one person.',
       'Rewrite that note from the day, keeping what still holds and adding what changed.',
-      'The note is yours alone: your opinion, your trust, what they owe you and what you owe them.',
+      'The note is yours alone: who they are to you, what the two of you have been through, and',
+      'what you would and would not trust them with.',
+      // r44 day 0: Bashir and Farida closed eleven scenes and eight were about firewood, because
+      // both notes had become work orders. The old ask said "what they owe you", and both notes
+      // came back saying "owes".
+      'It is about the person and never about the job. A chore, a count, a list of what each of',
+      'you is to do tomorrow goes stale by morning and belongs in your own plan. Write what the',
+      'day showed you about them instead.',
       // r37 day 9: these notes had grown to 4,600 characters, because the ask never said to
       // forget anything and a rewrite that only ever adds is a note nobody can read.
       'Keep it short enough to read at a glance, six lines at the very most. When you add',

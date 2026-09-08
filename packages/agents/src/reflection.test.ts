@@ -1133,6 +1133,15 @@ describe('★ what reaches the page is said plainly', () => {
     }
   })
 
+  // r44: Bashir and Farida closed eleven scenes on one day and eight were about firewood. Both
+  // private notes had become work orders, and both used the word the old ask handed them.
+  it('★ the note about a person is about the person, and never asks for what they owe', () => {
+    const system = updateLedgerPrompt('Farida', null, []).system
+    expect(system).not.toMatch(/\bowes?\b|\bowed\b/i)
+    expect(system).toMatch(/never about the job/)
+    expect(system).toMatch(/what the day showed you about them|day showed you about them/)
+  })
+
   // r39: the ask said the want names a person, and across three runs every want named one. By
   // day 5 all twelve were about a partner.
   it('★ the nightly want may be about a place or a thing, not only a person', () => {
