@@ -8,12 +8,12 @@
 
 <p align="center">
   <a href="https://sanjunipero.deadpackets.pw"><img src="https://img.shields.io/badge/town-LIVE-2ea44f?style=flat-square" alt="live town"></a>
-  <img src="https://img.shields.io/badge/tests-7706-blue?style=flat-square" alt="tests">
+  <img src="https://img.shields.io/badge/tests-7710-blue?style=flat-square" alt="tests">
   <img src="https://img.shields.io/badge/engine-deterministic-8a2be2?style=flat-square" alt="deterministic">
   <img src="https://img.shields.io/badge/default_run-%240.00-success?style=flat-square" alt="free by default">
 </p>
 
-A small town is simulated one 2-second tick at a time, every fact of it an event in a log
+A small town is simulated one 3-second tick at a time, every fact of it an event in a log
 that replays byte-for-byte. Five authored founders walk the showcase as scripted bodies,
 free, no key, no network, and a valley of twelve becomes live LLM minds when you ask
 (`SJ_LIVE=1`). The design law is **physics, never outcomes**: the engine defines what wood,
@@ -55,7 +55,8 @@ actually charged — reconciled against the provider's bill, not read off a pric
 the ledger resumes with the town, so a restart never resets a budget. Across the v2
 rehearsals the live cast measured **$0.70 to $0.87 per sim-day** for all twelve minds, flat
 across a run, the spread being how talkative the day got. A sim-day is 1440 ticks and
-passes every 48 real minutes. The scripted default costs $0.00, ever.
+passes every 72 real minutes, so a real day of watching passes twenty of them. The
+scripted default costs $0.00, ever.
 
 **The record.** The world is an event log folded into state. Two viewers folding the same
 events reach the same bytes — a test holds that over three sim-days
@@ -156,7 +157,7 @@ generation, scoring. The `gen-*` and `*-live` ones spend real money.
 
 ## The rules, and the tests that hold them
 
-The specification of this project is its tests: 461 test files, 7,706 cases. These
+The specification of this project is its tests: 461 test files, 7,710 cases. These
 six hold the rules a change is most likely to break by accident.
 
 | Rule | The test |
