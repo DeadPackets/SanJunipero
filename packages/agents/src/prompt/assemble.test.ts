@@ -407,6 +407,21 @@ describe('perceptionToProse', () => {
       expect(prose).toContain('You are married to Bashir.')
       expect(prose).not.toMatch(/nobody else|only person|faithful/i)
     })
+    // Owner 2026-09-08: a mind should know it is walking out with somebody who is married, and
+    // be told nothing at all about what to make of that.
+    it('★ a person in sight who is married is said to be married, with no word about it', () => {
+      const seen = {
+        ...conversationPacket,
+        visible: {
+          ...conversationPacket.visible,
+          agents: conversationPacket.visible.agents.map((a) => ({ ...a, partnerName: 'Omar' })),
+        },
+      }
+      const prose = perceptionToProse(seen)
+      expect(prose).toContain('married to Omar')
+      expect(prose).not.toMatch(/should not|wrong|betray|unfaithful|owe|duty/i)
+    })
+
     it('one parent is named alone, two are named together', () => {
       expect(perceptionToProse(kin({ parentNames: ['Halim'] }))).toContain('Halim is your parent.')
       expect(perceptionToProse(kin({ parentNames: ['Leyla', 'Kamal'] }))).toContain(

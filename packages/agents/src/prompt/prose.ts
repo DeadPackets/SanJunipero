@@ -79,6 +79,8 @@ type PerceptionAgent = {
   condition?: string
   // A face the valley has only just seen for the first time. Absent once the town is used to it.
   stranger?: true
+  // Who this body married, if anybody. Everyone in the valley knows this about everyone.
+  partnerName?: string
   // Tags a minted verb left on the body, readable by anyone who can see it.
   marks?: Record<string, string>
 }
@@ -1405,10 +1407,13 @@ export function perceptionToProse(
     // Said first, because it is the thing a pair of eyes lands on FIRST: a face nobody in the
     // valley has seen before.
     const road = a.stranger === true ? ', a stranger who came up the valley road,' : ''
+    // Said plainly and left there. A mind that walks out with somebody spoken for should know
+    // that is what it is doing, and nothing here tells it what to think about that.
+    const wed = a.partnerName === undefined ? '' : `, married to ${a.partnerName}`
     const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
-    const who = `${a.name} (${a.id})${road}${tie}`
+    const who = `${a.name} (${a.id})${road}${tie}${wed}`
     if (a.collapsed)
       lines.push(
         `${who} lies collapsed ${where}. Hold food out to them and they will eat it from your hand.`,

@@ -85,6 +85,9 @@ export type PerceivedAgent = {
   // A face the valley has only just seen for the first time. Absent once the town has had
   // STRANGER_DAYS to get used to it, and absent on everyone born here.
   stranger?: true
+  // Who this body married, if anybody. Twelve people in one valley all know this about each
+  // other, and a mind that does not know it cannot tell what it is doing.
+  partnerName?: string
 } & Markings
 
 /** How long a body off the road still reads as one to everyone who looks at it. */
@@ -452,6 +455,7 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
         ...(worn === undefined ? {} : { worn }),
         ...(condition === undefined ? {} : { condition }),
         ...(stranger ? { stranger: true as const } : {}),
+        ...(a.partnerId === undefined ? {} : { partnerName: nameOfBody(state, a.partnerId) }),
         ...marked(a),
       }
     })

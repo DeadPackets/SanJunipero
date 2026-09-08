@@ -1634,3 +1634,22 @@ describe('a packet names the family the world holds', () => {
     expect(p.self.body.parentNames).toBeUndefined()
   })
 })
+
+describe('★ a marriage is a fact everyone in the valley can see', () => {
+  it('names who each visible body married, and says nothing about it', () => {
+    let s = makeWorld([
+      { id: 'bashir', x: 1, y: 1 },
+      { id: 'farida', x: 2, y: 1 },
+      { id: 'salma', x: 3, y: 1 },
+    ])
+    s = fold(s, ev('partnership_formed', { aId: 'bashir', bId: 'farida' }), DEFAULT_CONFIG)
+    const seen = composePerception(s, DEFAULT_CONFIG, 'salma', []).visible.agents
+    const by = (id: string) => seen.find((a) => a.id === id)
+    expect(by('bashir')?.partnerName).toBe('farida')
+    expect(by('farida')?.partnerName).toBe('bashir')
+    // An unmarried body carries no such fact at all, so a valley that married nobody reads as
+    // it always did.
+    const alone = composePerception(s, DEFAULT_CONFIG, 'bashir', []).visible.agents
+    expect(alone.find((a) => a.id === 'salma')).not.toHaveProperty('partnerName')
+  })
+})
