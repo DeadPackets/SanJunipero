@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { FELT_TAGS, LAWS_SHOWN, LAW_TEXT_MAX, MYSTERIES } from '@sj/engine'
 import { FORBIDDEN_FRAMING, scanPromptForGlassLeak } from '@sj/shared'
-import { assemblePrompt, compactDayLog, OWN_WORDS_SHOWN, type PromptBlocks } from './assemble.js'
+import {
+  assemblePrompt,
+  compactDayLog,
+  OWN_WORDS_SHOWN,
+  saidAgain,
+  type PromptBlocks,
+} from './assemble.js'
 import { FELT_EVENT_PROSE, perceptionToProse, heardProse } from './prose.js'
 import { RULES_OF_BEING } from './rulesOfBeing.js'
 import { conversationPacket, fixtureBlocks, quietMeadowPacket } from '../testutil/fixtures.js'
@@ -354,6 +360,36 @@ describe('perceptionToProse', () => {
         expect(prose).not.toContain('You let people close slowly.')
         expect(prose).not.toContain('You fall fast')
       }
+    })
+  })
+
+  // r41: Kamal asked Nadia the same question five times between three in the afternoon and
+  // eleven at night, and she never answered once.
+  describe('★ a mind that has said the same thing twice is told so', () => {
+    const ask = 'Nadia, where is Tariq\u2019s house, or who last saw him?'
+    it('names the repeat when the newest line is the earlier one again', () => {
+      expect(saidAgain([ask, 'The fire needs wood.', ask])).toBe(true)
+      expect(saidAgain([ask, ask])).toBe(true)
+      // Kamal asked it five times and two of those were word for word, so the notice lands on the
+      // third. A reworded ask is not caught, and chasing one would catch ordinary related talk.
+      expect(saidAgain(['Nadia, tell me who last saw Tariq or where he was last seen.', ask])).toBe(
+        false,
+      )
+    })
+    it('says nothing about two different lines, or a first line, or a short one', () => {
+      expect(saidAgain([ask, 'The bridge can wait till morning.'])).toBe(false)
+      expect(saidAgain([ask])).toBe(false)
+      expect(saidAgain([])).toBe(false)
+      // Short lines repeat all the time and mean nothing by it.
+      expect(saidAgain(['Right.', 'Right.'])).toBe(false)
+    })
+    it('rides the prompt the mind reads, right under its own words', () => {
+      const withSaid = (said: string[]) =>
+        fixtureBlocks({ now: { prose: 'The sun stands high.', said } })
+      expect(fullSerialization(withSaid([ask, ask]))).toContain(
+        'You have said that more than once and nothing came back.',
+      )
+      expect(fullSerialization(withSaid([ask]))).not.toContain('nothing came back')
     })
   })
 

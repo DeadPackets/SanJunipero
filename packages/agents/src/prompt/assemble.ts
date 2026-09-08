@@ -171,16 +171,47 @@ function renderUnderway(u: Underway): string {
   )
 }
 
+/** How much of two lines has to be the same words for the second to be the first said again. */
+const SAID_AGAIN_OVERLAP = 0.5
+const bagOf = (text: string): Set<string> =>
+  new Set(
+    text
+      .toLowerCase()
+      .replace(/['\u2019]s\b/g, '')
+      .replace(/[^a-z ]/g, '')
+      .split(' ')
+      .filter((word) => word !== ''),
+  )
+
+/** r41: Kamal asked Nadia the same question five times between three in the afternoon and eleven
+ *  at night, and she never answered once. The mind can see its own last lines and said it again
+ *  anyway, so seeing them is not enough: the repeat itself has to be named. */
+export function saidAgain(said: readonly string[]): boolean {
+  const lines = said.slice(-OWN_WORDS_SHOWN)
+  const last = lines[lines.length - 1]
+  if (lines.length < 2 || last === undefined) return false
+  const newest = bagOf(last)
+  if (newest.size < 5) return false
+  return lines.slice(0, -1).some((earlier) => {
+    const old = bagOf(earlier)
+    const shared = [...newest].filter((word) => old.has(word)).length
+    return shared / new Set([...newest, ...old]).size >= SAID_AGAIN_OVERLAP
+  })
+}
+
 // Sanitized here as well as at the verb, for the same reason `heardLine` is: a quote in a
 // prompt is a fence, and model output is where one comes from.
 function renderSaid(said: readonly string[]): string {
   const lines = said.slice(-OWN_WORDS_SHOWN)
-  return lines
-    .map(
-      (text, i) =>
-        `${i === lines.length - 1 ? 'You just said' : 'You said'}: "${sanitizeSpokenText(text)}"`,
+  const rendered = lines.map(
+    (text, i) =>
+      `${i === lines.length - 1 ? 'You just said' : 'You said'}: "${sanitizeSpokenText(text)}"`,
+  )
+  if (saidAgain(lines))
+    rendered.push(
+      'You have said that more than once and nothing came back. Try another way, or let it go.',
     )
-    .join('\n')
+  return rendered.join('\n')
 }
 
 function ledgerLine(l: PromptBlocks['scene']['ledgers'][number]): string {
