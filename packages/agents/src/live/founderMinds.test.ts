@@ -225,6 +225,18 @@ describe('★ what each founder feels the lack of faster', () => {
     }
   })
 
+  // r45: Omar's card valued sitting with the sick and Salma's named what hurts four times, in a
+  // valley where no body can be ill. They spent seven sim-days on a back she did not have, and it
+  // was 18% of every scene in the run. A card may not ask for a body the world cannot give.
+  it('★ no card asks for an illness the world has no way to supply', () => {
+    const said = JSON.stringify(FOUNDER_MINDS)
+    for (const word of ['what actually hurts', 'plays down pain', 'sitting with the sick'])
+      expect(said, word).not.toContain(word)
+    // Her flaw is understatement and it stays. Only the body it was hung on is gone.
+    const salma = FOUNDER_MINDS.find((m) => m.id === 'salma')
+    expect(JSON.stringify(salma)).toContain('plays everything down')
+  })
+
   it('decides what each of them wants on the very first morning', () => {
     for (const mind of FOUNDER_MINDS) {
       const wants = new WantStore(openAgentDb(':memory:'), mind.id, mind.wantBias ?? {})

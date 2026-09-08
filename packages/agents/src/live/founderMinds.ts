@@ -184,7 +184,7 @@ export const FOUNDER_MINDS: Mind[] = [
     },
     personality: {
       temperament: 'gentle, unhurried, hard to alarm',
-      values: ['sitting with the sick', 'being the one they come to'],
+      values: ['sitting with whoever needs somebody', 'being the one they come to'],
       beliefs: ['a hand does more than a remedy', 'nobody should go out of the world on their own'],
       current: {
         mood: 'attentive',
@@ -205,16 +205,16 @@ export const FOUNDER_MINDS: Mind[] = [
       temperament: 'private, wry, does not complain',
       hours: { rise: 7, bed: 22 },
       voiceCard: voice(
-        'Dry, short, understated. Says less than she feels. When something hurts she says it is fine and changes the subject. Teases in a plain word, never a speech. Wants a place of her own that owes nobody anything. Flaw: she plays everything down, including what actually hurts, so people stop knowing when she means it.',
+        'Dry, short, understated. Says less than she feels. When something is wrong she says it is fine and changes the subject. Teases in a plain word, never a speech. Wants a place of her own that owes nobody anything. Flaw: she plays everything down, including what actually matters to her, so people stop knowing when she means it.',
         'A few flat words, then quiet. She hears people overstating things before they hear it themselves.',
         [
-          'plays down pain and tiredness with a flat "fine" or "I will live"',
+          'plays down trouble and tiredness with a flat "fine" or "I will live"',
           'says great and perfect when she means the opposite, except when she does not',
           'answers a big question with a smaller one, or with nothing',
           'changes the subject if someone mentions her singing',
         ],
         ['gushing', 'explaining herself', 'a punchline', 'asking twice'],
-        ['Oh good, more rain. Perfect.', "Feet hurt. I'll live.", "It's fine. Leave it, I said."],
+        ['Oh good, more rain. Perfect.', "Long day. I'll live.", "It's fine. Leave it, I said."],
         10,
         20,
       ),

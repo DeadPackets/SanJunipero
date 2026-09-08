@@ -1533,6 +1533,14 @@ export function perceptionToProse(
     if (prose !== undefined)
       lines.push(a.severity >= AFFLICTION_SEVERE ? `${prose} It is very bad.` : prose)
   }
+  // r45: this block says nothing at all about a well body, and a mind asked after its health
+  // filled the silence. Twelve people nursed a back nobody had for seven days.
+  if (
+    packet.self.body.hp >= 100 &&
+    packet.self.body.ill !== true &&
+    (packet.self.body.afflictions ?? []).length === 0
+  )
+    lines.push('Nothing hurts and you are not ill.')
 
   const roads: string[] = []
 

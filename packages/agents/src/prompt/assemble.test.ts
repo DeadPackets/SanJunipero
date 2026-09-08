@@ -395,6 +395,23 @@ describe('perceptionToProse', () => {
 
   // r37: 13 of a married founder's 15 walk outs were with somebody else, because the mind was
   // never told. The world refuses those now, so the refusal has to be one the mind can see coming.
+  // r45: this block said nothing whatever about a well body, so a mind asked how it was had
+  // nothing true to reach for. The town nursed a back the world never gave anybody.
+  describe('★ a well body is told that it is well', () => {
+    const bodied = (body: Record<string, unknown>) => ({
+      ...quietMeadowPacket,
+      self: { ...quietMeadowPacket.self, body: { ...quietMeadowPacket.self.body, ...body } },
+    })
+    it('says so plainly when there is nothing wrong', () => {
+      expect(perceptionToProse(bodied({}))).toContain('Nothing hurts and you are not ill.')
+    })
+    it('says nothing of the sort to a body that is hurt, ill or afflicted', () => {
+      const marked = [{ hp: 20 }, { ill: true }, { afflictions: [{ kind: 'cough', severity: 1 }] }]
+      for (const body of marked)
+        expect(perceptionToProse(bodied(body)), JSON.stringify(body)).not.toContain('Nothing hurts')
+    })
+  })
+
   describe('★ a mind is told its own family', () => {
     const kin = (body: Record<string, unknown>) => ({
       ...quietMeadowPacket,
@@ -830,8 +847,12 @@ describe('perceptionToProse', () => {
     const added = sentences(ailing('injury', 9)).filter((s) => !base.includes(s))
     expect(added.length).toBeGreaterThan(0)
     expect(added.join(' ')).not.toMatch(/\d/)
-    // A kind prose has no words for is silence, not a crash and not a number.
-    expect(ailing('cursed', 2)).toBe(perceptionToProse(quietMeadowPacket))
+    // A kind prose has no words for is silence, not a crash and not a number. Silence about it,
+    // though: a marked body is never told that nothing hurts.
+    const cursed = ailing('cursed', 2)
+    expect(cursed).not.toContain('cursed')
+    expect(sentences(cursed).filter((x) => !base.includes(x))).toEqual([])
+    expect(cursed).not.toContain('Nothing hurts')
   })
 
   // The word has to be a word the world answers to: there is no `rest` verb, and a mind told
