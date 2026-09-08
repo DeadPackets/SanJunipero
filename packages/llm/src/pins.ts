@@ -126,7 +126,9 @@ const JUDGES: CallSettings = {
   reasoning: { effort: 'xhigh' },
   fallbackReasoning: { effort: 'high' },
 }
-const THINKS: CallSettings = { reasoning: { effort: 'high' } }
+// Medium, on trial from r46. r45 spent 259 reasoning tokens on the mean turn and 280 on the
+// mean line, and the ask is whether the town notices the difference.
+const THINKS: CallSettings = { reasoning: { effort: 'medium' } }
 const RESTATES: CallSettings = { reasoning: { effort: 'minimal' } }
 
 // Rehearsal r3: all 21 refused reflection attempts were 429s, and every one had a mind call
@@ -186,8 +188,10 @@ const SETTINGS_BY_CALLER: Record<string, CallSettings> = {
   council: { ...ON_LUNA, ...JUDGES, maxOutputTokens: 20_000, dailyUsd: RAIL_FLOOR_USD },
   'law.compile': { ...ON_LUNA, ...JUDGES, maxOutputTokens: 20_000, dailyUsd: RAIL_FLOOR_USD },
   // One line said out loud, paid by the mouth that says it. Same route as the turn, so the two
-  // share one warm prefix. Medium was heard in r24: it reasoned as long as high and doubled a tic. p99 1,127 over 523 lines; bounded at 60 s, under the scene's own
+  // share one warm prefix. p99 1,127 over 523 lines; bounded at 60 s, under the scene's own
   // 90 s floor timeout, so the call dies before the floor takes the line away.
+  // r24 heard medium here and it reasoned as long as high and doubled a tic. That was before the
+  // speech rules were rewritten, so r46 asks the line again and speech.py answers it.
   scene: {
     ...ON_LUNA,
     ...THINKS,
