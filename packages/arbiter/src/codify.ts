@@ -101,6 +101,15 @@ export function emitOutcomeEffects(
           e.on === 'self' ? agentId : str(params[e.on === 'target' ? 'targetId' : `${e.on}Id`])
         if (id === undefined) break
         const on = e.on === 'self' || e.on === 'target' ? 'agent' : e.on
+        // The act can eat the thing it meant to inscribe: a memorial spends the last of a wood
+        // stack on start and marks that stack on completion, by which time it is gone.
+        const here =
+          on === 'agent'
+            ? state.agents[id]
+            : on === 'structure'
+              ? state.structures[id]
+              : state.items[id]
+        if (here === undefined) break
         events.push({ type: 'marked', payload: { on, id, key: e.key, value: e.value } })
         break
       }

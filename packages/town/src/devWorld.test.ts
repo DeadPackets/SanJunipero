@@ -123,6 +123,26 @@ describe('dev world server', () => {
     }
   })
 
+  // r42 answered every request for two hours and forty minutes while frozen at tick 5492,
+  // throwing the same line a thousand times. Nothing was watching for a world that is up and
+  // not moving, so the world says it itself now.
+  it('★ a fault that never clears pauses the world instead of retrying it forever', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const dw = await startDevWorld({ realMsPerTick: 5, port: 0, dbPath: join(dir, 'stuck.db') })
+    try {
+      await until(() => dw.loop.state.tick >= 1, 12_000)
+      dw.loop.step = () => {
+        throw new Error('marked for unknown item item_structure_house_63_39_wood')
+      }
+      await until(() => dw.loop.paused, 12_000)
+      const said = err.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('paused at'))
+      expect(said).toHaveLength(1)
+      expect(said[0]).toContain('marked for unknown item')
+    } finally {
+      await dw.stop()
+    }
+  })
+
   it('serves the founders town live with observer thoughts', async () => {
     // 5 ms, not 1: the socket is compressed and zlib finishes on the event loop, so a tick loop
     // that never yields starves those callbacks and the hub reads the backlog as a lagging viewer.

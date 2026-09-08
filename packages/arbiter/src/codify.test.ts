@@ -373,6 +373,28 @@ describe('codify', () => {
       ])
     })
 
+    // r42 froze at tick 5492 and retried the same throw a thousand times: Leyla's memorial
+    // charter spent the last of a wood stack on start and inscribed that stack on completion,
+    // by which time the fold had already dropped it at qty 0.
+    it('★ skips a mark on a body, building or stack the act has already used up', () => {
+      const params = { targetId: 'gone_agent', itemId: 'gone_item', structureId: 'gone_structure' }
+      expect(
+        emitOutcomeEffects(
+          agentState(),
+          'a1',
+          [
+            { op: 'mark', on: 'item', key: 'inscription', value: 'a lasting account' },
+            { op: 'mark', on: 'structure', key: 'keeper', value: 'a1' },
+            { op: 'mark', on: 'target', key: 'debt', value: 'two planks' },
+            { op: 'mark', on: 'self', key: 'oath', value: 'sworn' },
+          ],
+          { params },
+        ),
+      ).toEqual([
+        { type: 'marked', payload: { on: 'agent', id: 'a1', key: 'oath', value: 'sworn' } },
+      ])
+    })
+
     it('skips an effect whose mark the act never named, rather than inventing one', () => {
       expect(
         emitOutcomeEffects(agentState(), 'a1', [

@@ -382,13 +382,18 @@ export async function startDevWorld(
   // A throw out of one tick must not take the beat with it: skipping `arm()` freezes the world
   // for good, with no line anywhere. A repeating fault speaks at 1, 10, 100 …: quiet enough not
   // to fill the log, loud enough that a frozen world cannot pass for a healthy one.
+  // A fault that keeps landing on the same tick is not weather. The world cannot get past it,
+  // and a town that answers every request while nothing moves reads as healthy for hours.
+  const STUCK_FAULTS = 20
   let lastFault = ''
+  let lastFaultTick = -1
   let faults = 0
   let loudAt = 1
   const beatFailed = (err: unknown): void => {
     const why = err instanceof Error ? err.message : String(err)
-    if (why !== lastFault) {
+    if (why !== lastFault || loop.state.tick !== lastFaultTick) {
       lastFault = why
+      lastFaultTick = loop.state.tick
       faults = 0
       loudAt = 1
     }
@@ -404,6 +409,11 @@ export async function startDevWorld(
       if (!loop.paused) tickOnce()
     } catch (err) {
       beatFailed(err)
+      if (faults === STUCK_FAULTS) {
+        loop.pause()
+        console.error(`dev world: paused at tick ${loop.state.tick}, stuck on — ${lastFault}`)
+        cast?.ops?.alert('tick_stuck', `paused at tick ${loop.state.tick}: ${lastFault}`)
+      }
     }
     arm()
   }
