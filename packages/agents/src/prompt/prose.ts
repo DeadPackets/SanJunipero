@@ -1537,7 +1537,7 @@ export function perceptionToProse(
   // filled the silence. Twelve people nursed a back nobody had for seven days.
   if (
     packet.self.body.hp >= 100 &&
-    packet.self.body.ill !== true &&
+    !packet.self.body.ill &&
     (packet.self.body.afflictions ?? []).length === 0
   )
     lines.push('Nothing hurts and you are not ill.')
