@@ -258,7 +258,7 @@ describe('walk progression (stepWalk)', () => {
     s = applyAll(s, r.events)
     const done = walkUntilDone(s)
     expect(done.ticks).toBe(10)
-    expect(done.ticks * TICK_REAL_MS).toBe(20_000)
+    expect(done.ticks * TICK_REAL_MS).toBe(30_000)
     expect([done.s.agents.a1!.x, done.s.agents.a1!.y]).toEqual([30, 0])
   })
 

@@ -1,4 +1,7 @@
-export const TICK_REAL_MS = 2000
+// 3000 and not 2000: at two seconds a tick a watched real day passed thirty sim-days and cost
+// about $24. Three seconds runs twenty, for about $16, and the town still speaks a line every
+// twelve seconds (owner, 2026-09-08).
+export const TICK_REAL_MS = 3000
 export const MINUTES_PER_DAY = 1440
 export const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const
 export type Season = (typeof SEASONS)[number]

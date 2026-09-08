@@ -2759,7 +2759,7 @@ describe('the night boundary is staggered', () => {
   // Pinned, not recomputed: a mind restarting mid-night must keep the place in the spread it
   // had before, and a new hash would silently hand it someone else's.
   it('gives one mind the same offset across restarts and releases', () => {
-    expect(CAST.map(reflectionOffsetTicks)).toEqual([2, 2, 2, 1, 0])
+    expect(CAST.map(reflectionOffsetTicks)).toEqual([0, 1, 1, 1, 0])
   })
 
   it('does not put the whole cast in the same instant', () => {
@@ -2963,8 +2963,8 @@ describe('★ A BODY MAY STOP WHAT IT IS DOING', () => {
     )
 
     expect(startedVerbs(world.engineDb)).toContain(MOURN)
-    // Twenty real minutes is what a day-long act costs a mind that cannot put it down.
-    expect(DURATION_TICKS.day * TICK_REAL_MS).toBe(20 * 60 * 1000)
+    // Thirty real minutes is what a day-long act costs a mind that cannot put it down.
+    expect(DURATION_TICKS.day * TICK_REAL_MS).toBe(30 * 60 * 1000)
     expect(loop.tick).toBeLessThan(DURATION_TICKS.day)
     expect(loop.state.agents[AGENT]!.activity).toBeNull()
     expect(interrupts(world.engineDb)).toEqual([{ agentId: AGENT, reason: ACT_SET_DOWN }])
