@@ -389,8 +389,13 @@ describe('★ how a line is allowed to sound', () => {
     expect(SPEECH_RULES).toMatch(/how much you have in you to say/)
     expect(SPEECH_RULES).toMatch(/always exclaiming is worse/)
   })
-  it('keeps semicolons and dashes out of a spoken line', () => {
+  // The old line read "use a full stop or a comma", which is a list of the two marks that exist.
+  // Across r42, r44 and r45 that produced 3,200 spoken lines with not one exclamation mark.
+  it('keeps semicolons and dashes out of a spoken line, and names the marks that are allowed', () => {
     expect(SPEECH_RULES).toMatch(/No dashes and no semicolons in what you say out loud/)
+    expect(SPEECH_RULES).not.toMatch(/use a full stop or a comma/)
+    expect(SPEECH_RULES).toMatch(/An exclamation mark on the rare line/)
+    expect(SPEECH_RULES).toMatch(/three dots where you let one tail off/)
   })
   // The whole block rides the cached shared prefix, so its size is paid once per mind per run.
   it('stays small enough to ride the cached prefix', () => {
