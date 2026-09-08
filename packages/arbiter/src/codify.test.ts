@@ -327,7 +327,19 @@ describe('codify', () => {
     // The five grounding ops, each to the one engine event that folds it.
     it('grounds mark, witness, name_place, transfer and need_delta in engine events', () => {
       const params = { targetId: 'a2', itemId: 'item_1', structureId: 's1' }
-      const state = burningFireAdjacent()
+      // Every one of these has to be in the world: a mark on a body or stack that is not there
+      // is skipped now, which is the whole point of the guard above.
+      let state = burningFireAdjacent()
+      state = fold(
+        state,
+        ev('agent_spawned', { id: 'a2', name: 'a2', x: 6, y: 5, ageDays: ADULT_AGE_DAYS }),
+        CFG,
+      )
+      state = fold(
+        state,
+        ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'a1' } }),
+        CFG,
+      )
       expect(
         emitOutcomeEffects(
           state,
