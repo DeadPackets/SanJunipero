@@ -8,11 +8,11 @@ set -u
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT" || exit 1
 OUT=$ROOT/rehearsals
-# A sim-day is 1440 ticks of 2000 ms: 48 real minutes at SPEED=1. Faster than SPEED=1 puts a
+# A sim-day is 1440 ticks of 3000 ms: 72 real minutes at SPEED=1. Faster than SPEED=1 puts a
 # mind's 4-tick turn gap under the model's 14.7 s p95, so the default buys days with minutes.
 MINUTES=${1:-65}
 SPEED=${SPEED:-1}
-DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 48}")
+DAYS=$(awk "BEGIN{printf \"%.1f\", $MINUTES * $SPEED / 72}")
 export SJ_LIVE=${SJ_LIVE:-1} SJ_FRESH=1 SJ_SPEND_DAILY_USD=${SJ_SPEND_DAILY_USD:-10} SJ_MAX_MINDS=${SJ_MAX_MINDS:-20} PORT=${PORT:-8099}
 export SJ_MINDS_DIR=$OUT/minds SJ_MODELS_DIR=$ROOT/data/models SJ_ADMIN_TOKEN=rehearsal-$$
 export SJ_ADMIN_PORT=${SJ_ADMIN_PORT:-8799}
