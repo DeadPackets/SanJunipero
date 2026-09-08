@@ -8,17 +8,17 @@
 
 <p align="center">
   <a href="https://sanjunipero.deadpackets.pw"><img src="https://img.shields.io/badge/town-LIVE-2ea44f?style=flat-square" alt="live town"></a>
-  <img src="https://img.shields.io/badge/tests-5559-blue?style=flat-square" alt="tests">
+  <img src="https://img.shields.io/badge/tests-7706-blue?style=flat-square" alt="tests">
   <img src="https://img.shields.io/badge/engine-deterministic-8a2be2?style=flat-square" alt="deterministic">
   <img src="https://img.shields.io/badge/default_run-%240.00-success?style=flat-square" alt="free by default">
 </p>
 
 A small town is simulated one 2-second tick at a time, every fact of it an event in a log
-that replays byte-for-byte. Five authored founders walk it as scripted bodies — free, no
-key, no network — and become live LLM minds when you ask (`SJ_LIVE=1`). The design law is
-**physics, never outcomes**: the engine defines what wood, rain, hunger and walls *do*, and
-never what anybody should do about them. The minds noticed the cold and started building
-houses anyway. Watch it run at
+that replays byte-for-byte. Five authored founders walk the showcase as scripted bodies,
+free, no key, no network, and a valley of twelve becomes live LLM minds when you ask
+(`SJ_LIVE=1`). The design law is **physics, never outcomes**: the engine defines what wood,
+rain, hunger and walls *do*, and never what anybody should do about them. The minds noticed
+the cold and started building houses anyway. Watch it run at
 **[sanjunipero.deadpackets.pw](https://sanjunipero.deadpackets.pw)**.
 
 ## The town
@@ -52,10 +52,10 @@ on every call.
 
 **The money.** Every call is booked to a ledger (`_ops.db`) at the rate the account is
 actually charged — reconciled against the provider's bill, not read off a price list — and
-the ledger resumes with the town, so a restart never resets a budget. Across the launch
-rehearsals the live cast measured **$0.12–$0.66 per sim-day** for all five minds, the
-spread being how talkative the day got. A sim-day is 1440 ticks and passes every
-48 real minutes. The scripted default costs $0.00, ever.
+the ledger resumes with the town, so a restart never resets a budget. Across the v2
+rehearsals the live cast measured **$0.70 to $0.87 per sim-day** for all twelve minds, flat
+across a run, the spread being how talkative the day got. A sim-day is 1440 ticks and
+passes every 48 real minutes. The scripted default costs $0.00, ever.
 
 **The record.** The world is an event log folded into state. Two viewers folding the same
 events reach the same bytes — a test holds that over three sim-days
@@ -69,6 +69,14 @@ verb again. A chronicler writes the town's chapters under vocabulary rules that 
 rules against inventing — *"hurt is never a number… never call anybody a healer unless the
 town calls them one first"*
 ([`chronicle.ts`](packages/narrator/src/chronicle.ts)).
+
+**The people.** Twelve bodies, two families among them: Bashir and Farida are married,
+Kamal and Leyla are married and Tariq is their son, Dilara is Halim's daughter. The world
+holds those facts, the minds are told them, and the paper draws them. Nothing else about
+who likes whom is authored. The world refuses only what a body cannot do, which is holding
+two marriages and courting its own blood; it has no opinion on who a married person wants,
+and a mind is told who everybody married and nothing about what to make of it. When a walk
+out is not between the pair who married, the chronicle says so and stops there.
 
 **The one-way glass.** No operator word reaches a mind: a scan refuses vocabulary like
 `construct` or `milestone` in any mind-facing string
@@ -148,7 +156,7 @@ generation, scoring. The `gen-*` and `*-live` ones spend real money.
 
 ## The rules, and the tests that hold them
 
-The specification of this project is its tests: 360 test files, 5,559 cases. These
+The specification of this project is its tests: 461 test files, 7,706 cases. These
 six hold the rules a change is most likely to break by accident.
 
 | Rule | The test |
@@ -161,7 +169,7 @@ six hold the rules a change is most likely to break by accident.
 | `SimConfig` takes no unknown key at any depth, and its binding defaults are asserted by value. | `packages/shared/src/config.test.ts` |
 
 A `★` in a comment or a test name marks a load-bearing line — somebody paid to learn it, so
-read it before you change it. There are 975 of them.
+read it before you change it. There are 2,096 of them.
 
 ## The standing laws
 
