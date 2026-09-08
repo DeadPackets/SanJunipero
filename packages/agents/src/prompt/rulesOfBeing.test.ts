@@ -8,6 +8,7 @@ import {
   type SimEvent,
 } from '@sj/shared'
 import { fold, genesisState, submitIntent, type TileId, type WorldState } from '@sj/engine'
+import { proposesALaw } from '../scene/scene.js'
 import { assemblePrompt } from './assemble.js'
 import { calendarLine, inTalkLine, perceptionToProse } from './prose.js'
 import { CAPABILITIES, RULES_OF_BEING, SPEECH_RULES, WORKED_TURN } from './rulesOfBeing.js'
@@ -423,6 +424,24 @@ describe('★ the body on the page is the only body', () => {
   it('★ allows no long-carried trouble the world has no way to end', () => {
     expect(SPEECH_RULES).not.toContain('plus whatever has always been true of you')
     expect(SPEECH_RULES).toContain('there is no old trouble you have carried for years either')
+  })
+})
+
+// The council machinery is complete - proposal, quorum, tally, tabling, lapse, repeal - and in
+// r45 and r47 it fired zero times. No mind was ever told the town can hold a rule, and laws only
+// appear in a prompt once one exists, so the first one could never be made.
+describe('★ a mind is told the town can hold a rule', () => {
+  it('says three can bind the town, and that a rule is said out loud', () => {
+    expect(CAPABILITIES).toContain('Three or more of you standing together can agree something')
+    expect(CAPABILITIES).toContain('a later room of three can let it go')
+  })
+
+  // The load-bearing half: the register the prompt teaches has to be one the scene detector
+  // actually hears, or a mind does everything right and no council ever opens.
+  it('★ speaks in a register the scene detector recognises as a proposal', () => {
+    const taught = 'From now on, this is how we do it.'
+    expect(CAPABILITIES.toLowerCase()).toContain('from now on')
+    expect(proposesALaw(taught)).toBe(true)
   })
 })
 

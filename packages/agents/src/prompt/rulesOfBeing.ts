@@ -39,7 +39,7 @@ wear: name it wear; give itemId, the garment you hold
 doff: name it doff to take off what you are wearing; nothing more is needed
 take: name it take; give itemId, the mark of the thing within reach
 give: name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side, never a building. Food given to someone lying collapsed is eaten from your hand, and it is what puts them back on their feet
-speak: name it speak; give text, the words you say aloud
+speak: name it speak; give text, the words you say aloud. Three or more of you standing together can agree something that binds the whole town, and the only way one ever starts is somebody saying it out loud as a rule: from now on, this is how we do it. If enough of the room is for it, it holds for everybody, and a later room of three can let it go the same way. It takes a real reason, not a passing annoyance
 drop: name it drop; give itemId, the mark of the thing you hold, and it rests on the ground at your feet
 stow: name it stow; give itemId, the mark of the thing you hold, and structureId, the building you leave it in
 write: name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
