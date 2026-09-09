@@ -92,9 +92,12 @@ export function productsOf(recipe: Recipe): string[] {
 // The effects that leave the world different. `none` and `witness` do not, and a recipe made of
 // nothing else is a look: r31 minted "inspect a building exterior" with no effects at all, minds
 // ran it eight times a day, and the recognizer crowned it a custom.
+// `gain_skill` is not here, and the omission is the point. r49's Salma invented hand-grinding
+// wheat and the court granted her a craft that made no meal, took no grain and only made her
+// better at grinding. It passed this gate, then squatted on the name: every later ask was
+// refused as a second name for it, so the town could never learn to grind wheat again.
 const CHANGES_WORLD = new Set([
   'spawn_item',
-  'gain_skill',
   'hp_delta',
   'mark',
   'name_place',

@@ -51,6 +51,53 @@ describe('the codification sanity gate', () => {
     expect(recipeSanityRefusal(base)).toBeNull()
   })
 
+  // r49: Salma worked out how to hand-grind wheat with a flat stone, and the court granted a
+  // craft that took no grain, made no meal, and only made her better at grinding. Getting
+  // better at a thing is not the thing. Worse, the dud then squatted on the name.
+  it('★ refuses a craft whose only yield is the maker getting better at it', () => {
+    const practice: Recipe = {
+      ...base,
+      id: 'recipe:grind_wheat',
+      name: 'grind wheat',
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'The wheat is ground.',
+          effects: [{ op: 'gain_skill', track: 'cooking', xp: 5 }],
+        },
+      ],
+    }
+    expect(recipeSanityRefusal(practice)).toMatch(/changes nothing/)
+    const grinds: Recipe = {
+      ...practice,
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'The wheat is ground.',
+          effects: [
+            { op: 'spawn_item', kind: 'meal', qty: 1 },
+            { op: 'gain_skill', track: 'cooking', xp: 5 },
+          ],
+        },
+      ],
+    }
+    expect(recipeSanityRefusal(grinds)).toBeNull()
+  })
+
+  // Why the one above matters more than it looks: a name, once taken, is taken. The town could
+  // never have learned to grind wheat again while the dud held the word.
+  it('★ a codified name shuts out every later spelling of the same act', () => {
+    const second: Recipe = {
+      ...base,
+      id: 'recipe:grind_wheat_into_meal',
+      name: 'grind wheat into meal',
+    }
+    const held = { ...vocab, knownRecipeIds: new Set(['recipe:grind_wheat']) }
+    expect(recipeSanityRefusal(second, held)).toMatch(/second name for recipe:grind_wheat/)
+  })
+
   it('lets an honest recipe through', () => {
     expect(recipeSanityRefusal(base)).toBeNull()
     expect(
@@ -246,7 +293,12 @@ describe('★ a roof the town already raises is not a new craft', () => {
         weight: 7,
         success: true,
         label: 'It stands.',
-        effects: [{ op: 'gain_skill', track: 'carpentry', xp: 5 }],
+        // A mark and some skill is exactly what r33's fake build verbs yielded, and a mark is
+        // what carries them past the changes-nothing gate into the rule this block is about.
+        effects: [
+          { op: 'mark', on: 'structure', key: 'lamp', value: 'lit' },
+          { op: 'gain_skill', track: 'carpentry', xp: 5 },
+        ],
       },
     ],
   })
