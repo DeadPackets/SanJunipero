@@ -2,6 +2,7 @@
 // A body decides only while `activity` is unset — `submitIntent` discards an intent taken during one.
 import {
   DAYS_PER_YEAR,
+  founderSex,
   doorFrontTile,
   founderSeat,
   nextDawnTick,
@@ -191,8 +192,21 @@ const SCRIPTED_STRUCTURES: readonly DevStructure[] = TOWN_STRUCTURES.map((s) => 
 }))
 
 /** `rings` only means anything to 'showcase' — the frozen fixture has no grammar to grow. */
-export function townStructuresFor(map: DevMapKind, rings?: number): readonly DevStructure[] {
-  return map === 'showcase' ? devTown(undefined, rings).structures : SCRIPTED_STRUCTURES
+export function townStructuresFor(
+  map: DevMapKind,
+  rings?: number,
+  cast?: readonly string[],
+): readonly DevStructure[] {
+  const built = map === 'showcase' ? devTown(undefined, rings).structures : SCRIPTED_STRUCTURES
+  if (cast === undefined) return built
+  // A roof waiting on somebody who never founded the valley is nobody's roof and has no name:
+  // it stands empty and unowned until whoever walks up the road takes it.
+  const here = new Set(cast)
+  return built.map((s) => {
+    if (s.owner === null || here.has(s.owner)) return s
+    const { name: _drop, ...plain } = s
+    return { ...plain, owner: null }
+  })
 }
 
 export type DevHolding = {
@@ -599,11 +613,15 @@ function wellsideTile(structures: readonly DevStructure[]): { x: number; y: numb
 
 /** Each founder starts at their own door, so the first frame reads as households. A town with
  *  no named roofs is the frozen fixture, which keeps its own five bodies at their own coordinates. */
-export function foundersFor(structures: readonly DevStructure[]): readonly FounderDef[] {
+export function foundersFor(
+  structures: readonly DevStructure[],
+  cast?: readonly string[],
+): readonly FounderDef[] {
   const byName = new Map(structures.filter((s) => s.name !== undefined).map((s) => [s.name!, s]))
   if (byName.size === 0) return FOUNDERS
   const wellside = wellsideTile(structures)
-  return FOUNDER_ROSTER.map((f) => {
+  const here = cast === undefined ? null : new Set(cast)
+  return FOUNDER_ROSTER.filter((f) => here === null || here.has(f.id)).map((f) => {
     const home = byName.get(founderSeat(f.id) ?? '')
     if (home === undefined) throw new Error(`foundersFor: no roof in this town for ${f.id}`)
     // A hand-computed south-centre is wrong once buildings turn; this is the tile `doorTile` picks.
@@ -665,12 +683,14 @@ export function makeFoundersOnTick(
   return ({ tick, emit, apply }) => {
     if (tick === 1) {
       for (const f of cast) {
+        const sex = founderSex(f.id)
         emit('agent_spawned', {
           id: f.id,
           name: f.name,
           x: f.spawn.x,
           y: f.spawn.y,
           ageDays: f.ageDays,
+          ...(sex === undefined ? {} : { sex }),
           ...(FOUNDER_EATING[f.id] ?? {}),
           ...(FOUNDER_PACE[f.id] === undefined ? {} : { pace: FOUNDER_PACE[f.id] }),
           ...(FOUNDER_FAMILY[f.id] ?? {}),

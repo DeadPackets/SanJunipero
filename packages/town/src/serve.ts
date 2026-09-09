@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { foundingIds } from '@sj/shared'
 import { adminChannelPort, adminOpsRoutes, createLawsAdmin, type LiveCast } from '@sj/gateway'
 import { DEV_DB_PATH, SHOWCASE_CONFIG, startDevWorld } from './devWorld.js'
 import { intEnv, parseWorldEnv } from './worldEnv.js'
@@ -90,6 +91,8 @@ export async function main(): Promise<void> {
             ...(spendDaily === undefined ? {} : { spendDailyUsd: spendDaily }),
             ...(spendCap === undefined ? {} : { spendCapUsd: spendCap }),
             ...(maxMinds === undefined ? {} : { maxMinds }),
+            // The same slice the world spawns, off the same env knob: two lists, one number.
+            founderIds: foundingIds(env.founders),
             // The cap holds the minds and leaves the town standing: a stream that keeps serving
             // costs nothing, and a process that exits here restarts into the same refusal.
             onSpendStop: () => {

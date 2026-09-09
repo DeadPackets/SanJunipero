@@ -199,6 +199,9 @@ export type LiveCastOpts = {
    *  calls an hour. The gateway reads the same file, so both are handed one path. */
   narratorDbPath?: string
   minds?: readonly MindSpec[]
+  /** Who founded this valley, when it was founded with fewer than twelve. The world spawns these
+   *  bodies, so a mind list that disagrees leaves somebody standing in the town with nobody home. */
+  founderIds?: readonly string[]
   /** Dollars over the town's life; 0 is none. Reaching it stops the minds and calls `onSpendStop`. */
   spendCapUsd?: number
   /** Dollars in a rolling 24 real hours. Reaching it stops the minds and calls `onSpendStop`. */
@@ -419,7 +422,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
     ((line: string) => {
       console.log(line)
     })
-  const founders = opts.minds ?? FOUNDER_MINDS
+  const founders =
+    opts.minds ??
+    (opts.founderIds === undefined
+      ? FOUNDER_MINDS
+      : FOUNDER_MINDS.filter((m) => opts.founderIds!.includes(m.id)))
   // The world's own ceiling is announced from here at attach; this is the runtime's last line.
   const maxMinds = Math.max(opts.maxMinds ?? POPULATION_MAX_DEFAULT, founders.length)
   const cap = opts.spendCapUsd ?? LIVE_SPEND_STOP_USD

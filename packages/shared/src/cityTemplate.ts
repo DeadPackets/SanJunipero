@@ -315,6 +315,30 @@ export const FOUNDER_IDS = [
 ] as const
 export type FounderId = (typeof FOUNDER_IDS)[number]
 
+/** A founding smaller than twelve, taken a whole household at a time: the cards name each other,
+ *  so a cut through a marriage leaves somebody talking about a person who is not in the valley. */
+export const FOUNDING_GROUPS: readonly (readonly FounderId[])[] = [
+  ['omar', 'nadia', 'salma'],
+  ['yusuf'],
+  ['farida', 'bashir'],
+  ['amara'],
+  ['halim', 'dilara', 'tariq', 'kamal', 'leyla'],
+]
+
+/** Whole groups only, returned in FOUNDER_IDS order so a short founding folds the same events in
+ *  the same order a full one does. The sizes that fit are 3, 4, 6, 7 and 12. */
+export function foundingIds(n: number): readonly FounderId[] {
+  const kept = new Set<FounderId>()
+  let taken = 0
+  for (const group of FOUNDING_GROUPS) {
+    if (taken + group.length > n) break
+    for (const id of group) kept.add(id)
+    taken += group.length
+  }
+  if (kept.size === 0) for (const id of FOUNDING_GROUPS[0]!) kept.add(id)
+  return FOUNDER_IDS.filter((id) => kept.has(id))
+}
+
 /** The four who may come up the valley road later, in arrival order. Not in the founding, but
  *  the art gate wants their sheets before the first of them walks in. */
 export const TRAVELLER_IDS = ['mira', 'emre', 'reza', 'zeynep'] as const
@@ -340,6 +364,26 @@ export const FOUNDER_SEATS: Readonly<Record<FounderId, string>> = {
 
 export const founderSeat = (id: string): string | null =>
   (FOUNDER_SEATS as Readonly<Record<string, string | undefined>>)[id] ?? null
+
+/** The sex each card already declares, carried onto the body at the founding. Without it a
+ *  founder folds with the field absent, which reads as 'f' everywhere the world asks. */
+export const FOUNDER_SEX: Readonly<Record<FounderId, 'f' | 'm'>> = {
+  amara: 'f',
+  yusuf: 'm',
+  nadia: 'f',
+  omar: 'm',
+  salma: 'f',
+  farida: 'f',
+  bashir: 'm',
+  kamal: 'm',
+  leyla: 'f',
+  tariq: 'm',
+  halim: 'm',
+  dilara: 'f',
+}
+
+export const founderSex = (id: string): 'f' | 'm' | undefined =>
+  (FOUNDER_SEX as Readonly<Record<string, 'f' | 'm' | undefined>>)[id]
 
 // The room grid every enterable structure exposes to its furnishings: template vocabulary
 // only, never what a room actually looks like.

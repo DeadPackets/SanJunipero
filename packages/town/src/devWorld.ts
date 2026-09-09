@@ -3,8 +3,10 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
   DEFAULT_CONFIG,
+  FOUNDER_IDS,
   TICK_REAL_MS,
   TOWN_RINGS_GENESIS,
+  foundingIds,
   simTimeFromTick,
   type SimConfig,
   MINUTES_PER_DAY,
@@ -257,7 +259,10 @@ export async function startDevWorld(
 
   const genesisTerrain = devTerrain(map, rings)
   // Same map kind AND the same ring count as the terrain, or the town is an overlay of two layouts.
-  const structures = townStructuresFor(map, rings)
+  // Whole households, and only on the showcase: the frozen fixture has its own five bodies.
+  const founding =
+    map === 'showcase' ? foundingIds(world.founders ?? FOUNDER_IDS.length) : undefined
+  const structures = townStructuresFor(map, rings, founding)
 
   // `WorldState.terrain` rides in the snapshot, so the gateway must be handed THIS array and
   // not `devTerrain(map, rings)` recomputed from the environment.
@@ -304,7 +309,7 @@ export async function startDevWorld(
     // foundersFor is identity on an unowned town, so the scripted arm is byte-identical.
     interiors: world.interiors === true,
     structures,
-    founders: foundersFor(structures),
+    founders: foundersFor(structures, founding),
     holdings: map === 'showcase',
     builders: world.builders === true && map === 'showcase',
     jointBuild: world.jointBuild === true && map === 'showcase',

@@ -86,6 +86,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 |---|---|---|
 | `SJ_SITE_ADDRESS` | `:80` | The Caddy hostname. A real name gets a real certificate. |
 | `SJ_RINGS` | `1` | How far the town is platted. **Cannot change on a town that already exists.** |
+| `SJ_FOUNDERS` | `12` | How many people found the valley. Whole households, so 3, 4, 6, 7 or 12. Read once, at the founding. |
 | `SJ_INTERIORS` | on | `0` keeps people out of doors. |
 | `SJ_MAP` | `showcase` | `scripted` serves the frozen test fixture instead of the product town. |
 | `SJ_LAMPS` | `8` | Street lamps the lamplighter raises. `0` leaves the streets dark. |

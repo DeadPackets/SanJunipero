@@ -9,7 +9,7 @@ import {
   makeFixtureMap,
 } from '@sj/engine'
 import type { WorldState } from '@sj/engine'
-import { FOUNDER_IDS, INTERIOR_KINDS } from '@sj/shared'
+import { FOUNDER_IDS, INTERIOR_KINDS, founderSex, foundingIds } from '@sj/shared'
 import { libraryEntry } from '@sj/forge'
 import { SHOWCASE_CONFIG } from './devWorld.js'
 import { devTown } from './devTown.js'
@@ -587,6 +587,33 @@ describe('★ the founding families are world facts, not just something the mind
       if (FOUNDER_FAMILY[f.id] !== undefined) continue
       expect([f.id, bodies[f.id]]).not.toHaveProperty('partnerId')
       expect([f.id, bodies[f.id]]).not.toHaveProperty('parents')
+    }
+  })
+})
+
+describe('★ the founding carries the facts the cards already hold', () => {
+  const town = townAtTick1()
+
+  // A body folded with no sex reads as 'f' wherever the world asks: no pair can conceive, and
+  // r49 told the whole town that Omar, Bashir, Halim and Kamal each invented what "she" made.
+  it('★ gives every founder a sex, and both sexes are in the valley', () => {
+    const ids = Object.keys(town.agents)
+    expect(ids.length).toBeGreaterThan(0)
+    for (const id of ids) expect([id, town.agents[id]!.sex]).toEqual([id, founderSex(id)])
+    expect(new Set(ids.map((id) => town.agents[id]!.sex))).toEqual(new Set(['f', 'm']))
+  })
+
+  it('founds a six-person valley with six people, and leaves the other roofs to the road', () => {
+    const six = foundingIds(6)
+    const structures = townStructuresFor('showcase', 1, six)
+    const cast = foundersFor(structures, six)
+    expect(cast.map((f) => f.id).sort()).toEqual([...six].sort())
+    // A roof nobody in this founding owns is nobody's and has no name, so no mouth can say the
+    // place and nobody lives in a house called after a person the valley does not have.
+    const here = new Set<string>(six)
+    for (const s of structures) {
+      if (s.owner === null) continue
+      expect([s.id, here.has(s.owner)]).toEqual([s.id, true])
     }
   })
 })

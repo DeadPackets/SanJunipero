@@ -1,6 +1,6 @@
 // Every world knob, read HERE and nowhere else, so no test's world can drift with an env var and
 // no entrypoint can answer a knob differently from another by accident. Knobs: see README.md.
-import { TOWN_RINGS_GENESIS } from '@sj/shared'
+import { FOUNDER_IDS, TOWN_RINGS_GENESIS } from '@sj/shared'
 import type { DevMapKind } from './devWorld.js'
 
 /** What a PERSON asking for a town gets. The library default stays `scripted`, because the
@@ -14,6 +14,9 @@ export type WorldEnv = {
   builders: boolean
   bridge: boolean
   jointBuild: boolean
+  /** How many people the valley is founded with. Whole households only, so the number the town
+   *  gets is the largest of 3, 4, 6, 7 and 12 that fits under this. */
+  founders: number
   fresh: boolean
 }
 
@@ -58,6 +61,7 @@ export function parseWorldEnv(): WorldEnv {
     builders: boolEnv('SJ_BUILDERS', DEFAULTS.builders),
     bridge: boolEnv('SJ_BRIDGE', DEFAULTS.bridge),
     jointBuild: boolEnv('SJ_JOINT', DEFAULTS.jointBuild),
+    founders: intEnv('SJ_FOUNDERS', FOUNDER_IDS.length, 1),
     fresh: process.env.SJ_FRESH === '1',
   }
 }
