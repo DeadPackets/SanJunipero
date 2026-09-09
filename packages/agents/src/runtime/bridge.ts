@@ -463,8 +463,9 @@ export class EngineBridge {
     return groundForBuilding(this.#loop.state)
   }
 
-  // Off the live config, so a law that changes how fast the valley opens ground is felt the
-  // moment it passes. 0 means the town may start something now.
+  // The live config for the same reason `makeables` reads it: everything on this path does, and
+  // a second rebuild costs nothing. No law may set this rate; it is not a togglable path.
+  // 0 means the town may start something now.
   newGroundInDays(): number {
     return daysUntilNewGround(
       this.#loop.state,
