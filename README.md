@@ -65,8 +65,13 @@ events reach the same bytes — a test holds that over three sim-days
 can resume the town at the same tick.
 
 **The god layer.** An arbiter adjudicates what the physics alone cannot, writes canon, and
-keeps a codex of rulings; a ruling can mint a new verb, and reverting it unregisters the
-verb again. A chronicler writes the town's chapters under vocabulary rules that are all
+keeps a codex of rulings. A ruling can mint a new verb, and reverting it unregisters the verb
+again. It can also grant a **kind of building nobody has thought of**: ask for somewhere the
+town can sit of an evening and drink, and what comes back is an alehouse, with what it is made
+of and whether it has a roof and a fire. It lands as one config change on the same road every
+world fact travels, and from that moment the thing is in every mind's own list of what it knows
+how to build. The court rules on whether such a thing can be raised out of what the valley
+holds. It never holds the list of things there are. A chronicler writes the town's chapters under vocabulary rules that are all
 rules against inventing — *"hurt is never a number… never call anybody a healer unless the
 town calls them one first"*
 ([`chronicle.ts`](packages/narrator/src/chronicle.ts)).
