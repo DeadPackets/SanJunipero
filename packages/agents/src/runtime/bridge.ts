@@ -8,6 +8,7 @@ import {
   mintId,
   roadRimOf,
   spoilageFor,
+  daysUntilNewGround,
   groundForBuilding,
   hears,
   townSquareOf,
@@ -460,6 +461,15 @@ export class EngineBridge {
   // the prose names is the place `build` accepts and no other — a mind is never told two.
   groundForBuilding(): { x: number; y: number } | null {
     return groundForBuilding(this.#loop.state)
+  }
+
+  // Off the live config, so a law that changes how fast the valley opens ground is felt the
+  // moment it passes. 0 means the town may start something now.
+  newGroundInDays(): number {
+    return daysUntilNewGround(
+      this.#loop.state,
+      effectiveConfig(this.#simConfig, this.#loop.state.laws),
+    )
   }
 
   // Every place this body has ever laid eyes on or been told of, whether or not it can see one

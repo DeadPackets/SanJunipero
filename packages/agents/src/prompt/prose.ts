@@ -476,6 +476,7 @@ export function standingWallsLine(
 export function makeablesLine(
   m: Makeables,
   groundForBuilding?: { x: number; y: number } | null,
+  newGroundInDays = 0,
 ): string {
   const parts: string[] = []
   if (m.builds.length > 0) {
@@ -486,7 +487,13 @@ export function makeablesLine(
     )
     // "to begin a new one", never "to raise one": this ground is where a roof starts, and walls
     // that already stand are raised where they stand.
-    if (groundForBuilding !== undefined && groundForBuilding !== null) {
+    // The valley opens ground for one roof at a time. A mind that is not told so reads every
+    // refusal as the world saying no for no reason, which is worse than never wanting to build.
+    if (newGroundInDays > 0) {
+      parts.push(
+        `There is no new ground to build on for another ${newGroundInDays === 1 ? 'day' : `${newGroundInDays} days`}. Anything already half up can still be worked on.`,
+      )
+    } else if (groundForBuilding !== undefined && groundForBuilding !== null) {
       parts.push(
         `The town keeps ground for a new building at (${groundForBuilding.x}, ${groundForBuilding.y}). You have to be standing there to start one.`,
       )

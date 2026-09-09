@@ -164,6 +164,9 @@ const FireSchema = z
 
 const ConstructionSchema = z
   .object({
+    // The valley has only so much room, so the town opens ground for one new roof every ten
+    // days and no faster (owner, 2026-09-09). Work already standing is never held up by it.
+    plotOpensEveryTicks: z.number().int().default(14400),
     houseTicks: z.number().default(2880),
     houseMaterials: z
       .object({

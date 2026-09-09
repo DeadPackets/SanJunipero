@@ -8,6 +8,7 @@ import {
   type SimEvent,
 } from '@sj/shared'
 import {
+  GENESIS_BUILDER_ID,
   fromTileKey,
   clampNeed,
   INJURY_HEAL_DAYS,
@@ -587,6 +588,9 @@ export function fold(
             builtBy: p.builderId,
             burning: false,
             burnTicks: 0,
+            // The founding town is the world's own work, so it never counts toward the rate
+            // the valley opens ground at, and its absence keeps every old world's hash.
+            ...(p.builderId === GENESIS_BUILDER_ID ? {} : { plannedTick: event.tick }),
             ...(p.owner === undefined ? {} : { owner: p.owner }),
             ...(p.facing === undefined ? {} : { facing: p.facing }),
             ...(p.name === undefined ? {} : { name: p.name }),

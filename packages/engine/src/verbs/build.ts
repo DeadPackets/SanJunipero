@@ -4,7 +4,7 @@ import { type Structure, type WorldState } from '../state.js'
 import { claimInWorld, layBlock, townSquareOf, type TileChange } from '../town.js'
 import { heldQty, nearRect, siteAt } from './common.js'
 import { buildTicks, buildableRecipe, shortOf } from './craft.js'
-import { isTravelled, isWet, type SimConfig, type TownFacing } from '@sj/shared'
+import { MINUTES_PER_DAY, isTravelled, isWet, type SimConfig, type TownFacing } from '@sj/shared'
 
 /** Absent means this; the same convention `forge/buildingArt.facingKind` uses. */
 const DEFAULT_TOWN_FACING: TownFacing = 'sw'
@@ -294,6 +294,23 @@ function computeBuildSite(
 /** Every plot holds every legal mass, so a 1x1 claim's door serves every buildable kind. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
+}
+
+/** How long until the valley opens ground for another roof; 0 when it is open now. Counted from
+ *  the last one a PERSON began, so the founding town the world seeded never holds anybody up. */
+export function ticksUntilNewGround(state: WorldState, config: SimConfig): number {
+  const every = config.construction.plotOpensEveryTicks
+  if (every <= 0) return 0
+  let last = -Infinity
+  for (const s of Object.values(state.structures))
+    if (s.plannedTick !== undefined && s.plannedTick > last) last = s.plannedTick
+  if (last === -Infinity) return 0
+  return Math.max(0, last + every - state.tick)
+}
+
+/** The same wait in whole days, which is the only unit a person would say it in. */
+export function daysUntilNewGround(state: WorldState, config: SimConfig): number {
+  return Math.ceil(ticksUntilNewGround(state, config) / MINUTES_PER_DAY)
 }
 
 export type StandingWalls = {

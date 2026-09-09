@@ -114,6 +114,16 @@ describe('★ the ground a verb takes a tile for keeps its numbers', () => {
     )
   })
 
+  // The owner asked for one roof every ten days, and a rule the world enforces has to reach
+  // perception or the refusal reads as the world saying no for no reason (r39's law).
+  it('★ says how long the valley is shut instead of naming ground nobody may use', () => {
+    const shut = makeablesLine(makeables(CFG), { x: 30, y: 40 }, 6)
+    expect(shut).toContain('There is no new ground to build on for another 6 days.')
+    expect(shut).toContain('Anything already half up can still be worked on.')
+    expect(shut).not.toContain('keeps ground')
+    expect(makeablesLine(makeables(CFG), { x: 30, y: 40 }, 1)).toContain('another day.')
+  })
+
   it('names the tree, the crop, the animal and the patch, none of which a walk can name', () => {
     const said = seeing({
       crops: [{ id: 'crop_1', kind: 'wheat', x: 12, y: 8, stage: 2, withered: false }],

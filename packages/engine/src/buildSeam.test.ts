@@ -21,12 +21,14 @@ import { effectiveConfig } from './laws.js'
 import { makeables } from './verbs/craft.js'
 import { genesisState, type WorldState } from './state.js'
 import { GENESIS_FORD } from './geography.js'
-import { makeGenesisWorld, GENESIS_BUILDER_ID } from './genesis/world.js'
+import { makeGenesisWorld } from './genesis/world.js'
+import { GENESIS_BUILDER_ID } from './state.js'
 import { submitIntent } from './intent.js'
 import { makeFixtureMap } from './scripted.js'
 import {
   buildIsPlotted,
   buildSiteOf,
+  daysUntilNewGround,
   groundForBuilding,
   handsOnSite,
   isAdjacentToRect,
@@ -48,7 +50,13 @@ import {
 } from './town.js'
 import { builtBox, owedBox } from './systems/mapGrowth.js'
 
-const CFG = DEFAULT_CONFIG
+// The valley's one-roof-every-ten-days rate has its own describe below. Every other test here
+// is about WHERE a roof goes and who may work on it, so they run with the rate off.
+const CFG = {
+  ...DEFAULT_CONFIG,
+  construction: { ...DEFAULT_CONFIG.construction, plotOpensEveryTicks: 0 },
+}
+const RATED = DEFAULT_CONFIG
 const T_FOREST = 3
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 0, type, payload })
@@ -175,6 +183,48 @@ describe('the one tile the prose names works for every roof a mind can raise', (
       const r = submitIntent(s, CFG, `b_${kind}`, 'build', { kind })
       expect(r.ok, `${kind}: ${r.ok ? '' : r.reason}`).toBe(true)
     }
+  })
+})
+
+// The owner asked for one building every ten sim-days: the valley has only so much room
+// (2026-09-09). Counted off the last roof a PERSON began, so the thirteen the world seeds at
+// tick 1 never hold the first builder up.
+describe('★ the valley opens ground for one roof every ten days', () => {
+  // A pending event has no tick of its own; the envelope carries it, and `plannedTick` is
+  // read off the envelope, so a fixture that skips it stamps nothing.
+  let seq = 9000
+  const raise = (s: WorldState, who: string, at = 0): WorldState => {
+    const told = groundForBuilding(s)!
+    const withHands = withBuilder(s, who, told, 10)
+    const r = submitIntent(withHands, RATED, who, 'build', { kind: 'house' })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+    return (r.ok ? r.events : []).reduce(
+      (w, e) => fold(w, { seq: ++seq, tick: at, type: e.type, payload: e.payload }, RATED),
+      withHands,
+    )
+  }
+
+  it('lets the first one through and refuses the next until the days have passed', () => {
+    const after = raise(genesisTown(), 'first')
+    expect(daysUntilNewGround(after, RATED)).toBe(10)
+
+    const told = groundForBuilding(after)
+    expect(told, 'the founding town has spare plots; the rate is what refuses').not.toBeNull()
+    const second = withBuilder(after, 'second', told!, 10)
+    const r = submitIntent(second, RATED, 'second', 'build', { kind: 'house' })
+    expect(r.ok).toBe(false)
+    expect(r.ok ? '' : r.reason).toContain('no new ground to build on')
+  })
+
+  it('★ the seeded town does not count, so nobody waits on the world', () => {
+    const base = genesisTown()
+    expect(Object.values(base.structures).length).toBeGreaterThan(0)
+    expect(daysUntilNewGround(base, RATED)).toBe(0)
+  })
+
+  it('a knob of zero turns the rate off entirely', () => {
+    const after = raise(genesisTown(), 'first')
+    expect(daysUntilNewGround(after, CFG)).toBe(0)
   })
 })
 
@@ -654,7 +704,11 @@ describe('★ help must help — what a second pair of hands buys the calendar',
   const HOUSE_TICKS = 120
   const FAST = {
     ...DEFAULT_CONFIG,
-    construction: { ...DEFAULT_CONFIG.construction, houseTicks: HOUSE_TICKS },
+    construction: {
+      ...DEFAULT_CONFIG.construction,
+      houseTicks: HOUSE_TICKS,
+      plotOpensEveryTicks: 0,
+    },
   }
   // Tick 0 is midnight, so a run left at genesis measures the night penalty by accident.
   const NOON = 12 * 60

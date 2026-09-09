@@ -20,7 +20,7 @@ import { fold } from '../fold.js'
 import { doorTile } from '../interiors.js'
 import { besideAKeptFire, warmthTargetFor } from '../systems/warmth.js'
 import { findPath, isPassable, searchPath } from '../path.js'
-import { genesisState, type WorldState } from '../state.js'
+import { GENESIS_BUILDER_ID, genesisState, type WorldState } from '../state.js'
 import { submitIntent } from '../intent.js'
 import { RngStreams } from '../rng.js'
 import { buildableRecipe, buildTicks, VERBS } from '../verbs/index.js'
@@ -30,7 +30,6 @@ import { GENESIS_FORD, GENESIS_FORK_Y, GENESIS_RIVER_X } from '../geography.js'
 import {
   makeGenesisWorld,
   genesisDurability,
-  GENESIS_BUILDER_ID,
   GENESIS_ROOF_STOOD,
   GENESIS_SOUND_ROOFS,
   roofFell,

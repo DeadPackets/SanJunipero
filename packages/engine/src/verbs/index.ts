@@ -49,6 +49,7 @@ import {
   BUILD_NEEDS_A_THING_AND_A_PLACE,
   buildIsPlotted,
   buildSiteOf,
+  daysUntilNewGround,
   siteToRaise,
   words,
 } from './build.js'
@@ -1814,7 +1815,16 @@ const build: VerbDef = makeVerb({
         ? `where a ${words(kind)} stands is the town's to say, not yours — name the thing to raise and nothing else`
         : BUILD_NEEDS_A_THING_AND_A_PLACE
     }
-    return buildSiteOf(state, config, agentId, p.data).refusal
+    const answer = buildSiteOf(state, config, agentId, p.data)
+    if (answer.refusal !== null) return answer.refusal
+    // Walls already standing get finished whatever the calendar says. The valley's rate is on
+    // NEW ground, so a rule about room never strands a half-built roof.
+    if (answer.resume === null) {
+      const days = daysUntilNewGround(state, config)
+      if (days > 0)
+        return `there is no new ground to build on for another ${days === 1 ? 'day' : `${days} days`} — what is already standing can still be worked on`
+    }
+    return null
   },
   duration(state, config, agentId, params) {
     const p = BuildParams.parse(params)
@@ -3000,7 +3010,9 @@ export {
   buildFootprint,
   buildIsPlotted,
   buildSiteOf,
+  daysUntilNewGround,
   groundForBuilding,
+  ticksUntilNewGround,
   isPlottedKind,
   unfinishedWork,
   type BuildSiteAnswer,

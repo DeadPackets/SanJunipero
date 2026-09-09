@@ -459,8 +459,9 @@ describe('the close', () => {
     const { model, prompts } = answering(answer([]))
     const llm = makeSceneLlm(client(model), voice())
     await llm.close(closed())
+    const said = (prompts[0] ?? '').toLowerCase()
     for (const word of ['cough', 'fever', 'limp', 'ache', 'wound', 'shoulder'])
-      expect(prompts[0].toLowerCase(), word).not.toContain(word)
+      expect(said, word).not.toContain(word)
   })
 
   it('turns the names it was given back into ids', async () => {

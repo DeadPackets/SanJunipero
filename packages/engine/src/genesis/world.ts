@@ -11,7 +11,7 @@ import {
 import { genesisTerrainAt } from '../geography.js'
 import { FAUNA_YIELD, GENESIS_FAUNA } from '../data/faunaDefs.js'
 import { FORAGEABLE_YIELD, GENESIS_FORAGEABLES } from '../data/forageables.js'
-import { genesisState, type TileId, type WorldState } from '../state.js'
+import { GENESIS_BUILDER_ID, genesisState, type TileId, type WorldState } from '../state.js'
 import { spoilageFor } from '../systems/spoilage.js'
 import { SEED_RECIPES, buildableRecipe, buildTicks, type PendingEvent } from '../verbs/index.js'
 
@@ -21,7 +21,6 @@ import { SEED_RECIPES, buildableRecipe, buildTicks, type PendingEvent } from '..
 
 // Structures the world places and nobody built. The template is the single source of every
 // footprint; `structures.recipes` is the single source for the kinds that can also be built.
-export const GENESIS_BUILDER_ID = 'genesis'
 export type Durability = { maxHp: number; flammable: boolean }
 // shed must never get a structures.recipes row: it is in the frozen scripted world and an
 // INTERIOR_KIND, but inputs would mint a 1x1 store and roofed:true would promise shelter it lacks.

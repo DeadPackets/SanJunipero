@@ -139,6 +139,10 @@ export type AgentBody = {
   zeroHungerSinceTick: number | null
 }
 
+/** Who the world itself builds as. Lives here and not in `genesis/world.ts` because `fold` has
+ *  to tell the founding town from what a person adds, and cannot import the genesis module. */
+export const GENESIS_BUILDER_ID = 'genesis'
+
 export type Structure = {
   id: string
   kind: string
@@ -158,6 +162,9 @@ export type Structure = {
   // What the town calls it. Authored at genesis or cut into the wall by a hand; absent means
   // the thing has no name yet and is only ever pointed at by its id.
   name?: string
+  // When a person began it. Absent on everything the world seeded, which is what keeps the
+  // founding town out of the rate the valley opens ground at, and every old world's hash.
+  plannedTick?: number
   // Absent means `sw`. A turned 2x2 is byte-identical to an unturned one, so w/h cannot answer
   // for a house the way they do for a deck; absent-means-default keeps every old world's hash.
   facing?: TownFacing

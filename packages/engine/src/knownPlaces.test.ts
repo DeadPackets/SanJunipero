@@ -7,7 +7,7 @@ import {
   type SimConfig,
 } from '@sj/shared'
 import { openDb } from './db.js'
-import { GENESIS_BUILDER_ID } from './genesis/world.js'
+import { GENESIS_BUILDER_ID } from './state.js'
 import { doorTile } from './interiors.js'
 import { isAdjacentToRect } from './verbs/common.js'
 import { EventStore } from './eventStore.js'
