@@ -297,13 +297,16 @@ export function groundForBuilding(state: WorldState): { x: number; y: number } |
 }
 
 /** How long until the valley opens ground for another roof; 0 when it is open now. Counted from
- *  the last one a PERSON began, so the founding town the world seeded never holds anybody up. */
+ *  the last one a PERSON began, so the founding town the world seeded never holds anybody up.
+ *  Plotted kinds only: the owner's reason was room, and a span over water or a post in the
+ *  ground takes none, so neither waits on the clock nor starts it. */
 export function ticksUntilNewGround(state: WorldState, config: SimConfig): number {
   const every = config.construction.plotOpensEveryTicks
   if (every <= 0) return 0
   let last = -Infinity
   for (const s of Object.values(state.structures))
-    if (s.plannedTick !== undefined && s.plannedTick > last) last = s.plannedTick
+    if (s.plannedTick !== undefined && s.plannedTick > last && isPlottedKind(config, s.kind))
+      last = s.plannedTick
   if (last === -Infinity) return 0
   return Math.max(0, last + every - state.tick)
 }

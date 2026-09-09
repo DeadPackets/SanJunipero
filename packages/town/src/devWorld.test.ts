@@ -10,6 +10,7 @@ import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
 import {
   DEV_MAP_DEFAULT,
   SHOWCASE_CONFIG,
+  STILL_WEATHER_CONFIG,
   THOUGHT_LINES,
   devTerrain,
   startDevWorld,
@@ -18,6 +19,20 @@ import { DEV_MAP_HUMAN } from './worldEnv.js'
 import { townStructuresFor } from './founders.js'
 import { frameText, publishThought } from '@sj/gateway'
 import { until } from '@sj/gateway/testutil'
+
+// The config `serve.ts` runs is SHOWCASE_CONFIG, so a knob turned off here is a knob turned off
+// in the shipped town. This nearly happened: four harnesses that count roofs were failing under
+// the valley's building rate, and the one-line fix was to zero the rate in the config prod uses.
+describe('★ the shipped config carries the valley rules, and only the harness turns them off', () => {
+  it('★ opens ground for one roof every ten days, exactly as the world default says', () => {
+    expect(SHOWCASE_CONFIG.construction.plotOpensEveryTicks).toBe(
+      DEFAULT_CONFIG.construction.plotOpensEveryTicks,
+    )
+    expect(SHOWCASE_CONFIG.construction.plotOpensEveryTicks).toBeGreaterThan(0)
+    // The harness config, and nothing the town serves, is where the rate is lifted.
+    expect(STILL_WEATHER_CONFIG.construction.plotOpensEveryTicks).toBe(0)
+  })
+})
 
 describe('showcase weather', () => {
   it('runs the weather system — the storm grade was re-tuned, so nothing freezes it (D9)', () => {

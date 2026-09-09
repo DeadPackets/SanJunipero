@@ -40,7 +40,9 @@ const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
   mystery: { chancePerDay: 0 },
   aging: { deathOfOldAgeEnabled: false },
-  construction: { houseTicks: HOUSE_TICKS },
+  // Builds many roofs fast on purpose: the valley's one-roof-every-ten-days rate is not what
+  // this is about, and it has its own test.
+  construction: { houseTicks: HOUSE_TICKS, plotOpensEveryTicks: 0 },
   structures: {
     recipes: {
       ...SimConfigSchema.parse({}).structures.recipes,

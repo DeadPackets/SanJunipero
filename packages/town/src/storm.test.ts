@@ -11,6 +11,9 @@ function stormyDays(stormLightningFireChance: number): StormRun {
     ...SHOWCASE_CONFIG,
     // The founding-week mercy (harshFromDay) would blank the storms this test exists to measure.
     weather: { ...SHOWCASE_CONFIG.weather, stormLightningFireChance, harshFromDay: 0 },
+    // It needs a hundred and ten roofs to count strikes against; the valley's rate would give it
+    // one. Rare building is the live town's rule about room, and it has its own test.
+    construction: { ...SHOWCASE_CONFIG.construction, plotOpensEveryTicks: 0 },
   }
   const { events } = runFoundersWorld(
     { interiors: true, builders: true, holdings: true },

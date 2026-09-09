@@ -20,7 +20,7 @@ import {
   townSquareOf,
   type WorldState,
 } from '@sj/engine'
-import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
+import { SHOWCASE_CONFIG, STILL_WEATHER_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { devTownSquare, devWorldOrigin } from './devTown.js'
 import { FOUNDER_ROSTER, GO_HOME_BELOW, masonIntent } from './founders.js'
 import { type Run, runFoundersWorld } from './testutil.js'
@@ -258,7 +258,7 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
   // `homeIntent` has taken it to bed by then, so the reserve looks inert.
   describe('the mason, asked directly', () => {
     function twoAtOneSite(): WorldState {
-      const cfg = SHOWCASE_CONFIG
+      const cfg = STILL_WEATHER_CONFIG
       let n = 0
       const put = (s: WorldState, type: string, payload: unknown): WorldState =>
         fold(s, { seq: ++n, tick: 1, type, payload }, cfg)

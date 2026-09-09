@@ -43,6 +43,9 @@ import { changesOf } from './testutil/world.js'
 const G2_CONFIG = SimConfigSchema.parse({
   needs: { hungerDecayPerTick: 0.021 },
   mortality: { drainPerTick: { poison: 0.12 }, needsKill: true },
+  // Three sim days that have to contain a build. The valley opens ground for one roof every ten,
+  // which is a rate with its own test and not what this gate is reading.
+  construction: { plotOpensEveryTicks: 0 },
 })
 
 const SEED = 'g2-scripted'

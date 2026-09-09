@@ -267,6 +267,8 @@ describe('discovery_made — the record, and nothing in the state', () => {
 
 // The five grounding effects a minted verb may have, each folded to one pinned hash: a charter
 // that changes the world changes it the same way on every replay.
+// Re-pinned when `plannedTick` joined a structure: each state was hashed again with the field
+// stripped and matched its old hash exactly, so nothing but the new field moved.
 describe('what a minted verb can do to the world folds to a golden', () => {
   function town(): WorldState {
     let s = genesisState(DEFAULT_CONFIG)
@@ -325,7 +327,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     ).toThrow(/unknown item/)
     golden(
       ev(5, 'marked', { on: 'agent', id: 'a2', key: 'debt', value: 'two planks' }),
-      '15c5bba1869a6c91d0dce9e79c2ee2ae2004e1a5f6d25f65ff3030026667e04c',
+      '9b4692b4eb0050be1d52d82018e98f2e46e8c45d560c06e86d0cdffc913c82dd',
     )
   })
 
@@ -341,7 +343,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     })
     const before = town()
     expect(fold(before, event, DEFAULT_CONFIG)).toBe(before)
-    golden(event, '7e444532b37dee82a793f40869c2507ddd3ff2d5f6e800e7296be35c931388ed')
+    golden(event, 'f91b7e13dfc62e20c4cd68482881b8d2487f2857770234c8a82ba314286aec20')
   })
 
   // The camera and the viewer's frame read this one; the world only witnesses that the talk
@@ -412,14 +414,14 @@ describe('what a minted verb can do to the world folds to a golden', () => {
     expect(fold(town(), event, DEFAULT_CONFIG).structures.structure_1!.name).toBe(
       "the Widow's Well",
     )
-    golden(event, '90ce46cb9a17dd6802229631b62b2db78cf79be75aab1ba86f6a69d19eeedabf')
+    golden(event, '112c22c0de8958ddd126950aafe8eb948793ec0a2d88c342443a144a6de514ff')
   })
 
   it('transfer: title passes to the target, the thing stays where it is', () => {
     const event = ev(5, 'item_owner_changed', { id: 'item_1', owner: 'a2' })
     const after = fold(town(), event, DEFAULT_CONFIG)
     expect(after.items.item_1).toMatchObject({ owner: 'a2', loc: { t: 'agent', id: 'a1' } })
-    golden(event, '8cd99532114e27dc0a654b48e6a1192e245208048ac5087a2b84b26921c41d84')
+    golden(event, '84653acbef753471b4068fabb0b88def118c2969fb1f6c12de9201730a549c0b')
   })
 
   it('need_delta: one need moves by the charter’s number', () => {
@@ -433,7 +435,7 @@ describe('what a minted verb can do to the world folds to a golden', () => {
         event,
       ).agents.a1!.needs.social,
     ).toBe(60)
-    golden(event, 'cabe5a7ec8bf51f92e181c48c0e89a1be8332f9378be8328c22ee703529580b3')
+    golden(event, '09d44971e3c69a42fb9e80971a7e7f6cceae4aa1b8c0789a83d5f60678859959')
   })
 })
 

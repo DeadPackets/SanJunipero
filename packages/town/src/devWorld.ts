@@ -78,11 +78,13 @@ export const SHOWCASE_CONFIG: SimConfig = {
   },
 }
 
-/** The showcase with its weather held still. The test harnesses that count houses and
- *  bridges were tuned on a sunny run; the shipped town runs the weather. */
+/** The showcase with its weather held still, and its ground always open. The test harnesses that
+ *  count houses and bridges were tuned on a sunny run that built as fast as it liked; the shipped
+ *  town runs the weather and opens ground for one roof every ten days. */
 export const STILL_WEATHER_CONFIG: SimConfig = {
   ...SHOWCASE_CONFIG,
   weather: { ...SHOWCASE_CONFIG.weather, hourlyChangeChance: 0 },
+  construction: { ...SHOWCASE_CONFIG.construction, plotOpensEveryTicks: 0 },
 }
 
 // Human framing, no AI vocabulary: one-way glass holds for canned lines too.

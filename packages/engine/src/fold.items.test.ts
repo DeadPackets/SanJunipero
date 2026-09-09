@@ -150,6 +150,8 @@ describe('fold structures', () => {
   it('plans a structure at stage construction with hp 1', () => {
     const s = fold(genesisState(DEFAULT_CONFIG), plan('structure_1'))
     expect(s.structures.structure_1).toEqual({
+      // The tick a person began it, which the valley's one-roof-every-ten-days rate counts from.
+      plannedTick: 0,
       id: 'structure_1',
       kind: 'house',
       x: 0,

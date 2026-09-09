@@ -1817,9 +1817,10 @@ const build: VerbDef = makeVerb({
     }
     const answer = buildSiteOf(state, config, agentId, p.data)
     if (answer.refusal !== null) return answer.refusal
-    // Walls already standing get finished whatever the calendar says. The valley's rate is on
-    // NEW ground, so a rule about room never strands a half-built roof.
-    if (answer.resume === null) {
+    // Walls already standing get finished whatever the calendar says, and a span or a post takes
+    // no ground at all. The valley's rate is on NEW ground for a roof, so a rule about room
+    // never strands a half-built one and never stops a bridge.
+    if (plotted && answer.resume === null) {
       const days = daysUntilNewGround(state, config)
       if (days > 0)
         return `there is no new ground to build on for another ${days === 1 ? 'day' : `${days} days`} — what is already standing can still be worked on`

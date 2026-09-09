@@ -17,7 +17,11 @@ import { makeGenesisWorld } from './genesis/world.js'
 import { submitIntent } from './intent.js'
 import { claimInWorld, townSquareOf } from './town.js'
 
-const CFG: SimConfig = SimConfigSchema.parse({ construction: { houseTicks: 1 } })
+// Raises several houses in a row to read their facings; the valley's one-roof-every-ten-days
+// rate is not what this is about, and it has its own test.
+const CFG: SimConfig = SimConfigSchema.parse({
+  construction: { houseTicks: 1, plotOpensEveryTicks: 0 },
+})
 const BUILDER = 'b1'
 
 let seq = 50_000
