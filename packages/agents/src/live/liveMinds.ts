@@ -177,6 +177,10 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         ...(frontier === undefined ? {} : { frontier }),
         livingCast,
         want: () => runtimes.get(spec.id)?.wantSaid(opts.bridge.currentTick()) ?? null,
+        known: (names) =>
+          names
+            .map((name) => ({ name, doc: mem.getLedger(name)?.doc ?? '' }))
+            .filter((k) => k.doc.length > 0),
       })
       minds.set(spec.id, {
         llm: {

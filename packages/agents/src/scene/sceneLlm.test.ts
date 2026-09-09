@@ -178,6 +178,27 @@ describe('the scene turn keeps the cached prefix', () => {
   })
 })
 
+// r49: a mind's own six-line note about a person reached its turn prompt and never its speech.
+// Fourteen per cent of them carried a reservation, and nobody was ever short with anybody.
+describe('★ a mind speaks knowing what it makes of the person in front of it', () => {
+  const note = 'Yusuf is quick to promise and slow to arrive. I would not lend him anything.'
+  it('carries the note it wrote itself, and asks nothing of it', () => {
+    const said = block(
+      ask(),
+      voice({ known: (names) => names.map((name) => ({ name, doc: note })) }),
+    )
+    expect(said).toContain('What you make of them, in your own words:')
+    expect(said).toContain(note)
+    // Only the others: a mind reading its own appraisal of itself is a mirror, not a person.
+    expect(said).not.toContain('Tamar:\n')
+    expect(said).not.toMatch(/say so|bring it up|should|remember to/i)
+  })
+  it('says nothing at all when the mind has made nothing of anybody', () => {
+    expect(block()).not.toContain('What you make of them')
+    expect(block(ask(), voice({ known: () => [] }))).not.toContain('What you make of them')
+  })
+})
+
 describe('the scene block', () => {
   it('names the living cast and closes the roll', () => {
     expect(block()).toContain('Everyone alive in the valley: Tamar, Yusuf, Nadia.')

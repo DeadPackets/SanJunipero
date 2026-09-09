@@ -46,6 +46,8 @@ export type SceneVoice = {
   livingCast: () => readonly { id: string; name: string }[]
   /** The mind's strongest want, in its own words. Nothing at all until wants exist. */
   want?: () => string | null
+  /** What this mind privately makes of each named person, in the words it wrote itself. */
+  known?: (names: readonly string[]) => readonly { name: string; doc: string }[]
 }
 
 // How far back a mind reads before answering. Six lines is three exchanges for a pair: long
@@ -101,6 +103,15 @@ function castLaw(living: readonly { name: string }[]): string {
     'else. A name that is not among those has never lived here, and to say one aloud is to ' +
     'invent a neighbour.'
   )
+}
+
+// r49: fourteen per cent of the notes a mind keeps carried a reservation - careless, distrust,
+// would not tell them anything that matters - and in 4,255 spoken lines nobody was ever short
+// with anybody. The turn prompt has held these notes since they existed; the scene never did.
+function renderKnown(known: readonly { name: string; doc: string }[]): string {
+  if (known.length === 0) return ''
+  const rows = known.map((k) => `${k.name}:\n${k.doc}`)
+  return ['What you make of them, in your own words:', ...rows].join('\n\n')
 }
 
 function renderTies(ties: readonly Tie[], nameOf: (id: string) => string): string {
@@ -260,7 +271,7 @@ function renderRecent(recent: readonly string[]): string {
 
 export function sceneBlock(
   ask: SceneAsk,
-  voice: Pick<SceneVoice, 'livingCast' | 'want'> & { words: number; usual: number },
+  voice: Pick<SceneVoice, 'livingCast' | 'want' | 'known'> & { words: number; usual: number },
 ): string {
   const names = new Map<string, string>()
   for (const p of voice.livingCast()) names.set(p.id, p.name)
@@ -273,6 +284,7 @@ export function sceneBlock(
   const parts = [
     SCENE_ANSWER,
     castLaw(voice.livingCast()),
+    renderKnown(voice.known?.(rest.map((p) => p.name)) ?? []),
     renderTies(ask.ties, nameOf),
     want === null || want.length === 0 ? '' : `What you want most: ${want}`,
     renderThread(ask.thread, nameOf, ask.agentId, threadLinesFor(ask.cast.length)),
