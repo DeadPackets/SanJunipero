@@ -654,7 +654,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
                   ...(d.credit.saying ? { saying: d.credit.saying } : {}),
                   makes: d.makes,
                 })
-                art.onDiscovery({ name: d.name, makes: d.makes })
+                art.onDiscovery({ name: d.name, makes: d.makes, raises: d.raises })
               },
             })
       const arbiter: SeamArbiter | undefined =

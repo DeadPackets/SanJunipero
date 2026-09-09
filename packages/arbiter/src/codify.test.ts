@@ -938,6 +938,8 @@ describe('codify reports the mint — once, and only for a new one', () => {
       name: SALT.name,
       kind: 'craft',
       makes: ['salt'],
+      // A salt recipe raises nothing; the forge reads this to know when a roof needs drawing.
+      raises: [],
       credit: CREDIT,
     })
   })

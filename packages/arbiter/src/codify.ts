@@ -5,7 +5,7 @@ import { charterFromAttempt, type AttemptVerdict, type VerbCharter } from './cha
 import type { CodexStore } from './codex.js'
 import type { ReviewStore } from './review.js'
 import type { RulebookStore } from './rulebook.js'
-import { productsOf, recipeSanityRefusal } from './sanity.js'
+import { buildingsOf, productsOf, recipeSanityRefusal } from './sanity.js'
 import { rollOutcomeTable, skillFactor } from './verdict.js'
 import type { OutcomeEffect } from './verdict.js'
 import type { Codified } from './adjudicate.js'
@@ -378,6 +378,7 @@ export function codify(
     name: charter.name,
     kind: 'craft',
     makes: productsOf(recipe),
+    raises: buildingsOf(recipe),
     credit,
   })
   return { ruleId, verb: charter.id }

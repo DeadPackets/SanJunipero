@@ -89,6 +89,17 @@ export function productsOf(recipe: Recipe): string[] {
   return [...kinds].sort()
 }
 
+/** The buildings a recipe teaches the town, with the shape each one stands in. A codified kind
+ *  is a row in the world's own recipe table, so the forge has to hear about it the same way it
+ *  hears about a new item, or the town raises a roof and the screen draws a coloured block. */
+export function buildingsOf(recipe: Recipe): { kind: string; w: number; h: number }[] {
+  const out = new Map<string, { kind: string; w: number; h: number }>()
+  for (const row of recipe.outcomeTable)
+    for (const e of row.effects)
+      if (e.op === 'learn_building') out.set(e.kind, { kind: e.kind, w: e.w, h: e.h })
+  return [...out.values()].sort((a, b) => a.kind.localeCompare(b.kind))
+}
+
 // The effects that leave the world different. `none` and `witness` do not, and a recipe made of
 // nothing else is a look: r31 minted "inspect a building exterior" with no effects at all, minds
 // ran it eight times a day, and the recognizer crowned it a custom.

@@ -201,6 +201,8 @@ export type Codified = {
   name: string
   kind: DiscoveryKind
   makes: string[]
+  /** The kinds of building this taught the town, each with the shape it stands in. */
+  raises: { kind: string; w: number; h: number }[]
   credit: DiscoveryCredit
 }
 
@@ -308,7 +310,14 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     review.queue(ruleId, row.id, tick)
     // F-B: the coined word is the second codification path and it reports too. A record that
     // hooked only codify() would leave the town inventing a name for dancing with no trace.
-    deps.onCodified?.({ recipeId: row.id, name: row.name, kind: 'word', makes: [], credit })
+    deps.onCodified?.({
+      recipeId: row.id,
+      name: row.name,
+      kind: 'word',
+      makes: [],
+      raises: [],
+      credit,
+    })
     return row.id
   }
 

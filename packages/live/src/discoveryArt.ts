@@ -14,9 +14,19 @@ export function itemCommissionText(kind: string, discoveryName: string): string 
   return `A single ${words}, the object itself, lying still — the thing a townsperson gets when they ${discoveryName}.`
 }
 
+/** A building is the same commission with a footprint and a different class. The court gives
+ *  the town's own word for it, so the prose says a building of that name and nothing else. */
+export function buildingCommissionText(kind: string): string {
+  return `A single ${kind.replace(/_/g, ' ')}, the whole building seen from outside, standing alone.`
+}
+
 export type DiscoveryArtWatcher = {
   /** Fire-and-forget. Returns immediately; the art arrives when it arrives. */
-  onDiscovery(d: { name: string; makes: readonly string[] }): void
+  onDiscovery(d: {
+    name: string
+    makes: readonly string[]
+    raises?: readonly { kind: string; w: number; h: number }[]
+  }): void
   /** Awaits everything in flight. Tests only — the live run never waits on art. */
   settle(): Promise<void>
 }
@@ -36,6 +46,22 @@ export function watchDiscoveryArt(deps: {
 
   return {
     onDiscovery(d) {
+      // A roof the town worked out for itself is a kind the codex has never heard of, so
+      // without this the world raises it and the screen falls back to a coloured block.
+      for (const b of d.raises ?? []) {
+        if (known.has(b.kind)) continue
+        known.add(b.kind)
+        const q: Promise<unknown> = deps.forge
+          .commission(buildingCommissionText(b.kind), { w: b.w, h: b.h }, 'building', b.kind)
+          .catch((err: unknown) => {
+            known.delete(b.kind)
+            deps.onError?.(b.kind, err)
+          })
+          .finally(() => {
+            inFlight.delete(q)
+          })
+        inFlight.add(q)
+      }
       for (const kind of artNeededFor(d.makes, known)) {
         // Claimed BEFORE the await, so a second discovery naming the same kind in the same
         // breath does not pay for it twice.

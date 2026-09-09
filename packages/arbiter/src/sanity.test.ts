@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { assembleAdjudicationPrompt } from './prompt.js'
-import { nearDuplicate, recipeSanityRefusal } from './sanity.js'
+import { buildingsOf, nearDuplicate, recipeSanityRefusal } from './sanity.js'
 import type { Recipe } from './verdict.js'
 
 // The eight verbs the mini-rehearsal minted and nobody could ever use. Each one below is a
@@ -88,6 +88,34 @@ describe('the codification sanity gate', () => {
 
   // Why the one above matters more than it looks: a name, once taken, is taken. The town could
   // never have learned to grind wheat again while the dud held the word.
+  // The forge hears about a new item through `productsOf`. A building lands as a config row
+  // instead, so before this the town raised a roof nobody had ever drawn.
+  it('★ names the roofs a recipe teaches, with the shape each one stands in', () => {
+    const raises = (effects: Record<string, unknown>[]): Recipe => ({
+      ...base,
+      id: 'recipe:raise_alehouse',
+      name: 'raise an alehouse',
+      outcomeTable: [{ weight: 1, success: true, label: 'It stands.', effects }] as never,
+    })
+    expect(buildingsOf(raises([{ op: 'spawn_item', kind: 'plank', qty: 1 }]))).toEqual([])
+    expect(
+      buildingsOf(
+        raises([
+          {
+            op: 'learn_building',
+            kind: 'alehouse',
+            w: 4,
+            h: 3,
+            costs: [],
+            roofed: true,
+            hearth: true,
+            bed: false,
+          },
+        ]),
+      ),
+    ).toEqual([{ kind: 'alehouse', w: 4, h: 3 }])
+  })
+
   it('★ a codified name shuts out every later spelling of the same act', () => {
     const second: Recipe = {
       ...base,

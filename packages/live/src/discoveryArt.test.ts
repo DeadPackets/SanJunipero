@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
 import {
   artNeededFor,
+  buildingCommissionText,
   itemCommissionText,
   noDiscoveryArt,
   watchDiscoveryArt,
@@ -39,6 +40,10 @@ describe('the commission text', () => {
     expect(itemCommissionText('water_skin', 'x')).toContain('water skin')
     expect(itemCommissionText('water_skin', 'x')).not.toContain('water_skin')
   })
+  it('asks for the whole building when the kind is a roof', () => {
+    expect(buildingCommissionText('meeting_hall')).toContain('meeting hall')
+    expect(buildingCommissionText('meeting_hall')).not.toContain('meeting_hall')
+  })
 })
 
 describe('the watcher', () => {
@@ -50,6 +55,35 @@ describe('the watcher', () => {
     expect(commission).toHaveBeenCalledTimes(1)
     expect(commission.mock.calls[0]![1]).toEqual({ w: 1, h: 1 })
     expect(commission.mock.calls[0]![2]).toBe('item')
+  })
+
+  // The owner asked whether a building a person raises gets forge art. It did not: a codified
+  // kind lands as a config row, `makes` is empty for it, and the screen drew a coloured block.
+  it('★ commissions a roof the town worked out, as class "building" on its own footprint', async () => {
+    const commission = vi.fn().mockResolvedValue({ id: 'asset_1' })
+    const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]) })
+    w.onDiscovery({
+      name: 'raise an alehouse',
+      makes: [],
+      raises: [{ kind: 'alehouse', w: 4, h: 3 }],
+    })
+    await w.settle()
+    expect(commission).toHaveBeenCalledTimes(1)
+    expect(commission.mock.calls[0]![1]).toEqual({ w: 4, h: 3 })
+    expect(commission.mock.calls[0]![2]).toBe('building')
+    expect(commission.mock.calls[0]![3]).toBe('alehouse')
+    expect(String(commission.mock.calls[0]![0])).toContain('alehouse')
+  })
+
+  it('does not draw the same roof twice, and leaves one the codex already has alone', async () => {
+    const commission = vi.fn().mockResolvedValue({ id: 'a' })
+    const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex(['alehouse']) })
+    w.onDiscovery({ name: 'one', makes: [], raises: [{ kind: 'alehouse', w: 4, h: 3 }] })
+    w.onDiscovery({ name: 'two', makes: [], raises: [{ kind: 'school', w: 2, h: 2 }] })
+    w.onDiscovery({ name: 'three', makes: [], raises: [{ kind: 'school', w: 2, h: 2 }] })
+    await w.settle()
+    expect(commission).toHaveBeenCalledTimes(1)
+    expect(commission.mock.calls[0]![3]).toBe('school')
   })
 
   it('does NOT commission art the codex already has', async () => {
