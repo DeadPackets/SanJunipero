@@ -452,6 +452,17 @@ describe('the close', () => {
     expect(prompts[0]).toContain('Who was there: Tamar, Yusuf.')
   })
 
+  // Every mind reads the beat back as fact, so an ailment named in its examples becomes one the
+  // town has. This prompt used to offer "Her shoulder's getting worse" and an argument about a
+  // cough, and r45, r47 and r49 each grew a body out of them.
+  it('★ shows no ailment in the examples it teaches the beat with', async () => {
+    const { model, prompts } = answering(answer([]))
+    const llm = makeSceneLlm(client(model), voice())
+    await llm.close(closed())
+    for (const word of ['cough', 'fever', 'limp', 'ache', 'wound', 'shoulder'])
+      expect(prompts[0].toLowerCase(), word).not.toContain(word)
+  })
+
   it('turns the names it was given back into ids', async () => {
     const { model } = answering(
       answer([

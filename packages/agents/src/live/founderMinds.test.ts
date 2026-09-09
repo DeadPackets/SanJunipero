@@ -237,6 +237,16 @@ describe('★ what each founder feels the lack of faster', () => {
     expect(JSON.stringify(salma)).toContain('plays everything down')
   })
 
+  // r49 found the same fault a third time, in the two places the r45 sweep never looked: Dilara
+  // worried about her father's cough and Omar's own example line was about his shoulder. A
+  // backstory may say he has nursed the sick. A live want or an example line may not.
+  it('★ no voice or want in the cast names an ailment the world cannot give', () => {
+    const live = JSON.stringify(CAST.map((m) => [m.identity.voiceCard, m.personality]))
+    // Whole words: attached carries ache, and reaches carries it too.
+    for (const word of ['cough', 'fever', 'limp', 'ache', 'wound', 'unwell', 'sick'])
+      expect(live.toLowerCase(), word).not.toMatch(new RegExp(`\\b${word}`))
+  })
+
   it('decides what each of them wants on the very first morning', () => {
     for (const mind of FOUNDER_MINDS) {
       const wants = new WantStore(openAgentDb(':memory:'), mind.id, mind.wantBias ?? {})

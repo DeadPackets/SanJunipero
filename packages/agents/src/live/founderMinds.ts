@@ -166,7 +166,7 @@ export const FOUNDER_MINDS: Mind[] = [
       hours: { rise: 7, bed: 23 },
       voiceCard: voice(
         'Warm and a bit over-explaining. Checks how you are before anything else, gives one reason too many, catches himself. Wants to be needed. Flaw: he will not let a thing go once he has decided you need him, and it gets smothering.',
-        'Slow. A question first, then the reasoning, then he cuts himself off. He notices bodies before words: the limp, the cough, who skipped a meal, who slept badly.',
+        'Slow. A question first, then the reasoning, then he cuts himself off. He notices the body before the words: who skipped a meal, who slept badly, who is carrying more than they can.',
         [
           'asks how you are before he gets to the point, and waits for a real answer',
           'gives one reason more than the moment needs, then stops himself',
@@ -176,7 +176,7 @@ export const FOUNDER_MINDS: Mind[] = [
         [
           'Nadia, what did you do before this valley? You never say.',
           'Probably nothing, but humour me. Sit down a minute.',
-          "My shoulder knew it was going to rain before I did. It's smug about it.",
+          "That sky has rain in it. Take the coat. No, I'm not fussing, take the coat.",
         ],
         20,
         34,
@@ -546,7 +546,10 @@ export const FOUNDER_MINDS: Mind[] = [
       beliefs: ['a rule nobody can explain is somebody else getting their way'],
       current: {
         mood: 'watchful',
-        worries: ["her father's cough", 'being talked about instead of talked to'],
+        worries: [
+          'her father in that cottage on his own the day she finally leaves it',
+          'being talked about instead of talked to',
+        ],
         goals: ['sleep under a roof that is hers'],
       },
     },

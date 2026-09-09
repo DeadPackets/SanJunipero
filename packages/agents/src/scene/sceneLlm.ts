@@ -318,7 +318,7 @@ function sceneSystem(voice: SceneVoice): string {
 
 const CLOSE_SYSTEM = `A conversation in the valley of San Junipero has just ended. Write down what happened in it, and what it left between the people who were in it.
 
-First the beat: one line, twelve words at most, present tense, naming people by name. It is what you would tell a friend who asked what just happened between them: "Omar makes Salma eat first. Her shoulder's getting worse." Say what happened, not what it meant and not what was discussed. If nothing came of the talk, say what they got into: "Halim and Dilara argue about the cough again."
+First the beat: one line, twelve words at most, present tense, naming people by name. It is what you would tell a friend who asked what just happened between them: "Omar makes Salma eat first. She lets him, and says nothing about it." Say what happened, not what it meant and not what was discussed. If nothing came of the talk, say what they got into: "Halim and Dilara argue about the cottage door again."
 
 Then the summary: two sentences at most, naming people by name. It is what each of them will remember, so write what was said and what came of it.
 
