@@ -57,6 +57,9 @@ describe('asset http routes', () => {
   // The character route only draws people the world HAS — an id nobody answers to is a sharp
   // png encode a stranger picked the key for (see assetsHttp.ts).
   const CAST = ['farmer', 'idler', 'weaver', 'mason'] as const
+  // Born here rather than founded with: minted `agent_13`-style, so no committed sheet is its own.
+  const CHILD = 'sprout'
+  const PARENT = 'quarry'
 
   beforeAll(async () => {
     openForgeDb(dbPath).close()
@@ -71,6 +74,15 @@ describe('asset http routes', () => {
         if (tick !== 1) return
         CAST.forEach((id, i) => {
           emit('agent_spawned', { id, name: id, x: i, y: 0, ageDays: ADULT_AGE_DAYS })
+        })
+        emit('agent_spawned', { id: PARENT, name: PARENT, x: 8, y: 0, ageDays: ADULT_AGE_DAYS })
+        emit('agent_spawned', {
+          id: CHILD,
+          name: CHILD,
+          x: 9,
+          y: 0,
+          ageDays: ADULT_AGE_DAYS,
+          parents: [PARENT],
         })
       },
     })
@@ -182,6 +194,36 @@ describe('asset http routes', () => {
     const res = await fetch(`${base}/assets/character/weaver.png`)
     expect(res.status).toBe(200)
     expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
+  })
+
+  // Every committed character sheet belongs to a founder or a traveller, and a body born here is
+  // minted `agent_13`. Without a forebear to fall back on, the town's own children are the only
+  // people in it drawn as nobody in particular.
+  it('★ a body with no sheet of its own wears the one its parent has', async () => {
+    const png = await encodePng({
+      width: 6,
+      height: 6,
+      data: new Uint8ClampedArray(6 * 6 * 4).fill(90),
+    })
+    codex.register({
+      class: 'rig-part',
+      desc: `character:${PARENT}`,
+      kind: `character:${PARENT}`,
+      footprint: { w: 1, h: 1 },
+      png,
+      widthPx: 6,
+      heightPx: 6,
+      status: 'ready',
+      score: 9,
+      attempts: 1,
+      costUsd: 0,
+    })
+    const res = await fetch(`${base}/assets/character/${CHILD}.png`)
+    expect(res.status).toBe(200)
+    expect(Buffer.from(await res.arrayBuffer()).equals(png)).toBe(true)
+    // A body with no forebear who has one is still drawn as itself, not as somebody else.
+    const own = await fetch(`${base}/assets/character/idler.png`)
+    expect(Buffer.from(await own.arrayBuffer()).equals(png)).toBe(false)
   })
 
   // The route no longer re-reads the whole `assets` table per GET, so "newest ready wins" is now

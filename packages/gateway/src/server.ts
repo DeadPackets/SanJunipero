@@ -25,7 +25,7 @@ import { mountNarratorApi } from './narratorApi.js'
 import { makeMomentsReader } from './moments.js'
 import { mountConstructsApi } from './constructs.js'
 import { mountBondsApi } from './bonds.js'
-import { mountLineageApi } from './lineage.js'
+import { forebears, mountLineageApi } from './lineage.js'
 import { mountDiscoveryApi } from './discoveries.js'
 import { makeStaticSite } from './staticSite.js'
 import { mountShareCard, shareMeta } from './shareCard.js'
@@ -122,6 +122,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   mountAssetRoutes(router, {
     getCodex,
     knowsAgent: (id) => personAt(mirror.state().agents, id) !== undefined,
+    kinOf: (id) => forebears(mirror.state().agents, id),
   })
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })

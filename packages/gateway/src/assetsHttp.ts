@@ -144,6 +144,10 @@ export type AssetRouteDeps = {
   getCodex(): AssetCodex | null
   /** Absent → every id is served, which is only ever right for a test fixture. */
   knowsAgent?: (id: string) => boolean
+  /** Whose face a body wears when it has none of its own: its own forebears, nearest first.
+   *  Every committed sheet is a founder's or a traveller's, and a child is minted `agent_13`,
+   *  so without this the first baby the town ever has walks around as a checkerboard. */
+  kinOf?: (id: string) => readonly string[]
 }
 
 /** One zod parse per row for the process, not one per image GET; the cursor tops up from the
@@ -226,14 +230,17 @@ export function mountAssetRoutes(router: Router, deps: AssetRouteDeps): void {
       notFound(res)
       return
     }
-    // binding: newest ready codex sheet registered for this agent, else the built placeholder
+    // binding: newest ready codex sheet for this body, else the nearest forebear who has one,
+    // else the built placeholder
     const codex = deps.getCodex()
     if (codex) {
-      const id = newestReady(codex, `character:${agentId}`)
-      const hit = id === undefined ? null : codex.get(id)
-      if (hit) {
-        sendImage(res, hit.png)
-        return
+      for (const who of [agentId, ...(deps.kinOf?.(agentId) ?? [])]) {
+        const id = newestReady(codex, `character:${who}`)
+        const hit = id === undefined ? null : codex.get(id)
+        if (hit) {
+          sendImage(res, hit.png)
+          return
+        }
       }
     }
     onceEncoded(

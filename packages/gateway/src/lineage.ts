@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { SimEvent } from '@sj/shared'
+import { personAt, type SimEvent } from '@sj/shared'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
@@ -52,6 +52,33 @@ export function parentEdges(events: readonly SimEvent[]): ParentEdge[] {
       seen.add(key)
       out.push({ parentId, childId: p.id, tick: ev.tick })
     }
+  }
+  return out
+}
+
+/** How far back a face may be inherited. A town left running for weeks grows generations, and a
+ *  lineage the world was founded with can name a parent it never spawned. */
+const FOREBEAR_DEPTH = 4
+
+/** The forebears of a body, nearest first. Every committed character sheet belongs to a founder
+ *  or a traveller, so this is how a body born here is drawn at all. */
+export function forebears(
+  agents: Readonly<Record<string, { parents?: readonly string[] } | undefined>>,
+  id: string,
+): string[] {
+  const out: string[] = []
+  const seen = new Set([id])
+  let front = [id]
+  for (let step = 0; step < FOREBEAR_DEPTH && front.length > 0; step++) {
+    const next: string[] = []
+    for (const who of front)
+      for (const parent of personAt(agents, who)?.parents ?? []) {
+        if (seen.has(parent)) continue
+        seen.add(parent)
+        out.push(parent)
+        next.push(parent)
+      }
+    front = next
   }
   return out
 }
