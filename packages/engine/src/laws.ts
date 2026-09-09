@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { SimConfig } from '@sj/shared'
+import { type SimConfig, StructureRecipeSchema } from '@sj/shared'
 
 // World laws are physics an operator may change while the world runs. Never a side-channel write
 // to the config: it lands as one config_changed event, so it is hashed, snapshotted and replayed.
@@ -54,6 +54,22 @@ export const TOGGLABLE_PATHS: Readonly<Record<string, z.ZodType>> = {
   'light.fireRiskPerTick': z.number().min(0).max(1),
   'nightWitness.nightFactor': z.number().min(0).max(1),
   'regrowth.saplingChancePerDay': z.number().min(0).max(1),
+}
+
+/** A building the town worked out for itself, at `structures.recipes.<kind>`. Not a row in the
+ *  whitelist above because the kind is the town's own word: the arbiter rules only on whether
+ *  such a thing can be made, never on which things there are. */
+const CODIFIED_BUILDING = /^structures\.recipes\.[a-z][a-z0-9_]{2,23}$/
+
+/** The type a runtime change to this path must satisfy, or undefined if nothing may change it. */
+export function pathSchema(path: string): z.ZodType | undefined {
+  if (TOGGLABLE_PATHS[path] !== undefined) return TOGGLABLE_PATHS[path]
+  return CODIFIED_BUILDING.test(path) ? StructureRecipeSchema : undefined
+}
+
+/** The kind a codified-building path names, or null if the path names something else. */
+export function codifiedBuildingKind(path: string): string | null {
+  return CODIFIED_BUILDING.test(path) ? path.slice('structures.recipes.'.length) : null
 }
 
 export type LawQueue = { path: string; value: unknown }[]

@@ -4,6 +4,30 @@ import { ClosedIntentParams, DEFAULT_DURATION_WORD, DurationWordSchema } from '@
 // Magnitude caps: an out-of-range LLM verdict fails schema parse and flows
 // through the existing invalid-verdict path instead of entering the world.
 export const OutcomeEffectSchema = z.discriminatedUnion('op', [
+  // A kind of building the town worked out for itself. The nine the world ships with are not the
+  // nine there can ever be: this is the one road from "somewhere we can all sit in the evening"
+  // to a thing that stands. The court rules on whether it can be made, never on what to make.
+  z
+    .object({
+      op: z.literal('learn_building'),
+      kind: z
+        .string()
+        .regex(/^[a-z][a-z0-9_]{2,23}$/)
+        .describe("the town's own word for it, lowercase, e.g. alehouse"),
+      // A list and not a record: a record emits propertyNames and a constrained decoder
+      // refuses that grammar outright. Same shape a recipe's costs already take.
+      costs: z
+        .array(
+          z.object({ kind: z.string().min(1), qty: z.number().int().positive().max(60) }).strict(),
+        )
+        .min(1),
+      w: z.number().int().min(1).max(4),
+      h: z.number().int().min(1).max(4),
+      roofed: z.boolean().describe('is it walls and a roof somebody can shelter under'),
+      hearth: z.boolean().describe('is there a fire in it somebody can feed'),
+      bed: z.boolean().describe('is there somewhere in it to sleep'),
+    })
+    .strict(),
   z
     .object({
       op: z.literal('spawn_item'),

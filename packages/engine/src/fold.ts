@@ -129,7 +129,7 @@ import {
 import { countsAsFootfall, decayTraffic, quietPathsAt } from './systems/desirePaths.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
 import { occupantsOf } from './interiors.js'
-import { effectiveConfig, TOGGLABLE_PATHS } from './laws.js'
+import { codifiedBuildingKind, effectiveConfig, pathSchema } from './laws.js'
 import { renames } from './naming.js'
 import { findPath } from './path.js'
 import { markLaw, type Law } from './socialLaws.js'
@@ -1567,8 +1567,13 @@ export function fold(
     // log can only ever move a dial this table already agreed to.
     case 'config_changed': {
       const p = ConfigChanged.parse(event.payload)
-      const schema = TOGGLABLE_PATHS[p.path]
+      const schema = pathSchema(p.path)
       if (schema === undefined) throw new Error(`config_changed: ${p.path} is not a world law`)
+      // A kind the world already knows is the world's, not the town's: the arbiter may add a
+      // building nobody has thought of and may never quietly redefine a house.
+      const coined = codifiedBuildingKind(p.path)
+      if (coined !== null && baseConfig.structures.recipes[coined] !== undefined)
+        throw new Error(`config_changed: ${coined} is already a kind of building`)
       const parsed = schema.safeParse(p.value)
       if (!parsed.success) throw new Error(`config_changed: value rejected for ${p.path}`)
       return { ...state, laws: { ...state.laws, [p.path]: parsed.data } }

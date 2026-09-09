@@ -17,6 +17,8 @@ import {
   type TownClaim,
 } from '@sj/shared'
 import { fold } from './fold.js'
+import { effectiveConfig } from './laws.js'
+import { makeables } from './verbs/craft.js'
 import { genesisState, type WorldState } from './state.js'
 import { GENESIS_FORD } from './geography.js'
 import { makeGenesisWorld, GENESIS_BUILDER_ID } from './genesis/world.js'
@@ -199,6 +201,60 @@ describe('the bridge is the one thing a builder still sites', () => {
       ok: false,
       reason: 'building needs the thing to raise, and the ground to raise it on',
     })
+  })
+})
+
+// ★ The nine kinds the world ships with are not the nine there can ever be. A mind asked to
+// build a roof in r45 and got an item recipe back, because nothing could add a tenth. This is
+// the seam that lets the town's own idea become a thing anybody can raise.
+describe('★ a building the town worked out for itself', () => {
+  const ALEHOUSE = {
+    inputs: { wood: 6 },
+    w: 1,
+    h: 1,
+    maxHp: 20,
+    flammable: true,
+    durationTicks: 240,
+    roofed: true,
+    hearth: false,
+    bed: false,
+    sited: false,
+  }
+  const codified = { 'structures.recipes.alehouse': ALEHOUSE }
+
+  it('is refused before the town works it out', () => {
+    const s = withBuilder(genesisState(CFG, makeFixtureMap()), 'a', { x: 30, y: 22 })
+    const r = submitIntent(s, CFG, 'a', 'build', { kind: 'alehouse', x: 30, y: 20 })
+    expect(r.ok).toBe(false)
+    expect(r.ok ? '' : r.reason).toContain('cannot build a alehouse')
+  })
+
+  it('★ is a word every mind is handed, and one the build verb takes, once it is codified', () => {
+    const live = effectiveConfig(CFG, codified)
+    expect(makeables(live).builds.map((b) => b.kind)).toContain('alehouse')
+    const s = {
+      ...withBuilder(genesisState(CFG, makeFixtureMap()), 'a', { x: 30, y: 22 }),
+      laws: codified,
+    }
+    const r = submitIntent(s, live, 'a', 'build', { kind: 'alehouse', x: 30, y: 20 })
+    expect(r.ok, r.ok ? '' : r.reason).toBe(true)
+  })
+
+  // A house is the world's, not the town's: the court may add a kind and never redefine one.
+  it('★ cannot quietly redefine a kind the world already has', () => {
+    const s = genesisState(CFG, makeFixtureMap())
+    expect(() =>
+      fold(
+        s,
+        {
+          seq: 1,
+          tick: 0,
+          type: 'config_changed',
+          payload: { path: 'structures.recipes.house', value: ALEHOUSE },
+        },
+        CFG,
+      ),
+    ).toThrow(/already a kind of building/)
   })
 })
 

@@ -237,6 +237,16 @@ describe('the strict dialect covers every effect the town can emit', () => {
     transfer: { op: 'transfer', to: 'target' },
     need_delta: { op: 'need_delta', need: 'social', delta: 5 },
     none: { op: 'none' },
+    learn_building: {
+      op: 'learn_building',
+      kind: 'alehouse',
+      costs: [{ kind: 'wood', qty: 12 }],
+      w: 2,
+      h: 2,
+      roofed: true,
+      hearth: true,
+      bed: false,
+    },
   }
   const ops = OutcomeEffectSchema.options.map((o) => (o.shape.op as z.ZodLiteral<string>).value)
 

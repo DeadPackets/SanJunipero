@@ -77,6 +77,33 @@ export function emitOutcomeEffects(
   let nextId = state.counters.nextEntityId
   for (const e of effects) {
     switch (e.op) {
+      case 'learn_building': {
+        // The town names it and says what it is for; the numbers come off the shape, so a court
+        // in a hurry cannot hand out a hut with a thousand hit points.
+        const area = e.w * e.h
+        const stuff = e.costs.reduce((n, c) => n + c.qty, 0)
+        const inputs: Record<string, number> = {}
+        for (const c of e.costs) inputs[c.kind] = (inputs[c.kind] ?? 0) + c.qty
+        events.push({
+          type: 'config_changed',
+          payload: {
+            path: `structures.recipes.${e.kind}`,
+            value: {
+              inputs,
+              w: e.w,
+              h: e.h,
+              maxHp: 15 * area,
+              flammable: inputs.wood !== undefined || inputs.plank !== undefined,
+              durationTicks: Math.min(4320, 240 * stuff),
+              roofed: e.roofed,
+              hearth: e.hearth,
+              bed: e.bed,
+              sited: false,
+            },
+          },
+        })
+        break
+      }
       case 'spawn_item':
         events.push({
           type: 'item_spawned',

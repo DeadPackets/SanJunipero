@@ -100,6 +100,7 @@ The judgement word must agree with the reasoning that reached it: if your own re
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
 Two lines above name ids: what the town currently knows, and what stands within reach. When you rule "attempt", every id you put in the recipe's canon must be copied exactly from those two lines. An id that appears on neither line is a format error, not a craft, and the answer is thrown away unread.
 An attempt that reaches a craft within reach earns it, and you may add "unlocks": the one craft that step opens next, as a new id of lowercase words joined by underscores, its name in the town's words, and prerequisiteId copied from the recipe's own canon. Leave "unlocks" out when the attempt opens nothing new.
+A person raising a kind of building the town has no word for yet is an attempt like any other, and the effect that answers it is "learn_building": the town's own word for the thing, what it is made of, how many tiles it covers, and whether it has a roof, a fire and somewhere to sleep. Rule on whether such a thing can be raised here out of what the valley holds, never on whether the town needs one. The nine kinds standing today are the nine somebody has built, not the nine there can be.
 Every recipe says how long one go at it takes, as "takes".
 ${DURATION_CALIBRATION}
 Three judgements for the measure of it:

@@ -10,7 +10,14 @@ import {
 import { openDb } from './db.js'
 import { EventStore } from './eventStore.js'
 import { fold } from './fold.js'
-import { applyLaw, effectiveConfig, TOGGLABLE_PATHS, type LawQueue } from './laws.js'
+import {
+  applyLaw,
+  codifiedBuildingKind,
+  effectiveConfig,
+  pathSchema,
+  TOGGLABLE_PATHS,
+  type LawQueue,
+} from './laws.js'
 import { replayFromGenesis, replayLatest } from './replay.js'
 import { RngStreams } from './rng.js'
 import { genesisState, type TileId, type WorldState } from './state.js'
@@ -267,5 +274,45 @@ describe('laws survive the wire: replay and snapshots', () => {
     const recovered = replayLatest(store, CFG, MAP())
     expect(recovered.state.laws).toEqual(loop.state.laws)
     expect(stateHash(recovered.state)).toBe(stateHash(loop.state))
+  })
+})
+
+// ★ The town shipped with nine kinds of building and no road to a tenth, in a simulation whose
+// whole point is that what gets made is the town's own idea. A codified kind rides the same rail
+// a world law does, so it is folded, hashed, snapshotted and replayed like every other fact.
+describe('★ a building the town worked out for itself', () => {
+  const ALEHOUSE = {
+    inputs: { wood: 12, stone: 4 },
+    w: 2,
+    h: 2,
+    maxHp: 60,
+    flammable: true,
+    durationTicks: 2400,
+    roofed: true,
+    hearth: true,
+    bed: false,
+    sited: false,
+  }
+
+  it('is a path a runtime change may take, and names its kind', () => {
+    expect(pathSchema('structures.recipes.alehouse')).toBeDefined()
+    expect(codifiedBuildingKind('structures.recipes.alehouse')).toBe('alehouse')
+    expect(codifiedBuildingKind('mortality.enabled')).toBeNull()
+    // Not every string: the kind is one lowercase word, so a path cannot smuggle a shape in.
+    expect(pathSchema('structures.recipes.Ale House')).toBeUndefined()
+    expect(pathSchema('structures.nonsense.alehouse')).toBeUndefined()
+  })
+
+  it('becomes a kind anybody can build, through the config every verb already reads', () => {
+    const laws = { 'structures.recipes.alehouse': ALEHOUSE }
+    const config = effectiveConfig(CFG, laws)
+    expect(config.structures.recipes.alehouse).toEqual(ALEHOUSE)
+    // The house the world shipped with is untouched beside it.
+    expect(config.structures.recipes.house).toEqual(CFG.structures.recipes.house)
+  })
+
+  it('is refused a shape that is not a building', () => {
+    expect(pathSchema('structures.recipes.alehouse')!.safeParse({ w: 2 }).success).toBe(false)
+    expect(pathSchema('structures.recipes.alehouse')!.safeParse(ALEHOUSE).success).toBe(true)
   })
 })

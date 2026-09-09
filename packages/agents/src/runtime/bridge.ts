@@ -449,10 +449,11 @@ export class EngineBridge {
     return loneCandidateFor(this.#loop.state, this.#simConfig, agentId, verb, {}) !== null
   }
 
-  // The words `build` and `craft` accept. Handed over whole, because the tables behind them do
-  // not change inside a run and a mind that is never given a word never uses it (C11 R-H).
+  // The words `build` and `craft` accept. Off the live config, not the base one: a building the
+  // town has worked out for itself is a row the run added, and a mind that is never given a word
+  // never uses it (C11 R-H).
   makeables(): Makeables {
-    return makeables(this.#simConfig)
+    return makeables(effectiveConfig(this.#simConfig, this.#loop.state.laws))
   }
 
   // Where the town has room for the next roof. Read off the engine's own claim, so the place

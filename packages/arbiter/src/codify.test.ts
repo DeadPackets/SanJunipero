@@ -27,6 +27,7 @@ import { ReviewStore } from './review.js'
 import type { Recipe } from './verdict.js'
 import { charterFromAttempt } from './charter.js'
 import { codify, emitOutcomeEffects, isExpertCharter, verbFromCharter } from './codify.js'
+import type { OutcomeEffect } from './verdict.js'
 import { productsOf } from './sanity.js'
 import { makeArbiter, type Codified } from './adjudicate.js'
 import { ScriptedLlm } from './testutil/scriptedLlm.js'
@@ -322,6 +323,55 @@ describe('codify', () => {
 
     it('emits [] for none', () => {
       expect(emitOutcomeEffects(agentState(), 'a1', [{ op: 'none' }])).toEqual([])
+    })
+
+    // ★ r45 and r47: a mind asked to build a roof and got an item recipe, because the world
+    // shipped nine kinds of building and no road to a tenth. The court rules on whether a thing
+    // can be raised; it never holds the list of things there are.
+    describe('★ a kind of building the town worked out for itself', () => {
+      const learn = {
+        op: 'learn_building',
+        kind: 'alehouse',
+        costs: [
+          { kind: 'wood', qty: 12 },
+          { kind: 'stone', qty: 4 },
+        ],
+        w: 2,
+        h: 2,
+        roofed: true,
+        hearth: true,
+        bed: false,
+      } satisfies OutcomeEffect
+
+      it('lands as one config_changed, the road every world fact already travels', () => {
+        const events = emitOutcomeEffects(agentState(), 'a1', [learn])
+        expect(events).toHaveLength(1)
+        expect(events[0]!.type).toBe('config_changed')
+        const p = events[0]!.payload as { path: string; value: Record<string, unknown> }
+        expect(p.path).toBe('structures.recipes.alehouse')
+        expect(p.value).toMatchObject({ roofed: true, hearth: true, bed: false, w: 2, h: 2 })
+      })
+
+      // The numbers come off the shape, not off the court's imagination.
+      it('sizes the thing from what it is and what it is made of', () => {
+        const p = (
+          emitOutcomeEffects(agentState(), 'a1', [learn])[0]!.payload as {
+            value: { maxHp: number; durationTicks: number; flammable: boolean }
+          }
+        ).value
+        expect(p.maxHp).toBe(60)
+        expect(p.durationTicks).toBe(3840)
+        expect(p.flammable).toBe(true)
+      })
+
+      // The whole point: it folds, and then it is a thing anybody in the town can raise.
+      it('★ folds into a kind the build verb accepts from anybody', () => {
+        const state = agentState()
+        const events = emitOutcomeEffects(state, 'a1', [learn])
+        const folded = fold(state, { ...events[0]!, seq: 1, tick: state.tick }, CFG)
+        expect(folded.laws?.['structures.recipes.alehouse']).toBeDefined()
+        expect(CFG.structures.recipes.alehouse).toBeUndefined()
+      })
     })
 
     // The five grounding ops, each to the one engine event that folds it.
