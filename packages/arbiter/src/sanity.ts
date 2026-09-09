@@ -136,8 +136,15 @@ function shadowedRoof(recipe: Recipe, vocab: RecipeVocabulary): string | null {
 export function recipeSanityRefusal(recipe: Recipe, vocab: RecipeVocabulary = {}): string | null {
   const slug = recipe.id.replace(/^recipe:/, '')
   if (VERDICT_WORDS.has(slug)) return `${recipe.id} is a verdict word, not a craft`
-  if (!recipe.outcomeTable.some((row) => row.effects.some((e) => CHANGES_WORLD.has(e.op))))
-    return `${recipe.id} changes nothing in the world: that is looking, not a craft`
+  // Row by row, not recipe-wide: r49's grind-wheat said "The wheat is ground into usable meal."
+  // on the row that succeeded and made none, and by day six the town was stacking fish behind a
+  // flour it did not have. A row that works has to leave something behind.
+  const wins = recipe.outcomeTable.filter((row) => row.success)
+  const hollow = wins.find((row) => !row.effects.some((e) => CHANGES_WORLD.has(e.op)))
+  if (wins.length === 0)
+    return `${recipe.id} changes nothing in the world: every outcome is a failure`
+  if (hollow !== undefined)
+    return `${recipe.id} changes nothing in the world when it works ("${hollow.label}"): that is looking, not a craft`
   const roof = shadowedRoof(recipe, vocab)
   if (roof !== null)
     return `${recipe.id} is the town's own build verb wearing a new name: a ${roof.replace(/_/g, ' ')} is raised with build`

@@ -51,6 +51,43 @@ describe('the codification sanity gate', () => {
     expect(recipeSanityRefusal(base)).toBeNull()
   })
 
+  // The r49 recipe as it was actually written: a real second row that fails honestly, and a
+  // success row that says the meal was made and makes none. Recipe-wide, this passed.
+  it('★ refuses the row that says it worked and left nothing, whatever the other rows do', () => {
+    const lie: Recipe = {
+      ...base,
+      id: 'recipe:grind_wheat',
+      name: 'grind wheat',
+      outcomeTable: [
+        {
+          weight: 1,
+          success: true,
+          label: 'The wheat is ground into usable meal.',
+          effects: [{ op: 'gain_skill', track: 'cooking', xp: 1 }],
+        },
+        {
+          weight: 1,
+          success: false,
+          label: 'The wheat is husked, but no meal comes of it.',
+          effects: [{ op: 'none' }],
+        },
+        {
+          weight: 1,
+          success: true,
+          label: 'A handful of meal.',
+          effects: [{ op: 'spawn_item', kind: 'meal', qty: 1 }],
+        },
+      ],
+    }
+    expect(recipeSanityRefusal(lie)).toMatch(/changes nothing in the world when it works/)
+    expect(recipeSanityRefusal(lie)).toContain('usable meal')
+    // The honest failure row is not the fault, and a craft that only ever fails is its own.
+    const works: Recipe = { ...lie, outcomeTable: [lie.outcomeTable[1]!, lie.outcomeTable[2]!] }
+    expect(recipeSanityRefusal(works)).toBeNull()
+    const never: Recipe = { ...lie, outcomeTable: [lie.outcomeTable[1]!] }
+    expect(recipeSanityRefusal(never)).toMatch(/every outcome is a failure/)
+  })
+
   // r49: Salma worked out how to hand-grind wheat with a flat stone, and the court granted a
   // craft that took no grain, made no meal, and only made her better at grinding. Getting
   // better at a thing is not the thing. Worse, the dud then squatted on the name.
