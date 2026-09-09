@@ -443,6 +443,16 @@ describe('★ a mind is told the town can hold a rule', () => {
     expect(CAPABILITIES.toLowerCase()).toContain('from now on')
     expect(proposesALaw(taught)).toBe(true)
   })
+
+  // r49 ran four sim-days on these exact words and produced zero proposals, and not one line in
+  // the taught register. They sat at the end of the speak: grammar, in a list of fifteen verbs,
+  // where they read as a parameter and not as a thing a person might want. Presence was already
+  // pinned above and presence was never the problem, so this pins where the words sit.
+  it("★ stands on its own, not buried in a verb's grammar", () => {
+    const speak = CAPABILITIES.split('\n').find((l) => l.startsWith('speak:')) ?? ''
+    expect(speak).toBe('speak: name it speak; give text, the words you say aloud')
+    expect(CAPABILITIES).toContain("\n\nSome things are not one person's to decide.")
+  })
 })
 
 describe('★ looking is not an experiment', () => {

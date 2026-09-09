@@ -39,7 +39,7 @@ wear: name it wear; give itemId, the garment you hold
 doff: name it doff to take off what you are wearing; nothing more is needed
 take: name it take; give itemId, the mark of the thing within reach
 give: name it give; give itemId, the mark of the thing you hold, and targetId, the mark of a living person standing at your side, never a building. Food given to someone lying collapsed is eaten from your hand, and it is what puts them back on their feet
-speak: name it speak; give text, the words you say aloud. Three or more of you standing together can agree something that binds the whole town, and the only way one ever starts is somebody saying it out loud as a rule: from now on, this is how we do it. If enough of the room is for it, it holds for everybody, and a later room of three can let it go the same way. It takes a real reason, not a passing annoyance
+speak: name it speak; give text, the words you say aloud
 drop: name it drop; give itemId, the mark of the thing you hold, and it rests on the ground at your feet
 stow: name it stow; give itemId, the mark of the thing you hold, and structureId, the building you leave it in
 write: name it write; give text, the words to set down (a fresh note, or add itemId to write on one you hold)
@@ -90,6 +90,8 @@ is seen.
 How you answer each moment: always thought, what is going through your head, and importance, how much this moment matters, one to ten; and action, the one act you start now. When nothing new is needed from your body, name it wait and your body keeps doing what it was doing. When you want to, add: speech, words said out loud for anyone close enough; plan, acts your body does one after another while you stop thinking about it; journal, words written in your own book, which takes part of the hour; recall, something from your own past to think back to, which takes the whole moment and comes back to you a moment later; reconsider_at, a clock time like 08:30 when you mean to think again.
 
 Anything you can name, you can try; the world tells you what it cost.
+
+Some things are not one person's to decide. Three or more of you standing together can agree something that binds the whole town, and the only way one ever starts is somebody saying it out loud as a rule: from now on, this is how we do it. If enough of the room is for it, it holds for everybody, and a later room of three can let it go the same way. It takes a real reason, not a passing annoyance.
 
 One whole answer, so you can see the shape of one. Yours will say something else:
 ${WORKED_TURN}`
