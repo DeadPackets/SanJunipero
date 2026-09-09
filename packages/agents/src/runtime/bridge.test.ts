@@ -188,14 +188,13 @@ describe('nearestPerson', () => {
 
 describe('the default perception window outlasts the gap between turns (D-28-6)', () => {
   it('covers the longest an awake mind can go without a turn, with margin', () => {
-    expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThanOrEqual(DEFAULT_MIND_CONFIG.boredomTicks)
-    expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThanOrEqual(64)
+    expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThan(DEFAULT_MIND_CONFIG.boredomTicks)
   })
 
-  it('a witnessed taking still reaches a mind that looks a sim-hour later', () => {
+  it('a witnessed taking still reaches a mind that looks at the end of its longest gap', () => {
     const { bridge, step } = ownedWorld()
     step() // Cass lifts Bex's plank at tick 1, in Tamar's sight
-    for (let i = 0; i < 60; i++) step()
+    for (let i = 0; i < DEFAULT_MIND_CONFIG.boredomTicks; i++) step()
     expect(bridge.perception(AGENT).seen).toEqual([
       { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },
     ])
@@ -246,7 +245,7 @@ describe('the default perception window outlasts the gap between turns (D-28-6)'
   it('a bridge built moments after the event still carries it', () => {
     const { config, loop, store, step } = ownedWorld()
     step() // Cass lifts Bex's plank at tick 1, in Tamar's sight
-    for (let i = 0; i < 60; i++) step()
+    for (let i = 0; i < DEFAULT_MIND_CONFIG.boredomTicks; i++) step()
     const restarted = new EngineBridge({ loop, store, simConfig: config })
     expect(restarted.perception(AGENT).seen).toEqual([
       { kind: 'item_taken', takerName: 'Cass', ownerName: 'Bex', itemKind: 'plank' },

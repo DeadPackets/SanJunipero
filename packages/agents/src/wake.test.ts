@@ -50,6 +50,10 @@ function pln(overrides: Partial<PlanState> = {}): PlanState {
   return { queue: [], lastResult: 'idle', ...overrides }
 }
 
+// A mind with a step still queued. Boredom needs an empty queue, so a case about whether a face
+// or a voice is news is judged on the news alone and never on the boredom clock underneath it.
+const busy = (): PlanState => pln({ queue: [{ verb: 'wait', params: {} }], lastResult: 'running' })
+
 const HOLDS_FLOOR: FloorState = { inScene: true, holdsFloor: true }
 const LISTENS: FloorState = { inScene: true, holdsFloor: false }
 const NO_SCENE: FloorState = { inScene: false, holdsFloor: false }
@@ -262,10 +266,10 @@ describe('decideWake — priority and floor', () => {
         ],
       },
     }
-    expect(decideWake(cfg, packet, clk(), 40, pln())).toBe('salient_perception')
-    expect(decideWake(cfg, packet, clk({ facesSeen: { nadia: 39 } }), 40, pln())).toBe(null)
+    expect(decideWake(cfg, packet, clk(), 40, busy())).toBe('salient_perception')
+    expect(decideWake(cfg, packet, clk({ facesSeen: { nadia: 39 } }), 40, busy())).toBe(null)
     expect(
-      decideWake(cfg, packet, clk(), 10, pln()),
+      decideWake(cfg, packet, clk(), 10, busy()),
       'a face arriving is noticed, and waits out the idle gap like anything else noticed',
     ).toBe(null)
   })
@@ -291,14 +295,14 @@ describe('company is news once', () => {
 
   it('a face that stays is noticed once, not on every turn after', () => {
     const clock = clk()
-    expect(decideWake(cfg, company, clock, 40, pln())).toBe('salient_perception')
+    expect(decideWake(cfg, company, clock, 40, busy())).toBe('salient_perception')
     clock.lastTurnTick = 40
-    expect(decideWake(cfg, company, clock, 80, pln())).toBe(null)
+    expect(decideWake(cfg, company, clock, 80, busy())).toBe(null)
   })
 
   it('a face gone and back inside the memory window is the same company', () => {
     const clock = clk({ facesSeen: { nadia: 100 } })
-    expect(decideWake(cfg, company, { ...clock, lastTurnTick: 150 }, 200, pln())).toBe(null)
+    expect(decideWake(cfg, company, { ...clock, lastTurnTick: 150 }, 200, busy())).toBe(null)
     const long = clk({ facesSeen: { nadia: 100 } })
     expect(
       decideWake(
@@ -306,31 +310,31 @@ describe('company is news once', () => {
         company,
         { ...long, lastTurnTick: 150 },
         100 + cfg.faceMemoryTicks + 1,
-        pln(),
+        busy(),
       ),
     ).toBe('salient_perception')
   })
 
   it('a departure is not news', () => {
     const clock = clk({ facesSeen: { nadia: 39 }, lastTurnTick: 0 })
-    expect(decideWake(cfg, alone, clock, 40, pln())).toBe(null)
+    expect(decideWake(cfg, alone, clock, 40, busy())).toBe(null)
   })
 
   it('a voice is news once, and again only after the memory window', () => {
     const clock = clk()
-    expect(decideWake(cfg, overheard, clock, 40, pln())).toBe('salient_perception')
+    expect(decideWake(cfg, overheard, clock, 40, busy())).toBe('salient_perception')
     clock.lastTurnTick = 40
-    expect(decideWake(cfg, overheard, clock, 80, pln())).toBe(null)
-    expect(decideWake(cfg, overheard, clock, 80 + cfg.voiceMemoryTicks + 1, pln())).toBe(
+    expect(decideWake(cfg, overheard, clock, 80, busy())).toBe(null)
+    expect(decideWake(cfg, overheard, clock, 80 + cfg.voiceMemoryTicks + 1, busy())).toBe(
       'salient_perception',
     )
   })
 
   it('being named reaches you whatever the memory says', () => {
     const clock = clk({ voicesHeard: { nadia: 39 }, lastTurnTick: 0 })
-    expect(decideWake(cfg, overheard, clock, 40, pln())).toBe(null)
+    expect(decideWake(cfg, overheard, clock, 40, busy())).toBe(null)
     expect(
-      decideWake(cfg, overheard, clock, 40, pln(), {
+      decideWake(cfg, overheard, clock, 40, busy(), {
         inScene: false,
         holdsFloor: false,
         addressed: true,

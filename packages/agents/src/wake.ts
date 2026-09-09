@@ -37,7 +37,9 @@ export type MindConfig = {
 
 export const DEFAULT_MIND_CONFIG: MindConfig = {
   idleGapTicks: 30,
-  boredomTicks: 60,
+  // r49 measured 10.0 idle hours a mind-day against a bar of 8, and acts started at 0.79 of the
+  // rate the owner approved. An hour of standing is where both go; forty minutes is where 60 met.
+  boredomTicks: 40,
   // Thirst rings with hunger; any named affliction rings at its first severity. Hunger rings
   // late (D1). Energy rings at 25: at 10 the bell came an hour before the body dropped, and r18
   // lost ten of its eleven collapses to minds still up and talking at 23:00 with no way to a bed.
