@@ -97,6 +97,12 @@ const MUTATING_STEMS: readonly string[] = [
   'put',
   'set',
   'draw',
+  // r49 minted `gather` as a free word off "gather any fallen wood, picking up the pieces",
+  // because `check` made it expressive and nothing here said picking things up moves them. The
+  // town already had a craft for the same act, minted an hour before, that actually made wood.
+  'gather',
+  'pick',
+  'collect',
 ]
 
 const hasStem = (text: string, stems: readonly string[]): boolean =>

@@ -142,6 +142,20 @@ describe('isExpressive', () => {
     expect(isExpressive('I sing while I build the wall')).toBe(false)
   })
 
+  // r49 minted `gather` as a free word an hour after minting a craft for the same act. The
+  // intent said "gather any fallen wood, picking up the pieces" and `check` at the front of it
+  // made the whole thing expressive, so a mind got a verb for gathering that gathered nothing.
+  it('★ picking things up moves them, however the sentence starts', () => {
+    expect(
+      isExpressive(
+        'Check under the brush and gather any fallen wood I can find, picking up the pieces one at a time',
+      ),
+    ).toBe(false)
+    expect(isExpressive('I count the loaves and collect them into the store')).toBe(false)
+    // A noun is not an act: the tally is still a look.
+    expect(isExpressive('Tally the bundles on the shelf')).toBe(true)
+  })
+
   it('refuses an intent with no expression in it at all', () => {
     expect(isExpressive('I boil river water for salt')).toBe(false)
   })
@@ -426,6 +440,8 @@ describe('F-B — BOTH codification paths report their mint, and a third could n
           name: 'dance',
           kind: 'word',
           makes: [],
+          // A word raises nothing; the forge reads this to know when a roof needs drawing.
+          raises: [],
           credit: { agentId: ctx.agentId, intent: 'I dance by the fire' },
         },
       ])
