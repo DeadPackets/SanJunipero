@@ -88,6 +88,9 @@ export type PerceivedAgent = {
   // Who this body married, if anybody. Twelve people in one valley all know this about each
   // other, and a mind that does not know it cannot tell what it is doing.
   partnerName?: string
+  // How many days the beholder has walked out with THIS person. The world counts it and the
+  // propose gate reads it; absent means never. Omitted when zero, like every other absence here.
+  walkedOut?: number
 } & Markings
 
 /** How long a body off the road still reads as one to everyone who looks at it. */
@@ -456,6 +459,7 @@ function perceiveAgents(lens: Lens): PerceivedAgent[] {
         ...(condition === undefined ? {} : { condition }),
         ...(stranger ? { stranger: true as const } : {}),
         ...(a.partnerId === undefined ? {} : { partnerName: nameOfBody(state, a.partnerId) }),
+        ...(self.walkOuts?.[a.id] ? { walkedOut: self.walkOuts[a.id] } : {}),
         ...marked(a),
       }
     })

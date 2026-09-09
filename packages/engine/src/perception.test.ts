@@ -1653,3 +1653,27 @@ describe('★ a marriage is a fact everyone in the valley can see', () => {
     expect(alone.find((a) => a.id === 'salma')).not.toHaveProperty('partnerName')
   })
 })
+
+describe('★ a walk out is counted for the two who took it and nobody else', () => {
+  // r49: the propose gate reads walkOuts and no prompt ever said it, so eleven courtships across
+  // seven people never once came back to the same person and no proposal could be reached.
+  it('hands each body its own count, and hands a bystander none', () => {
+    let s = makeWorld([
+      { id: 'bashir', x: 1, y: 1 },
+      { id: 'farida', x: 2, y: 1 },
+      { id: 'salma', x: 3, y: 1 },
+    ])
+    s = {
+      ...s,
+      agents: {
+        ...s.agents,
+        bashir: { ...s.agents.bashir!, walkOuts: { farida: 3 } },
+        farida: { ...s.agents.farida!, walkOuts: { bashir: 3 } },
+      },
+    }
+    const seen = (id: string) => composePerception(s, DEFAULT_CONFIG, id, []).visible.agents
+    expect(seen('bashir').find((a) => a.id === 'farida')?.walkedOut).toBe(3)
+    for (const a of seen('salma')) expect(a, a.id).not.toHaveProperty('walkedOut')
+    expect(seen('bashir').find((a) => a.id === 'salma')).not.toHaveProperty('walkedOut')
+  })
+})

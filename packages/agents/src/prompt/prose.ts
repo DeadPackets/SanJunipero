@@ -81,6 +81,8 @@ type PerceptionAgent = {
   stranger?: true
   // Who this body married, if anybody. Everyone in the valley knows this about everyone.
   partnerName?: string
+  // How many times the beholder has walked out with this one. Absent when never.
+  walkedOut?: number
   // Tags a minted verb left on the body, readable by anyone who can see it.
   marks?: Record<string, string>
 }
@@ -1417,10 +1419,14 @@ export function perceptionToProse(
     // Said plainly and left there. A mind that walks out with somebody spoken for should know
     // that is what it is doing, and nothing here tells it what to think about that.
     const wed = a.partnerName === undefined ? '' : `, married to ${a.partnerName}`
+    // The propose gate counts walks out and nothing told the walker, so r49 courted eleven times
+    // across seven people and never twice the same one. Said as a fact, like the marriage above.
+    const n = a.walkedOut ?? 0
+    const walked = n === 0 ? '' : `, who you have walked out with ${TIMES_SAID[n] ?? `${n} times`},`
     const where = `${inSight(packet.self, a)}${dressed}${ails}${markedPhrase(a.marks)}`
     // Collapse before sleep: hunger goes on falling through the night, so a body that goes down
     // while sleeping is flagged both, and asleep-first told the town it was only resting.
-    const who = `${a.name} (${a.id})${road}${tie}${wed}`
+    const who = `${a.name} (${a.id})${road}${tie}${wed}${walked}`
     if (a.collapsed)
       lines.push(
         `${who} lies collapsed ${where}. Hold food out to them and they will eat it from your hand.`,

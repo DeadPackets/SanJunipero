@@ -439,6 +439,28 @@ describe('perceptionToProse', () => {
       expect(prose).not.toMatch(/should not|wrong|betray|unfaithful|owe|duty/i)
     })
 
+    // r49: the propose gate counts walks out and no prompt said the count, so eleven courtships
+    // across seven people never came back to the same one and no proposal could be reached.
+    it('★ a person walked out with is said to be, in the count the propose gate reads', () => {
+      const walked = (n: number) =>
+        perceptionToProse({
+          ...conversationPacket,
+          visible: {
+            ...conversationPacket.visible,
+            agents: conversationPacket.visible.agents.map((a) => ({ ...a, walkedOut: n })),
+          },
+        })
+      expect(walked(1)).toContain('who you have walked out with once')
+      expect(walked(4)).toContain('who you have walked out with four times')
+      expect(walked(9)).toContain('who you have walked out with 9 times')
+      expect(walked(0)).not.toContain('walked out')
+      const line =
+        walked(3)
+          .split('. ')
+          .find((l) => l.includes('walked out with')) ?? ''
+      expect(line).not.toMatch(/enough|nearly|soon|should|ready/i)
+    })
+
     it('one parent is named alone, two are named together', () => {
       expect(perceptionToProse(kin({ parentNames: ['Halim'] }))).toContain('Halim is your parent.')
       expect(perceptionToProse(kin({ parentNames: ['Leyla', 'Kamal'] }))).toContain(
