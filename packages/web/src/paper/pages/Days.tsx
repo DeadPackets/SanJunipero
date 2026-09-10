@@ -126,7 +126,7 @@ function DayStripView({
               className="mark"
               data-kind={mk.kind}
               style={{ left: markLeft(mk.tick, span) }}
-              aria-label={`Day ${at.day} ${at.time} — ${mk.words}. Watch this moment.`}
+              aria-label={`Day ${at.day} ${at.time}. ${mk.words}. Watch this moment.`}
               onClick={() => {
                 onMark(mk)
               }}
@@ -174,7 +174,6 @@ function DayStripView({
         className={live ? 'live-pill live' : 'live-pill'}
         onClick={onLive}
         aria-pressed={live}
-        aria-label="Return to now"
       >
         {live ? 'LIVE' : 'Return to now'}
       </button>

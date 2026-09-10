@@ -118,17 +118,6 @@ export function coldOpen(startedMs: number): ColdOpen {
   }
 }
 
-/** The cold open's other half: a wide look at the town while the line reads. Taken once a
- *  session, because the browser is never told which SCENES it has shown and this opens none. */
-export function openingShot(): (coldOpen: boolean) => boolean {
-  let taken = false
-  return (coldOpen) => {
-    if (!coldOpen || taken) return false
-    taken = true
-    return true
-  }
-}
-
 export function useColdOpen(
   dressed: boolean,
   living: number,

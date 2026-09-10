@@ -409,20 +409,26 @@ export class LlmClient {
           toolChoice: this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
         })
         note(stepFacts(r))
-        const parsed = schema.safeParse(r.toolCalls[0]?.input)
-        if (!parsed.success) {
-          // The same class the response_format path throws: an off-schema answer is a wrong
-          // answer, and the loop must not bill an identical second ask for it.
-          const why = `tool transport: ${r.toolCalls.length === 0 ? 'no tool call' : z.prettifyError(parsed.error)}`
-          throw new NoObjectGeneratedError({
-            message: why,
-            text: JSON.stringify(r.toolCalls[0]?.input ?? null),
-            response: r.finalStep.response,
-            usage: r.usage,
-            finishReason: r.finishReason,
-          })
+        const call = r.toolCalls[0]
+        const parsed = schema.safeParse(call?.input)
+        if (parsed.success) return parsed.data
+        // A turn the model wrote as prose instead of calling the tool is in the text channel;
+        // stringifying the call it never made throws that answer away.
+        const answer = call === undefined ? r.text : JSON.stringify(call.input)
+        const repaired = repairToSchema(answer, schema)
+        if (repaired !== undefined) {
+          this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
+          return repaired.value
         }
-        return parsed.data
+        // The same class the response_format path throws: an off-schema answer is a wrong
+        // answer, and the loop must not bill an identical second ask for it.
+        throw new NoObjectGeneratedError({
+          message: `tool transport: ${call === undefined ? 'no tool call' : z.prettifyError(parsed.error)}`,
+          text: answer,
+          response: r.finalStep.response,
+          usage: r.usage,
+          finishReason: r.finishReason,
+        })
       }
       try {
         const r = await generateText({
@@ -780,13 +786,12 @@ export class LlmClient {
   }
 }
 
-// No text and no tool call: the SDK says so one way for the object path and another for the
-// tool path, where the refusal carries the stringified missing call.
+// No text and no tool call: the SDK says so one way for the object path, and the tool path's
+// own refusal carries whatever the model did write.
 function answeredNothing(err: unknown, dead: NoObjectGeneratedError | null): boolean {
   if (NoOutputGeneratedError.isInstance(err)) return true
   if (dead === null) return false
-  const text = (dead.text ?? '').trim()
-  return text.length === 0 || text === 'null'
+  return (dead.text ?? '').trim().length === 0
 }
 
 function toModelMessages(messages: LlmMessage[]): ModelMessage[] {

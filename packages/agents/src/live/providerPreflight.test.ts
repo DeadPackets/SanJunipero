@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { ClosedIntentParams } from '@sj/shared'
 import { CAPABILITIES } from '../prompt/rulesOfBeing.js'
 import { StrictTurnSchema, TurnSchema } from '../turn.js'
 import {
@@ -15,7 +16,7 @@ import {
 
 // Two recorded signatures: a grammar-constrained back end returns only the schema's required
 // properties, and a back end that serves the optional ones returns a whole turn.
-const REQUIRED_ONLY = { thought: 'Salma looks ill. I should tend to her.', importance: 6 }
+const REQUIRED_ONLY = { thought: 'Salma is down and I am the one holding food.', importance: 6 }
 const WHOLE_TURNS = [
   {
     thought: 'My throat is raw. The well is right there.',
@@ -29,14 +30,18 @@ const WHOLE_TURNS = [
     importance: 5,
   },
   {
-    thought: 'She is burning up. The herb is in my hand.',
-    speech: 'Lie still. I have something for this.',
-    action: { verb: 'tend', params: { targetId: 'salma', itemId: 'item_h3' } },
+    thought: 'She cannot get up and I am the one carrying the bread.',
+    speech: 'Here. Eat this first.',
+    action: { verb: 'give', params: { targetId: 'salma', itemId: 'item_h3' } },
     importance: 8,
   },
 ]
 
 const ok = (raw: unknown): PreflightAnswer => ({ ok: true, turn: TurnSchema.parse(raw) })
+
+const PEOPLE = /\b(Yusuf|Nadia|Salma)\b/
+// The moment itself, which is the last block the prompt carries.
+const scenes = (): string[] => preflightPrompts().map((p) => p.messages.at(-1)!.content)
 
 function fakeLlm(answers: readonly unknown[]): PreflightLlm {
   let i = 0
@@ -67,6 +72,30 @@ describe('the provider pre-flight asks the real question', () => {
     }
     // Three different moments, or the probe measures one scene three times.
     expect(new Set(prompts.map((p) => p.messages[2]!.content)).size).toBe(PREFLIGHT_CALLS)
+  })
+
+  it('says every scene the way a person says it: no semicolon and no dash', () => {
+    expect(scenes()).toHaveLength(PREFLIGHT_CALLS)
+    for (const scene of scenes()) expect(scene, scene).not.toMatch(/[;—–]/)
+  })
+
+  it('still forces a mark for every param the three scenes were written to force', () => {
+    const grammar = Object.keys(ClosedIntentParams.shape)
+    const marks = {
+      x: /\(\d+, ?\d+\)/,
+      nodeId: /\bnode_\w+\b/,
+      itemId: /\bitem_\w+\b/,
+      targetId: PEOPLE,
+    }
+    for (const [key, mark] of Object.entries(marks)) {
+      expect(grammar, `${key} is not a param the closed grammar reads`).toContain(key)
+      expect(
+        scenes().filter((s) => mark.test(s)),
+        `no scene names a ${key}`,
+      ).not.toHaveLength(0)
+    }
+    // Somebody in every scene, or a scene never invites the speech the gate reports.
+    for (const scene of scenes()) expect(scene, scene).toMatch(PEOPLE)
   })
 
   it('sends the real TurnSchema, whose action and speech are the fields under test', () => {

@@ -411,8 +411,6 @@ describe('roomShell — the room is a closed box', () => {
 // WHAT THE BROWSER CAUGHT: the landed camera centred the FLOOR. Walls doubled the height of
 // the drawn box, so the top of the room was cut off by the top of the stage.
 describe('roomShell — the room fits the stage', () => {
-  const OFFSET = 40
-
   it('the box is the walls plus the floor, not the floor alone', () => {
     const box = roomBox()
     expect(box.top).toBe(-WALL_H_PX)
@@ -423,12 +421,13 @@ describe('roomShell — the room fits the stage', () => {
 
   it('centring the whole box keeps every wall point on the stage', () => {
     const STAGE_H = 900
-    const y = roomOriginY(STAGE_H, OFFSET, ROOM_ZOOM)
+    const y = roomOriginY(STAGE_H, ROOM_ZOOM)
     const box = roomBox()
     expect(y + box.top * ROOM_ZOOM).toBeGreaterThan(0)
     expect(y + box.bottom * ROOM_ZOOM).toBeLessThan(STAGE_H)
-    // the landed rule centred the floor only, and put the wall top off the top of the stage
-    const landed = STAGE_H / 2 - OFFSET - (box.bottom / 2) * ROOM_ZOOM
+    // the landed rule centred the floor only and lifted it 40px, which put the wall top off the
+    // top of the stage
+    const landed = STAGE_H / 2 - 40 - (box.bottom / 2) * ROOM_ZOOM
     expect(landed + box.top * ROOM_ZOOM).toBeLessThan(0)
   })
 
@@ -436,7 +435,7 @@ describe('roomShell — the room fits the stage', () => {
     const box = roomBox()
     for (let h = 600; h <= 1600; h += 1) {
       const z = roomZoomFor(h)
-      const y = roomOriginY(h, OFFSET, z)
+      const y = roomOriginY(h, z)
       // The skip is measured against `roomCropPx`, never against the zoom under test, or a
       // zoom that ignored the stage would excuse itself from this check.
       if (roomCropPx(h) > 0) continue
@@ -450,13 +449,6 @@ describe('roomShell — the room fits the stage', () => {
         h - ROOM_MARGIN_Y,
       )
     }
-  })
-
-  it('★ and it still lifts the full offset when the stage can afford it', () => {
-    const tall = 1400
-    const box = roomBox()
-    const centred = tall / 2 - ((box.top + box.bottom) / 2) * ROOM_ZOOM
-    expect(roomOriginY(tall, OFFSET, roomZoomFor(tall))).toBe(centred - OFFSET)
   })
 
   it('★ the room is centred by its own BOX across the stage, not by its origin', () => {
@@ -475,7 +467,7 @@ describe('roomShell — the room fits the stage', () => {
     const short = 678
     expect(roomCropPx(short)).toBe(58)
     const box = roomBox()
-    const y = roomOriginY(short, OFFSET, ROOM_ZOOM)
+    const y = roomOriginY(short, ROOM_ZOOM)
     expect(y + box.top * ROOM_ZOOM).toBe(0) // the wall top is kept, flush
     expect(y + box.bottom * ROOM_ZOOM).toBeGreaterThan(short) // the near corner is what goes
     expect(y + box.bottom * ROOM_ZOOM - short).toBe(roomCropPx(short)) // and it is the measured number
@@ -541,7 +533,7 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
       for (const stage of STAGES) {
         const range = roomPanRange(stage.w, stage.h, room, WALL_H_PX)
         const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
-        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        const oy = roomOriginY(stage.h, ROOM_ZOOM, room, WALL_H_PX)
         const crop = roomCrop(stage.w, stage.h, room, WALL_H_PX)
         if (crop.x > 0 || crop.y > 0) anyCropped = true
         // the four extremes of the box, each at the offset that reaches hardest for it
@@ -578,7 +570,7 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
       for (const stage of STAGES) {
         const crop = roomCrop(stage.w, stage.h, room, WALL_H_PX)
         const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
-        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        const oy = roomOriginY(stage.h, ROOM_ZOOM, room, WALL_H_PX)
         // ask for the middle of every tile in the room and a long way past every edge, so the
         // clamp is exercised from outside its own range as well as inside it
         for (const fx of [-4000, west, 0, east, 4000]) {
@@ -657,7 +649,7 @@ describe('★★ the camera inside a room, and its range IS the crop', () => {
     for (const { kind, room } of roomsOf()) {
       for (const stage of STAGES) {
         const ox = roomOriginX(stage.w, ROOM_ZOOM, room)
-        const oy = roomOriginY(stage.h, 0, ROOM_ZOOM, room, WALL_H_PX)
+        const oy = roomOriginY(stage.h, ROOM_ZOOM, room, WALL_H_PX)
         for (let x = 0; x < room.w; x++) {
           for (let y = 0; y < room.h; y++) {
             const f = tileCentreScreen(x, y)

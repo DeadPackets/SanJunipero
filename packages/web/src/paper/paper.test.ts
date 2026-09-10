@@ -27,6 +27,15 @@ import { stamp } from './stamp.js'
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const PAGES = Object.keys(PAGE_TABS) as PageKey[]
 
+/** The masthead and the section rule, without the page body a page may date honestly. */
+const headOf = (html: string): string => html.slice(0, html.indexOf('</header>'))
+const dated = (when: ReturnType<typeof stamp>): string[] => [
+  when.time,
+  `DAY ${when.day}`,
+  when.weekday,
+  when.season,
+]
+
 const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
   renderToStaticMarkup(
     createElement(Paper, {
@@ -247,15 +256,14 @@ describe('the paper', () => {
     expect(html).toContain('class="paper-grip"')
   })
 
-  // ★ 4A — the sheet is a dated front page, so the head is a masthead over a dateline rule and
-  // the tabs run along it as the section line.
-  it('★ prints a masthead, and dates it off the town’s own clock', () => {
+  // ★ 4A — the head dated itself off the town's clock until phase 4 gave the Day Bar the one
+  // band that says when: a second date is the same minute in a second type face.
+  it('★ prints a masthead over the section rule, and dates it nowhere', () => {
     const html = paper({ page: 'chronicle', tab: 'Today' })
-    expect(html).toContain('class="paper-dateline"')
-    expect(html).toMatch(/class="paper-title" id="paper-title">Chronicle</)
-    const when = stamp(0)
-    expect(html).toContain(`class="paper-date">${when.weekday} · DAY ${when.day} · ${when.season}<`)
-    expect(html).toContain(`class="paper-clock">${when.time}<`)
+    const head = headOf(html)
+    expect(head).toContain('class="paper-dateline"')
+    expect(head).toMatch(/class="paper-title" id="paper-title">Chronicle</)
+    for (const said of dated(stamp(0))) expect(head, said).not.toContain(said)
   })
 
   it('★ runs the section line INSIDE the dateline, with the keyboard path untouched', () => {
@@ -269,10 +277,28 @@ describe('the paper', () => {
 
   it('★ every arm wears the same chrome, not the Chronicle alone', () => {
     for (const page of ARMS) {
-      const html = paper({ page, tab: firstTab(page) })
-      expect(html, page).toContain('class="paper-dateline"')
-      expect(html, page).toContain('class="paper-date">')
+      const head = headOf(paper({ page, tab: firstTab(page) }))
+      expect(head, page).toContain('class="paper-dateline"')
+      for (const said of dated(stamp(0))) expect(head, `${page}: ${said}`).not.toContain(said)
     }
+  })
+
+  // Two clocks on one frame can only ever agree or lie, and both read `store.getTick`. The band
+  // above the sheet is the surface that says when, so the sheet's head says it nowhere.
+  it('★ leaves the head with ONE dated surface on the frame: the Day Bar, not the masthead', () => {
+    const head = headOf(paper({ page: 'laws', tab: 'World' }))
+    expect(head.match(/class="paper-(?:date|clock)"/g)).toBeNull()
+    expect(head).toMatch(/class="paper-marginalia"><button/)
+  })
+
+  // A voice-control user says the word they can see, and the pill's own label renamed it:
+  // "click LIVE" reached nothing.
+  it('★ names the day strip’s pill with the word it shows', () => {
+    const html = paper({ page: 'chronicle', tab: 'Days' })
+    const pill = /<button[^>]*class="live-pill live"[^>]*>([^<]*)</.exec(html)
+    expect(pill?.[1]).toBe('LIVE')
+    expect(html).not.toContain('aria-label="Return to now"')
+    expect(html).toContain('aria-pressed="true"')
   })
 
   // The lead story and the live feed, one beside the other — and the lead keeps a real heading

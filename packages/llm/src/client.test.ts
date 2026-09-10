@@ -1564,6 +1564,73 @@ describe('a re-ask waits out the window it was refused in', () => {
     expect(model.doGenerateCalls, 'an off-schema answer was asked for twice').toHaveLength(1)
   })
 
+  // ★ In the 2026-09-10 tool trial, 7 of 11 faults were a schema-valid turn sitting in the
+  // model's text channel with no tool call made, and the transport threw all seven away.
+  it('★ reads a turn the model wrote as prose instead of calling the tool', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'Sure, here is the turn:\n{"mood":"calm","count":3}',
+        usage: { inputTokens: 900, outputTokens: 40 },
+        provider: 'OpenAI',
+        servedModelId: MIND_MODEL,
+      },
+    ])
+    const got = await new LlmClient({ model, db, caller: 'turn', transport: 'tool' }).object({
+      system: 's',
+      messages: [{ role: 'user', content: 'u' }],
+      schema: SCHEMA,
+    })
+    expect(got.value).toEqual({ mood: 'calm', count: 3 })
+    // One call, not two, and the row is an answer rather than a fault: it was never re-asked.
+    expect(model.doGenerateCalls).toHaveLength(1)
+    expect(rows(db).map((r) => r.ok)).toEqual([1])
+    expect(rows(db)[0]!.output_tokens).toBe(40)
+    expect(alertsOf(db, 'decode_repaired')[0]).toContain('turn')
+  })
+
+  // A model that wrote prose and skipped the tool did not think itself out of tokens. The
+  // transport reported the call it never made as `null`, so the court billed a second ask for it.
+  it('does not call a prose answer a runaway, whatever cut it off', async () => {
+    const db = openDb()
+    const model = mockModel([
+      {
+        text: 'The mood was calm but I did not count.',
+        finishReason: 'length',
+        usage: { inputTokens: 900, outputTokens: 16_000 },
+      },
+      { json: { mood: 'calm', count: 1 } },
+    ])
+    await expect(
+      new LlmClient({ model, db, caller: 'arbiter', transport: 'tool' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow(/tool transport/)
+    expect(model.doGenerateCalls, 'a written answer was re-asked as a runaway').toHaveLength(1)
+    expect(alertsOf(db, 'reasoning_runaway')).toEqual([])
+  })
+
+  // A model that answers the word null answered something. It used to read as the stringified
+  // tool call nobody made, and the court billed a second ask for it.
+  it('does not call an answer of null a runaway either', async () => {
+    const db = openDb()
+    const model = mockModel([
+      { text: 'null', finishReason: 'length', usage: { inputTokens: 900, outputTokens: 16_000 } },
+      { json: { mood: 'calm', count: 1 } },
+    ])
+    await expect(
+      new LlmClient({ model, db, caller: 'arbiter', transport: 'tool' }).object({
+        system: 's',
+        messages: [{ role: 'user', content: 'u' }],
+        schema: SCHEMA,
+      }),
+    ).rejects.toThrow(/tool transport/)
+    expect(model.doGenerateCalls, 'an answer of null was re-asked as a runaway').toHaveLength(1)
+    expect(alertsOf(db, 'reasoning_runaway')).toEqual([])
+  })
+
   // ★ The stall budget used to be re-armed by a burst: once `attempt` had passed `maxRetries`,
   // the stall check could never fire again, so reflection billed three 45 s stalls for two.
   it('spends the stall budget once, whatever order a burst arrives in', async () => {

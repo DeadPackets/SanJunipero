@@ -6,15 +6,29 @@ import { CONSTRUCT_VOCABULARY, momentTitle, SceneKind } from '@sj/shared'
 import { DirectorCue } from './DirectorCue.js'
 import { type CueLine, type CueSlot, cueStep, NO_CUE_LINE } from './cueSlot.js'
 
+const cue = (props: Parameters<typeof DirectorCue>[0]): string =>
+  renderToStaticMarkup(createElement(DirectorCue, props))
+
+/** What the stamp actually strikes onto the picture, off the markup the component made. */
+const stampText = (html: string): string =>
+  /class="stage-scene-stamp"[^>]*>([^<]*)/.exec(html)?.[1] ?? ''
+
 // ★ `council` is a construct type, and the stamp was printing the enum id straight from the
 // wire. One-way glass: the machinery's own word must never be struck onto the picture.
 describe('★ the scene stamp is prose, never the wire’s own word for the scene', () => {
-  const SRC = readFileSync(new URL('./DirectorCue.tsx', import.meta.url), 'utf8')
-  const stamp = /function SceneStamp\([\s\S]*?\n\}/.exec(SRC)![0]
-
   it('★ renders the town’s title for the kind, not the kind', () => {
-    expect(stamp, 'the raw enum id was the stamp text').not.toMatch(/\{kind\}/)
-    expect(stamp).toContain('momentTitle(kind, null)')
+    for (const kind of SceneKind.options) {
+      const html = cue({
+        text: null,
+        moment: null,
+        scene: { kind, text: 'the well · Nadia', stakes: 2, band: 'quiet' },
+        why: null,
+      })
+      expect(stampText(html), `${kind}: the raw enum id was the stamp text`).toBe(
+        momentTitle(kind, null),
+      )
+      expect(stampText(html), kind).not.toBe(kind)
+    }
   })
 
   it('★ no kind the gateway can send carries an ops word onto the glass', () => {
@@ -31,8 +45,6 @@ describe('★ the scene stamp is prose, never the wire’s own word for the scen
 // prints it under the shot, in the sentence case a thing the town could have said is set in.
 describe('★ the two slots, and the order the four things claim them in', () => {
   const CSS = readFileSync(new URL('../ui/chrome.css', import.meta.url), 'utf8')
-  const cue = (props: Parameters<typeof DirectorCue>[0]): string =>
-    renderToStaticMarkup(createElement(DirectorCue, props))
   const WHY = 'Nadia & Yusuf — falling out, a slight'
   const MOMENT = { text: 'Rahel died.', icon: 'star', bodies: ['rahel'] }
   const SCENE = {

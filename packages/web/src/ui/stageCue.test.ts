@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import type { SimEvent } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { InvitationRefused, PartnershipDissolved, PartnershipFormed } from '@sj/engine'
 import type { TownScene } from '../state/worldStore.js'
+import { DirectorCue } from '../stage/DirectorCue.js'
 import { CHRONICLE_GLYPH } from './importantFeed.js'
 import { contrast, tokens } from './contrast.test.js'
 import {
@@ -191,16 +194,21 @@ describe('★ the moment stands for six seconds, then the slot goes back to nami
     expect(queue[queue.length - 1]?.text).toContain(`dark ${String(burst.length - 1)}`)
   })
 
-  it('★ the cue slot draws the glyph, and the App feeds it from the world’s own events', () => {
-    expect(src('../stage/DirectorCue.tsx')).toContain('CUE_ICON_PX')
-    expect(src('../App.tsx')).toContain('useStageCue(store)')
+  // What the App does with these is driven in `directorsCut.test.ts`, where it is rendered.
+  it('★ the cue slot draws the moment the feed’s own glyph, at the feed’s own size', () => {
+    const cue = cueFor(ev('agent_died', { agentId: 'amara' }), town())!
+    const html = renderToStaticMarkup(
+      createElement(DirectorCue, { text: null, moment: cue, scene: null }),
+    )
+    expect(html).toContain(`width="${String(CUE_ICON_PX)}"`)
+    expect(
+      html.match(/<rect/g),
+      'the glyph was drawn from something other than the feed',
+    ).toHaveLength(CHRONICLE_GLYPH[cue.icon]!.pixels.length)
   })
 
-  it('★ the two bodies it happened to bounce, on the finished-structure curve', () => {
-    const AMBIENT = src('../render/ambient.ts')
-    expect(AMBIENT).toContain('bodiesOf(')
-    expect(AMBIENT).toContain('BOUNCE_SCALE')
-  })
+  // ★ The bounce the two bodies take is driven over a real director in `render/ambient.test.ts`:
+  // a bond formed lifts both of them and the grave tone lands them again.
 
   it('fades rather than blinking out, and holds still under reduced motion', () => {
     const CSS = src('./chrome.css').replace(/\s+/g, ' ')
@@ -338,8 +346,11 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     )
     expect(CSS).toMatch(/\.stage-scene-stamp\[data-stakes='hot'\] \{ color: var\(--ember\)/)
     // ...and a third for anyone who cannot see either
-    expect(src('../stage/DirectorCue.tsx')).toContain('at stake')
-    expect(src('../stage/DirectorCue.tsx')).toContain('stage-sr')
+    const cue = sceneCueFor(sceneStageOf(scene({ kind: 'quarrel', stakes: 9 }), null), NAMES)
+    const html = renderToStaticMarkup(
+      createElement(DirectorCue, { text: null, moment: null, scene: cue }),
+    )
+    expect(html).toContain(`<span class="stage-sr">, 9 of ${String(STAKES_MAX)} at stake</span>`)
   })
 
   // Measured in a headless shot at 390px: `balance` shrinks a flex item to equalise its lines,
@@ -379,13 +390,6 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     expect(CSS).toMatch(/@media \(forced-colors: active\)[\s\S]*?\.stage-scene-stamp/)
   })
 
-  it('★ the App feeds the slot from the one hold that owns the summary', () => {
-    const APP = src('../App.tsx')
-    expect(APP).toContain('useSceneStage(store)')
-    expect(APP).toContain('sceneCueFor(stage,')
-    // The camera no longer takes a claim off this hold — the gateway scores the scene and the
-    // shot arrives on the socket — so the slot is the hold's ONLY reader.
-    expect(APP).not.toContain('stage={stage}')
-    expect(src('./DirectorMode.tsx')).not.toContain('SceneStage')
-  })
+  // ★ The App feeding this slot off the one hold, and striking the stamp once, is driven in
+  // `directorsCut.test.ts`: the scene the shot is on stands on the glass once.
 })

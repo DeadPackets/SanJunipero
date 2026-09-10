@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { CLOSED_KEYS, PLAN_MAX_STEPS } from '@sj/shared'
 import {
   CEILING_PRICE_PER_M,
@@ -236,4 +236,61 @@ it('only the night chain that compounds waits a burst out', () => {
 
 it('an unpinned caller keeps the routing it has always had', () => {
   expect(callSettingsFor('nobody-pinned-this')).toEqual({})
+})
+
+/** A fresh module with the trial route set, because the pins are read once at import. */
+async function pinsWithRoute(route: string): Promise<typeof import('./pins.js')> {
+  vi.resetModules()
+  vi.stubEnv('LLM_MIND_ROUTE', route)
+  try {
+    return await import('./pins.js')
+  } finally {
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  }
+}
+
+// ★ The pinned back ends are an allow-list, so swapping the model alone sends every call to a
+// home the new model is not served by: measured 2026-09-10 as 100% of calls refused.
+it('★ a trial route moves the model and its back ends as one word', async () => {
+  const trial = await pinsWithRoute('z-ai/glm-5.3-flash@DeepInfra')
+  expect(trial.MIND_MODEL).toBe('z-ai/glm-5.3-flash')
+  expect(trial.PROVIDER_ORDER).toEqual(['DeepInfra'])
+  expect(trial.callSettingsFor('turn').model).toBe('z-ai/glm-5.3-flash')
+  expect(trial.callSettingsFor('turn').providerOrder).toEqual(['DeepInfra'])
+  expect((await pinsWithRoute('z-ai/glm-5.3-flash@Wafer, DeepInfra')).PROVIDER_ORDER).toEqual([
+    'Wafer',
+    'DeepInfra',
+  ])
+})
+
+it('a model with no back end named is refused at boot, not at every call', async () => {
+  for (const bad of ['z-ai/glm-5.3-flash', '@DeepInfra', 'z-ai/glm-5.3-flash@', 'glm@ , '])
+    await expect(pinsWithRoute(bad), bad).rejects.toThrow(/LLM_MIND_ROUTE/)
+  expect((await pinsWithRoute('   ')).MIND_MODEL).toBe(MIND_MODEL)
+})
+
+// ★ Keyed off `MIND_MODEL`, the fleet's own row was RENAMED by a trial route: luna's measured
+// rate then priced a model nobody measured, and luna's own ledger rows booked at the ceiling.
+it('★ the pinned price row survives a trial route, and the trial books at its own rate', async () => {
+  const trial = await pinsWithRoute('z-ai/glm-5.3-flash@DeepInfra')
+  expect(trial.PRICE_PER_M_BY_ROUTE['openai/gpt-5.6-luna@OpenAI']).toEqual({
+    input: 0.25,
+    output: 1.2,
+    cacheRead: 0.02,
+  })
+  expect(trial.pricesFor('openai/gpt-5.6-luna', 'OpenAI').source).toBe('provider')
+  expect(trial.PRICE_PER_M).toEqual({ input: 0.075, output: 0.25, cacheRead: 0.016 })
+})
+
+// ★ The ledger must never under-book. The market has endpoints billing 1.50 where the ceiling
+// reads 1.32, and the ceiling does not chase the market: a route the table cannot price may not
+// serve, and 'the ceiling is at least as expensive as every priced provider' holds the rest.
+it('★ the town cannot serve a route the ledger cannot price', async () => {
+  await expect(pinsWithRoute('anthropic/claude-4.5@Anthropic')).rejects.toThrow(
+    /has no row in PRICE_PER_M_BY_ROUTE/,
+  )
+  await expect(pinsWithRoute('z-ai/glm-5.3-flash@DeepInfra,Morph')).rejects.toThrow(
+    /z-ai\/glm-5.3-flash@Morph/,
+  )
 })

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { MOTION } from './motion.js'
-import { ESTABLISH_HOLD_MS, nextShot, shotKindFor, takeShot, type ShotSpec } from './shot.js'
 import {
   COLD_OPEN_FADE_MS,
   COLD_OPEN_IN_MS,
@@ -8,7 +7,6 @@ import {
   coldOpen,
   coldOpenLine,
   firstWorryLine,
-  openingShot,
   peopleWords,
 } from './coldOpen.js'
 
@@ -121,40 +119,7 @@ describe('★ the cold open', () => {
   })
 })
 
-// ★ THE COLD OPEN IS A SHOT AS WELL AS A LINE. It shipped as a caption with nothing behind it:
-// the browser asked for `opening: false` always, so the establishing shot was unreachable.
-describe('★ the shot behind the cold open', () => {
-  const TALK = { peak: false, indoors: false, walking: false, cast: 2 }
-  const cast: ShotSpec['target'] = { at: 'cast', ids: ['amara', 'yusuf'] }
-
-  it('★ opens the session wide, and asks for it once', () => {
-    const open = openingShot()
-    expect(shotKindFor({ ...TALK, opening: open(true) })).toBe('establish')
-    expect(shotKindFor({ ...TALK, opening: open(true) })).toBe('twoShot')
-    expect(shotKindFor({ ...TALK, opening: open(false) })).toBe('twoShot')
-  })
-
-  it('★ takes nothing while the cold open is not running, and takes the next one that is', () => {
-    const open = openingShot()
-    expect(open(false)).toBe(false)
-    expect(open(true)).toBe(true)
-    expect(open(true)).toBe(false)
-  })
-
-  it('★ holds the town wide long enough to be a shot, then hands the grammar back', () => {
-    const open = openingShot()
-    const shot = takeShot(
-      { kind: shotKindFor({ ...TALK, opening: open(true) }), target: { at: 'town' }, why: '' },
-      0,
-    )
-    expect(shot.stop, 'the opening shot is not a wide one').toBe(1)
-    expect(shot.minHoldMs).toBe(ESTABLISH_HOLD_MS)
-    const after: ShotSpec = {
-      kind: shotKindFor({ ...TALK, opening: open(true) }),
-      target: cast,
-      why: '',
-    }
-    expect(nextShot(shot, after, ESTABLISH_HOLD_MS - 1), 'it was cut away from').toBe(shot)
-    expect(nextShot(shot, after, ESTABLISH_HOLD_MS)?.kind).toBe('twoShot')
-  })
-})
+// ★ THE SHOT BEHIND THE COLD OPEN moved into the tree: `openingShot` was asked in a render
+// body, so a render React threw away could spend the session's one opening. `DirectorMode` now
+// spends it on the shot a viewer got, and `openingShot.test.ts` drives that. The grammar it used
+// to assert here is driven in `shot.test.ts` (the establish stop at :66, its floor at :111).

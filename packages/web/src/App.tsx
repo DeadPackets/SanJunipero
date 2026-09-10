@@ -464,6 +464,7 @@ export function App() {
         onAt={address}
         autoCut={autoCut}
         handbackAt={handbackAt}
+        broadcast={route.broadcast}
       />
       <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
       {cold.frame.line !== null && (

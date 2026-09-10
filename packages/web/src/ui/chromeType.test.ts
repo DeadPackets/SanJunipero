@@ -127,6 +127,46 @@ describe('B4 (partial) — the chrome type floors', () => {
   })
 })
 
+// A weight the browser has no file for is not the weight that renders: CSS font matching serves
+// Manrope 500 as 400 and Fraunces 600 as 700, so the sheet said one thing and the screen another.
+describe('\u2605 every weight the sheet asks for is a weight it loads', () => {
+  const MAIN = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
+
+  /** The first family named by a `--font-*` token, as `@fontsource` spells it. */
+  const familyOf = (token: string): string =>
+    (new RegExp(`--font-${token}:\\s*'?([^,']+)'?`).exec(CSS)?.[1] ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+
+  /** The weights `main.tsx` actually pulls for that family. Empty means a system stack. */
+  const loaded = (family: string): number[] =>
+    [...MAIN.matchAll(new RegExp(`@fontsource/${family}/latin-(\\d+)`, 'g'))].map(([, w]) =>
+      Number(w),
+    )
+
+  const ASKED = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, sel, body]) => ({
+      sel: (sel ?? '').trim().split('\n').at(-1)!.trim(),
+      token: /font-family:\s*var\(--font-([\w-]+)\)/.exec(body ?? '')?.[1],
+      weight: Number(/font-weight:\s*(\d+)/.exec(body ?? '')?.[1]),
+    }))
+    .filter((d) => d.token !== undefined && !Number.isNaN(d.weight))
+
+  it('finds the pairs it is meant to be checking', () => {
+    expect(ASKED.length).toBeGreaterThan(15)
+    expect(loaded(familyOf('body'))).toContain(400)
+  })
+
+  it('\u2605 asks for no weight the browser would have to substitute', () => {
+    const bad = ASKED.filter((d) => {
+      const have = loaded(familyOf(d.token!))
+      return have.length > 0 && !have.includes(d.weight)
+    })
+    expect(bad.map((d) => `${d.sel} wants ${String(d.weight)} of --font-${d.token!}`)).toEqual([])
+  })
+})
+
 // The sheet styles no bare `h2` outside `.digest-modal`, so an unclassed one is the browser's
 // system-ui bold at 21px.
 describe('every page heading is the sheet\u2019s own face', () => {

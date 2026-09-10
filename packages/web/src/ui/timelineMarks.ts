@@ -213,7 +213,9 @@ export const markSources = (body: unknown): WireSources => {
 }
 
 export type MarkSources = {
-  chapters: readonly { day: number; title: string }[]
+  /** `startTick` is the minute the chapter's first scene opened. A chapter that kept no scene
+   *  has none, and is dated to its day alone. */
+  chapters: readonly { day: number; title: string; startTick?: number | null }[]
   milestones: readonly { label: string; day: number; tick: number }[]
   /** A narrated scene. A day the narrator kept but never titled still deserves a mark. */
   moments: readonly { day: number; startTick: number }[]
@@ -254,7 +256,8 @@ export function marksFrom(sources: MarkSources): Mark[] {
   const titledDays = new Set<number>()
   for (const c of sources.chapters) {
     titledDays.add(c.day)
-    push(c.day * MINUTES_PER_DAY, 'chapter', c.title, true)
+    const start = c.startTick ?? null
+    push(start ?? c.day * MINUTES_PER_DAY, 'chapter', c.title, start === null)
   }
   // A scene the narrator kept without a chapter is still a day worth aiming at; a scene on a
   // day that HAS a chapter is the same day, and must not be marked twice.

@@ -26,6 +26,8 @@
   --parchment-zebra: #F1E1CC;
 
   /* Semantic, outside the five: a valence the world holds, and nothing else may borrow one. */
+  /* How hot: the top of the stakes band, and the material a first is cut from when one mind
+     worked it out. It answered six questions before and now answers this one. */
   --ember: #E8785A;
   /* Ember is 2.70:1 on cream, which no word may be set in. This is 6.30:1. */
   --ember-ink: #9E3B2B;
@@ -34,6 +36,10 @@
   --rose: #C47876;
   --rose-pale: #F2C6C2;
   --sky: #3E6786;
+
+  /* State, which is us and not the world: the one you are in, and the control that is on. The
+     ink's own hue at reading strength — 4.88:1 under deep, 3.08:1 on cream, where ember was 2.70. */
+  --current: #AA7ACD;
 
   /* A 2px base, not 4px: 4px cannot spell the hairline pads the chips are built from. */
   --s-1: 2px;
@@ -192,8 +198,9 @@ body {
   background: var(--cream); border-radius: 0; box-shadow: var(--frame-tight);
   padding: var(--s-1) var(--s-3);
 }
-/* A rail as well as a fill: "ill" against "well" may not be a colour on its own. */
-.badge.ill, .rr-cond.ill { border-left: 3px solid var(--ember); }
+/* A rail as well as a fill: "ill" against "well" may not be a colour on its own. Cream is
+   3.12:1 on the rose it is drawn on, where the ember it replaces was 1.15:1 and invisible. */
+.badge.ill, .rr-cond.ill { border-left: 3px solid var(--cream); }
 .badge.ill { background: var(--rose); color: var(--deep); }
 
 .block { margin: var(--s-5) 0; }
@@ -315,7 +322,7 @@ body {
 }
 .feed-jump:hover { background: var(--cream); border-left-color: var(--honey); }
 /* the entry you are standing in — a rail as well as a colour, never colour alone */
-.feed-jump[aria-current='true'] { background: var(--cream); border-left-color: var(--ember); }
+.feed-jump[aria-current='true'] { background: var(--cream); border-left-color: var(--current); }
 .feed-glyph { flex: none; display: block; }
 @media (prefers-reduced-motion: no-preference) {
   .feed-jump {
@@ -418,7 +425,7 @@ body {
 .mark:hover .mark-tip, .mark:focus .mark-tip { display: block; }
 .playhead {
   position: absolute; top: -3px; bottom: -3px; width: 3px; translate: -50%;
-  background: var(--ember); box-shadow: var(--frame-tight);
+  background: var(--current); box-shadow: var(--frame-tight);
 }
 /* positioned, never transitioned: `.playhead` is dragged on pointermove, and a transition
    lags the finger and lies about which minute is on screen. */
@@ -516,7 +523,7 @@ body {
 /* struck-out chips keep filtering while the key is shut — say so where the key is */
 .key-filtered {
   font-family: var(--font-px); font-size: var(--f-1);
-  background: var(--ember); color: var(--deep);
+  background: var(--current); color: var(--deep);
   padding: var(--s-1) var(--s-2); box-shadow: var(--frame-tight);
 }
 
@@ -635,7 +642,7 @@ body {
 .moment-card:hover { background: var(--cream); border-left-color: var(--honey); }
 .moment-card:active { translate: 0 1px; box-shadow: var(--ledge-in); }
 /* the day you are watching — a rail as well as a fill, never colour alone */
-.moment-card[data-open='yes'] { background: var(--cream); border-left-color: var(--ember); }
+.moment-card[data-open='yes'] { background: var(--cream); border-left-color: var(--current); }
 @media (prefers-reduced-motion: no-preference) {
   .moment-card {
     transition-property: background-color, border-left-color;
@@ -1036,8 +1043,8 @@ body {
   background-color: var(--honey-l); translate: 0 -2px; box-shadow: var(--ledge-hi);
 }
 .discovery-leaf:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-/* the leaf you are standing in — an ember rail as well as a ring, never colour alone */
-.discovery-leaf[aria-current='true'] { border-left-width: 6px; border-left-color: var(--ember); }
+/* the leaf you are standing in — a wider rail as well as a colour, never colour alone */
+.discovery-leaf[aria-current='true'] { border-left-width: 6px; border-left-color: var(--current); }
 .discovery-body { display: grid; gap: var(--s-2); min-width: 0; }
 .discovery-body > * { font-size: var(--f-2); color: var(--ink-quiet); }
 .discovery-name { font-size: var(--f-3); font-weight: 600; color: var(--ink); text-wrap: balance; }
@@ -1162,7 +1169,7 @@ body {
   grid-area: bar; grid-column: edge; grid-row: 1 / bar-end; z-index: 21;
   min-height: 56px;
   display: grid;
-  grid-template-columns: minmax(0, 300px) minmax(0, 640px) minmax(0, 300px);
+  grid-template-columns: minmax(0, 300px) minmax(0, 640px) auto;
   justify-content: space-between; align-items: center;
   gap: var(--s-5);
   /* The band takes the frame's top row, so the notch is its own padding and no town shows
@@ -1236,8 +1243,10 @@ body {
   background: var(--honey); box-shadow: 0 0 0 1px var(--deep);
 }
 
+/* No `min-width: 0`: every mark in the flank is one nowrap word, so the flank keeps its own
+   width and the track gives the room rather than the words printing over it. */
 .day-bar-right {
-  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5); min-width: 0;
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5);
 }
 .day-bar-weather {
   display: flex; align-items: center; gap: var(--s-3);
@@ -1362,7 +1371,7 @@ body {
 }
 .scene-card-chip {
   padding: var(--s-2) var(--s-3);
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 400;
   text-wrap: pretty;
   color: var(--ink); background: var(--parchment);
   border-left: var(--s-2) solid var(--sand);
@@ -1433,7 +1442,7 @@ body {
 }
 /* the second line is a person: the first line's face at the note's weight, in its ink */
 .cold-open-worry {
-  font-family: var(--font-body); font-size: var(--f-4); font-weight: 500;
+  font-family: var(--font-body); font-size: var(--f-4); font-weight: 600;
   text-wrap: pretty; max-width: 44ch;
   color: var(--cream);
   text-shadow: var(--halo-deep);
@@ -1442,6 +1451,9 @@ body {
 /* The line is the town's first page, not the paper's: a deep link that opens a sheet, or a
    sheet opened while it stands, takes it down. */
 body:has(.app[data-paper='on']) .cold-open { display: none; }
+/* The same order one step down: while the town's first sentence stands, the card that names the
+   scene waits. They shared the top-left corner and overlapped 52px whenever both were up. */
+body:has(.cold-open) .scene-card { display: none; }
 
 .stage-exit, .stage-live {
   grid-area: left-1; justify-self: start; align-self: start; z-index: 25;
@@ -1499,12 +1511,14 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
    to the window's; a mark that hangs over the picture rather than standing in a row of its own
    spans `open`, the slack row, because an item that spans it makes no row taller.
    Three rows carry a floor instead: a cue arriving may not move the caption over it, and a
-   button that only exists inside a room may not move the card under it.
+   button that only exists inside a room may not move the card under it. The cue is one news
+   line over one doing line and either may wrap: its floor is four of them and the scene gap.
    `clip`, never `hidden`: `hidden` is still a scroll container, and a `.focus()` inside the
    sheet walked up to it and carried the whole town with it. */
 .app {
   position: relative; height: 100%; overflow: clip;
   background: var(--night); user-select: none;
+  --cue-floor: calc(4 * 1.5 * var(--f-2) + var(--s-4));
   display: grid;
   grid-template-columns:
     [edge-start] max(var(--mark-inset), env(safe-area-inset-left))
@@ -1517,7 +1531,7 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
     auto
     minmax(0, 1fr)
     minmax(44px, auto)
-    minmax(calc(2 * 1.5 * var(--f-2)), auto)
+    minmax(var(--cue-floor), auto)
     auto auto auto
     max(var(--mark-inset), env(safe-area-inset-bottom));
   grid-template-areas:
@@ -1533,6 +1547,11 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
     '.    wisp       .      foot-right  .'
     '.    foot-left  .      foot-right  .'
     '.    .          .      .           .';
+}
+/* A short window has 75px between the caption and the corner stack: four lines reserved there
+   would push the frame off its own bottom edge, so the floor goes back to two. */
+@media (max-height: 620px) {
+  .app { --cue-floor: calc(2 * 1.5 * var(--f-2)); }
 }
 /* The world is under every area, not in one: the canvas hangs off `.app` itself. */
 .app > main { grid-area: 1 / 1 / -1 / -1; min-height: 0; }
@@ -1684,7 +1703,8 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
    under them. */
 .paper-dateline {
   /* `1fr` sides balance, so the strip centres on the masthead; `max-content` in the middle
-     because a wrapping flex row's min-content is ONE tab and `auto` collapsed the line. */
+     because a wrapping flex row's min-content is ONE tab and `auto` collapsed the line. Both
+     children take their column by hand: the empty first track is not an in-flow child. */
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
   align-items: center; column-gap: var(--s-4);
@@ -1694,16 +1714,12 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
   margin-bottom: var(--s-2);
 }
 .paper-marginalia {
+  grid-column: 3;
   display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); min-width: 0;
 }
-/* The date already had this; the close word did not, and "close · Esc" broke to two lines the
-   moment its flank became a flexible track. */
+/* "close · Esc" breaks to two lines the moment its flank becomes a flexible track. */
 .paper-close { white-space: nowrap; }
-.paper-date, .paper-clock {
-  margin: 0; font-family: var(--font-data); font-size: var(--f-1); letter-spacing: 0.06em;
-  color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.paper-tabs { display: flex; gap: var(--s-1); }
+.paper-tabs { grid-column: 2; display: flex; gap: var(--s-1); }
 /* Manrope, not the pixel face: Silkscreen at 13px reads as a smear, and these are words. */
 .paper-tab {
   min-height: 44px; padding: 0 var(--s-3);
@@ -1769,12 +1785,8 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
   font-size: var(--f-3); line-height: 1.5;
   user-select: text;
 }
-/* The one-row section line needs about 723px of head: five tabs, the date, the clock and the
-   close word. The dateline carries its weekday now, which took the date from 157px to 207px and
-   the line past what a 760px sheet can hold — measured, the date's own text was painting 50px
-   outside its track and over the first tab at every width from 1024 to 1600. The sheet is capped
-   at 760px until 1920px widens it to 1040, so 1920 is the ONLY width where one row fits, and the
-   complement of that rule is where the tabs take the second row and scroll along it. */
+/* The sheet is capped at 760px until 1920px widens it to 1040, and below that the tabs take a
+   second row and scroll along it rather than crowding the close word. */
 @media (max-width: 1919.98px) {
   .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
   .paper-tabs {
@@ -1871,7 +1883,7 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
 }
 .room-door:hover { background: var(--deep); }
 .room-door:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-.room-door[aria-pressed='true'] { background: var(--ember); color: var(--deep); border-color: var(--deep); }
+.room-door[aria-pressed='true'] { background: var(--current); color: var(--deep); border-color: var(--deep); }
 
 .day-strip { display: grid; gap: var(--s-4); }
 .day-marks { position: relative; height: 30px; }
@@ -2357,7 +2369,7 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
 /* Fraunces, because the card is a title and this is the one face the sheet titles with. */
 .replay-card-title {
   margin: var(--s-2) 0 0;
-  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 700; line-height: 1.2;
   text-wrap: balance; color: var(--cream);
 }
 .replay-card-cast {
@@ -2425,7 +2437,7 @@ body:has(.app[data-paper='on']) .cold-open { display: none; }
 /* Fraunces: the plate is a label on a thing, and this is the face the sheet titles with. */
 .first-label {
   margin: 0;
-  font-family: var(--font-title); font-size: var(--f-5); font-weight: 600; line-height: 1.2;
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 700; line-height: 1.2;
   text-wrap: balance; color: var(--ink);
 }
 .first-when {

@@ -470,6 +470,53 @@ describe('★ the signpost and the paper hold their own shape', () => {
   })
 })
 
+// Measured in a headless Chromium against this sheet at 1440×844: at the old two-line floor the
+// caption stood at 581 for one cue line and at 561.5 for three. It holds every case now.
+describe('★ the two rows over the picture that may not move each other', () => {
+  const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+  const root = Object.fromEntries(
+    [...(/:root\s*\{([\s\S]*?)\n\}/.exec(BARE)?.[1] ?? '').matchAll(/--([\w-]+):\s*(\d+)px/g)].map(
+      ([, name, px]) => [name!, Number(px)],
+    ),
+  )
+
+  /** A `calc()` of numbers and `:root` px tokens, summed. */
+  const px = (expr: string): number =>
+    expr.split('+').reduce(
+      (sum, term) =>
+        sum +
+        term.split('*').reduce((a, f) => {
+          const t = /var\(--([\w-]+)\)/.exec(f)?.[1]
+          return a * (t === undefined ? Number.parseFloat(f) : root[t]!)
+        }, 1),
+      0,
+    )
+
+  const LINE_HEIGHT = Number(/^body \{[^}]*line-height:\s*([\d.]+)/m.exec(BARE)?.[1])
+
+  /** Every floor the sheet sets for the cue row, in line boxes of the cue's own size. */
+  const floors = [...BARE.matchAll(/--cue-floor:\s*calc\((.*?)\);/g)].map(
+    ([, expr]) => px(expr!) / (LINE_HEIGHT * root['f-2']!),
+  )
+
+  it('★ floors the cue row at four of its own line boxes, so a third line moves nothing', () => {
+    const rows = /grid-template-rows:([\s\S]*?);/.exec(rulesFor(BARE, '.app'))?.[1] ?? ''
+    expect(rows, 'the cue row is floored by hand again').toContain('minmax(var(--cue-floor), auto)')
+    expect(LINE_HEIGHT).toBeGreaterThan(1)
+    expect(Math.max(...floors)).toBeGreaterThanOrEqual(4)
+  })
+
+  it('★ gives the floor back on a window too short to spare it, and never below two lines', () => {
+    expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.app \{ --cue-floor:/)
+    expect(floors).toHaveLength(2)
+    expect(Math.min(...floors)).toBeGreaterThanOrEqual(2)
+  })
+
+  it('★ takes the scene card down while the town’s first sentence stands over it', () => {
+    expect(rulesFor(BARE, 'body:has(.cold-open) .scene-card')).toMatch(/display:\s*none/)
+  })
+})
+
 describe('★ the sheet answers the device, not only the window width', () => {
   const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -642,6 +689,9 @@ const STEP_OF: Readonly<Record<string, string>> = {
 /** Outside the five, because each is a valence the world holds rather than a voice of ours. */
 const SEMANTIC = ['ember', 'sage', 'rose', 'sky']
 
+/** Outside the five the other way: what WE are doing, which no valence may be borrowed for. */
+const STATE = ['current']
+
 /** The only colour literals the sheet may carry outside `:root`: a gradient stop and a shadow
  *  take no `var()` for their alpha. Each names the token it is a transparency of. */
 const ALPHAS: Readonly<Record<string, string>> = {
@@ -704,11 +754,12 @@ describe('★ four faces, ruled by role, and five colours', () => {
 
   it('★ is one of the five, a step of one, or a valence — never a sixth colour', () => {
     for (const name of Object.keys(COLOURS)) {
-      const classed = name in FIVE || name in STEP_OF || SEMANTIC.includes(name)
+      const classed =
+        name in FIVE || name in STEP_OF || SEMANTIC.includes(name) || STATE.includes(name)
       expect(classed, `${name} belongs to no class`).toBe(true)
     }
     expect(Object.keys(FIVE).length).toBe(5)
-    for (const named of [...Object.keys(FIVE), ...Object.keys(STEP_OF), ...SEMANTIC]) {
+    for (const named of [...Object.keys(FIVE), ...Object.keys(STEP_OF), ...SEMANTIC, ...STATE]) {
       expect(COLOURS, `${named} is classed here and declared nowhere`).toHaveProperty(named)
     }
   })
@@ -730,7 +781,7 @@ describe('★ four faces, ruled by role, and five colours', () => {
     const used = new Set([...SHEET.matchAll(/var\(--([a-z-]+)\)/g)].map((m) => m[1]!))
     const undeclared = [...used].filter(
       (n) =>
-        /^(cream|parchment|sand|ink|deep|night|honey|ember|sage|rose|sky)/.test(n) &&
+        /^(cream|parchment|sand|ink|deep|night|honey|ember|sage|rose|sky|current)/.test(n) &&
         !(n in COLOURS),
     )
     expect(undeclared).toEqual([])

@@ -2,10 +2,34 @@
 // GLM homes ran 15-20 s turns with timeouts all afternoon, while this one answered in 6.5 s with
 // one failure in 948 (r21). OpenRouter publishes no dated snapshot of it, so the bare id is the
 // only id there is; see the pins test for the dated-pin exception.
-export const MIND_MODEL = 'openai/gpt-5.6-luna' as const
+const LUNA = 'openai/gpt-5.6-luna'
+
+/** A trial route is ONE word, the same key the price table uses, so a model can never be swapped
+ *  onto the back ends pinned for the model before it. Those are an allow-list, so a model sent
+ *  to a home that does not serve it is refused on every call it makes. */
+function trialRoute(raw: string | undefined): { model: string; providers: string[] } | undefined {
+  if (raw === undefined || raw.trim().length === 0) return undefined
+  const at = raw.indexOf('@')
+  const model = raw.slice(0, at).trim()
+  const providers = raw
+    .slice(at + 1)
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0)
+  if (at < 0 || model.length === 0 || providers.length === 0)
+    throw new Error(
+      `LLM_MIND_ROUTE names a model and the back ends that may serve it, as model@Provider or ` +
+        `model@ProviderA,ProviderB. Got '${raw}'.`,
+    )
+  return { model, providers }
+}
+
+const TRIAL = trialRoute(process.env.LLM_MIND_ROUTE)
+
+export const MIND_MODEL: string = TRIAL?.model ?? LUNA
 // One home, not two: the `openai` tier is the one that was measured, and `openai/fast` bills 2x
 // for the same answer. Its strict decoder is why every schema passes `strictSchemaFaults`.
-export const PROVIDER_ORDER: string[] = ['OpenAI']
+export const PROVIDER_ORDER: string[] = TRIAL?.providers ?? ['OpenAI']
 // Everything the town cannot take back: the court's physics, the council's law, and the compiler
 // that turns a law into a rule. These think hardest; nothing per-tick or per-turn is on this list.
 export const RULING_CALLERS: readonly string[] = ['arbiter', 'council', 'law.compile']
@@ -43,7 +67,7 @@ export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   // 0.99, so the old row over-booked Wafer by half and raised 1,232 price-divergence alerts.
   // Fitted to 3,046 reconciled bills in r23, not read off the list: uncached input bills at
   // 0.25, the list's 0.20 ran the estimator 10% under and raised a stale-pin alert every run.
-  [route(MIND_MODEL, 'OpenAI')]: { input: 0.25, output: 1.2, cacheRead: 0.02 },
+  [route(LUNA, 'OpenAI')]: { input: 0.25, output: 1.2, cacheRead: 0.02 },
   [route(GLM, 'Wafer')]: { input: 0.1, output: 0.35, cacheRead: 0.02 },
   [route(GLM, 'DeepInfra')]: { input: 0.075, output: 0.25, cacheRead: 0.016 },
   [route(DEEPSEEK, 'DeepInfra')]: { input: 0.08, output: 0.18, cacheRead: 0.016 },
@@ -58,6 +82,15 @@ export const PRICE_PER_M_BY_ROUTE: Record<string, ModelPrices> = {
   [route(DEEPSEEK, 'AtlasCloud')]: { input: 0.44, output: 1.32, cacheRead: 0.028 },
   [route(DEEPSEEK, 'StreamLake')]: { input: 0.247016, output: 0.741048, cacheRead: 0.0078596 },
 }
+
+// Priced before served: the ceiling below is the maximum over these rows, so a route with no
+// row of its own could bill above it and the ledger would under-book the whole trial.
+for (const provider of PROVIDER_ORDER)
+  if (PRICE_PER_M_BY_ROUTE[route(MIND_MODEL, provider)] === undefined)
+    throw new Error(
+      `${route(MIND_MODEL, provider)} has no row in PRICE_PER_M_BY_ROUTE. Read the rate off ` +
+        `/api/v1/models/${MIND_MODEL}/endpoints and add one before this route serves a call.`,
+    )
 
 // The per-component maximum over every endpoint the ledger has ever routed to, peak legs
 // included, so an unpriced back end can only ever OVER-report.

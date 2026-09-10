@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flingFrom, trackDrag, type DragTrack } from '../render/fling.js'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
-import { stamp } from './stamp.js'
 import { PageBody } from './pages/index.js'
 import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
@@ -123,10 +122,6 @@ export function Paper({
     }
   }
 
-  // The dateline is the sheet's own clock: it moves with the town, or with the scrub.
-  const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
-  const date = stamp(tick)
-
   const title =
     key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
 
@@ -200,12 +195,10 @@ export function Paper({
           }}
         />
         <header className="paper-head">
-          {/* The masthead, then the dated rule under it: the tabs ARE the section line. */}
           <h2 className="paper-title" id="paper-title">
             {title}
           </h2>
           <div className="paper-dateline">
-            <p className="paper-date">{`${date.weekday} · DAY ${date.day} · ${date.season}`}</p>
             <div
               className="paper-tabs"
               role="tablist"
@@ -242,10 +235,8 @@ export function Paper({
             <p className="stage-sr" id="paper-tabs-keys">
               Left and right arrow keys move between pages
             </p>
-            {/* One cell, so the dateline's two flanks balance and the tabs are centred on the
-                masthead rather than on whatever the clock and the close word leave. */}
+            {/* The narrow dateline lifts this flank to row 1, off the tabs' own row. */}
             <div className="paper-marginalia">
-              <p className="paper-clock">{date.time}</p>
               <button type="button" className="paper-close" onClick={onClose}>
                 close<span className="paper-close-key"> · Esc</span>
               </button>

@@ -328,9 +328,13 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       res,
       cache.json('marks', () => ({
         throughTick: deps.mirror.state().tick,
-        chapters: readOrEmpty<ChapterRow>(
+        // A chapter is dated to a day, and its own scenes hold the only minute the world ever
+        // wrote for it. A chapter that kept no scene keeps no minute, and says so with null.
+        chapters: readOrEmpty<{ day: number; title: string; startTick: number | null }>(
           deps.narratorDb,
-          'SELECT day, title FROM chapters ORDER BY day',
+          `SELECT c.day AS day, c.title AS title, MIN(s.start_tick) AS startTick
+           FROM chapters c LEFT JOIN scenes s ON s.day = c.day
+           GROUP BY c.day ORDER BY c.day`,
         ),
         moments: readOrEmpty<{ day: number; startTick: number }>(
           deps.narratorDb,

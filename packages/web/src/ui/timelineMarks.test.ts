@@ -21,6 +21,7 @@ import {
   type MarkKind,
   type MarkSources,
 } from './timelineMarks.js'
+import { marksOfDay } from '../stage/DayBar.js'
 import { GAMIFICATION_BAN } from './townStats.js'
 
 const DAY = 1440
@@ -360,6 +361,40 @@ describe('the ninth mark — a discovery', () => {
       events: [{ tick: 10, type: 'agent_died' }],
     })
     expect(without.map((m) => m.kind)).toEqual(['death'])
+  })
+})
+
+// A chapter used to stand at 00:00 of its day on every track, which is the screen stating a
+// minute the world never wrote. The narrator's own scenes hold that minute, and the day track
+// drops what still has none rather than guess at it.
+describe('a chapter stands where its first scene did', () => {
+  const chapter = (c: MarkSources['chapters'][number]): Mark =>
+    marksFrom({
+      chapters: [c],
+      milestones: [],
+      moments: [],
+      changes: [],
+      events: [],
+      discoveries: [],
+    })[0]!
+
+  it('stands at the minute its first scene opened, and is no longer dated to the day alone', () => {
+    const m = chapter({ day: 3, title: 'The storehouse fills', startTick: 3 * DAY + 415 })
+    expect(m.tick).toBe(3 * DAY + 415)
+    expect(m.dayOnly).toBeUndefined()
+    expect(marksOfDay([m], 3 * DAY)).toEqual([m])
+  })
+
+  it('keeps the day track off a chapter the world gave no minute', () => {
+    for (const undated of [
+      { day: 3, title: 'The quiet day' },
+      { day: 3, title: 'The quiet day', startTick: null },
+    ]) {
+      const m = chapter(undated)
+      expect(m.tick, JSON.stringify(undated)).toBe(3 * DAY)
+      expect(m.dayOnly).toBe(true)
+      expect(marksOfDay([m], 3 * DAY)).toEqual([])
+    }
   })
 })
 

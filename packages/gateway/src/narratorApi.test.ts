@@ -146,6 +146,12 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
         'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
       )
       .run(1, 'What the Fire Took', 'It burned.', '[]', '[]')
+    // A day the narrator titled and kept no scene for: the world holds no minute for it.
+    ndb
+      .prepare(
+        'INSERT INTO chapters (day, title, text, citations, scene_ids) VALUES (?, ?, ?, ?, ?)',
+      )
+      .run(3, 'The Quiet Day', 'Little was said.', '[]', '[]')
     ndb
       .prepare(
         `INSERT INTO milestones (kind, label, event_seq, day, tick, tier, domain, agent_ids,
@@ -174,6 +180,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     )
     scene.run(0, 10, 60, '[1,2]', '["alice","bob"]', 'the plaza')
     scene.run(1, 1440, 1500, '[3]', '["cara"]', null)
+    scene.run(1, 1500, 1560, '[4]', '["cara"]', null)
     scene.run(2, 2880, 2900, '[]', '[]', 'the riverbank') // a day with no chapter written
     const publish = ndb.prepare(
       'INSERT INTO publications (day, kind, title, body, citations, subject_id) VALUES (?, ?, ?, ?, ?, ?)',
@@ -303,6 +310,7 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(await (await fetch(`${base}/api/chapters`)).json()).toEqual([
       { day: 0, title: 'The First Morning', text: 'They woke.', seen: [[]] },
       { day: 1, title: 'What the Fire Took', text: 'It burned.', seen: [[]] },
+      { day: 3, title: 'The Quiet Day', text: 'Little was said.', seen: [[]] },
     ])
   })
 
@@ -431,25 +439,40 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     expect(res.status).toBe(200)
     const body = (await res.json()) as {
       throughTick: number
-      chapters: { day: number; title: string }[]
+      chapters: { day: number; title: string; startTick: number | null }[]
       moments: { day: number; startTick: number }[]
       changes: { tick: number }[]
       events: { tick: number; type: string }[]
     }
     expect(body.throughTick).toBeGreaterThanOrEqual(60)
-    // a mark is a label on a track: the titles, never the prose `/api/chapters` carries
+    // a mark is a label on a track: the titles, never the prose `/api/chapters` carries.
+    // A chapter stands at the minute its first scene opened, and day 1's is the earlier of two.
     expect(body.chapters).toEqual([
-      { day: 0, title: 'The First Morning' },
-      { day: 1, title: 'What the Fire Took' },
+      { day: 0, title: 'The First Morning', startTick: 10 },
+      { day: 1, title: 'What the Fire Took', startTick: 1440 },
+      { day: 3, title: 'The Quiet Day', startTick: null },
     ])
     // the firsts are `/api/milestones`' to serve; a second copy here is a second one to keep right
     expect(body).not.toHaveProperty('milestones')
     expect(body.moments).toEqual([
       { day: 0, startTick: 10 },
       { day: 1, startTick: 1440 },
+      { day: 1, startTick: 1500 },
       { day: 2, startTick: 2880 },
     ])
     expect(body.changes).toEqual([]) // no agent memory dir on this world
+  })
+
+  // Position on a time track is a statement of time, and a chapter is dated to a day. Its own
+  // first scene is the only minute the world ever wrote for it, so that is where the mark stands.
+  it('dates a chapter by its first scene, and leaves a chapter with no scenes undated', async () => {
+    const body = (await (await fetch(`${base}/api/timeline/marks`)).json()) as {
+      chapters: { day: number; startTick: number | null }[]
+    }
+    expect(body.chapters.find((c) => c.day === 0)?.startTick).toBe(10)
+    // Day 1 opened two scenes: the mark stands at the first of them, never the last.
+    expect(body.chapters.find((c) => c.day === 1)?.startTick).toBe(1440)
+    expect(body.chapters.find((c) => c.day === 3)?.startTick).toBeNull()
   })
 
   it('sends only the events the town would remember, and nothing else', async () => {

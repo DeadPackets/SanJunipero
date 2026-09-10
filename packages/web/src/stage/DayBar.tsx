@@ -8,7 +8,7 @@ import { townAsleep } from '../ui/directorCut.js'
 import { WEATHER_GLYPH } from '../ui/townStats.js'
 import { skyKind, skyTemp, skyWord } from '../ui/skyModel.js'
 import { useFrameCoalesced } from '../ui/onFrame.js'
-import { useFeed, usePolled } from '../ui/useEndpoint.js'
+import { endpoint, useFeed, usePolled } from '../ui/useEndpoint.js'
 import { milestonesFeed } from '../ui/feeds.js'
 import {
   EMPTY_SOURCES,
@@ -67,12 +67,11 @@ export function stateSaysSky(word: StampWord, kind: string): boolean {
   return word === 'LIVE' && SEVERE.has(kind)
 }
 
-/** ★ ONE WORD for what the town is: a clock nobody can trust, then where the picture came from,
- *  then the world's own state. Never a number, because no hour wakes a body or ends a storm. */
-export function stateField(word: StampWord, kind: string, asleep: string | null): string {
-  if (stateSaysSky(word, kind)) return kind.toUpperCase()
-  if (word !== 'LIVE') return word
-  return asleep ?? 'LIVE'
+/** ★ ONE WORD for where the picture came from, and never a number, because no hour wakes a body
+ *  or ends a storm. It says nothing about the town itself: a town asleep is its own mark beside
+ *  this one, so neither fact can take the other's room. */
+export function stateField(word: StampWord, kind: string): string {
+  return stateSaysSky(word, kind) ? kind.toUpperCase() : word
 }
 
 /** ★ Pause is a scrub and resume is a replay: the socket already speaks both, so the one
@@ -131,6 +130,9 @@ const at = (frac: number): CSSProperties =>
   ({ '--at': `${(Math.min(1, Math.max(0, frac)) * 100).toFixed(3)}%` }) as CSSProperties
 
 const NO_FIRSTS: MarkSources['milestones'] = []
+/** A stream frame has no track to draw a mark on, so it reads neither list. A reader with no
+ *  url fetches nothing and times nothing, which is what a frame that runs for days is owed. */
+const NO_MILESTONES: typeof milestonesFeed = endpoint(null)
 /** One minute of the day, for the arrow keys. */
 const KEY_STEP = 1
 
@@ -190,6 +192,7 @@ export function DayBar({
   onAt,
   autoCut,
   handbackAt,
+  broadcast = false,
 }: {
   store: WorldStore
   link: LinkState
@@ -197,6 +200,7 @@ export function DayBar({
   onAt: (tick: number) => void
   autoCut: boolean
   handbackAt: () => number | null
+  broadcast?: boolean
 }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -218,8 +222,9 @@ export function DayBar({
   const act = useSyncExternalStore(store.subscribe, actNow, actNow)
 
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
-  const sources = usePolled(MARKS_URL, markSources, MARKS_POLL_MS).data ?? EMPTY_SOURCES
-  const firsts = useFeed(milestonesFeed).data ?? NO_FIRSTS
+  const sources =
+    usePolled(broadcast ? null : MARKS_URL, markSources, MARKS_POLL_MS).data ?? EMPTY_SOURCES
+  const firsts = useFeed(broadcast ? NO_MILESTONES : milestonesFeed).data ?? NO_FIRSTS
   const from = dayStart(tick)
   const marks = useMemo(
     () =>
@@ -336,7 +341,8 @@ export function DayBar({
           />
           {sky}
         </p>
-        <p className="day-bar-state">{stateField(word, kind, asleep)}</p>
+        <p className="day-bar-state">{stateField(word, kind)}</p>
+        {asleep !== null && <p className="day-bar-state">{asleep}</p>}
         <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
       </div>
     </div>

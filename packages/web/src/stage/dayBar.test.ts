@@ -1,6 +1,9 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { createElement } from 'react'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, createElement, type ReactElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { DAYS_PER_SEASON, MINUTES_PER_DAY } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
@@ -23,7 +26,8 @@ import {
   trackTick,
 } from './DayBar.js'
 
-const CSS = readFileSync(new URL('../ui/chrome.css', import.meta.url), 'utf8')
+// happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
+const CSS = readFileSync(join(import.meta.dirname, '../ui/chrome.css'), 'utf8')
 const at = (h: number, min = 0): number => h * 60 + min
 const DAY_12 = 12 * MINUTES_PER_DAY + at(9, 40)
 const EDGE = 400 * MINUTES_PER_DAY
@@ -43,17 +47,52 @@ const townAt = (tick: number, over: Partial<WorldState> = {}): WorldStore => ({
     }) as unknown as WorldState,
 })
 
+/** All three at once: the town asleep, a storm running, and a viewer watching it back. */
+const asleepInAStormWatchedBack = (): WorldStore => ({
+  ...townAt(DAY_12, {
+    weather: { kind: 'storm', temperatureC: 4 },
+    agents: { a: body(true, true) },
+  } as never),
+  getMode: () => ({ live: false, replaying: false, tick: DAY_12 }),
+})
+
+const props = (store: WorldStore, link: LinkState, broadcast: boolean) => ({
+  store,
+  link,
+  handle: null,
+  onAt: () => undefined,
+  autoCut: true,
+  handbackAt: () => null,
+  broadcast,
+})
+
 const bar = (store: WorldStore, link: LinkState = 'online'): string =>
-  renderToStaticMarkup(
-    createElement(DayBar, {
-      store,
-      link,
-      handle: null,
-      onAt: () => undefined,
-      autoCut: true,
-      handbackAt: () => null,
-    }),
-  )
+  renderToStaticMarkup(createElement(DayBar, props(store, link, false)))
+
+/** Every word the band is saying about the town, in the order a reader meets them. */
+const marksOf = (html: string): string[] =>
+  [...html.matchAll(/class="day-bar-state">([^<]*)</g)].map((m) => m[1]!)
+
+const roots: { unmount: () => void }[] = []
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+async function mount(el: ReactElement): Promise<void> {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  roots.push(root)
+  await act(async () => {
+    root.render(el)
+  })
+}
+
+afterEach(async () => {
+  await act(async () => {
+    for (const root of roots.splice(0)) root.unmount()
+  })
+  document.body.replaceChildren()
+  vi.unstubAllGlobals()
+})
 
 // ── ★ ONE BAR, ONE CLOCK ──────────────────────────────────────────────────────────────────
 // Five boxes printed the town's date or time on one frame, from four formatters. One owns it.
@@ -105,7 +144,7 @@ describe('★ the day bar the viewer actually gets', () => {
     const html = bar(townAt(DAY_12, { weather: { kind: 'storm', temperatureC: 4 } }))
     expect(html.match(/STORM/g)).toHaveLength(1)
     expect(html).toContain('>4°</p>')
-    expect(html).toContain('class="day-bar-state">STORM<')
+    expect(marksOf(html)).toContain('STORM')
   })
 
   // ★ THE WORLD HOLDS THE STORM IN EVERY STATE. The strip assumed the state field had taken it,
@@ -117,7 +156,7 @@ describe('★ the day bar the viewer actually gets', () => {
       getMode: () => ({ live: false, replaying: false, tick: DAY_12 }),
     }
     expect(bar(back)).toContain('STORM 4°')
-    expect(bar(back)).toContain('class="day-bar-state">REPLAY<')
+    expect(marksOf(bar(back))).toContain('REPLAY')
     expect(bar(stormy, 'reconnecting')).toContain('STORM 4°')
   })
 })
@@ -126,28 +165,36 @@ describe('★ the day bar the viewer actually gets', () => {
 // A countdown may only stand where the world holds a deadline, and it holds none.
 
 describe('★ what the town says it is', () => {
-  it('★ is one word, and that word is never a number', () => {
-    for (const [word, kind, asleep] of [
-      ['LIVE', 'sunny', null],
-      ['LIVE', 'storm', null],
-      ['LIVE', 'sunny', 'ASLEEP'],
-      ['REPLAY', 'storm', 'ASLEEP'],
-      ['OFFLINE', 'sunny', null],
-      ['PAUSED', 'sunny', null],
-    ] as const) {
-      const field = stateField(word, kind, asleep)
-      expect(field.split(' '), `${word}/${kind}`).toHaveLength(1)
-      expect(field, `${word}/${kind}`).not.toMatch(/\d/)
+  it('★ every mark is one word, and no word is ever a number', () => {
+    for (const store of [
+      townAt(DAY_12),
+      townAt(DAY_12, { weather: { kind: 'storm', temperatureC: 4 } }),
+      townAt(at(2), { agents: { a: body(true, true) } } as never),
+      asleepInAStormWatchedBack(),
+    ]) {
+      const marks = marksOf(bar(store))
+      expect(marks.length).toBeGreaterThan(0)
+      for (const mark of marks) {
+        expect(mark.split(' '), mark).toHaveLength(1)
+        expect(mark, mark).not.toMatch(/\d/)
+      }
     }
   })
 
-  it('★ puts a clock nobody can trust first, then the picture, then the world', () => {
-    expect(stateField('OFFLINE', 'storm', 'ASLEEP')).toBe('OFFLINE')
-    expect(stateField('REPLAY', 'storm', 'ASLEEP')).toBe('REPLAY')
-    expect(stateField('PAUSED', 'storm', null)).toBe('PAUSED')
-    expect(stateField('LIVE', 'storm', 'ASLEEP')).toBe('STORM')
-    expect(stateField('LIVE', 'sunny', 'ASLEEP')).toBe('ASLEEP')
-    expect(stateField('LIVE', 'sunny', null)).toBe('LIVE')
+  // ★ THE SCREEN MAY NEVER REFUSE A FACT THE WORLD HOLDS. A replay, a storm and a town asleep
+  // are three independent facts that ranking put through one slot: two of the three went unsaid.
+  it('★ says all three when the world holds all three', () => {
+    const html = bar(asleepInAStormWatchedBack())
+    expect(html, 'the sky').toContain('STORM 4°')
+    expect(marksOf(html), 'the picture, and what the town is doing').toEqual(['REPLAY', 'ASLEEP'])
+  })
+
+  it('★ the state field says where the picture came from, never what the town is doing', () => {
+    expect(stateField('OFFLINE', 'storm')).toBe('OFFLINE')
+    expect(stateField('REPLAY', 'storm')).toBe('REPLAY')
+    expect(stateField('PAUSED', 'storm')).toBe('PAUSED')
+    expect(stateField('LIVE', 'storm')).toBe('STORM')
+    expect(stateField('LIVE', 'sunny')).toBe('LIVE')
   })
 
   it('★ reaches the viewer as a field in the bar, never as a slab over the town', () => {
@@ -163,7 +210,7 @@ describe('★ what the town says it is', () => {
     expect(sleepField).toHaveLength(1)
     for (const h of [0, 3, 6, 12, 18, 23]) {
       const html = bar(townAt(at(h), { agents: { a: body(true, true) } } as never))
-      expect(/class="day-bar-state">([^<]*)</.exec(html)?.[1], `${h}:00`).toBe('ASLEEP')
+      expect(marksOf(html), `${h}:00`).toContain('ASLEEP')
     }
   })
 
@@ -388,6 +435,26 @@ function classesUnder(html: string, cls: string): string[] {
 // selector counts: reading only the first is how a hidden caption once measured 6.00px.
 
 describe('★ the bar a stream viewer is left with', () => {
+  // ★ A STREAM HAS NO HANDS. The track is `display: none` under `[data-broadcast='on']`, so both
+  // reads drew nothing, on a frame that runs for days: 2 URLs every 30 s, for ever.
+  it('★ asks the gateway for nothing it has no track to draw', async () => {
+    const asked: string[] = []
+    vi.stubGlobal('fetch', (url: string) => {
+      asked.push(url)
+      return Promise.reject(new Error('no gateway in a test'))
+    })
+    await mount(createElement(DayBar, props(townAt(DAY_12), 'online', true)))
+    expect(asked, 'a stream frame reads neither list').toEqual([])
+    await act(async () => {
+      for (const root of roots.splice(0)) root.unmount()
+    })
+    await mount(createElement(DayBar, props(townAt(DAY_12), 'online', false)))
+    expect(asked.sort(), 'a viewer who can scrub still gets the marks').toEqual([
+      '/api/milestones',
+      '/api/timeline/marks',
+    ])
+  })
+
   it('★ names no caption the stream frame has taken out of the bar', () => {
     const gone = [...CSS.matchAll(/([^{}]*)\{[^}]*display: none/g)]
       .flatMap(([, list]) => [...(list ?? '').matchAll(/\[data-broadcast='on'\] \.([\w-]+)/g)])

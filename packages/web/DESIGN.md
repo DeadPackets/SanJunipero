@@ -13,19 +13,40 @@ the one motion table; `paper/pageModel.ts` is the one page table. Tests pin each
 
 All in `:root` at the top of `ui/chrome.css`.
 
-| Role | Token | Value |
+**One colour, one question.** The five below each mean one thing, a step is the same colour at
+another strength, and everything under them is semantic: a valence the world holds, or the one
+state that is ours. `--ember` was read at nine sites answering six questions at once — is this
+body ill, is this the one I am in, which material is this first cut from, is a filter on, where
+is the tape, how much is at stake — and nobody can learn a colour like that. It is down to two
+sites and one question, how hot, plus the material a first is cut from that takes its name, and
+`ui/contrast.test.ts` fails if a third site reads it. `--honey` is the next one: 47 sites, and
+under the accent it also carries warm stakes, a changed law, a stopped run and gilded, so its
+own split is the next lane's.
+
+| Role, and the one question it answers | Token | Value |
 |---|---|---|
 | paper, lit | `--cream` | `#FFF6E9` |
 | paper | `--parchment` | `#F6E8D5` |
 | paper, shaded | `--sand` | `#E8D5BC` |
 | ink | `--ink` | `#43394A` |
-| ink, quiet | `--ink-quiet` | `#5F5568` — 6.57:1 on cream, 4.91:1 on sand |
+| ink, quiet | `--ink-quiet` | `#5F5568` — 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand |
 | ground, dark | `--deep` / `--night` | `#241F2B` / `#322B38` |
-| cream, quiet | `--cream-quiet` | `#C4B8AE` — 8.28:1 on deep |
-| the one accent | `--honey` / `--honey-l` | `#F2C879` / `#F8DCA2` |
-| alarm | `--ember` | `#E8785A` |
-| state | `--sage` `--rose` | `#93B573` `#C47876` |
+| cream, quiet | `--cream-quiet` | `#C4B8AE` — 8.28:1 on deep, 7.03:1 on night |
+| the accent, this one here, and the four states that still borrow it | `--honey` / `--honey-l` | `#F2C879` / `#F8DCA2` |
+| the nameplate's own wood | `--honey-deep` | `#7E512B` — cream on it is 6.33:1 |
 | the feed's zebra | `--parchment-zebra` | `#F1E1CC` — the sand-over-parchment composite, computed once |
+| **how hot**: the top of the stakes band, and the material a first is cut from | `--ember` | `#E8785A` |
+| a word ember cannot be set in | `--ember-ink` | `#9E3B2B` — ember is 2.70:1 on cream, this is 6.30:1 |
+| **the good half** of a valence: a gain, a full need, a warm tie | `--sage` / `--sage-pale` | `#93B573` / `#DCE8C8` |
+| **the bad half**: unwell, a low need, a cost, a strained tie | `--rose` / `--rose-pale` | `#C47876` / `#F2C6C2` |
+| **the weather**, and nothing else | `--sky` | `#3E6786` |
+| **the one you are in**, and the control that is on | `--current` | `#AA7ACD` — the ink's own hue at reading strength: 4.88:1 under deep, 3.08:1 on cream |
+
+`--current` is us and not the world, which is why it is the ink's hue and not a warm one: six
+sites read it — the feed entry, the moment card, the discovery leaf, the room door, the filtered
+count and the playhead — and every one of them answers *this one, now*. Illness keeps the rose it
+already wore and its rail is cream at 3.12:1, where the ember rail it replaces was **1.15:1** and
+could not be seen at all.
 
 `--water`, `--stone`, `--panel` and `--accent` were read by no rule in the sheet and are gone.
 
@@ -42,9 +63,11 @@ edges as `2px solid CanvasText`.
 `--f-7: 28px` — seven steps, where 12.48, 12.8 and 13 used to be three. `--f-1` is the floor and
 belongs to stamps and pixel chips; a *word* starts at `--f-2`.
 
-Sheet geometry: `--paper-w: min(78%, 760px)`, `--paper-h: min(66%, 100dvh - 96px)`; under 640px
-`--paper-w-narrow: 96%`, `--paper-h-narrow: 80%` (78% of a 390px phone is 304px, which no roster
-row fits in). The town behind it dims by `--dim: 0.28`. Every mark that hangs off an edge takes
+Sheet geometry: `--paper-w: min(78%, 760px)`, `--paper-h: 66%` **of the sheet's own grid row**,
+which starts under the band and the arms — the depth of those was written out by hand at four
+sites and every one was a different number. Under 640px `--paper-w-narrow: 96%` and
+`--paper-h-narrow: 100%` (78% of a 390px phone is 304px, which no roster row fits in), and above
+1920px `--paper-w` goes to 1040px. The town behind it dims by `--dim: 0.4`. Every mark that hangs off an edge takes
 `--mark-inset: clamp(16px, 3vmin, 40px)`, guarded by `max(…, env(safe-area-inset-*))` — a 4% inset
 was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 
@@ -57,8 +80,12 @@ was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 | Fraunces | `--font-title` | paper headings |
 | system mono | `--font-data` | law paths, stamps, every column of figures |
 
-Only **400 and 600** of Manrope are loaded. Six marks asked for 500 and were served 400 by the
-browser's own font matching; every mark that stands over the town takes 600, a weight that exists.
+**A weight the sheet does not load is not the weight that renders.** Manrope loads 400 and 600,
+Fraunces 500 and 700, Silkscreen 400 and 700 — so CSS font matching served Manrope 500 as 400 and
+Fraunces 600 as 700, and the sheet said one thing while the screen said another.
+`ui/chromeType.test.ts` now reads the loaded weights out of `main.tsx` and fails on any rule that
+names a family and a weight together and asks for a pair the browser would have to substitute. Every mark that stands over the picture takes 600, a weight
+that exists; a mark carrying its own parchment ground may take 400.
 
 The arms are the one place off the seven-step ladder: `--f-sign` is 24px and `--f-sign-wide` 32,
 whole multiples of the 8px grid the pixel face is drawn on, so every stroke lands on the plank's
@@ -82,20 +109,31 @@ Two column tracks. `frame` is the inner width, inset by `--mark-inset` or the sa
 is the larger; `edge` is the window's own, and the band is the one thing that takes it. The middle
 row, `open`, is the slack: a mark that hangs over the picture rather than standing in a row of its
 own spans it, so it can make no row taller. Three rows carry a floor instead — the corner rows at
-44px and the cue's at two lines — so a cue arriving may not move the caption over it, and a button
-that only exists inside a room may not move the card under it.
+44px and the cue's at `--cue-floor` — so a cue arriving may not move the caption over it, and a
+button that only exists inside a room may not move the card under it.
+
+**The cue's floor is four of its own line boxes plus the one gap the scene variant sets**
+(`calc(4 * 1.5 * var(--f-2) + var(--s-4))`, 86px). The cue is one news line over one doing line
+and either may wrap, so two lines held the caption still and three did not: measured in a headless
+Chromium at 1440×844, the caption stood at 581 for one and two lines and at 561.5 for three.
+It stands at 534 for one, two, three and four now, and at 543.3 for the same four at 500×844.
+Under `max-height: 620px` the floor goes back to two lines: a landscape phone has 75px between
+the caption and the corner stack, and reserving four there pushes the frame off its own bottom
+edge. A cue past four lines still moves the caption, and there is no floor that holds a law's own
+quoted text at 500px wide.
 
 | Area | What stands in it |
 |---|---|
 | `bar` | the Day Bar, the window's full width, over the top inset |
 | `head` | the frame meter (`Shift+P`) |
 | `left-1` · `right-1` | Back to town · Return to now |
-| `left-2` | the scene card |
+| `left-2` | the scene card, hanging over the slack row; hidden while the cold open stands |
 | `open` | the slack row; the cold open stands at the top of it |
 | `third` | the lower third, and the replay card |
-| `cue` | the director cue |
+| `cue` | the director cue, on a floor of four of its own lines |
 | `sound` · `wisp` · `foot-left` | the corner cluster, one 44px slab to a row, bottom up: the key map, thought bubbles, sound |
 | `foot-right` | the signpost |
+| `edge` × `head-end / -1` | the paper, which is why it measures no band and sums no arm |
 
 **The one exemption is the key map**, which is `position: fixed; inset: 0` and centred. It is a
 modal sheet over the whole app, not a mark over the town, and it is the only thing allowed to
@@ -129,7 +167,8 @@ a cut, then hands the same shot to the card, the caption and the camera. Nothing
 gets a second opinion about who is in frame, so nothing on the stage can name somebody the camera
 is not on. The two lines a visitor arrives to (`ui/coldOpen.ts`, `.cold-open` in the frame's own
 `open` row) are the fourth: they stand at the top of the picture until the first cut, the first
-hand on the camera, or twenty seconds.
+hand on the camera, or twelve seconds and a 300ms fade. The scene card takes the other half of
+that corner, so it waits while the cold open stands — they overlapped 52px whenever both were up.
 
 **The sun and the moon are not drawn on the chrome at all.** `ui/skyModel.ts` still puts one
 traveller on one curve — the sun from 05:00 to 21:00, then the moon over the same hours — and the
@@ -268,20 +307,25 @@ the sheet's own instant snap.
 
 ## Breakpoints
 
-One media query in the whole sheet was a width-only 640px, and **height is what a landscape phone runs
-out of**. Several now, and the sheet's own lists read the sheet rather than the window.
+One media query in the whole sheet was a width-only 640px, and **height is what a landscape phone
+runs out of**. Twelve distinct queries now over nineteen blocks, plus twenty-five motion guards,
+and the sheet's own lists read the sheet rather than the window.
 
 | Query | What it is for |
 |---|---|
-| `max-width: 640px` | the sheet takes 96% × 80%; the arms move to the top edge as a 2×2 block |
+| `max-width: 640px` | the sheet takes 96% × 100% of its own row; the arms move to the top edge as a 2×2 block |
+| `max-width: 900px` | the band drops the weekday, the weather and the camera chip, and its three columns become auto · 1fr · auto |
+| `max-width: 480px` | the paper's masthead steps down one, to `--f-6` |
 | `max-width: 1919.98px` | the head becomes a grid — date and marginalia on one row, tabs scrolling along the next. With the weekday in the dateline the one-row section line needs ~723px of head, which only the 1040px sheet above 1920px has |
-| `641–1000px` | with the sheet open the arms take the top-left corner, 2×2: the sheet at the left edge leaves 146px beside it at 768 and the longest arm is 192px |
+| `min-width: 700px` | the caption and the cue stop 320px short of the corner, so neither ever reaches the signpost |
+| `max-width: 1000px` **or** `max-height: 620px` | with the sheet open the arms take the top-left corner, 2×2: the sheet at the left edge leaves 146px beside it at 768 and the longest arm is 192px |
 | `641–1400px` | the sheet steps left far enough to clear the arms, statically, so nothing moves when it opens |
-| `max-height: 620px` | the sheet takes `100dvh - 64px` and 96% of the width; the post is hidden; the arms lie in a row above it |
+| `max-height: 620px` | the sheet takes 100% of its own row and `min(96%, 1040px)` of the width; the post is hidden; the masthead steps to `--f-5`; the cue's floor goes back to two lines |
+| `641px+` **and** `max-height: 620px` | the arms lie in a row rather than a 2×2 block |
 | `min-width: 1920px` | `--paper-w` to 1040px; the signpost's `--px` to 3 — three screen pixels per drawn one, and the label to 24px (`scale: 1.5` resampled the 2× layer and left the outline one row thick, then two) |
 | `hover: none` | no lift survives the tap; the mark tips open on focus; the close word drops `· Esc` |
 | `forced-colors: active` | every `box-shadow` edge comes back as `2px solid CanvasText` |
-| `@container` on `.paper-sheet` | roster reservations above 26rem, two roster columns above 46rem |
+| `@container` on `.feed` and `.paper-sheet` | the feed stamp folds under 26rem; roster reservations above 26rem, two roster columns above 46rem; the front page splits at 40rem |
 
 **With the sheet open the signpost stays whole at every width** — 0 px² of overlap measured at
 320, 375, 390, 768, 844×390, 1024, 1440 and 2560, against 36,352 px² (100% hidden) at ≤390 before.

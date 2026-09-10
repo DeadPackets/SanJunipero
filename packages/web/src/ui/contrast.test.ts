@@ -42,6 +42,21 @@ export function ruleBody(css: string, selector: string): string {
 const T = tokens(CSS)
 const AA = 4.5
 
+/** The colour wheel angle of a hex, so two roles can be asked how far apart they read. */
+function hue(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ]
+  const hi = Math.max(r, g, b)
+  const lo = Math.min(r, g, b)
+  if (hi === lo) return 0
+  const d = hi - lo
+  const a = hi === r ? (g - b) / d + (g < b ? 6 : 0) : hi === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return a * 60
+}
+
 describe('the palette these fixes are measured against', () => {
   it('reads the tokens out of the sheet', () => {
     expect(T.ink).toBe('#43394A')
@@ -141,8 +156,79 @@ describe('the filtered-count badge on the shut bonds key', () => {
     const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
     const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
     expect(fg).toBe('deep')
-    expect(bg).toBe('ember')
+    expect(bg).toBe('current')
     expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
+  })
+})
+
+// ── ★ ONE COLOUR, ONE QUESTION ────────────────────────────────────────────────────────────
+// --ember was read at nine sites answering six questions: is this body ill, is this the one I
+// am in, which material is this first cut from, is a filter on, where is the tape, and how much
+// is at stake. Nobody can learn a colour that answers six questions.
+
+/** The sites that paint each role's colour, and the one question it answers there. */
+const ROLES: Readonly<Record<string, readonly string[]>> = {
+  // the one you are in, and the control that is on
+  current: [
+    ".feed-jump[aria-current='true']",
+    ".moment-card[data-open='yes']",
+    ".discovery-leaf[aria-current='true']",
+    ".room-door[aria-pressed='true']",
+    '.key-filtered',
+    '.playhead',
+  ],
+  // how hot: the top of the stakes band, and the material cut for a mind's own working out
+  ember: [".stage-scene-stamp[data-stakes='hot']", ".first-plate[data-material='ember']"],
+}
+
+/** Every selector in the sheet whose own declarations read `--name`. */
+function readersOf(css: string, name: string): string[] {
+  const out: string[] = []
+  for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!(body ?? '').includes(`var(--${name})`)) continue
+    for (const one of (sel ?? '').split(',')) out.push(one.trim().split('\n').at(-1)!.trim())
+  }
+  return [...new Set(out)]
+}
+
+describe('★ a colour that means two things means neither', () => {
+  it.each(Object.entries(ROLES))(
+    '★ --%s is read by its own role and by nothing else',
+    (name, sites) => {
+      expect(readersOf(CSS, name).sort()).toEqual([...sites].sort())
+    },
+  )
+
+  it('★ paints the two roles in two colours a viewer can tell apart', () => {
+    expect(T.current).not.toBe(T.ember)
+    const apart = Math.min(
+      Math.abs(hue(T.current!) - hue(T.ember!)),
+      360 - Math.abs(hue(T.current!) - hue(T.ember!)),
+    )
+    expect(apart, `--current is ${apart.toFixed(0)}° off --ember`).toBeGreaterThanOrEqual(60)
+  })
+
+  it('★ clears AA under the deep it carries, and the 3:1 rail floor on the cream it rules', () => {
+    expect(contrast(T.deep!, T.current!)).toBeGreaterThanOrEqual(AA)
+    expect(contrast(T.current!, T.cream!)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('records the ember it took the six questions off, so they cannot come back', () => {
+    expect(contrast(T.ember!, T.cream!), 'the rail ember drew on cream').toBeCloseTo(2.7, 1)
+  })
+})
+
+// The rail is the second channel on "ill", and ember on rose was 1.15:1 — a channel nobody
+// could see, asserting a redundancy the picture never had.
+describe('★ the rail that says unwell can actually be seen', () => {
+  it.each(['.badge.ill', '.rr-cond.ill'])('%s draws a rail at 3:1 on its own rose', (selector) => {
+    const rail = /border-left:[^;]*var\(--([\w-]+)\)/.exec(ruleBody(CSS, selector))?.[1]
+    expect(rail, `${selector} draws no rail`).toBeDefined()
+    expect(contrast(T[rail!]!, T.rose!)).toBeGreaterThanOrEqual(3)
+  })
+
+  it('records the rail it replaced, so it cannot come back', () => {
+    expect(contrast(T.ember!, T.rose!)).toBeCloseTo(1.15, 2)
   })
 })
 

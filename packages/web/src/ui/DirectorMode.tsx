@@ -11,7 +11,6 @@ import { sceneBox, sceneShot } from '../render/sceneFraming.js'
 import type { TensionTurn } from '../render/tension.js'
 import { CUT_MIN_MS, type CameraClaim, cameraClaim, townAsleep } from './directorCut.js'
 import { cutFloor, quietRound } from './autoCut.js'
-import { openingShot } from './coldOpen.js'
 import {
   driftAt,
   nextShot,
@@ -347,7 +346,9 @@ export function DirectorMode({
   const [floor] = useState(() => cutFloor<StakeScore>(setHeld, keyOf))
   const [round] = useState(() => quietRound())
   const [hold] = useState(() => shotHold())
-  const [openShot] = useState(() => openingShot())
+  // Spent by the establishing shot a viewer actually got, never by asking. Asked in the render
+  // body it went on a shot nobody saw: a render React threw away, or a town with nobody outside.
+  const [opened, setOpened] = useState(false)
   useEffect(() => floor.clear, [floor])
   // The one moment worth pushing over: a give_way the world recorded after three presses. The
   // fold is the store's, so a remount cannot take the turn signal down with it.
@@ -389,8 +390,9 @@ export function DirectorMode({
   const wantFollowed = want.followed
   // Never before there is a town to look at: a claim that asks for no shot at all would spend
   // the session's one opening on nothing.
+  const wantsOpening = opening && awake && claimBy !== 'hold' && !opened
   const wantKind = shotKindFor({
-    opening: openShot(opening && awake && claimBy !== 'hold'),
+    opening: wantsOpening,
     peak: claimBy === 'cut' && (held?.score ?? 0) >= PEAK_SCORE,
     indoors: wantRoom !== null,
     walking: wantFollowed !== null && state?.agents[wantFollowed]?.activity?.path !== undefined,
@@ -417,6 +419,10 @@ export function DirectorMode({
   const isCut = on?.of.isCut ?? false
   const why = on?.of.why ?? null
   const shotKey = castKey !== '' ? castKey : (followed ?? '')
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the opening is spent by the shot a viewer got, and no render body may decide it was.
+    if (shot?.kind === 'establish') setOpened(true)
+  }, [shot])
 
   // Centre BEFORE the stop changes: the zoom eases about whatever the middle of the screen holds.
   useEffect(() => {

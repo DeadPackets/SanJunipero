@@ -47,9 +47,9 @@ const PREFLIGHT_PERSONALITY: PersonalityDoc = {
 // Deliberately unambiguous moments: this measures whether a provider CAN emit the optional
 // fields, not whether a mind chooses to.
 const PREFLIGHT_SCENES: readonly string[] = [
-  'Your throat is dry and cracking. The well stands three steps away at (62, 70), its rope in reach. Yusuf is beside you, waiting on you.',
-  'You have eaten nothing since yesterday. A berry bush stands at your elbow, heavy with fruit; its mark is node_e14. Nadia comes up the path towards you.',
-  'Salma is on the ground beside you, shaking with fever. You have a herb in your hand, its mark is item_h3, and nobody else is near.',
+  'Your throat is dry and cracking. The well stands three steps away at (62, 70). Yusuf is beside you, waiting on you.',
+  'You have eaten nothing since yesterday. A berry bush stands at your elbow, heavy with fruit, and its mark is node_e14. Nadia comes up the path towards you.',
+  'Salma is on the ground at your feet, too weak with hunger to stand. You are carrying bread, and its mark is item_h3. Nobody else is near.',
 ]
 
 export function preflightPrompts(
@@ -128,7 +128,7 @@ export function scorePreflight(opts: {
     roundsRun: opts.roundsRun ?? 1,
     roundsPassed: opts.roundsPassed ?? (passed ? 1 : 0),
     speechAdvisory:
-      `speech ${speeches}/${opts.answers.length} — ADVISORY, not gated` +
+      `speech ${speeches}/${opts.answers.length}, ADVISORY and not gated` +
       " (it measures a mind's choice, not a provider's capability)",
     costUsd: opts.costUsd ?? 0,
     servedProviders: [...new Set(opts.servedProviders ?? [])].sort(),

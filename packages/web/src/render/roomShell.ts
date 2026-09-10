@@ -336,7 +336,7 @@ export function roomPanTo(
   if (focus === null)
     return { dx: clamp(0, range.minX, range.maxX), dy: clamp(0, range.minY, range.maxY) }
   const originX = roomOriginX(screenW, zoom, room)
-  const originY = roomOriginY(screenH, 0, zoom, room, wallH)
+  const originY = roomOriginY(screenH, zoom, room, wallH)
   return {
     dx: clamp(screenW / 2 - (originX + focus.sx * zoom), range.minX, range.maxX),
     dy: clamp(screenH / 2 - (originY + focus.sy * zoom), range.minY, range.maxY),
@@ -376,11 +376,9 @@ export function roomOriginX(screenW: number, zoom: number, room: RoomSize = ROOM
   return screenW / 2 - ((west + east) / 2) * zoom
 }
 
-/** Where the room container's origin goes so the box is centred in a stage `screenH` tall,
- *  lifted clear of the bottom chrome by `offsetY` — clamped to the headroom that exists. */
+/** Where the room container's origin goes so the box is centred in a stage `screenH` tall. */
 export function roomOriginY(
   screenH: number,
-  offsetY: number,
   zoom: number,
   room: RoomSize = ROOM_TILES,
   wallH: number = WALL_H_PX,
@@ -390,7 +388,7 @@ export function roomOriginY(
   const headroom = centred + box.top * zoom // stage above the wall top, centred
   // A short stage loses the near corner, not the wall top — the walls carry the room's detail.
   if (headroom < ROOM_MARGIN_Y) return Math.max(0, headroom) - box.top * zoom
-  return centred - Math.max(0, Math.min(offsetY, headroom - ROOM_MARGIN_Y))
+  return centred
 }
 
 /** Just enough of a Pixi `Graphics` to paint the shell. Structural, so this module stays pure

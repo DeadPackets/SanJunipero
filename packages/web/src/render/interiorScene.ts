@@ -882,7 +882,7 @@ export function createInteriorScene(
     // the top of the stage, which is what the browser showed.
     room.position.set(
       roomOriginX(app.screen.width, zoom, roomTiles) + camX,
-      roomOriginY(app.screen.height, 0, zoom, roomTiles, WALL_H_PX) + camY,
+      roomOriginY(app.screen.height, zoom, roomTiles, WALL_H_PX) + camY,
     )
     if (activeId !== null) layoutRoom(dtMs)
   }
