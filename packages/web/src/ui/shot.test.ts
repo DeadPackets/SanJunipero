@@ -3,7 +3,6 @@ import { TWO_SHOT_MAX_STOP } from '../render/camera.js'
 import type { Facing } from '../render/iso.js'
 import { CUT_MIN_MS } from './directorCut.js'
 import {
-  CLOSE_MAX_MS,
   CUT_BLACK_MS,
   CUT_FALL_MS,
   CUT_FALL_SCALE,
@@ -16,12 +15,13 @@ import {
   ESTABLISH_HOLD_MS,
   PEAK_PUSH_MS,
   PEAK_PUSH_STOPS,
+  PEAK_TURN_HOLD_MS,
   REFRAME_MS,
-  SHOT_MAX_HOLD_MS,
   SHOT_MIN_HOLD_MS,
   SHOT_STOP,
   type Shot,
   type ShotKind,
+  type ShotSpec,
   type ShotTarget,
   driftAt,
   holdState,
@@ -31,6 +31,7 @@ import {
   planMove,
   pushedStop,
   shotKindFor,
+  shotOnTurn,
   takeShot,
   travelViewports,
 } from './shot.js'
@@ -141,42 +142,24 @@ describe('a hold shorter than minHoldMs is refused', () => {
   })
 })
 
-describe('a close never runs past 6 s', () => {
-  it('is over the instant it reaches six seconds, and stays over', () => {
-    const c = clock()
-    const shot = shotOf('close', c.now)
-    let last: string | null = null
-    const seen: string[] = []
-    let overAt = -1
-    while (c.now - shot.startedMs <= 8000) {
-      const s = holdState(shot, c.now)
-      if (s !== last) {
-        seen.push(s)
-        last = s
-      }
-      if (s === 'over' && overAt < 0) overAt = c.now - shot.startedMs
-      c.tick(16)
-    }
-    expect(seen).toEqual(['locked', 'free', 'over'])
-    expect(overAt).toBeLessThan(6016)
-    expect(holdState(shot, shot.startedMs + 5999)).toBe('free')
-    expect(holdState(shot, shot.startedMs + 6000)).toBe('over')
-    expect(holdState(shot, shot.startedMs + 60_000)).toBe('over')
-    expect(CLOSE_MAX_MS).toBe(6000)
-  })
-
+// The 6 s close ceiling was read by nobody: `nextShot` refuses a cut on 'locked' alone, so the
+// state it answered past six seconds took the identical path 'free' took.
+describe('a shot ends when the world moves on, never on a clock of its own', () => {
   it('outlives its own push before it may be cut', () => {
     const shot = shotOf('close', 0)
     expect(shot.minHoldMs).toBe(PEAK_PUSH_MS)
     expect(holdState(shot, PEAK_PUSH_MS - 1)).toBe('locked')
+    expect(holdState(shot, PEAK_PUSH_MS)).toBe('free')
   })
 
-  it('leaves every other kind with no ceiling at all', () => {
-    expect(SHOT_MAX_HOLD_MS).toEqual({ close: CLOSE_MAX_MS })
+  it('★ keeps an hour-long shot of every kind, so long as the world asks for the same one', () => {
+    const away: ShotSpec = { kind: 'follow', target: { at: 'body', id: 'omar' }, why: '' }
     for (const kind of KINDS) {
-      if (kind === 'close') continue
-      expect(SHOT_MAX_HOLD_MS[kind], kind).toBeUndefined()
-      expect(holdState(shotOf(kind, 0), 3_600_000), kind).not.toBe('over')
+      const shot = shotOf(kind, 0)
+      const same: ShotSpec = { kind, target: shot.target, why: shot.why }
+      expect(holdState(shot, 3_600_000), kind).toBe('free')
+      expect(nextShot(shot, same, 3_600_000), kind).toBe(shot)
+      expect(nextShot(shot, away, 3_600_000), kind).not.toBe(shot)
     }
   })
 })
@@ -483,5 +466,75 @@ describe('the stop a close is on', () => {
       expect(pushedStop(shot, 0), kind).toBe(shot.stop)
       expect(pushedStop(shot, 9000), kind).toBe(shot.stop)
     }
+  })
+})
+
+// The push had nothing to push over: a close arrived at 4 in its first 2400 ms and then sat
+// there for whatever the gateway's score happened to be. A give_way after three presses is the
+// world's own record of a scene turning, and it is the moment the camera exists to be on.
+describe('★ a turn the world recorded', () => {
+  const TURN = { sceneId: 'sc_1' }
+
+  it('★ pushes the camera in again, from the turn and not from the shot', () => {
+    const c = clock()
+    const shot = shotOf('close', c.now)
+    c.tick(5000)
+    expect(pushedStop(shot, c.now), 'the first push had long since arrived').toBe(4)
+    const turned = shotOnTurn(shot, 'sc_1', TURN, c.now)
+    expect(pushedStop(turned, c.now)).toBe(3)
+    expect(pushedStop(turned, c.now + PEAK_PUSH_MS - 1)).toBe(3)
+    expect(pushedStop(turned, c.now + PEAK_PUSH_MS)).toBe(4)
+    expect(peakPushAt(turned, c.now + PEAK_PUSH_MS)).toBeCloseTo(PEAK_PUSH_STOPS)
+    expect(turned.startedMs, 'the drift keeps its own origin').toBe(shot.startedMs)
+  })
+
+  it('★ holds fourteen seconds from the turn, so the camera stays for the aftermath', () => {
+    const c = clock()
+    const shot = shotOf('close', c.now)
+    c.tick(5000)
+    expect(holdState(shot, c.now), 'an unturned close is replaceable from 2.4 s').toBe('free')
+    const turned = shotOnTurn(shot, 'sc_1', TURN, c.now)
+    expect(holdState(turned, c.now)).toBe('locked')
+    expect(holdState(turned, c.now + PEAK_TURN_HOLD_MS - 1)).toBe('locked')
+    expect(holdState(turned, c.now + PEAK_TURN_HOLD_MS)).not.toBe('locked')
+    expect(PEAK_TURN_HOLD_MS).toBe(14_000)
+  })
+
+  // ★ `holdState` asked a 6 s close ceiling before the floor, so a shot told to hold 14 s went
+  // free at six and the aftermath was cut away from at the same 6 s it always had been. The
+  // ceiling is gone; the rule it broke is asserted where a caller reads it.
+  it('★ is not cut short six seconds in, by any ceiling', () => {
+    const c = clock()
+    const two = shotOf('twoShot', c.now)
+    const turned = shotOnTurn(two, 'sc_1', TURN, c.now)
+    expect(turned.kind, 'a turn IS the peak, and the camera answers a peak with a close').toBe(
+      'close',
+    )
+    expect(turned.stop).toBe(4)
+    const away: ShotSpec = { kind: 'single', target: { at: 'body', id: 'omar' }, why: '' }
+    expect(holdState(turned, c.now + 6000)).toBe('locked')
+    expect(nextShot(turned, away, c.now + 6000)).toBe(turned)
+    expect(nextShot(turned, away, c.now + PEAK_TURN_HOLD_MS)).not.toBe(turned)
+  })
+
+  it('★ moves nothing at all when it lands in a scene the camera is not on', () => {
+    const c = clock()
+    const shot = shotOf('close', c.now)
+    c.tick(5000)
+    expect(shotOnTurn(shot, 'sc_1', { sceneId: 'sc_2' }, c.now)).toBe(shot)
+    expect(shotOnTurn(shot, null, TURN, c.now)).toBe(shot)
+    expect(pushedStop(shotOnTurn(shot, 'sc_1', { sceneId: 'sc_2' }, c.now), c.now)).toBe(4)
+  })
+
+  it('★ never holds a hand on the lens for an aftermath it did not ask to watch', () => {
+    const c = clock()
+    const turned = shotOnTurn(shotOf('close', c.now), 'sc_1', TURN, c.now)
+    c.tick(100)
+    const away: ShotSpec = { kind: 'single', target: { at: 'body', id: 'omar' }, why: '' }
+    expect(nextShot(turned, away, c.now)).toBe(turned)
+    const byHand = nextShot(turned, away, c.now, true)
+    expect(byHand).not.toBe(turned)
+    expect(byHand?.target).toEqual({ at: 'body', id: 'omar' })
+    expect(byHand?.startedMs).toBe(c.now)
   })
 })

@@ -33,6 +33,8 @@ export type Shot = {
   /** one plain sentence a viewer could read */
   why: string
   beatId: string | null
+  /** when the world last turned this shot's scene, which is where the push runs from */
+  turnedMs: number | null
 }
 
 // ── the grammar ────────────────────────────────────────────────────────────────────────────
@@ -48,7 +50,6 @@ export const SHOT_STOP: Readonly<Record<ShotKind, ZoomStop>> = {
 }
 
 export const ESTABLISH_HOLD_MS = 3200
-export const CLOSE_MAX_MS = 6000
 export const PEAK_PUSH_MS = 2400
 
 /** How long a shot may not be cut away from. A scene-length shot takes the town's own cut floor;
@@ -62,9 +63,6 @@ export const SHOT_MIN_HOLD_MS: Readonly<Record<ShotKind, number>> = {
   interior: CUT_MIN_MS,
   overview: 0,
 }
-
-/** Only the close has a ceiling. Everything else ends because the world moved on. */
-export const SHOT_MAX_HOLD_MS: Readonly<Partial<Record<ShotKind, number>>> = { close: CLOSE_MAX_MS }
 
 export type ShotSpec = {
   kind: ShotKind
@@ -89,17 +87,16 @@ export function takeShot(spec: ShotSpec, nowMs: number): Shot {
     minHoldMs: SHOT_MIN_HOLD_MS[spec.kind],
     why: spec.why,
     beatId: spec.beatId ?? null,
+    turnedMs: null,
   }
 }
 
-/** `locked` refuses a cut, `free` allows one, `over` demands one. */
-export type HoldState = 'locked' | 'free' | 'over'
+/** `locked` refuses a cut, `free` allows one. A shot ends because the world moved on, never
+ *  because a clock ran out: an aftermath 14 s deep was cut away from at the close's own 6 s. */
+export type HoldState = 'locked' | 'free'
 
 export function holdState(shot: Shot, nowMs: number): HoldState {
-  const held = nowMs - shot.startedMs
-  const max = SHOT_MAX_HOLD_MS[shot.kind]
-  if (max !== undefined && held >= max) return 'over'
-  return held >= shot.minHoldMs ? 'free' : 'locked'
+  return nowMs - shot.startedMs < shot.minHoldMs ? 'locked' : 'free'
 }
 
 /** Which shot a live scene asks for. The overview is never in the answer: it is the viewer's
@@ -222,9 +219,31 @@ export function driftAt(
 
 export const PEAK_PUSH_STOPS = 1 / 5
 
+/** How long the camera stays with a scene the world just turned, instead of cutting away from
+ *  the one moment that mattered. */
+export const PEAK_TURN_HOLD_MS = 14_000
+
+/** The shot a turn the world recorded in THIS scene leaves behind: it pushes in again from the
+ *  turn, and holds for the aftermath. A turn anywhere else leaves the shot exactly as it stands. */
+export function shotOnTurn(
+  shot: Shot,
+  sceneId: string | null,
+  turn: { sceneId: string },
+  nowMs: number,
+): Shot {
+  if (sceneId === null || sceneId !== turn.sceneId) return shot
+  return {
+    ...shot,
+    kind: 'close',
+    stop: SHOT_STOP.close,
+    turnedMs: nowMs,
+    minHoldMs: nowMs - shot.startedMs + PEAK_TURN_HOLD_MS,
+  }
+}
+
 /** The push over a peak, in stops, eased in and then held. `pushedStop` is what reads it. */
 export function peakPushAt(shot: Shot, nowMs: number): number {
-  const t = (nowMs - shot.startedMs) / PEAK_PUSH_MS
+  const t = (nowMs - (shot.turnedMs ?? shot.startedMs)) / PEAK_PUSH_MS
   if (t <= 0) return 0
   return PEAK_PUSH_STOPS * (t >= 1 ? 1 : easeOutCubic(t))
 }

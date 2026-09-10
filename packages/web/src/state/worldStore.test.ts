@@ -20,6 +20,24 @@ const spawn: SimEvent = {
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 
+const scene = (id: string, over: Record<string, unknown> = {}) => ({
+  id,
+  kind: 'quarrel' as const,
+  participants: ['amara', 'salma'],
+  topic: 'the well',
+  stakes: 9,
+  open: true,
+  ...over,
+})
+
+const cutTo = (sceneId: string) => ({
+  t: 'director' as const,
+  tick: 1,
+  cut: { sceneId, agentIds: ['amara'], score: 7, why: 'they are shouting' },
+  quiet: false,
+  act: null,
+})
+
 function makeSnapshot() {
   const state = fold(genesisState(DEFAULT_CONFIG, GRASS), spawn, DEFAULT_CONFIG)
   return {
@@ -228,24 +246,108 @@ describe('worldStore', () => {
     expect(store.assetRecords()).toHaveLength(3)
   })
 
-  it('★ holds the scene the town is in, and keeps the closing frame that carries the summary', () => {
+  it('★ holds every scene the town is in, and keeps the closing frame that carries the summary', () => {
     const store = createWorldStore()
-    expect(store.getScene()).toBe(null)
-    const open = {
-      id: 'sc_1',
-      kind: 'quarrel' as const,
-      participants: ['amara', 'salma'],
-      topic: 'the well',
-      stakes: 9,
-      open: true,
-    }
-    store.applyServer({ t: 'scene', scene: open })
-    expect(store.getScene()).toEqual(open)
+    expect(store.sceneById('sc_1')).toBe(null)
+    store.applyServer({ t: 'scene', scene: scene('sc_1') })
+    store.applyServer({ t: 'scene', scene: scene('sc_2', { participants: ['omar', 'nadir'] }) })
+    expect(store.sceneById('sc_1')?.participants).toEqual(['amara', 'salma'])
+    expect(store.sceneById('sc_2')?.participants).toEqual(['omar', 'nadir'])
+    expect(store.openScenes().map((s) => s.id)).toEqual(['sc_1', 'sc_2'])
 
     // The close is not a clear: whoever shows the summary decides how long it stands.
-    store.applyServer({ t: 'scene', scene: { ...open, open: false, summary: 'They agreed.' } })
-    expect(store.getScene()?.open).toBe(false)
-    expect(store.getScene()?.summary).toBe('They agreed.')
+    store.applyServer({
+      t: 'scene',
+      scene: scene('sc_1', { open: false, summary: 'They agreed.' }),
+    })
+    expect(store.sceneById('sc_1')?.open).toBe(false)
+    expect(store.sceneById('sc_1')?.summary).toBe('They agreed.')
+    expect(
+      store.openScenes().map((s) => s.id),
+      'and it is no longer open',
+    ).toEqual(['sc_2'])
+  })
+
+  it('answers a scene by id, and hands the same open list back until one changes', () => {
+    const store = createWorldStore()
+    store.applyServer({ t: 'scene', scene: scene('sc_1') })
+    const held = store.openScenes()
+    expect(held).toBe(store.openScenes())
+    store.applyServer({ t: 'scene', scene: scene('sc_2') })
+    expect(store.openScenes()).not.toBe(held)
+    expect(store.openScenes()).toHaveLength(2)
+  })
+
+  // ★ WHAT WAS LEARNED: this used to derive the shot from the cut frame, and a viewer who pinned
+  // a body then watched the floor and the bars sit under the town's top-scored talk instead of the
+  // one they picked. A pin is client state the wire never carries, so the director hands the
+  // answer over and the store only holds it.
+  it('★ the shot is the scene the DIRECTOR hands over, never one the store derives', () => {
+    const store = createWorldStore()
+    store.applyServer({ t: 'scene', scene: scene('sc_1') })
+    store.applyServer({ t: 'scene', scene: scene('sc_2') })
+    expect(store.shotScene(), 'nothing has been handed over yet').toBe(null)
+    store.applyServer(cutTo('sc_1'))
+    expect(store.shotScene(), 'and a cut on its own does not move the floor').toBe(null)
+
+    store.setShotScene('sc_2')
+    expect(store.shotScene()?.id, 'the pinned talk wins over the town cut').toBe('sc_2')
+    store.setShotScene(null)
+    expect(store.shotScene(), 'a body pinned inside no talk gets no floor').toBe(null)
+    store.setShotScene('sc_9')
+    expect(store.shotScene(), 'and an id the store never heard of names nothing').toBe(null)
+  })
+
+  it('★ handing over a scene tells the page, so a docked column redraws with the floor', () => {
+    const store = createWorldStore()
+    store.applyServer({ t: 'scene', scene: scene('sc_1') })
+    let told = 0
+    const off = store.subscribe(() => {
+      told++
+    })
+    store.setShotScene('sc_1')
+    expect(told, 'the change reaches the page').toBe(1)
+    store.setShotScene('sc_1')
+    expect(told, 'and the same answer twice does not').toBe(1)
+    off()
+  })
+
+  it('a scrub forgets the scenes, the way it forgets the cut', () => {
+    const store = createWorldStore()
+    const snap = makeSnapshot()
+    store.applyServer(snap)
+    store.applyServer({ t: 'scene', scene: scene('sc_1') })
+    store.applyServer(cutTo('sc_1'))
+    store.applyServer({ t: 'scrubbed', reqId: 1, tick: 1, state: snap.state })
+    expect(store.shotScene(), 'the minute on screen holds no talk we were told about').toBe(null)
+    expect(store.sceneById('sc_1')).toBe(null)
+    expect(store.openScenes()).toEqual([])
+  })
+
+  it('folds the bars once, for whoever reads them', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    expect(store.tension).toBe(store.tension)
+    store.applyServer({
+      t: 'tick',
+      tick: 2,
+      seq: 2,
+      events: [
+        {
+          seq: 2,
+          tick: 2,
+          type: 'scene_opened',
+          payload: {
+            id: 'sc_1',
+            kind: 'talk',
+            participants: ['amara', 'salma'],
+            topic: null,
+            stakes: 5,
+          },
+        },
+      ],
+    })
+    expect(store.tension.bars('sc_1', 0).map((b) => b.agentId)).toEqual(['amara', 'salma'])
   })
 
   it('onEvents fires per delta and recentEvents keeps the last 400', () => {

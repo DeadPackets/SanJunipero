@@ -1,56 +1,46 @@
-import { SOMEONE, type SimEvent, agentName, chronicleLine, kindWords } from '@sj/shared'
+import { SOMEONE, type SimEvent, agentName, kindWords } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import { chronicleLabel } from './importantFeed.js'
+
+// `The weather turned storm.` Three of the five kinds the config ships are nouns, not adjectives.
+// An unnamed kind keeps the old shape, which is the right one for an adjective.
+const WEATHER_LINE: Record<string, string> = {
+  sunny: 'The sky cleared.',
+  cloudy: 'It clouded over.',
+  rain: 'The rain came on.',
+  storm: 'A storm blew in.',
+  snow: 'It began to snow.',
+}
 
 // Human-framed one-liners for the viewer-worthy subset; null hides plumbing (spec §5/§8).
 export function describeEvent(ev: SimEvent, state: WorldState | null): string | null {
+  // The paper's own sentence first, so the live column and the chronicle beside it cannot print
+  // one tick two ways. What is left below is what the paper leaves out on purpose.
+  const shared = chronicleLabel(ev, state)
+  if (shared !== null) return shared
+
   const p = ev.payload as Record<string, unknown>
   const name = (agentId: unknown): string =>
     typeof agentId === 'string' ? agentName(state?.agents, agentId) : SOMEONE
-  // R4: a kind is a slug in the engine and PROSE to a viewer. The chronicle read "The
-  // fire_pit is finished." on screen until this went through kindWords.
-  const structureKind = (id: unknown): string =>
-    kindWords(typeof id === 'string' ? (state?.structures[id]?.kind ?? 'building') : 'building')
 
   switch (ev.type) {
     case 'agent_spoke':
       return `${name(p.agentId)}: "${String(p.text)}"`
-    // The feed's C11 vocabulary lives in one place, so the viewer's ticker and the chronicle
-    // cannot drift into two different sentences for the same fact.
-    case 'agent_died':
-    case 'agent_harmed':
-    case 'agent_afflicted':
-    case 'affliction_worsened':
-    case 'affliction_recovered':
-    case 'agent_tended':
-    case 'grave_placed':
-    case 'fire_extinguished':
-    case 'tile_changed':
-    case 'world_grown':
-    case 'fauna_killed':
-    case 'agent_expressed':
-    case 'discovery_made':
-    case 'scene_closed':
-    case 'agent_spawned':
-      return chronicleLine(ev, {
-        agentName: (id) => name(id),
-        structureKind: (id) => structureKind(id),
-        mysteryProse: () => null,
-      })
-    case 'structure_completed':
-      return `The ${structureKind(p.id)} is finished.`
     case 'structure_planned':
       return `${name(p.builderId)} began a ${kindWords(String(p.kind))}.`
-    case 'crop_planted':
-      return `${kindWords(String(p.kind))} was planted.`
+    case 'crop_planted': {
+      const kind = kindWords(String(p.kind))
+      return `${kind.charAt(0).toUpperCase()}${kind.slice(1)} was planted.`
+    }
     case 'crop_harvested': {
       const kind =
         typeof p.cropId === 'string' ? (state?.crops[p.cropId]?.kind ?? 'harvest') : 'harvest'
       return `The ${kindWords(kind)} came in.`
     }
-    case 'fire_ignited':
-      return `Fire! The ${structureKind(p.structureId)} is burning.`
-    case 'weather_changed':
-      return `The weather turned ${kindWords(String(p.kind))}.`
+    case 'weather_changed': {
+      const kind = String(p.kind)
+      return WEATHER_LINE[kind] ?? `The weather turned ${kindWords(kind)}.`
+    }
     case 'agent_collapsed':
       return `${name(p.agentId)} collapsed.`
     case 'action_completed':

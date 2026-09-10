@@ -27,6 +27,8 @@ import {
   type LayerSet,
   type ScreenLayerSet,
 } from './layers.js'
+import { createSceneRing, type SceneRing } from './sceneRing.js'
+import { createTensionLayer } from './tensionLayer.js'
 import { TextureBook } from './textures.js'
 import { createTooltipLayer, type TooltipLayer } from './tooltip.js'
 
@@ -96,6 +98,9 @@ export type Scene = {
   tags: TooltipLayer
   /** above the entities and never hit-tested: place names and other reading aids */
   overlay: Container
+  /** The floor under the scene the camera is on. THE anchor a talk is measured from: the bars
+   *  stand over it and the speech column docks beside it. */
+  ring: SceneRing
   rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void
   centerOn(x: number, y: number): void
   /** the same move in the space `tileToScreen` returns, so a camera can be put back EXACTLY
@@ -297,7 +302,6 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   }
 
   const clock = sceneClock(app)
-
   const scene: Scene = {
     app,
     setTicking: clock.set,
@@ -310,6 +314,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     screen,
     entities: layers.entities,
     overlay: layers.overlay,
+    ring: createSceneRing({ layers, pointOf: (kind, id) => scene.pointOf(kind, id) }, store),
     addDepthSource: (fn) => {
       depthSources.add(fn)
       return () => depthSources.delete(fn)
@@ -361,10 +366,20 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       rig.destroy()
       app.ticker.remove(bakeTick)
       app.ticker.remove(mirrorLights)
+      app.ticker.remove(ringTick)
+      tension.destroy()
+      scene.ring.destroy()
       tags.destroy()
       baker.destroy()
       app.destroy(true, { children: true })
     },
   }
+  const tension = createTensionLayer({ layers, bounds: () => scene.ring.bounds() }, store)
+  const ringTick = (): void => {
+    const nowMs = performance.now()
+    scene.ring.tick(nowMs)
+    tension.tick(nowMs)
+  }
+  app.ticker.add(ringTick)
   return scene
 }

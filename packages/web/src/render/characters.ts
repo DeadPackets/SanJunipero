@@ -28,6 +28,7 @@ import { hoverPlate } from '../ui/interaction.js'
 import { statusOf } from '../ui/status.js'
 import { createConversation, faceInScene, floorHolder } from './converse.js'
 import { progress } from '../ui/motion.js'
+import { drainTint } from './tension.js'
 import {
   CROWD_PITCH_PX,
   CROWD_SETTLE_MS,
@@ -509,7 +510,7 @@ export function createCharacterLayer(
     const nowTick = store.getTick()
     const wantsMotion = scene.wantsMotion()
     // An open scene turns its cast toward each other and puts the ring under whoever has it.
-    const open = store.getScene()
+    const open = store.shotScene()
     const cast = open?.open === true ? open.participants : null
     const heard = talk.voices()
     const inScene = new Set(cast ?? [])
@@ -636,6 +637,8 @@ export function createCharacterLayer(
       e.ringA = e.ringFrom + (hasFloor - e.ringFrom) * fade
       e.ring.alpha = e.ringA
       e.ring.visible = e.ringA > 0
+      const drain = store.tension.desaturate(a.id, nowMs)
+      if (drain > 0 || e.sprite.tint !== 0xffffff) e.sprite.tint = drainTint(drain)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY * e.breath
       if (e.ghost.visible) {
         const p = (nowMs - e.ghostSinceMs) / TURN_FADE_MS

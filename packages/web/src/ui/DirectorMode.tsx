@@ -3,21 +3,24 @@ import type { AgentBody } from '@sj/engine/state'
 import type { StakeScore } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
-import type { ZoomStop } from '../render/camera.js'
+import { fitStop, type ZoomStop } from '../render/camera.js'
 import { type Facing, facingFrom, tileToScreen } from '../render/iso.js'
 import { rendersOnMap } from '../render/characters.js'
 import { agentName, PEAK_SCORE } from '@sj/shared'
-import { sceneShot } from '../render/sceneFraming.js'
+import { sceneBox, sceneShot } from '../render/sceneFraming.js'
+import type { TensionTurn } from '../render/tension.js'
 import { CUT_MIN_MS, type CameraClaim, cameraClaim, townAsleep } from './directorCut.js'
 import { cutFloor, quietRound } from './autoCut.js'
 import {
   driftAt,
   nextShot,
+  PEAK_TURN_HOLD_MS,
   pushedStop,
   type Shot,
   type ShotKind,
   type ShotSpec,
   shotKindFor,
+  shotOnTurn,
 } from './shot.js'
 
 export const DIRECTOR_ZOOM = 3 as const
@@ -78,6 +81,16 @@ export type ShotCamera = Pick<
 
 /** What the shot is OF, off the claim alone. Every rule the camera and the caption follow is
  *  here rather than inside an effect, so a test can read them without a React tree. */
+/** The talk a pinned body is standing in, which is the floor a viewer who picked somebody
+ *  should get. Null when they are in none, because a floor round one person says the opposite
+ *  of what a floor is for. */
+export function shotSceneFor(
+  followed: string,
+  open: readonly { id: string; participants: readonly string[] }[],
+): string | null {
+  return open.find((sc) => sc.participants.includes(followed))?.id ?? null
+}
+
 export function shotOf(
   claim: CameraClaim,
   held: StakeScore | null,
@@ -146,13 +159,11 @@ export function driveShot(
   if (claim.castKey !== '') {
     const cast = claim.castKey.split(' ')
     const stageBox = { w: scene.app.screen.width, h: scene.app.screen.height }
-    const where = (): ReturnType<typeof sceneShot> =>
-      sceneShot(
-        cast
-          .map((id) => scene.pointOf('agent', id))
-          .filter((p): p is { sx: number; sy: number } => p !== null),
-        stageBox,
-      )
+    const pointsNow = (): { sx: number; sy: number }[] =>
+      cast
+        .map((id) => scene.pointOf('agent', id))
+        .filter((p): p is { sx: number; sy: number } => p !== null)
+    const where = (): ReturnType<typeof sceneShot> => sceneShot(pointsNow(), stageBox)
     // The subject faces whoever they are framed with, which is the character layer's own rule
     // for a body standing in a scene. One body alone has no direction and does not drift.
     const facing = (): Facing | null => {
@@ -161,8 +172,15 @@ export function driveShot(
       const b = agents?.[cast[1] ?? '']
       return a === undefined || b === undefined ? null : facingFrom(b.x - a.x, b.y - a.y)
     }
-    const stopNow = (fitted: ZoomStop): ZoomStop =>
-      shot !== null && shot.kind === 'close' ? pushedStop(shot, performance.now()) : fitted
+    // A close is the one stop that is a clock rather than the framing box, and it may pass the
+    // two-shot cap. It may never pass the box: a turn in a gathering pushed in past the cast.
+    const stopNow = (fitted: ZoomStop): ZoomStop => {
+      if (shot?.kind !== 'close') return fitted
+      const push = pushedStop(shot, performance.now())
+      const box = sceneBox(pointsNow())
+      const cap = box === null ? fitted : fitStop(box, stageBox)
+      return push < cap ? push : cap
+    }
     const first = where()
     if (first !== null) scene.setZoom(stopNow(first.stop))
     // Resolved on the ticker: the shot is cut to where they are standing NOW, and a cast the
@@ -254,12 +272,15 @@ function specOf(
 /** The shot ON SCREEN, kept across renders, which is not always the shot the world is asking
  *  for: one inside its own floor is not replaced, so a round turn and a stand-down wait as long
  *  as a cut does. */
-function shotHold(): (
-  want: { spec: ShotSpec | null; byHand: boolean } & Omit<Shown, 'shot'>,
+export function shotHold(): (
+  want: { spec: ShotSpec | null; byHand: boolean; turn: TensionTurn | null } & Omit<Shown, 'shot'>,
 ) => Shown | null {
   let on: Shown | null = null
+  /** the newest turn the world sent, when it landed, and whether a shot has taken it */
+  let turn: { it: TensionTurn; atMs: number; taken: boolean } | null = null
   return (want) => {
-    const shot = nextShot(on?.shot ?? null, want.spec, performance.now(), want.byHand)
+    const now = performance.now()
+    const shot = nextShot(on?.shot ?? null, want.spec, now, want.byHand)
     if (shot === null) on = null
     else if (shot !== on?.shot)
       on = { shot, by: want.by, structureId: want.structureId, of: want.of }
@@ -271,6 +292,17 @@ function shotHold(): (
       (on.of.why !== want.of.why || on.of.sceneId !== want.of.sceneId)
     )
       on = { ...on, of: want.of }
+    if (want.turn !== null && want.turn !== turn?.it)
+      turn = { it: want.turn, atMs: now, taken: false }
+    // A turn is taken once, by the shot that is ON its scene. It is what makes the director cut
+    // there, so it usually lands a render before the camera does, and waits out its aftermath.
+    if (turn !== null && !turn.taken && on !== null && now - turn.atMs < PEAK_TURN_HOLD_MS) {
+      const turned = shotOnTurn(on.shot, on.of.sceneId, turn.it, now)
+      if (turned !== on.shot) {
+        turn = { ...turn, taken: true }
+        on = { ...on, shot: turned }
+      }
+    }
     return on
   }
 }
@@ -312,6 +344,10 @@ export function DirectorMode({
   const [round] = useState(() => quietRound())
   const [hold] = useState(() => shotHold())
   useEffect(() => floor.clear, [floor])
+  // The one moment worth pushing over: a give_way the world recorded after three presses. The
+  // fold is the store's, so a remount cannot take the turn signal down with it.
+  const [turn, setTurn] = useState<TensionTurn | null>(null)
+  useEffect(() => store.tension.onTurn(setTurn), [store])
   // Whether the town has ever been framed for this viewer, so the overview is an opening shot
   // and never the thing the camera does on its way out of a claim.
   const framedRef = useRef(false)
@@ -361,6 +397,7 @@ export function DirectorMode({
     // A hand on the lens outranks the floor: a viewer who pinned somebody, opened a moment or
     // took the camera waits for nothing.
     byHand: !autoCut || pinned !== null || moment.length > 0,
+    turn,
     by: claimBy,
     structureId: wantRoom,
     of: want,
@@ -403,6 +440,21 @@ export function DirectorMode({
     // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
     scene.cameraSubject = subject
   }, [scene, subject])
+
+  // The floor, the bars and the speech column all stand under the scene the camera is framing,
+  // and only the director knows which that is: a pinned body is a talk the town never cut to.
+  useEffect(() => {
+    if (sceneId !== null || followed === null) {
+      store.setShotScene(sceneId)
+      return undefined
+    }
+    // A pinned body may not be in a talk yet, so this watches for the one they walk into.
+    const look = (): void => {
+      store.setShotScene(shotSceneFor(followed, store.openScenes()))
+    }
+    look()
+    return store.subscribe(look)
+  }, [store, sceneId, followed])
 
   const name = followed === null ? null : agentName(state?.agents, followed)
   useEffect(() => {

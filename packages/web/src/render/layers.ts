@@ -4,7 +4,7 @@ import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
 
 export const LAYERS = [
   'ground', // the baked terrain field
-  'groundDecal', // patch outlines, furrows, overlay tints, water shimmer, tree canopies
+  'groundDecal', // patch outlines, furrows, overlay tints, water shimmer, canopies, scene floors
   'shadow', // every contact shadow, for every body and every structure
   'entities', // THE ONLY depth-sorted layer: bodies, structures, items, crops
   'overhead', // smoke, hearth glow, fire, birds — drawn over the thing they belong to

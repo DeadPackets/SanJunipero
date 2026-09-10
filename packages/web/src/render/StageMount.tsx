@@ -254,7 +254,7 @@ export function StageMount({
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
           if (said > seenThoughts) {
-            const held = store.getScene()
+            const held = store.shotScene()
             const inTheRoom = held?.open ? held.participants : NOBODY
             for (const t of store.thoughtsLog().slice(seenThoughts - said))
               if (shouldBubble(t, bubbleSubject(s), inTheRoom))

@@ -83,12 +83,12 @@ describe('describeEvent', () => {
         ev('crop_planted', { id: 'c1', kind: 'wheat', x: 0, y: 0, plantedDay: 0 }),
         state,
       ),
-    ).toBe('wheat was planted.')
+    ).toBe('Wheat was planted.')
     expect(
       describeEvent(ev('fire_ignited', { structureId: 's1', cause: 'lightning' }), state),
     ).toBe('Fire! The storehouse is burning.')
     expect(describeEvent(ev('weather_changed', { kind: 'rain', temperatureC: 10 }), state)).toBe(
-      'The weather turned rain.',
+      'The rain came on.',
     )
     expect(describeEvent(ev('agent_collapsed', { agentId: 'farmer' }), state)).toBe(
       'Wren collapsed.',
@@ -207,5 +207,107 @@ describe('the ticker and the chronicle agree about a scene and an arrival', () =
     expect(describeEvent({ ...arrival, tick: 0 }, state)).toBeNull()
     expect(isNarratable({ ...arrival, tick: 0 })).toBe(false)
     expect(isNarratable(arrival)).toBe(true)
+  })
+})
+
+// The live column and the chronicle sit side by side on the same page. Everything the paper can
+// say, the feed now says in the paper's own words; what is left is what the paper drops on purpose.
+describe('the feed and the paper are one formatter', () => {
+  const agents: Record<string, { name: string; partnerId?: string }> = {
+    a1: { name: 'Maret' },
+    a2: { name: 'Yusuf' },
+    a3: { name: 'Wren', partnerId: 'a4' },
+    a4: { name: 'Sol' },
+  }
+  const state = { agents, structures: { s1: { kind: 'storehouse' } }, crops: {} } as never
+  const look = {
+    agentName: (id: string) => agentName(agents, id),
+    structureKind: () => 'storehouse',
+    mysteryProse: () => null,
+    partnerOf: (id: string) => agents[id]?.partnerId ?? null,
+  }
+
+  // Every one of these reached the stage cue for six seconds and then was gone: the feed, the one
+  // place a viewer can scroll back through, had no line for any of them.
+  const social: [string, Record<string, unknown>, string][] = [
+    ['agent_born', { name: 'Wren' }, 'Wren was born.'],
+    ['agent_arrived', { name: 'Yusuf' }, 'Yusuf came up the valley road.'],
+    ['agent_departed', { agentId: 'a2' }, 'Yusuf went down the valley road.'],
+    ['co_slept', { aId: 'a1', bId: 'a2' }, 'Maret and Yusuf kept house together.'],
+    ['invited', { verb: 'court', byId: 'a1', agentId: 'a2' }, 'Maret asked Yusuf to walk out.'],
+    [
+      'invitation_accepted',
+      { verb: 'court', byId: 'a1', agentId: 'a2' },
+      'Yusuf said yes to Maret.',
+    ],
+    [
+      'invitation_refused',
+      { verb: 'propose', byId: 'a1', agentId: 'a2' },
+      'Yusuf refused Maret a life together.',
+    ],
+    ['partnership_formed', { aId: 'a1', bId: 'a2' }, 'Maret and Yusuf are partners now.'],
+    ['partnership_dissolved', { byId: 'a1', aId: 'a1', bId: 'a2' }, 'Maret has left Yusuf.'],
+    ['law_ratified', { text: 'No fishing at night.' }, 'The town agreed: “No fishing at night.”'],
+    [
+      'law_proposed',
+      { agentId: 'a1', text: 'No fishing at night.' },
+      'Maret put a rule to the room: “No fishing at night.”',
+    ],
+    [
+      'law_broken',
+      { agentId: 'a1', witnesses: ['a2'] },
+      'Maret did what the town agreed against, and Yusuf saw.',
+    ],
+    ['fire_spread', { toId: 's1' }, 'The fire has spread to the storehouse.'],
+    ['structure_inscribed', { structureId: 's1' }, 'New words carved on the storehouse.'],
+  ]
+
+  it.each(social)('says a %s the way the paper says it', (type, payload, line) => {
+    const e = ev(type, payload)
+    expect(describeEvent(e, state)).toBe(line)
+    expect(describeEvent(e, state)).toBe(chronicleLine(e, look))
+    expect(isNarratable(e)).toBe(true)
+  })
+
+  // Owner 2026-09-08: an ask by a married body is not an ordinary courtship, and the feed used to
+  // print it as one because it never handed the formatter the marriage.
+  it('names the marriage standing behind an ask, as the paper does', () => {
+    const e = ev('invited', { verb: 'propose', byId: 'a3', agentId: 'a2' })
+    expect(describeEvent(e, state)).toBe(
+      'Wren asked Yusuf to be their partner. Wren is married to Sol.',
+    )
+  })
+
+  // The paper is what the town would remember. The feed is what is happening, so it keeps the
+  // four the chronicle drops on purpose. Delegating these away would mute the ticker.
+  it('keeps what the paper leaves out', () => {
+    const speech = ev('agent_spoke', { agentId: 'a1', text: 'The wheat is in.' })
+    expect(chronicleLine(speech, look)).toBeNull()
+    expect(describeEvent(speech, state)).toBe('Maret: "The wheat is in."')
+    for (const [type, payload, line] of [
+      ['structure_planned', { kind: 'house', builderId: 'a1' }, 'Maret began a house.'],
+      ['agent_collapsed', { agentId: 'a1' }, 'Maret collapsed.'],
+      ['action_completed', { agentId: 'a1', verb: 'give' }, 'Maret gave something away.'],
+    ] as const) {
+      expect(chronicleLine(ev(type, payload), look)).toBeNull()
+      expect(describeEvent(ev(type, payload), state)).toBe(line)
+    }
+  })
+
+  // `The weather turned storm.` Three of the five kinds the config ships are nouns.
+  it('says the weather the way a person says it', () => {
+    const said = ['sunny', 'cloudy', 'rain', 'storm', 'snow'].map((kind) =>
+      describeEvent(ev('weather_changed', { kind }), state),
+    )
+    expect(said).toEqual([
+      'The sky cleared.',
+      'It clouded over.',
+      'The rain came on.',
+      'A storm blew in.',
+      'It began to snow.',
+    ])
+    expect(describeEvent(ev('weather_changed', { kind: 'muggy' }), state)).toBe(
+      'The weather turned muggy.',
+    )
   })
 })

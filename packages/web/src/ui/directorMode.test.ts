@@ -2,8 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sceneShot } from '../render/sceneFraming.js'
 import type { StakeScore } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { PEAK_PUSH_MS, type Shot, takeShot } from './shot.js'
-import { OVERVIEW_ZOOM, type ShotCamera, driveShot, shotOf } from './DirectorMode.js'
+import type { TensionTurn } from '../render/tension.js'
+import { CUT_MIN_MS } from './directorCut.js'
+import { PEAK_PUSH_MS, PEAK_TURN_HOLD_MS, type Shot, shotOnTurn, takeShot } from './shot.js'
+import {
+  OVERVIEW_ZOOM,
+  type ShotCamera,
+  driveShot,
+  shotHold,
+  shotOf,
+  shotSceneFor,
+} from './DirectorMode.js'
 
 const STAGE_BOX = { w: 1280, h: 720 }
 
@@ -66,6 +75,23 @@ const RELEASED = {
 
 // The camera, the caption, the card and the thought gate all follow ONE answer. It used to be
 // six expressions inside a React component, which is why nothing could read them.
+describe('★ a viewer who pins somebody gets THEIR talk, not the town top-scored one', () => {
+  const open = [
+    { id: 'sc_town', participants: ['omar', 'salma'] },
+    { id: 'sc_mine', participants: ['nadia', 'yusuf'] },
+  ]
+
+  it('★ finds the talk the pinned body is standing in', () => {
+    expect(shotSceneFor('nadia', open)).toBe('sc_mine')
+    expect(shotSceneFor('omar', open)).toBe('sc_town')
+  })
+
+  it('★ gives a body who is in no talk no floor at all, rather than somebody else one', () => {
+    expect(shotSceneFor('halim', open)).toBe(null)
+    expect(shotSceneFor('nadia', [])).toBe(null)
+  })
+})
+
 describe('what the shot is OF', () => {
   const HELD: StakeScore = {
     sceneId: 'sc_1',
@@ -409,7 +435,10 @@ describe('★ a held two-shot drifts, and never past one tile', () => {
 // ★ `peakPushAt` eased a fifth of a stop over 2400 ms and was called by nothing. The stop ladder
 // is rungs, so the push lands as the rung it eases toward: 4 minus the push, arriving at 4.
 describe('★ the camera pushes in over a peak', () => {
-  const FAR = { ada: { sx: 0, sy: 0 }, bo: { sx: 2000, sy: 1000 } }
+  // Two bodies a couple of tiles apart, whose box a 1280 stage holds at 4: the push has
+  // somewhere to go. The pair 2000 px apart it used to run on is the test under this one.
+  const NEAR = { ada: { sx: 900, sy: 500 }, bo: { sx: 964, sy: 532 } }
+  const SPREAD = { ada: { sx: 0, sy: 0 }, bo: { sx: 2000, sy: 1000 } }
   const PEAK = {
     by: 'cut' as const,
     castKey: 'ada bo',
@@ -426,7 +455,7 @@ describe('★ the camera pushes in over a peak', () => {
 
   it('★ opens one rung wide and arrives at 4 when the push has run', () => {
     const now = vi.spyOn(performance, 'now').mockReturnValue(0)
-    const { rig, cam, tick } = fakeCamera(FAR)
+    const { rig, cam, tick } = fakeCamera(NEAR)
     driveShot(rig, NO_WORLD, PEAK, { current: true }, { current: false }, close(0))
     expect(cam.scale, 'a close that opened at the clamp has nowhere to push').toBe(3)
     now.mockReturnValue(PEAK_PUSH_MS - 1)
@@ -435,5 +464,155 @@ describe('★ the camera pushes in over a peak', () => {
     now.mockReturnValue(PEAK_PUSH_MS)
     tick()
     expect(cam.scale).toBe(4)
+  })
+
+  it('★ pushes again over a turn, from a close that had already arrived at 4', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+    const { rig, cam, tick } = fakeCamera(NEAR)
+    const settled = close(0)
+    now.mockReturnValue(PEAK_PUSH_MS)
+    driveShot(rig, NO_WORLD, PEAK, { current: true }, { current: false }, settled)
+    tick()
+    expect(cam.scale).toBe(4)
+    const turned = shotOnTurn(settled, 'sc_1', { sceneId: 'sc_1' }, PEAK_PUSH_MS)
+    driveShot(rig, NO_WORLD, PEAK, { current: true }, { current: false }, turned)
+    expect(cam.scale, 'nothing on screen said the scene had turned').toBe(3)
+    now.mockReturnValue(PEAK_PUSH_MS * 2 - 1)
+    tick()
+    expect(cam.scale).toBe(3)
+    now.mockReturnValue(PEAK_PUSH_MS * 2)
+    tick()
+    expect(cam.scale).toBe(4)
+  })
+
+  // ★ A turn promotes ANY shot to a close, and the close took stop 4 whatever the cast was
+  // standing in. A council spread over 2000 px was pushed past, at 4, with nobody in frame.
+  it('★ never pushes a close past the box the cast is standing in', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(0)
+    const { rig, cam, tick } = fakeCamera(SPREAD)
+    const fits = sceneShot([SPREAD.ada, SPREAD.bo], STAGE_BOX)
+    expect(fits?.stop, 'the box these two stand in fits the stage at a half').toBe(0.5)
+    driveShot(rig, NO_WORLD, PEAK, { current: true }, { current: false }, close(0))
+    expect(cam.scale).toBe(0.5)
+    for (const at of [PEAK_PUSH_MS - 1, PEAK_PUSH_MS, PEAK_PUSH_MS * 4]) {
+      now.mockReturnValue(at)
+      tick()
+      expect(cam.scale, `${at} ms`).toBe(0.5)
+    }
+    expect(cam, 'and it is still on the two of them').toEqual({
+      x: fits?.sx,
+      y: fits?.sy,
+      scale: 0.5,
+    })
+  })
+})
+
+// The turn reaches the camera as one more thing the world said, so the holder has to take it
+// once: applied on every render it would restart the push and the hold forever.
+describe('★ the shot on screen takes a turn once', () => {
+  const OF = {
+    castKey: 'ada bo',
+    followed: null,
+    sceneId: 'sc_1',
+    isCut: true,
+    why: 'they are falling out',
+  }
+  const WANT = {
+    spec: {
+      kind: 'twoShot' as const,
+      target: { at: 'cast' as const, ids: ['ada', 'bo'] },
+      why: '',
+    },
+    byHand: false,
+    turn: null as TensionTurn | null,
+    by: 'cut' as const,
+    structureId: null,
+    of: OF,
+  }
+  const TURN = { sceneId: 'sc_1', yielder: 'bo', tick: 42 }
+  /** the shot the camera is on while the turn happens somewhere else */
+  const ELSEWHERE = {
+    ...WANT,
+    spec: {
+      kind: 'twoShot' as const,
+      target: { at: 'cast' as const, ids: ['cy', 'dee'] },
+      why: '',
+    },
+    of: { ...OF, castKey: 'cy dee', sceneId: 'sc_9' },
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // ★ The turn was marked taken by whatever shot was up when it landed. A give_way is what
+  // raises the scene's score, so the shot up at that instant is the one the director is about
+  // to cut AWAY from, and the push and the fourteen second hold went to nobody.
+  it('★ waits for the shot that is on its own scene, instead of being spent on another', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const hold = shotHold()
+    const away = hold(ELSEWHERE)
+    expect(away?.shot.kind).toBe('twoShot')
+    now.mockReturnValue(1100)
+    expect(hold({ ...ELSEWHERE, turn: TURN })?.shot, 'the turn is not this scene’s').toBe(
+      away?.shot,
+    )
+    // The cut floor is eight seconds, so the camera cannot arrive any sooner than this.
+    now.mockReturnValue(1000 + CUT_MIN_MS)
+    const arrived = hold({ ...WANT, turn: TURN })
+    expect(arrived?.of.sceneId).toBe('sc_1')
+    expect(arrived?.shot.kind).toBe('close')
+    expect(arrived?.shot.turnedMs).toBe(1000 + CUT_MIN_MS)
+    expect(arrived?.shot.minHoldMs).toBeGreaterThanOrEqual(PEAK_TURN_HOLD_MS)
+  })
+
+  it('★ drops a turn no shot took before the aftermath it would have held for ran out', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const hold = shotHold()
+    hold(ELSEWHERE)
+    now.mockReturnValue(1100)
+    hold({ ...ELSEWHERE, turn: TURN })
+    now.mockReturnValue(1100 + PEAK_TURN_HOLD_MS)
+    const late = hold({ ...WANT, turn: TURN })
+    expect(late?.of.sceneId).toBe('sc_1')
+    expect(late?.shot.kind).toBe('twoShot')
+    expect(late?.shot.turnedMs).toBeNull()
+  })
+
+  it('★ pushes and holds the shot the turn landed on, and holds it against the next want', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const hold = shotHold()
+    const first = hold(WANT)
+    expect(first?.shot.kind).toBe('twoShot')
+    now.mockReturnValue(3000)
+    const turned = hold({ ...WANT, turn: TURN })
+    expect(turned?.shot.kind).toBe('close')
+    expect(turned?.shot.turnedMs).toBe(3000)
+    expect(turned?.shot.minHoldMs).toBe(2000 + PEAK_TURN_HOLD_MS)
+    now.mockReturnValue(3000 + PEAK_TURN_HOLD_MS - 1)
+    expect(hold({ ...WANT, turn: TURN })?.shot).toBe(turned?.shot)
+    now.mockReturnValue(3000 + PEAK_TURN_HOLD_MS)
+    expect(hold({ ...WANT, turn: TURN })?.shot).not.toBe(turned?.shot)
+  })
+
+  it('★ never takes the same turn twice, however many renders go past it', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const hold = shotHold()
+    hold(WANT)
+    const turned = hold({ ...WANT, turn: TURN })
+    for (const at of [3100, 3200, 3300, 4000]) {
+      now.mockReturnValue(at)
+      expect(hold({ ...WANT, turn: TURN })?.shot, `${at}`).toBe(turned?.shot)
+    }
+  })
+
+  it('★ leaves the shot alone for a turn in a scene the camera is not on', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000)
+    const hold = shotHold()
+    const first = hold(WANT)
+    now.mockReturnValue(3000)
+    const after = hold({ ...WANT, turn: { sceneId: 'sc_9', yielder: 'zed', tick: 43 } })
+    expect(after?.shot).toBe(first?.shot)
+    expect(after?.shot.kind).toBe('twoShot')
   })
 })

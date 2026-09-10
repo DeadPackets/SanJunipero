@@ -10,6 +10,7 @@ import {
 import { fold } from '@sj/engine/fold'
 import type { WorldState } from '@sj/engine/state'
 import { isNarratable } from '../ui/chronicleFormat.js'
+import { createTension, type Tension } from '../render/tension.js'
 
 const THOUGHT_LOG_CAP = 200
 /** Narratable events only — see the filter in `applyServer`. */
@@ -25,6 +26,8 @@ export type TownScene = ServerScene['scene']
 // Law flips are kept whole, outside the capped delta ring: a town's legal history
 // is short and must not scroll away behind four hundred footsteps.
 type LawChange = { tick: number; path: string; value: unknown }
+
+const NO_SCENES: readonly TownScene[] = []
 
 /** What a frame the view could not take asks of whoever delivered it: a fresh snapshot, or a
  *  bundle that can read this town at all. */
@@ -51,9 +54,18 @@ export type WorldStore = {
    *  into the log is reused the moment it is trimmed, so a reader counts from here. */
   thoughtsSeq: () => number
   recentEvents: () => SimEvent[]
-  /** The scene the town is holding, open or just closed. The closing frame carries the summary,
-   *  so it is KEPT rather than cleared — whoever shows it decides how long it stands. */
-  getScene: () => TownScene | null
+  /** The scene the town holds under this id, open or standing on the summary its closing frame
+   *  carried. The town runs many at once, so nobody may ask it for "the scene". */
+  sceneById: (id: string) => TownScene | null
+  /** Every scene open right now, in the order the town opened them. */
+  openScenes: () => readonly TownScene[]
+  /** The scene the camera is framing: the town's own cut, or the talk a pinned body is in. The
+   *  director writes it, because a viewer's own pin is client state the wire never carries. */
+  shotScene: () => TownScene | null
+  setShotScene: (id: string | null) => void
+  /** The bars of every talk, folded ONCE for the whole page: two folds of one event stream
+   *  drift, and an instance built later than the scene never hears it open. */
+  tension: Omit<Tension, 'destroy'>
   /** What the gateway says is worth watching, and the act the day has reached. One frame, kept
    *  until the next one changes it — the camera, the cue and the stamp all read this one. */
   getDirector: () => ServerDirector | null
@@ -84,13 +96,26 @@ export function createWorldStore(): WorldStore {
   const latest = new Map<string, { tick: number; text: string }>()
   const moods = new Map<string, string>()
   const events: SimEvent[] = []
-  let scene: TownScene | null = null
+  const scenes = new Map<string, TownScene>()
+  let openList: readonly TownScene[] = NO_SCENES
   let director: ServerDirector | null = null
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
   const eventSubs = new Set<(evts: SimEvent[]) => void>()
   const timeMoving = (): boolean => mode.live || mode.replaying
+  const onEvents = (fn: (evts: SimEvent[]) => void): (() => void) => {
+    eventSubs.add(fn)
+    return () => eventSubs.delete(fn)
+  }
+  const tension = createTension({ onEvents })
+  let shotSceneId: string | null = null
+  const forgetScenes = (): void => {
+    scenes.clear()
+    openList = NO_SCENES
+    shotSceneId = null
+    tension.forget()
+  }
 
   // Every subscriber pass is a full entity sync, so a burst is coalesced onto the next frame.
   // Off a browser there is no frame to wait for and the pass stays synchronous.
@@ -121,7 +146,18 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
-    getScene: () => scene,
+    sceneById: (id) => scenes.get(id) ?? null,
+    openScenes: () => openList,
+    // The director owns this, because a viewer's own pin is client state the wire never carries.
+    // It is written on every shot, so the town's cut is not a fallback: it is what the director
+    // hands over when nobody has pinned anybody.
+    setShotScene: (id) => {
+      if (id === shotSceneId) return
+      shotSceneId = id
+      for (const fn of subs) fn()
+    },
+    shotScene: () => (shotSceneId === null ? null : (scenes.get(shotSceneId) ?? null)),
+    tension,
     getDirector: () => director,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
@@ -186,6 +222,7 @@ export function createWorldStore(): WorldStore {
           // The live cut is about the live minute. Left standing it aimed the camera and the
           // caption at people doing something that has not happened in the minute on screen.
           director = null
+          forgetScenes()
           break
         case 'replaying':
           // The log head goes BACK to where this state was taken: the recorded deltas that follow
@@ -194,6 +231,7 @@ export function createWorldStore(): WorldStore {
           state = msg.state as WorldState
           mode = { live: false, replaying: true, tick: msg.tick }
           director = null
+          forgetScenes()
           break
         case 'mood':
           moods.set(msg.agentId, msg.mood)
@@ -215,7 +253,13 @@ export function createWorldStore(): WorldStore {
           assetsSeq += msg.records.length
           break
         case 'scene':
-          scene = msg.scene
+          // Only the newest close is ever on screen, so an older one goes rather than sit here
+          // for the life of the session.
+          if (!msg.scene.open) {
+            for (const [id, held] of scenes) if (!held.open) scenes.delete(id)
+          }
+          scenes.set(msg.scene.id, msg.scene)
+          openList = [...scenes.values()].filter((held) => held.open)
           break
         case 'director':
           director = msg
@@ -230,10 +274,7 @@ export function createWorldStore(): WorldStore {
       subs.add(fn)
       return () => subs.delete(fn)
     },
-    onEvents(fn) {
-      eventSubs.add(fn)
-      return () => eventSubs.delete(fn)
-    },
+    onEvents,
   }
 }
 

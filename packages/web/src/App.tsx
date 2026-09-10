@@ -455,7 +455,7 @@ export function App() {
         onFocus={setFocus}
         onOpen={setSubject}
       />
-      <Nameplate subject={focus ?? subject} scene={scene} />
+      <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
       <SkyArc store={store} link={link} />
       <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />

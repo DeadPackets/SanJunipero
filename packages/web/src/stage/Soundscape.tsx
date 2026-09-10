@@ -157,10 +157,9 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
         const at = feetOf(s.x, s.y)
         if (inView(view, at.sx, at.sy)) firefliesInView++
       }
-    const held = store.getScene()
     let mouths = 0,
       voicePan = 0
-    if (held?.open)
+    for (const held of store.openScenes())
       for (const id of held.participants) {
         const a = state.agents[id]
         if (a === undefined) continue

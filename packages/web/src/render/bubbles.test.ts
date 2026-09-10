@@ -33,7 +33,15 @@ import { BUBBLE_PAD, SPEECH_FILL, SPEECH_INK, faceFor, wrapCharsFor } from './te
 import { bandRatios, over } from './legibility.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
-import { fateOfPriorLine, typedChars, typingMs } from './converse.js'
+import {
+  COLUMN_PRIOR_ALPHA,
+  MAX_LIVE_THOUGHTS,
+  PRIOR_ALPHA,
+  columnLines,
+  fateOfPriorLine,
+  typedChars,
+  typingMs,
+} from './converse.js'
 import type { Rect } from './tooltip.js'
 import { Container } from 'pixi.js'
 import type { Scene } from './scene.js'
@@ -538,39 +546,41 @@ describe('a bubble stays on its leash and leaves on a fade (D19, D20)', () => {
 // The layer, driven the way the ticker drives it. Pixi measures labels through
 // `document.createElement('canvas')` and these tests run with no DOM, so a label needs the
 // smallest stub that lets one build.
-describe('★ a mind under a roof is not on the map, and neither is what it says', () => {
-  beforeAll(() => {
-    if (typeof globalThis.document !== 'undefined') return
-    const ctx = {
-      font: '',
-      measureText: (t: string) => ({
-        width: t.length * 8,
-        actualBoundingBoxLeft: 0,
-        actualBoundingBoxRight: t.length * 8,
-        actualBoundingBoxAscent: 8,
-        actualBoundingBoxDescent: 2,
-      }),
-      fillText: () => {},
-      clearRect: () => {},
-      getImageData: () => ({ data: new Uint8ClampedArray(4) }),
-      scale: () => {},
-      translate: () => {},
-      save: () => {},
-      restore: () => {},
-      setTransform: () => {},
-    }
-    const canvas = { width: 1, height: 1, getContext: () => ctx, style: {} }
-    Object.defineProperty(globalThis, 'document', {
-      configurable: true,
-      value: { createElement: () => canvas, body: { appendChild: () => {} } },
-    })
-    Object.defineProperty(globalThis, 'CanvasRenderingContext2D', {
-      configurable: true,
-      value: class {
-        letterSpacing = ''
-      },
-    })
+function stubCanvas(): void {
+  if (typeof globalThis.document !== 'undefined') return
+  const ctx = {
+    font: '',
+    measureText: (t: string) => ({
+      width: t.length * 8,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: t.length * 8,
+      actualBoundingBoxAscent: 8,
+      actualBoundingBoxDescent: 2,
+    }),
+    fillText: () => {},
+    clearRect: () => {},
+    getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+    scale: () => {},
+    translate: () => {},
+    save: () => {},
+    restore: () => {},
+    setTransform: () => {},
+  }
+  const canvas = { width: 1, height: 1, getContext: () => ctx, style: {} }
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: { createElement: () => canvas, body: { appendChild: () => {} } },
   })
+  Object.defineProperty(globalThis, 'CanvasRenderingContext2D', {
+    configurable: true,
+    value: class {
+      letterSpacing = ''
+    },
+  })
+}
+
+describe('★ a mind under a roof is not on the map, and neither is what it says', () => {
+  beforeAll(stubCanvas)
 
   type Body = { x: number; y: number; alive: boolean; name: string; insideId?: string }
 
@@ -589,9 +599,11 @@ describe('★ a mind under a roof is not on the map, and neither is what it says
       viewRect: () => ({ x: -1e4, y: -1e4, w: 2e4, h: 2e4 }),
       anchorOf: () => null,
       tags: { occupied: () => [], setOccupied: () => {} },
+      ring: { bounds: () => null },
     } as unknown as Scene
     const store = {
       getState: () => ({ agents: { amara } }),
+      sceneById: () => null,
       assetRecords: () => [],
     } as unknown as WorldStore
     return { layer: createBubbleLayer(scene, store), amara, said: () => bubbleLayer.children }
@@ -663,5 +675,267 @@ describe('★ the paper is cut for the name, and laid clear of the chrome', () =
     expect(SRC).toContain('const seen = inViewSpeakers(at, view)')
     const ACTS = readFileSync(new URL('./acts.ts', import.meta.url), 'utf8')
     expect(ACTS).toContain('safeView(view, scene.safeInsets, zoom)')
+  })
+})
+
+// ★ Phase 3 — the owner's words were "the UI is extremely hard to follow what is going on":
+// up to 24 boxes over the town, last-write-wins, and no way to tell which line answers which.
+describe('★ the framed scene stacks in a column, and the rest of the town murmurs', () => {
+  beforeAll(stubCanvas)
+
+  type Ring = { sceneId: string; sx: number; sy: number; rx: number; ry: number } | null
+  type Held = { id: string; participants: string[]; open: boolean }
+
+  const RING = { sceneId: 's1', sx: 300, sy: 300, rx: 60, ry: 30 }
+  /** the ring's own right edge: a docked line stands past it, a line over a head does not */
+  const DOCKED = RING.sx + RING.rx
+
+  const talk = (id: string, participants: string[]): Held => ({ id, participants, open: true })
+
+  function town(
+    scenes: Held[],
+    startRing: Ring = { ...RING },
+  ): {
+    layer: ReturnType<typeof createBubbleLayer>
+    nodes: () => Container[]
+    box: (i: number) => Container
+    glyph: (i: number) => Container
+    mark: (i: number) => Container
+    setRing: (r: Ring) => void
+    close: (id: string) => void
+  } {
+    const held = new Container()
+    const agents = {
+      amara: { x: 4, y: 4, alive: true, name: 'Amara' },
+      nadir: { x: 6, y: 4, alive: true, name: 'Nadir' },
+      kofi: { x: 20, y: 12, alive: true, name: 'Kofi' },
+    }
+    let ring = startRing
+    const open = new Map(scenes.map((s) => [s.id, s]))
+    const scene = {
+      layers: { bubbles: held },
+      textScale: 1,
+      getZoom: () => 1,
+      wantsMotion: () => false,
+      viewRect: () => ({ x: 0, y: 0, w: 2000, h: 900 }),
+      anchorOf: () => null,
+      tags: { occupied: () => [], setOccupied: () => {} },
+      ring: { bounds: () => ring },
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ agents }),
+      sceneById: (id: string) => open.get(id) ?? null,
+      assetRecords: () => [],
+    } as unknown as WorldStore
+    const kids = (): Container[] => held.children
+    return {
+      layer: createBubbleLayer(scene, store),
+      nodes: kids,
+      box: (i) => kids()[i]!.children[0] as Container,
+      glyph: (i) => kids()[i]!.children[1] as Container,
+      mark: (i) => kids()[i]!.children[2] as Container,
+      setRing: (r) => {
+        ring = r
+      },
+      close: (id) => {
+        open.get(id)!.open = false
+      },
+    }
+  }
+
+  it('★ stands the scene’s lines beside the ring, newest on its floor and the older at 0.45', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well is dry')
+    t.layer.spawnSpeech('nadir', 'then we dig')
+    t.layer.tick(now + 500)
+    const [older, newest] = t.nodes()
+    expect(t.box(0).visible, 'both are slabs, not marks').toBe(true)
+    expect(t.box(1).visible).toBe(true)
+    // one column, off the ring's own side, and the newest sits on the ring's floor
+    expect(older!.position.x).toBeGreaterThan(DOCKED)
+    expect(newest!.position.x).toBeGreaterThan(DOCKED)
+    expect(newest!.position.y).toBe(RING.sy + RING.ry)
+    expect(older!.position.y).toBeLessThan(newest!.position.y)
+    expect(newest!.alpha).toBe(1)
+    expect(older!.alpha).toBe(COLUMN_PRIOR_ALPHA)
+    expect(older!.alpha).toBe(0.45)
+  })
+
+  // ★ `fateOfPriorLine` ends the third line of any exchange, so a column that says four could
+  // only ever draw two. The framed scene's lines are the column's now, and the fifth reaps the
+  // oldest: the constant and the picture say the same number.
+  it('★ holds four of the scene’s lines, and the fifth pushes the oldest out', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    const now = performance.now()
+    const said = [
+      'the well is dry',
+      'then we dig',
+      'not in this ground',
+      'we dig anyway',
+      'at dawn',
+    ]
+    said.forEach((line, i) => {
+      t.layer.spawnSpeech(i % 2 === 0 ? 'amara' : 'nadir', line)
+    })
+    const oldest = t.nodes()[0]!
+    t.layer.tick(now + 500)
+    expect(t.nodes().filter((n) => (n.children[0] as Container).visible)).toHaveLength(4)
+
+    t.layer.tick(now + 520)
+    expect(t.nodes()).toHaveLength(4)
+    expect(oldest.destroyed, 'the first line is the one that went').toBe(true)
+    const ys = t.nodes().map((n) => n.position.y)
+    expect(
+      [...ys].sort((a, b) => a - b),
+      'oldest at the top, newest on the floor',
+    ).toEqual(ys)
+    expect(ys.at(-1)).toBe(RING.sy + RING.ry)
+  })
+
+  it('takes neither a thought nor a body the world left out of the scene', () => {
+    expect(
+      columnLines(
+        [
+          { agentId: 'amara', isThought: false },
+          { agentId: 'amara', isThought: true },
+          { agentId: 'kofi', isThought: false },
+        ],
+        new Set(['amara']),
+      ),
+    ).toEqual([0])
+  })
+
+  // ★ The nearest-three cap was killed deliberately: the town does not go quiet because the
+  // camera looked away. A body outside the shot's scene murmurs, and murmuring is not silence.
+  it('★ a body outside the shot’s scene keeps a 6 px mark and no slab', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    t.layer.spawnSpeech('kofi', 'my roof leaks')
+    t.layer.tick(performance.now() + 500)
+    expect(t.box(0).visible).toBe(false)
+    expect(t.mark(0).visible).toBe(true)
+    // a MARK, not the three-dot glyph shrunk to where nobody can resolve it
+    expect(t.glyph(0).visible).toBe(false)
+    expect(t.mark(0).getLocalBounds().height).toBe(6)
+    expect(t.nodes()[0]!.visible, '★ every speaking body still shows something').toBe(true)
+  })
+
+  // ★ `getScene()` answered with the last scene the town opened ANYWHERE, so with two talks
+  // running the one the camera was on is the one that got muted.
+  it('★ murmurs by the scene the camera is on, not by the last talk the town opened', () => {
+    const t = town([talk('s1', ['amara', 'nadir']), talk('s2', ['kofi'])])
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well is dry')
+    t.layer.spawnSpeech('kofi', 'my roof leaks')
+    t.layer.tick(now + 500)
+    expect(t.box(0).visible, 'the shot’s own line is a slab').toBe(true)
+    expect(t.nodes()[0]!.position.x).toBeGreaterThan(DOCKED)
+    expect(t.box(1).visible, 'the other talk murmurs').toBe(false)
+    expect(t.mark(1).visible).toBe(true)
+  })
+
+  // ★ A thought is not part of the exchange, so it was never in the murmur: it collapsed to a
+  // 6 px mark for as long as any scene anywhere was open.
+  it('★ a thought keeps its wisp while a scene is framed', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    t.layer.spawnThought('kofi', 'the roof again')
+    t.layer.spawnSpeech('kofi', 'my roof leaks')
+    t.layer.tick(performance.now() + 500)
+    expect(t.box(0).visible, 'the thought').toBe(true)
+    expect(t.mark(0).visible).toBe(false)
+    expect(t.box(1).visible, 'the spoken line beside it').toBe(false)
+    expect(t.mark(1).visible).toBe(true)
+  })
+
+  it('★ lets the column and the murmur go the moment the world closes the scene', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well is dry')
+    t.layer.spawnSpeech('kofi', 'my roof leaks')
+    t.layer.tick(now + 500)
+    expect(t.nodes()[0]!.position.x).toBeGreaterThan(DOCKED)
+    expect(t.mark(1).visible).toBe(true)
+
+    t.close('s1')
+    t.layer.tick(now + 600)
+    expect(t.nodes()[0]!.position.x, 'the line goes back over its speaker').toBeLessThan(DOCKED)
+    expect(t.mark(1).visible, 'and the town has its own voice back').toBe(false)
+    expect(t.box(1).visible).toBe(true)
+  })
+
+  // ★ The column's dim comes from POSITION, and the alpha write was skipped whenever both were
+  // 1: a short reply that died before the line it answered left that line stuck at 0.45.
+  it('★ a line that returns to the front of the column brightens again', () => {
+    const t = town([talk('s1', ['amara', 'nadir'])])
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well by the mill is dry too')
+    t.layer.spawnSpeech('nadir', 'no')
+    t.layer.tick(now + 500)
+    expect(t.nodes()[0]!.alpha).toBe(COLUMN_PRIOR_ALPHA)
+
+    t.layer.tick(now + 4000) // the short reply has gone and the long line is the newest again
+    expect(t.nodes()).toHaveLength(1)
+    expect(t.nodes()[0]!.alpha).toBe(1)
+  })
+
+  it('leaves the town its slabs when the world holds no scene open', () => {
+    const t = town([], null)
+    t.layer.spawnSpeech('kofi', 'my roof leaks')
+    t.layer.tick(performance.now() + 500)
+    expect(t.box(0).visible).toBe(true)
+    expect(t.mark(0).visible).toBe(false)
+  })
+
+  it('★ docks on the side with the room, and holds that side for the life of the scene', () => {
+    const t = town([talk('s1', ['amara', 'nadir']), talk('s2', ['amara', 'nadir'])])
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well is dry')
+    t.layer.tick(now + 500)
+    expect(t.nodes()[0]!.position.x, 'the room is to the right of a ring at 300').toBeGreaterThan(
+      DOCKED,
+    )
+
+    // the cast walks across the frame and the room flips. The column does not.
+    t.setRing({ sceneId: 's1', sx: 1700, sy: 300, rx: 60, ry: 30 })
+    t.layer.tick(now + 600)
+    expect(t.nodes()[0]!.position.x).toBeGreaterThan(1760)
+
+    // a scene the world opened after it is a new question, and gets the other answer
+    t.setRing({ sceneId: 's2', sx: 1700, sy: 300, rx: 60, ry: 30 })
+    t.layer.tick(now + 700)
+    expect(t.nodes()[0]!.position.x).toBeLessThan(1640)
+  })
+
+  // ★ Moved off `expect(SRC).toContain('PRIOR_HOLD_MS')`: the layer's own rule for a line
+  // nobody is framing, driven rather than read.
+  it('★ outside a framed scene it holds an answered line, and lets go on the third', () => {
+    const t = town([], null)
+    const now = performance.now()
+    t.layer.spawnSpeech('amara', 'the well is dry')
+    t.layer.spawnSpeech('nadir', 'then we dig')
+    t.layer.tick(now + 500)
+    expect(t.nodes()).toHaveLength(2)
+    expect(t.nodes()[0]!.alpha, 'the answered line dims and stays').toBe(PRIOR_ALPHA)
+
+    t.layer.spawnSpeech('amara', 'not in this ground')
+    t.layer.tick(now + 600)
+    expect(t.nodes()).toHaveLength(2)
+  })
+
+  // ★ Moved off `expect(SRC).toContain('for (const i of thoughtsToEnd(...)')`.
+  it('★ ends a mind’s own earlier thought, and never leaves three standing', () => {
+    const t = town([], null)
+    const now = performance.now()
+    t.layer.spawnThought('amara', 'the well')
+    t.layer.spawnThought('nadir', 'the road')
+    t.layer.spawnThought('kofi', 'the roof')
+    t.layer.tick(now + 10)
+    expect(t.nodes()).toHaveLength(MAX_LIVE_THOUGHTS)
+
+    const kofi = t.nodes()[1]!
+    t.layer.spawnThought('kofi', 'the roof again')
+    t.layer.tick(now + 20)
+    expect(t.nodes()).toHaveLength(MAX_LIVE_THOUGHTS)
+    expect(kofi.destroyed, 'its own earlier one is the one that went').toBe(true)
   })
 })

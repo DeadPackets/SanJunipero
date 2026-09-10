@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
 import type { TownScene, WorldStore } from '../state/worldStore.js'
+import { createTension, TENSION_DESATURATE_MS } from './tension.js'
 
 vi.mock('pixi.js', () => {
   class Point {
@@ -48,6 +49,7 @@ vi.mock('pixi.js', () => {
     hitArea: unknown = null
     texture: unknown = null
     alpha = 1
+    tint = 0xffffff
     constructor(texture?: unknown) {
       super()
       if (texture !== undefined) this.texture = texture
@@ -181,6 +183,12 @@ function makeStore(agents: MutableAgents): {
   setMoving: (v: boolean) => void
 } {
   const handlers = new Set<(evts: SimEvent[]) => void>()
+  const tension = createTension({
+    onEvents: (fn) => {
+      handlers.add(fn)
+      return () => handlers.delete(fn)
+    },
+  })
   let scene: TownScene | null = null
   let moving = true
   const store = {
@@ -192,7 +200,8 @@ function makeStore(agents: MutableAgents): {
     latestThought: () => null,
     thoughtsLog: () => [],
     recentEvents: () => [],
-    getScene: () => scene,
+    shotScene: () => scene,
+    tension,
     assetsSeq: () => 0,
     assetRecords: () => [],
     applyServer: () => {},
@@ -1090,6 +1099,8 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     layer: ReturnType<typeof createCharacterLayer>
     setScene: (s: TownScene | null) => void
     say: (who: string, x: number, atMs: number) => void
+    line: (agentId: string, move: string, atMs: number) => void
+    talk: (participants: string[], atMs: number) => void
   }> {
     // Two tiles apart on one row, so their facings are opposite and unambiguous.
     const agents: MutableAgents = {
@@ -1113,6 +1124,28 @@ describe('★ the floor ring and the facing, through the real layer', () => {
         emit([spoke(who, x, 0)])
         layer.tick(atMs)
         layer.tick(atMs + FADE_MS)
+      },
+      talk: (participants, atMs) => {
+        clockMs = atMs
+        emit([
+          {
+            seq: 1,
+            tick: 1,
+            type: 'scene_opened',
+            payload: { id: 'sc_1', kind: 'talk', participants, topic: null, stakes: 4 },
+          },
+        ])
+      },
+      line: (agentId, move, atMs) => {
+        clockMs = atMs
+        emit([
+          {
+            seq: 1,
+            tick: 1,
+            type: 'scene_line',
+            payload: { id: 'sc_1', agentId, text: 'Well.', move },
+          },
+        ])
       },
     }
   }
@@ -1240,6 +1273,24 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     setScene({ ...openScene(['amara', 'salma']), open: false, summary: 'They agreed.' })
     say('amara', 0, 2000)
     expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
+  })
+
+  it('drains the two bodies a turn was between, and gives their colour back', async () => {
+    const { layer, setScene, line, talk } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    talk(['amara', 'salma'], 1000)
+    line('amara', 'press', 1000)
+    line('amara', 'press', 1000)
+    line('amara', 'press', 1000)
+    layer.tick(1000)
+    expect(layer.getSprite('salma')!.tint).toBe(0xffffff)
+    line('salma', 'give_way', 1000)
+    layer.tick(1000)
+    expect(layer.getSprite('salma')!.tint, 'the one who folded').not.toBe(0xffffff)
+    expect(layer.getSprite('amara')!.tint, 'and the one who pushed').not.toBe(0xffffff)
+    layer.tick(1000 + TENSION_DESATURATE_MS)
+    expect(layer.getSprite('salma')!.tint).toBe(0xffffff)
+    expect(layer.getSprite('amara')!.tint).toBe(0xffffff)
   })
 
   it('rings nobody in a scene where nobody has spoken yet', async () => {

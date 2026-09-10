@@ -125,13 +125,6 @@ describe('★ the line before this one stays, and dims', () => {
     expect(PRIOR_ALPHA).toBe(0.6)
   })
 
-  it('★ the bubble layer holds a line once it is answered, and lets go on the third', () => {
-    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
-    expect(SRC).toContain('PRIOR_HOLD_MS')
-    expect(SRC).toContain('PRIOR_ALPHA')
-    expect(SRC).toContain('typedChars(')
-  })
-
   it('★ the character layer turns a talking body toward its partner', () => {
     const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
     expect(SRC).toContain('partnerOf(')
@@ -174,12 +167,6 @@ describe('★ one live thought a mind, and two on screen', () => {
         'keep',
       )
     }
-  })
-
-  it('★ the layer applies it on every thought, and leaves speech on its own rule', () => {
-    const SRC = readFileSync(new URL('./bubbles.ts', import.meta.url), 'utf8')
-    expect(SRC).toContain('for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now')
-    expect(SRC).toContain('const live = bubbles.filter((b) => b.isThought)')
   })
 })
 

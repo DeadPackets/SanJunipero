@@ -88,7 +88,7 @@ export function sceneStageOf(scene: TownScene | null, clearedId: string | null):
 /** The one owner of the eight-second hold: the cue prints off it and the camera lets go on it,
  *  so the shot cannot release while the summary is still on screen. */
 export function useSceneStage(store: WorldStore): SceneStage | null {
-  const scene = useSyncExternalStore(store.subscribe, store.getScene)
+  const scene = useSyncExternalStore(store.subscribe, store.shotScene)
   const [cleared, setCleared] = useState<string | null>(null)
   useEffect(() => {
     if (scene === null || scene.open) return

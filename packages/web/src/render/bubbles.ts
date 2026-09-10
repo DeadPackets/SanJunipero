@@ -4,12 +4,16 @@ import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import {
+  COLUMN_PRIOR_ALPHA,
   PRIOR_ALPHA,
   PRIOR_HOLD_MS,
+  columnLines,
+  dockSide,
   fateOfPriorLine,
   thoughtsToEnd,
   typedChars,
   typingMs,
+  type DockSide,
 } from './converse.js'
 import {
   BUBBLE_EDGE,
@@ -38,6 +42,7 @@ import {
   EDGE_PAD_PX,
   MAX_STACK_STEPS,
   STACK_STEP_PX,
+  TAG_GAP_PX,
   overlaps,
   placeTag,
   type Rect,
@@ -177,6 +182,12 @@ export function speakerWash(rgb: number): number {
 /** How far a box floats over the head it belongs to. */
 export const BUBBLE_LIFT_PX = 18
 
+/** How far the column stands off the ring, and off its own next line. */
+const COLUMN_GAP_PX = 6
+/** All a body outside the framed scene keeps: the town stays audibly alive without asking to
+ *  be read, and nobody who speaks ever goes invisible. */
+const MURMUR_MARK_PX = 6
+
 /** `tick` is the only reaper and it stops with `requestAnimationFrame`, so a hidden tab would
  *  stack every line twelve minds say for as long as it is hidden. Twice the on-screen most. */
 export const BUBBLE_CAP = 24
@@ -208,14 +219,17 @@ export function bubbleShown(zoom: number, inView: boolean): boolean {
 export const bubbleInked = (typed: number): boolean => typed > 0
 
 /** `placeTag` clamps a bubble into the view, so a speaker who has walked off screen would leave
- *  a "…" pinned to the viewport corner with nobody under it. */
+ *  a "…" pinned to the viewport corner with nobody under it. The gap the placer always leaves is
+ *  inside the leash: without it a mark no taller than that gap is never on it. */
 export function onLeash(
   rect: Rect,
   sx: number,
   sy: number,
   size: { w: number; h: number },
 ): boolean {
-  return overlaps(rect, { x: sx - size.w, y: sy - size.h, w: size.w * 2, h: size.h * 2 })
+  const w = size.w + TAG_GAP_PX
+  const h = size.h + TAG_GAP_PX
+  return overlaps(rect, { x: sx - w, y: sy - h, w: w * 2, h: h * 2 })
 }
 
 /** The opacity a bubble has `msLeft` before it dies: the reveal motion run backwards. */
@@ -322,6 +336,7 @@ type Bubble = {
   /** the box, in the node's local space, and the tail that has to point out of it */
   box: Container
   glyph: Graphics
+  mark: Graphics
   tail: Graphics
   /** the whole line, and how much of it has been set — the box is cut to the WHOLE line, so a
    *  reveal never moves the paper it is written on */
@@ -341,6 +356,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
   const bubbles: Bubble[] = []
   let graveTone = false
   let viewer: ThoughtsSetting = 'shown'
+  let dock: { sceneId: string; side: DockSide } | null = null
   // Whatever shut them, the ones already in the air go with it.
   const gate = (): void => {
     if (!thoughtsHidden(graveTone, viewer)) return
@@ -375,6 +391,21 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     return SPEECH_FILL
   }
 
+  /** THE one alpha a bubble gets: the last frames fading out, under whatever the line is worth
+   *  beside a newer one. The fade-in is a rAF on the node and owns the first frames. Past those
+   *  the layer always writes, or a line that returns to the front of the column stays dim. */
+  const fade = (b: Bubble, dim: number, leaving: number, nowMs: number): void => {
+    if (dim >= 1 && leaving >= 1 && nowMs - b.bornMs < BUBBLE_FADE_MS) return
+    b.node.alpha = Math.min(dim, leaving)
+  }
+
+  /** The cast of the scene the camera is framing, and null when the ring is on nothing the world
+   *  still holds open. */
+  const castOf = (ring: { sceneId: string } | null): ReadonlySet<string> | null => {
+    const held = ring === null ? null : store.sceneById(ring.sceneId)
+    return held?.open === true ? new Set(held.participants) : null
+  }
+
   /** The tail is redrawn when the box changes side, so it always points at its own speaker
    *  even after de-confliction has moved the bubble somewhere else. */
   const drawTail = (tail: Graphics, side: BubbleSide, w: number, h: number, fill: number): void => {
@@ -395,6 +426,17 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     return g
   }
 
+  /** A murmur is a MARK. The ellipsis glyph shrunk to 6 px is three characters of text nobody
+   *  can resolve, and it read as a bubble too small rather than as somebody talking over there. */
+  const markNode = (): Graphics => {
+    const g = new Graphics()
+    g.circle(0, -MURMUR_MARK_PX / 2, MURMUR_MARK_PX / 2)
+    g.fill(SPEECH_FILL)
+    g.stroke({ width: 1, color: BUBBLE_EDGE, alignment: 1 })
+    g.visible = false
+    return g
+  }
+
   const build = (
     agentId: string,
     text: string,
@@ -404,6 +446,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     node: Container
     box: Container
     glyph: Graphics
+    mark: Graphics
     tail: Graphics
     label: WorldLabel
     full: string
@@ -478,8 +521,9 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     }
     const glyph = glyphNode(isThought)
     glyph.visible = false
-    node.addChild(box, glyph)
-    return { node, box, glyph, tail, label, full, typed, fill, w, h }
+    const mark = markNode()
+    node.addChild(box, glyph, mark)
+    return { node, box, glyph, mark, tail, label, full, typed, fill, w, h }
   }
 
   const spawn = (agentId: string, text: string, isThought: boolean): void => {
@@ -492,7 +536,11 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
       const live = bubbles.filter((b) => b.isThought)
       for (const i of thoughtsToEnd(live, agentId)) live[i]!.dieMs = now
     } else {
+      // The framed scene's own column governs its lines: this rule ends or dims the third, so
+      // four could never stand in a column that says four.
+      const cast = castOf(scene.ring.bounds())
       for (const b of bubbles) {
+        if (cast !== null && cast.has(agentId) && cast.has(b.agentId)) continue
         const fate = fateOfPriorLine({ ...b, dimmed: b.dimMs !== null }, agentId)
         if (fate === 'end') b.dieMs = now
         else if (fate === 'dim') {
@@ -568,25 +616,86 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         return { id: String(i), sx, sy, drift }
       })
       const view = scene.viewRect()
+      const sv = safeView(view, scene.safeInsets, zoom)
+      // The shot's scene: the floor the ring is drawing, and the cast the world stood on it.
+      const ring = scene.ring.bounds()
+      const cast = castOf(ring)
+      if (ring === null || cast === null) dock = null
+      else if (dock?.sceneId !== ring.sceneId)
+        dock = { sceneId: ring.sceneId, side: dockSide(ring, view) }
+      const lines = cast === null ? [] : columnLines(bubbles, cast)
+      const stacked = new Set(lines)
+      // The column is the only reaper its own lines have, so the fifth pushes the oldest out.
+      if (cast !== null)
+        bubbles.forEach((b, i) => {
+          if (!b.isThought && cast.has(b.agentId) && !stacked.has(i)) b.dieMs = nowMs
+        })
       // The SPEAKER, not the box that floats over them: the lift belongs to the placement below.
       const seen = inViewSpeakers(at, view)
       const want = at.map((p, i) => {
         const b = bubbles[i]!
-        const shown = bubbleShown(zoom, seen.has(p.id))
+        // A thought is not a murmur: it was never part of the exchange the column is showing.
+        const murmur = cast !== null && !b.isThought && !stacked.has(i)
+        const shown = bubbleShown(zoom, stacked.has(i) || (!murmur && seen.has(p.id)))
         b.box.visible = shown
-        b.glyph.visible = !shown
+        b.glyph.visible = !shown && !murmur
+        b.mark.visible = murmur
+        const small = murmur
+          ? { w: MURMUR_MARK_PX * inv, h: MURMUR_MARK_PX * inv }
+          : { w: GLYPH_W * inv, h: GLYPH_H * inv }
         return {
           id: p.id,
           sx: p.sx,
           sy: p.sy - CHAR_TARGET_PX - BUBBLE_LIFT_PX - p.drift,
-          size: shown ? { w: b.w * inv, h: b.h * inv } : { w: GLYPH_W * inv, h: GLYPH_H * inv },
+          size: shown ? { w: b.w * inv, h: b.h * inv } : small,
         }
       })
       const boxes: Rect[] = []
+      if (ring !== null && dock !== null) {
+        const side = dock.side
+        const stack: Rect[] = []
+        let y = ring.sy + ring.ry
+        for (let n = lines.length - 1; n >= 0; n--) {
+          const b = bubbles[lines[n]!]!
+          const w = b.w * inv
+          const h = b.h * inv
+          const x =
+            side === 'left'
+              ? ring.sx - ring.rx - COLUMN_GAP_PX - w
+              : ring.sx + ring.rx + COLUMN_GAP_PX
+          stack.push({ x, y: y - h, w, h })
+          y -= h + COLUMN_GAP_PX
+        }
+        // The column moves as ONE: a stack whose lines each fit the view alone is not a column.
+        const dy =
+          stack.length === 0
+            ? 0
+            : pin(
+                0,
+                sv.y + EDGE_PAD_PX - stack[stack.length - 1]!.y,
+                sv.y + sv.h - EDGE_PAD_PX - (ring.sy + ring.ry),
+              )
+        for (let n = 0; n < stack.length; n++) {
+          const rect = stack[n]!
+          const b = bubbles[lines[lines.length - 1 - n]!]!
+          rect.x = pin(rect.x, sv.x + EDGE_PAD_PX, sv.x + sv.w - EDGE_PAD_PX - rect.w)
+          rect.y += dy
+          b.node.scale.set(inv)
+          b.node.visible = bubbleInked(b.typed)
+          if (!b.node.visible) continue
+          fade(b, n === 0 ? 1 : COLUMN_PRIOR_ALPHA, bubbleAlpha(b.dieMs - nowMs), nowMs)
+          b.node.position.set(Math.round(rect.x + rect.w / 2), Math.round(rect.y + rect.h))
+          if (b.side !== side) {
+            b.side = side
+            drawTail(b.tail, side, b.w, b.h, b.fill)
+          }
+          boxes.push(rect)
+        }
+      }
       for (const placed of placeBubbles(
-        want,
-        safeView(view, scene.safeInsets, zoom),
-        scene.tags.occupied('bubbles'),
+        want.filter((_, i) => !stacked.has(i)),
+        sv,
+        [...boxes, ...scene.tags.occupied('bubbles')],
       )) {
         const i = Number(placed.id)
         const b = bubbles[i]!
@@ -594,10 +703,7 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
         const p = want[i]!
         b.node.visible = bubbleInked(b.typed) && onLeash(placed.rect, p.sx, p.sy, p.size)
         if (!b.node.visible) continue
-        // the last frames fade; the fade-in is a rAF on the node and is left alone once done
-        const leaving = bubbleAlpha(b.dieMs - nowMs)
-        const dim = b.dimMs === null ? 1 : PRIOR_ALPHA
-        if (leaving < 1 || dim < 1) b.node.alpha = Math.min(dim, leaving)
+        fade(b, b.dimMs === null ? 1 : PRIOR_ALPHA, bubbleAlpha(b.dieMs - nowMs), nowMs)
         // the box is drawn from (-w/2, -h), so the node sits at the box's bottom centre
         b.node.position.set(Math.round(placed.sx), Math.round(placed.rect.y + placed.rect.h))
         if (b.side !== placed.side) {

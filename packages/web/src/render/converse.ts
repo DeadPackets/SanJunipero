@@ -21,6 +21,35 @@ export function fateOfPriorLine(
   return prior.agentId === speakerId || prior.dimmed ? 'end' : 'dim'
 }
 
+/** The most lines of the framed scene that stand at once, newest at the bottom. */
+const COLUMN_LINES = 4
+/** What a line that is no longer the newest is worth beside the one that is. */
+export const COLUMN_PRIOR_ALPHA = 0.45
+
+export type DockSide = 'left' | 'right'
+
+/** Which of the live lines stand in the framed scene's column: the newest `COLUMN_LINES` its own
+ *  cast said. Indices into `live`, oldest first. A thought is not part of the exchange. */
+export function columnLines(
+  live: readonly { agentId: string; isThought: boolean }[],
+  cast: ReadonlySet<string>,
+): number[] {
+  const said: number[] = []
+  live.forEach((b, i) => {
+    if (!b.isThought && cast.has(b.agentId)) said.push(i)
+  })
+  return said.slice(-COLUMN_LINES)
+}
+
+/** Which side of the ring the column stands on: the side of the view with more room beside it.
+ *  Asked once a scene, never per frame: a column that changes sides mid-talk is worse. */
+export function dockSide(
+  ring: { sx: number; rx: number },
+  view: { x: number; w: number },
+): DockSide {
+  return view.x + view.w - (ring.sx + ring.rx) >= ring.sx - ring.rx - view.x ? 'right' : 'left'
+}
+
 /** ★ A THOUGHT IS ENDED BY THINKING, NEVER BY SPEECH. `fateOfPriorLine` keeps every prior
  *  thought — right, because a thought is not part of the exchange — so nothing ever ended one
  *  and they stacked until each timed out, two of them overlapping on screen. */

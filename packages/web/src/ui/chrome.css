@@ -1356,6 +1356,25 @@ body {
   color: var(--cream);
   text-shadow: var(--halo-deep);
 }
+/* What the talk turned on, and what it changed. The turn is the town's own honey; a chip takes
+   its edge from what the tie is worth, so a slight and a promise kept do not read alike. */
+.scene-card-turn {
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-px); font-size: var(--f-1); font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--deep); background: var(--honey);
+  box-shadow: var(--frame); text-shadow: none;
+}
+.scene-card-chip {
+  padding: var(--s-2) var(--s-3);
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 500;
+  text-wrap: pretty;
+  color: var(--ink); background: var(--parchment);
+  border-left: var(--s-2) solid var(--sand);
+  box-shadow: var(--frame-tight); text-shadow: none;
+}
+.scene-card-chip[data-tone='cost'] { border-left-color: var(--rose); }
+.scene-card-chip[data-tone='gain'] { border-left-color: var(--sage); }
 
 /* ── the lower third at the desk ────────────────────────────────────────────────────────────
    The same slab the stream frame carries, at a quarter of its size, and only while somebody the
@@ -2255,6 +2274,7 @@ body:has(.stage-exit) .camera-chip {
 }
 [data-broadcast='on'] .scene-card-title { font-size: 24px; padding: 8px 12px; }
 [data-broadcast='on'] .scene-card-where { font-size: 28px; }
+[data-broadcast='on'] :is(.scene-card-turn, .scene-card-chip) { font-size: 20px; padding: 8px 12px; }
 
 [data-broadcast='on'] .lower-third {
   position: absolute; left: 4%; right: auto; margin: 0; width: auto; z-index: 26;
