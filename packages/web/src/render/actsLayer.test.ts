@@ -128,6 +128,21 @@ describe('a chip appears on the person doing the work', () => {
     expect(h.chips()).toHaveLength(1)
   })
 
+  // ★ 7M-B: no wash under the word and no mask per chip. The fill was a Graphics mask PER CHIP,
+  // which is a render target for every working person the viewport can see.
+  it('★ carries no mask of its own, and nothing under the word but its paper', () => {
+    const h = harness()
+    h.set(body('yusuf', { verb: 'chop', ticksRemaining: 30 }))
+    h.noteStart('yusuf', 'chop', 30)
+    h.layer.tick()
+    const walk = (n: Container): Container[] => [n, ...n.children.flatMap((c) => walk(c))]
+    const nodes = walk(h.chips()[0]!)
+    expect(nodes.length).toBeGreaterThan(3)
+    for (const n of nodes) expect(n.mask, 'a mask here is a render target per person').toBeFalsy()
+    // the slab, the word and the bar under it: nothing else is drawn behind the letters
+    expect(h.chips()[0]!.children[0]!.children).toHaveLength(3)
+  })
+
   it('says nothing about a person who is only walking past', () => {
     const h = harness()
     h.set(body('nadia', { verb: 'walk', ticksRemaining: 12 }))

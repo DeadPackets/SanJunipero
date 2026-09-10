@@ -6,7 +6,7 @@ import { stamp } from '../paper/stamp.js'
 import { tickBadgeState, type BadgeState, type LinkState } from '../ui/broadcastReady.js'
 import { townAsleep } from '../ui/directorCut.js'
 import { WEATHER_GLYPH } from '../ui/townStats.js'
-import { skyKind, skyTemp, skyWord } from '../ui/skyModel.js'
+import { skyKind, skyWord } from '../ui/skyModel.js'
 import { useFrameCoalesced } from '../ui/onFrame.js'
 import { endpoint, useFeed, usePolled } from '../ui/useEndpoint.js'
 import { milestonesFeed } from '../ui/feeds.js'
@@ -56,22 +56,6 @@ export function sleepField(
   agents: Readonly<Record<string, { alive: boolean; asleep: boolean }>> | undefined,
 ): string | null {
   return townAsleep(agents) ? 'ASLEEP' : null
-}
-
-/** The weather worth taking the field off the town's own state for. */
-const SEVERE: ReadonlySet<string> = new Set(['storm'])
-
-/** Whether the state field has taken the sky for itself, so the strip beside it says only how
- *  cold it is. A question, because assuming it printed a storm nobody could see. */
-export function stateSaysSky(word: StampWord, kind: string): boolean {
-  return word === 'LIVE' && SEVERE.has(kind)
-}
-
-/** ★ ONE WORD for where the picture came from, and never a number, because no hour wakes a body
- *  or ends a storm. It says nothing about the town itself: a town asleep is its own mark beside
- *  this one, so neither fact can take the other's room. */
-export function stateField(word: StampWord, kind: string): string {
-  return stateSaysSky(word, kind) ? kind.toUpperCase() : word
 }
 
 /** ★ Pause is a scrub and resume is a replay: the socket already speaks both, so the one
@@ -209,13 +193,11 @@ export function DayBar({
   // Primitives, never the folded state object: `state.weather` is a fresh object every tick and
   // would re-render this mark sixty times for a sky that has not changed.
   const readKind = (): string => skyKind(store.getState())
-  const readTemp = (): string => skyTemp(store.getState())
   const readWeather = (): string => skyWord(store.getState())
   const readAsleep = (): string | null => sleepField(store.getState()?.agents)
   const isAwake = (): boolean => store.getState() !== null
   const actNow = (): ActMark | null => store.getDirector()?.act ?? null
   const kind = useSyncExternalStore(store.subscribe, readKind, readKind)
-  const temp = useSyncExternalStore(store.subscribe, readTemp, readTemp)
   const weather = useSyncExternalStore(store.subscribe, readWeather, readWeather)
   const asleep = useSyncExternalStore(store.subscribe, readAsleep, readAsleep)
   const awake = useSyncExternalStore(store.subscribe, isAwake, isAwake)
@@ -236,7 +218,6 @@ export function DayBar({
   )
 
   const word = stampWord(mode.live, awake, link, paused)
-  const sky = stateSaysSky(word, kind) ? temp : weather
   const dead = deadFrom(from, edge)
   const when = stamp(tick)
   const frac = dayFrac(tick)
@@ -339,9 +320,9 @@ export function DayBar({
             className="day-bar-sky"
             pixels={(WEATHER_GLYPH[kind] ?? WEATHER_GLYPH['—']!).pixels}
           />
-          {sky}
+          {weather}
         </p>
-        <p className="day-bar-state">{stateField(word, kind)}</p>
+        <p className="day-bar-state">{word}</p>
         {asleep !== null && <p className="day-bar-state">{asleep}</p>}
         <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
       </div>

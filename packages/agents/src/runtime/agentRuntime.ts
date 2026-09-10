@@ -217,8 +217,8 @@ const GATHERING_VERBS: ReadonlySet<string> = new Set(['fish', 'forage', 'hunt', 
 export function actionMemoryText(done: FinishedAct, mintedName?: string, runsToday = 1): string {
   if (done.settled)
     return done.verb === 'walk'
-      ? 'You were already there; no step was needed.'
-      : 'Nothing needed doing; it already stood as you asked.'
+      ? 'You were already there. No step was needed.'
+      : 'Nothing needed doing. It already stood as you asked.'
   if (mintedName !== undefined) {
     const again =
       runsToday < 2 ? '' : ` That makes ${TIMES_SAID[runsToday] ?? `${runsToday} times`} today.`
@@ -1471,7 +1471,7 @@ export class AgentRuntime {
       if (isBlankAnswer(answer.raw)) {
         // Twice nothing leaves the turn UNSPENT: no invented thought, no turn counted. The
         // doze is the back-pressure, so a silent back end is not hammered.
-        this.#llm.alert('blank_answer', 'two blank answers; the turn is left unspent')
+        this.#llm.alert('blank_answer', 'two blank answers, so the turn is left unspent')
         this.#doze(tick)
         return
       }
@@ -1771,7 +1771,7 @@ export class AgentRuntime {
       if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]}: ${t.text}`)
       held.set(name, rows)
     }
-    return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join('; ')}.`]))
+    return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join(' | ')}.`]))
   }
 
   #buildLedgers(people: string[], packet: PerceptionPacket): PromptBlocks['scene']['ledgers'] {
@@ -1830,7 +1830,7 @@ export class AgentRuntime {
   #doze(tick: number, cause?: unknown): void {
     this.#stats.dozes += 1
     const why = cause === undefined ? 'providers unavailable' : messageOf(cause)
-    this.#llm.alert('doze_off', `${why}; the mind dozes off mid-thought`)
+    this.#llm.alert('doze_off', `${why}. The mind dozes off mid-thought`)
     this.#clock.lastTurnTick = tick + this.#config.dozeTicks
     this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
   }

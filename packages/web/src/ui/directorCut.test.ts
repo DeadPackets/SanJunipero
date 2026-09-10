@@ -26,7 +26,7 @@ const NOBODY_INSIDE = new Set<string>()
 const NO_MOMENT: readonly string[] = []
 
 const cut = (agentIds: string[], over: Partial<StakeScore> = {}): { cut: StakeScore } => ({
-  cut: { sceneId: 'sc_1', agentIds, score: 18, why: 'Nadia & Yusuf — falling out', ...over },
+  cut: { sceneId: 'sc_1', agentIds, score: 18, why: 'Nadia & Yusuf: falling out', ...over },
 })
 
 // ── the frame on the wire ──────────────────────────────────────────────────────────────────

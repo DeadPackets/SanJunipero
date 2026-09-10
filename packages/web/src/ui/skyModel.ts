@@ -70,7 +70,7 @@ export function shadowCast(tick: number): ShadowCast {
 
 /** How cold it is. A town whose snapshot has not landed says nothing about the weather rather
  *  than inventing a temperature. */
-export function skyTemp(state: WorldState | null): string {
+function skyTemp(state: WorldState | null): string {
   return state === null ? '' : `${Math.round(state.weather.temperatureC)}°`
 }
 

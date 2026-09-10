@@ -132,10 +132,10 @@ describe('the affordance block says what the validators would otherwise refuse',
       'not holding that',
     )
     expect(proseFor(t.bridge)).toContain(
-      `Your hands are empty; close enough to touch but not in your hands yet: 1 bread (${BREAD}).`,
+      `Your hands are empty. Close enough to touch but not in your hands yet: 1 bread (${BREAD}).`,
     )
     expect(proseFor(town({ indoors: true }).bridge)).toContain(
-      'Your hands are empty; nothing is close enough to touch.',
+      'Your hands are empty. Nothing is close enough to touch.',
     )
   })
 
@@ -146,7 +146,7 @@ describe('the affordance block says what the validators would otherwise refuse',
     )
     for (let i = 0; i < 20; i++) t.step()
     expect(proseFor(t.bridge)).toContain(
-      `Your hands hold bread ×1 (${BREAD}); nothing else is close enough to touch.`,
+      `Your hands hold bread ×1 (${BREAD}). Nothing else is close enough to touch.`,
     )
   })
 

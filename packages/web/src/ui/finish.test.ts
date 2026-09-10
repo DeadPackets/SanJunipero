@@ -130,7 +130,6 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 // Every control that lifts on hover, not the seven somebody happened to list.
 const CONTROLS = named([
   '.feed-tab',
-  '.live-pill',
   '.legend-chip',
   '.signpost-arm',
   '.room-door',

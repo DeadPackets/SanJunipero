@@ -156,7 +156,7 @@ describe('a discovery in the live feed', () => {
 
   it('reads as the same sentence the chronicle prints — one formatter, not two', () => {
     const state = { agents: { a1: { name: 'Maret' } }, structures: {} } as never
-    expect(describeEvent(ev, state)).toBe('Maret found the way of it — stitch a waterskin.')
+    expect(describeEvent(ev, state)).toBe('Maret found the way of it, stitch a waterskin.')
   })
 
   it('never leaks the mind’s own words into the ticker', () => {

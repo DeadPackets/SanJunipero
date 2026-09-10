@@ -1,5 +1,63 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// The slot is driven for real below, so what it draws is read off the plate it drew.
+vi.mock('pixi.js', () => {
+  class Point {
+    x = 0
+    y = 0
+    set(x: number, y: number = x): void {
+      this.x = x
+      this.y = y
+    }
+  }
+  class Container {
+    children: Container[] = []
+    visible = true
+    eventMode = ''
+    mask: unknown = null
+    destroyed = false
+    anchor = new Point()
+    position = new Point()
+    width = 0
+    height = 0
+    addChild(...cs: Container[]): void {
+      this.children.push(...cs)
+    }
+    destroy(): void {
+      this.destroyed = true
+    }
+  }
+  class Sprite extends Container {
+    texture: unknown = Texture.EMPTY
+  }
+  class Graphics extends Container {
+    fills: number[] = []
+    strokes: { width?: number; color?: number }[] = []
+    rects: number[][] = []
+    clear(): this {
+      this.fills = []
+      this.strokes = []
+      this.rects = []
+      return this
+    }
+    rect(...args: number[]): this {
+      this.rects.push(args)
+      return this
+    }
+    fill(o: number | { color?: number }): this {
+      this.fills.push(typeof o === 'number' ? o : (o.color ?? 0))
+      return this
+    }
+    stroke(o: { width?: number; color?: number }): this {
+      this.strokes.push(o)
+      return this
+    }
+  }
+  const Texture = { EMPTY: { empty: true } }
+  return { Container, Graphics, Point, Sprite, Texture }
+})
+import { Container as MockContainer, Texture as MockTexture } from 'pixi.js'
 import { EMOTE_KINDS } from './charAnim.js'
 import { CONDITIONS, STATES, STATE_WORD, type AgentView } from '../ui/status.js'
 import {
@@ -8,6 +66,7 @@ import {
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
   NO_OVERHEAD,
+  createOverhead,
   overheadRow,
 } from './overhead.js'
 
@@ -78,14 +137,17 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
   // `EMOTE_KINDS.indexOf(kind)` at face value, and -1 for a kind the sheet has no cell for cut a
   // frame off the left of the atlas — art the viewer reads as "the picture is missing", drawn
   // over a person who was only speaking.
+  // The index that produced it is checked one test up: every row's glyph is in the roster, so
+  // no reachable row asks the atlas for a cell it has not got.
   it('★ a cell the atlas does not have draws NOTHING, never a placeholder', () => {
-    const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
-    const cut = /const setGlyph = [\s\S]*?\n  \}/.exec(SRC)?.[0] ?? ''
-    expect(cut, 'setGlyph must be findable').not.toBe('')
-    expect(cut).toContain('Texture.EMPTY')
-    // the index is CHECKED before it becomes a frame, rather than handed straight to Rectangle
-    expect(cut).toMatch(/cell < 0/)
-    expect(cut).not.toMatch(/frame: new Rectangle\(EMOTE_KINDS\.indexOf/)
+    const slot = createOverhead(new MockContainer())
+    slot.setRow(OVERHEAD_PRIORITY[0]!)
+    expect(slot.glyph.texture, 'nothing was cut for it').toBe(MockTexture.EMPTY)
+    expect(slot.glyph.visible, 'so the slot shows no mark at all').toBe(false)
+
+    slot.glyph.texture = { frame: { x: 0 } } as never
+    slot.setRow(OVERHEAD_PRIORITY[1]!)
+    expect(slot.glyph.visible, 'and a cut cell IS drawn').toBe(true)
   })
 
   // The web and the forge each keep the roster; drift shifts every cell by one and the whole
@@ -125,7 +187,14 @@ describe('★ 7A — one slot, one glyph, and the priority table is the whole sp
 // ★ An arch of progress over the head read as broken on any job past a minute, and crowded the
 // one address the slot was built to be. `acts.ts` carries progress now.
 describe('★ the slot is one glyph, and nothing else stands over a head', () => {
-  const src = readFileSync(new URL('./overhead.ts', import.meta.url), 'utf8')
+  const slot = (row = OVERHEAD_PRIORITY[0]!) => {
+    const parent = new MockContainer()
+    const o = createOverhead(parent)
+    o.setRow(row)
+    return { parent, o, node: o.node as unknown as Drawn }
+  }
+  type Drawn = { mask: unknown; children: Drawn[]; fills: number[] }
+  const walk = (n: Drawn): Drawn[] => [n, ...n.children.flatMap(walk)]
 
   it('sits eight pixels above the head, where 7A puts it', () => {
     expect(SLOT_ABOVE_HEAD_PX).toBe(8)
@@ -134,20 +203,29 @@ describe('★ the slot is one glyph, and nothing else stands over a head', () =>
   })
 
   it('★ draws one plate and one glyph, and nothing that counts', () => {
-    // comments stripped: the source SAYS the blocks are gone where it explains that they are
-    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    expect(code).not.toMatch(/TRACK|BLOCK|blockCentres|trackFilled|setTrack/)
-    expect(code).toContain('node.addChild(plate, glyph)')
+    const { o, node } = slot()
+    expect(node.children, 'the plate and the mark, and no row of blocks').toHaveLength(2)
+    for (const row of OVERHEAD_PRIORITY) o.setRow(row)
+    expect(node.children, 'and no news ever adds a third thing').toHaveLength(2)
   })
 
   // With chips on everyone in the viewport, a mask per chip is a render target per person.
+  // With chips on everyone in the viewport, a mask per chip is a render target per person.
+  // The act chip's own half is driven in actsLayer.test.ts, '★ carries no mask of its own'.
   it('★ draws the mark unmasked', () => {
-    expect(src).not.toContain('.mask')
-    expect(readFileSync(new URL('./acts.ts', import.meta.url), 'utf8')).not.toContain('.mask')
+    const { o, node } = slot()
+    for (const row of OVERHEAD_PRIORITY) o.setRow(row)
+    for (const n of walk(node)) expect(n.mask).toBeNull()
   })
 
   it('gives the mark its own ground, like everything else over this town', () => {
-    expect(src).toContain('brings its own ground')
-    expect(src).toMatch(/PLATE_URGENT = 0xe8785a/)
+    const plate = (row: (typeof OVERHEAD_PRIORITY)[number]): Drawn => slot(row).node.children[0]!
+    const urgent = plate(OVERHEAD_PRIORITY.find((r) => r.urgent)!)
+    const quiet = plate(OVERHEAD_PRIORITY.find((r) => !r.urgent)!)
+    // a stepped ledge under the mark: an ink slab, then the paper over it
+    expect(urgent.fills).toHaveLength(2)
+    expect(urgent.fills[1], 'news wears the ember plate').toBe(0xe8785a)
+    expect(quiet.fills[1]).not.toBe(urgent.fills[1])
+    expect(quiet.fills[0], 'and both stand on the same ink').toBe(urgent.fills[0])
   })
 })

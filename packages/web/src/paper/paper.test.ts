@@ -1,13 +1,16 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { createElement } from 'react'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, createElement, Fragment, type ReactElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createWorldStore } from '../state/worldStore.js'
 import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
 import { Signpost } from './Signpost.js'
 import { HelpButton } from '../stage/HelpButton.js'
-import { KEY_MAP_ID, KEY_MAP_KEY } from '../stage/KeyMap.js'
+import { KEY_MAP_ID, KEY_MAP_KEY, KeyMap } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
   ARMS,
@@ -24,7 +27,8 @@ import {
 
 import { stamp } from './stamp.js'
 
-const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
+// happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
+const src = (rel: string): string => readFileSync(join(import.meta.dirname, rel), 'utf8')
 const PAGES = Object.keys(PAGE_TABS) as PageKey[]
 
 /** The masthead and the section rule, without the page body a page may date honestly. */
@@ -36,30 +40,79 @@ const dated = (when: ReturnType<typeof stamp>): string[] => [
   when.season,
 ]
 
+const sheetOf = (over: Partial<Parameters<typeof Paper>[0]> = {}): ReactElement =>
+  createElement(Paper, {
+    page: null,
+    tab: '',
+    subject: null,
+    thing: null,
+    momentId: null,
+    store: createWorldStore(),
+    scene: null,
+    operatorToken: null,
+    insideId: null,
+    gapTicks: null,
+    onTab: () => {},
+    onClose: () => {},
+    onSubject: () => {},
+    onInside: () => {},
+    onScrub: () => {},
+    onPlay: () => {},
+    onLive: () => {},
+    onMoment: () => {},
+    ...over,
+  })
+
 const paper = (over: Partial<Parameters<typeof Paper>[0]> = {}): string =>
-  renderToStaticMarkup(
-    createElement(Paper, {
-      page: null,
-      tab: '',
-      subject: null,
-      thing: null,
-      momentId: null,
-      store: createWorldStore(),
-      scene: null,
-      operatorToken: null,
-      insideId: null,
-      gapTicks: null,
-      onTab: () => {},
-      onClose: () => {},
-      onSubject: () => {},
-      onInside: () => {},
-      onScrub: () => {},
-      onPlay: () => {},
-      onLive: () => {},
-      onMoment: () => {},
-      ...over,
-    }),
-  )
+  renderToStaticMarkup(sheetOf(over))
+
+const roots: { unmount: () => void }[] = []
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+vi.stubGlobal('fetch', () => Promise.reject(new Error('no gateway in a test')))
+
+type Live = {
+  host: HTMLElement
+  again: (over?: Partial<Parameters<typeof Paper>[0]>) => Promise<void>
+  el: (sel: string) => HTMLElement | null
+}
+
+/** The sheet on a real DOM, with its own re-render, so an effect can be watched happening. */
+async function live(over: Partial<Parameters<typeof Paper>[0]> = {}): Promise<Live> {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  roots.push(root)
+  await act(async () => {
+    root.render(sheetOf(over))
+  })
+  return {
+    host,
+    again: async (next = {}) => {
+      await act(async () => {
+        root.render(sheetOf({ ...over, ...next }))
+      })
+    },
+    el: (sel: string): HTMLElement | null => host.querySelector<HTMLElement>(sel),
+  }
+}
+
+/** happy-dom has no PointerEvent, and React reads `clientY`, `pointerId` and `timeStamp` off
+ *  whatever native event arrives under the name. */
+function pointer(el: Element, type: string, clientY: number, at = 0): void {
+  const ev = new MouseEvent(type, { clientY, bubbles: true }) as MouseEvent & {
+    pointerId: number
+  }
+  Object.defineProperty(ev, 'pointerId', { value: 1 })
+  Object.defineProperty(ev, 'timeStamp', { value: at })
+  el.dispatchEvent(ev)
+}
+
+afterEach(async () => {
+  await act(async () => {
+    for (const root of roots.splice(0)) root.unmount()
+  })
+  document.body.replaceChildren()
+})
 
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
@@ -131,14 +184,38 @@ describe('the signpost', () => {
 
   // The button toggles, so the click-away that shuts the sheet must not count it as away — and
   // it asks the DOM through the disclosure, so the key map imports no opener back.
-  it('★ leaves whatever opened the key map out of its own click-away', () => {
-    const keyMap = src('../stage/KeyMap.tsx')
-    expect(keyMap).toContain("[aria-controls='${KEY_MAP_ID}']")
-    expect(keyMap).not.toContain('HelpButton')
-    expect(src('../stage/HelpButton.tsx')).toContain('aria-controls={KEY_MAP_ID}')
-    // ...and the id it names is the one the sheet actually carries
-    expect(keyMap).toContain(`id={KEY_MAP_ID}`)
+  it('★ leaves whatever opened the key map out of its own click-away', async () => {
     expect(KEY_MAP_ID).toBe('key-map-sheet')
+    const asked: boolean[] = []
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(
+        createElement(Fragment, null, [
+          createElement(HelpButton, { key: 'b', open: true, onToggle: () => {} }),
+          createElement(KeyMap, {
+            key: 'm',
+            open: true,
+            onOpenChange: (v: boolean) => asked.push(v),
+          }),
+        ]),
+      )
+    })
+    // the sheet carries the id the button names, which is the whole of the wiring between them
+    expect(host.querySelector('.help-button')?.getAttribute('aria-controls')).toBe(KEY_MAP_ID)
+    expect(host.querySelector(`#${KEY_MAP_ID}`)).not.toBeNull()
+
+    await act(async () => {
+      host.querySelector('.help-button')?.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+    expect(asked, 'the opener cannot put down what it puts up').toEqual([])
+
+    await act(async () => {
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    })
+    expect(asked).toEqual([false])
   })
 
   // React may re-invoke a pending updater, and Safari allows 100 history writes per 30 s: an
@@ -291,16 +368,6 @@ describe('the paper', () => {
     expect(head).toMatch(/class="paper-marginalia"><button/)
   })
 
-  // A voice-control user says the word they can see, and the pill's own label renamed it:
-  // "click LIVE" reached nothing.
-  it('★ names the day strip’s pill with the word it shows', () => {
-    const html = paper({ page: 'chronicle', tab: 'Days' })
-    const pill = /<button[^>]*class="live-pill live"[^>]*>([^<]*)</.exec(html)
-    expect(pill?.[1]).toBe('LIVE')
-    expect(html).not.toContain('aria-label="Return to now"')
-    expect(html).toContain('aria-pressed="true"')
-  })
-
   // The lead story and the live feed, one beside the other — and the lead keeps a real heading
   // for a reader who cannot see that the headline is one.
   it('★ lays the Chronicle out as a front page: a lead story and a column beside it', () => {
@@ -338,19 +405,31 @@ describe('★ every tab of every arm reaches its own body', () => {
   })
 })
 
-// The four ways down and the two focus moves are effects: no DOM runs in this suite, so they are
-// pinned where they are written instead of left unasserted.
 describe('★ every way the paper goes down, and where focus lands', () => {
   const code = src('./Paper.tsx')
+  const OPEN = { page: 'folk', tab: 'People' } as const
 
-  it('leaves Escape to the one ladder in App rather than listening itself', () => {
-    expect(code).not.toContain('Escape')
-    expect(code).not.toContain("addEventListener('keydown'")
+  it('leaves Escape to the one ladder in App rather than listening itself', async () => {
+    const shut: string[] = []
+    const p = await live({ ...OPEN, onClose: () => shut.push('esc') })
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      p.el('.paper')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(shut, 'a second Escape listener takes two rungs of the ladder at once').toEqual([])
   })
 
-  it('closes on the close word and on a click on the town', () => {
-    expect(code).toMatch(/className="town-dim"[\s\S]{0,120}onClick=\{onClose\}/)
-    expect(code).toMatch(/className="paper-close" onClick=\{onClose\}/)
+  it('closes on the close word and on a click on the town', async () => {
+    const shut: string[] = []
+    const p = await live({ ...OPEN, onClose: () => shut.push('x') })
+    await act(async () => {
+      p.el('.paper-close')?.click()
+    })
+    expect(shut).toHaveLength(1)
+    await act(async () => {
+      p.el('.town-dim')?.click()
+    })
+    expect(shut).toHaveLength(2)
   })
 
   it(`closes on a grip drag of more than ${GRIP_CLOSE_PX}px, or on a throw`, () => {
@@ -362,39 +441,88 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     expect(gripDismiss(25, GRIP_FLING_PX_MS)).toBe(false)
     // and an upward throw is never one
     expect(gripDismiss(-60, 2)).toBe(false)
-    expect(code).toMatch(/gripDismiss\(e\.clientY - d\.from, thrown\?\.vy \?\? 0\)/)
   })
 
-  it('★ follows the finger, rubber-banded upward, and brightens the town under it', () => {
-    expect(code).toMatch(/onPointerMove/)
-    expect(code).toMatch(/setPointerCapture/)
-    expect(code).toMatch(/transform = `translate\(-50%, \$\{y\}px\)`/)
-    expect(code).toMatch(/down > 0 \? down : down \/ RUBBER_BAND/)
-    // the camera's own tail, so the sheet and the town answer "was that a throw" alike
-    expect(code).toMatch(/trackDrag\(/)
-    expect(code).toMatch(/dimRef\.current\.style\.opacity/)
+  it(`★ goes down on a drag past ${GRIP_CLOSE_PX}px and comes back from a shorter one`, async () => {
+    const far: string[] = []
+    const p = await live({ ...OPEN, onClose: () => far.push('down') })
+    const grip = p.el('.paper-grip')!
+    pointer(grip, 'pointerdown', 100, 0)
+    pointer(grip, 'pointermove', 100 + GRIP_CLOSE_PX + 1, 400)
+    pointer(grip, 'pointerup', 100 + GRIP_CLOSE_PX + 1, 400)
+    expect(far).toEqual(['down'])
+
+    const near: string[] = []
+    const q = await live({ ...OPEN, onClose: () => near.push('down') })
+    const hold = q.el('.paper-grip')!
+    pointer(hold, 'pointerdown', 100, 0)
+    pointer(hold, 'pointermove', 100 + GRIP_CLOSE_PX - 1, 400)
+    pointer(hold, 'pointerup', 100 + GRIP_CLOSE_PX - 1, 400)
+    expect(near).toEqual([])
+    // and the sheet is handed back to its own CSS rather than left where the finger left it
+    expect(q.el('.paper')?.style.transform ?? '').toBe('')
+  })
+
+  it('★ follows the finger, rubber-banded upward, and brightens the town under it', async () => {
+    const p = await live(OPEN)
+    const grip = p.el('.paper-grip')!
+    const sheet = p.el('.paper')!
+    const dim = p.el('.town-dim')!
+    Object.defineProperty(sheet, 'offsetHeight', { value: 600, configurable: true })
+    pointer(grip, 'pointerdown', 200, 0)
+    pointer(grip, 'pointermove', 290, 16)
+    expect(sheet.style.transform).toBe('translate(-50%, 90px)')
+    // ...and upward it gives a third of the throw, because it is already at the top of its travel
+    pointer(grip, 'pointermove', 110, 32)
+    expect(sheet.style.transform).toBe('translate(-50%, -30px)')
+    // the scrim fades with the sheet, so the town brightens under the finger
+    pointer(grip, 'pointermove', 500, 48)
+    expect(Number(dim.style.opacity)).toBeLessThan(1)
+    pointer(grip, 'pointercancel', 500, 48)
   })
 
   // The sheet is inert while it is down, so its 300ms of held content is not a tab trap in
   // the town, and `aria-hidden` and `inert` never disagree about whether it is there.
-  it('★ is inert and hidden together while it is down', () => {
-    expect(code).toMatch(/aria-hidden=\{!open\}/)
-    expect(code).toMatch(/inert=\{!open\}/)
+  it('★ is inert and hidden together while it is down', async () => {
     expect(paper()).toContain('inert=""')
-    expect(paper({ page: 'folk', tab: 'People' })).not.toContain('inert')
+    expect(paper(OPEN)).not.toContain('inert')
+    const p = await live()
+    const sheet = p.el('.paper')!
+    expect(sheet.getAttribute('aria-hidden')).toBe('true')
+    expect(sheet.hasAttribute('inert')).toBe(true)
+    await p.again(OPEN)
+    expect(sheet.getAttribute('aria-hidden')).toBe('false')
+    expect(sheet.hasAttribute('inert')).toBe(false)
   })
 
   // Switching arms while the sheet is up unmounted the focused tab and dropped focus to <body>.
   // The tab now counts too: on `[open, key]` alone a tab change moved no focus, so a reader was
   // told nothing when the panel under it was replaced.
-  it('★ re-seats focus when the arm or the tab changes, not only when the sheet opens', () => {
-    expect(code).toMatch(/\}, \[open, key, current\]\)/)
+  it('★ re-seats focus when the arm or the tab changes, not only when the sheet opens', async () => {
+    const p = await live(OPEN)
+    expect(document.activeElement?.id).toBe('paper-tab-People')
+    // a tab change replaces the panel under the reader, and focus goes with it
+    await p.again({ tab: 'Families' })
+    expect(document.activeElement?.id).toBe('paper-tab-Families')
+    // and so does an arm change, which unmounts the tab focus was on
+    await p.again({ page: 'laws', tab: 'World' })
+    expect(document.activeElement?.id).toBe('paper-tab-World')
   })
 
   // The opener capture is its own effect: on the focus effect's deps its cleanup fired on every
   // tab change and put focus back on the old tab before the new one took it.
-  it('★ hands the opener back only when the sheet goes down', () => {
-    expect(code).toMatch(/const opener = document\.activeElement[\s\S]*?\}, \[open\]\)/)
+  it('★ hands the opener back only when the sheet goes down', async () => {
+    const arm = document.createElement('button')
+    arm.id = 'the-arm'
+    document.body.append(arm)
+    arm.focus()
+    const p = await live(OPEN)
+    expect(document.activeElement?.id).toBe('paper-tab-People')
+    // a tab change must not bounce focus through the arm, which announces the sheet twice
+    await p.again({ tab: 'Families' })
+    expect(document.activeElement?.id).toBe('paper-tab-Families')
+    await p.again({ page: null, tab: '' })
+    expect(document.activeElement?.id).toBe('the-arm')
   })
 
   // A keyboard instruction inside an accessible name is re-announced on every tab focus.
@@ -407,10 +535,9 @@ describe('★ every way the paper goes down, and where focus lands', () => {
 
   // The first button is not always the selected one: a person page opens on Story and a deep link
   // opens on whatever tab it names, and focus landed on the wrong tab in both.
-  it('moves focus to the tab being shown on the way up, and back to the opener on the way down', () => {
-    expect(code).toMatch(/const opener = document\.activeElement/)
-    expect(code).toMatch(/querySelector<HTMLButtonElement>\(`#paper-tab-\$\{current\}`\)/)
-    expect(code).toMatch(/opener\?\.focus\(\)/)
+  it('moves focus to the tab being shown, which is not always the first one', async () => {
+    await live({ page: 'folk', tab: 'Families' })
+    expect(document.activeElement?.id).toBe('paper-tab-Families')
   })
 
   // `.focus()` reveals its target by scrolling every ancestor that can scroll, and the sheet's
@@ -421,8 +548,15 @@ describe('★ every way the paper goes down, and where focus lands', () => {
 
   // The sheet's scroll box is one div that React keeps mounted across every arm and tab, so its
   // scrollTop was carried into the next page and dropped the reader mid-way down it.
-  it('★ returns the sheet to the top when the page or the tab under it changes', () => {
-    expect(code).toMatch(/sheetBoxRef\.current\.scrollTop = 0/)
+  it('★ returns the sheet to the top when the page or the tab under it changes', async () => {
+    const p = await live(OPEN)
+    const box = p.el('.paper-sheet')!
+    box.scrollTop = 240
+    await p.again({ tab: 'Families' })
+    expect(box.scrollTop).toBe(0)
+    box.scrollTop = 240
+    await p.again({ page: 'laws', tab: 'World' })
+    expect(box.scrollTop).toBe(0)
     // A layout effect: Found's own scroll-to-row is a child passive effect, which runs later.
     expect(code).toMatch(
       /useLayoutEffect\(\(\) => \{[\s\S]*?scrollTop = 0[\s\S]*?\}, \[open, key, current\]\)/,
@@ -489,6 +623,8 @@ describe('★ a page that throws costs the viewer the page, not the town', () =>
     expect(renderToStaticMarkup(boundary.render())).toContain('This page could not be read')
   })
 
+  // A boundary has no DOM of its own and the page under it draws different markup per tab, so
+  // there is nothing on the screen a remount would change. The key itself is the whole rule.
   it('wraps the page body, keyed by the page so a tab switch keeps its feeds', () => {
     expect(src('./Paper.tsx')).toContain('<PageBoundary key={key}>')
   })

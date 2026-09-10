@@ -26,11 +26,11 @@ export const TENSION_CARET_PX = 1
 export const TENSION_DESATURATE_MS = 120
 export const TENSION_RIM_MS = 200
 
-/** --ember, and what a bar that has given way falls to. */
-export const TENSION_INK = 0xe8785a
-export const TENSION_SPENT = 0x5f5568
-/** --honey: a joke's tick and the ring rim's flash on a turn. */
-export const TENSION_WARM = 0xf2c879
+/** The pressure in a bar, and what one that has given way falls to. */
+export const TENSION_INK = 0xe8785a // --ember
+export const TENSION_SPENT = 0x5f5568 // --ink-quiet
+/** A joke's tick and the ring rim's flash on a turn. */
+export const TENSION_WARM = 0xf2c879 // --honey
 /** What a body's own colour falls toward while the turn drains it. */
 const TENSION_DRAIN = 0x9a9490
 

@@ -126,7 +126,7 @@ describe('the road under the makeables list', () => {
 
   it('★ ranks roofs and pots in one list: the cheapest thing overall is a plank, not a post', () => {
     expect(road(quietMeadowPacket, trees)).toBe(
-      'Plank needs 1 wood; the nearest standing tree is at (31, 44).',
+      'Plank needs 1 wood, and the nearest standing tree is at (31, 44).',
     )
   })
 
@@ -134,7 +134,7 @@ describe('the road under the makeables list', () => {
     // One wood covers the plank. A lamp post and a torch are both one thing short; builds run
     // first and the comparison is strict, so the post wins and wins again every turn.
     const line = road(holding({ kind: 'wood', qty: 1 }), trees)
-    expect(line).toBe('A lamp post needs 2 wood; the nearest standing tree is at (31, 44).')
+    expect(line).toBe('A lamp post needs 2 wood, and the nearest standing tree is at (31, 44).')
     expect(road(holding({ kind: 'wood', qty: 1 }), trees)).toBe(line)
   })
 
@@ -153,7 +153,7 @@ describe('the road under the makeables list', () => {
       },
     )
     expect(line).toBe(
-      'Garment needs 2 hide; the nearest hide lying where it was left is at (9, 9).',
+      'Garment needs 2 hide, and the nearest hide lying where it was left is at (9, 9).',
     )
   })
 
@@ -190,13 +190,13 @@ describe('the road under the makeables list', () => {
       },
     }
     expect(road(byTheFire, wet)).toBe(
-      'Stew needs water in something you carry; the nearest water is at (34, 35).',
+      'Stew needs water in something you carry, and the nearest water is at (34, 35).',
     )
   })
 
   it('a stack somebody already put down is named for what it is, not for a source', () => {
     expect(road(quietMeadowPacket, { nearestSource: at('stack', 5, 6) })).toBe(
-      'Plank needs 1 wood; the nearest wood lying where it was left is at (5, 6).',
+      'Plank needs 1 wood, and the nearest wood lying where it was left is at (5, 6).',
     )
   })
 

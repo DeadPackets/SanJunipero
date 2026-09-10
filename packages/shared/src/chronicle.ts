@@ -415,8 +415,8 @@ export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | nul
       const who = look.agentName(str(p.byId))
       const line =
         kind === 'word'
-          ? `${who} gave the town a word for it — ${name}.`
-          : `${who} found the way of it — ${name}.`
+          ? `${who} gave the town a word for it, ${name}.`
+          : `${who} found the way of it, ${name}.`
       const saying = clipSaying(str(p.saying))
       return saying === '' ? line : `${line} “${saying}”`
     }

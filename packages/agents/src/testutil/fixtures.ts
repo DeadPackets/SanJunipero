@@ -146,7 +146,7 @@ export function fixtureBlocks(overrides: Partial<PromptBlocks> = {}): PromptBloc
     journal: [],
     recalled: null,
     scene: {
-      ledgers: [{ name: 'Nadia', doc: 'The basket weaver; she shares her bread with me. [mem#2]' }],
+      ledgers: [{ name: 'Nadia', doc: 'The basket weaver. She shares her bread with me. [mem#2]' }],
       memories,
     },
     dayLog: ['Woke with the light.', 'Drew water and fed the hens.', 'Sat a while by the gate.'],

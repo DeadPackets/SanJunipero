@@ -106,7 +106,7 @@ describe('the door seam — prose, intent, verb, interior', () => {
   it('names the doorway for a building it could walk into, and no tile for either', () => {
     const { bridge } = town()
     const said = proseFor(bridge)
-    expect(said).toContain('it has a doorway; walk to it and you can go in')
+    expect(said).toContain('It has a doorway. Walk to it and you can go in')
     expect(said).not.toContain('no open ground lies beside it')
     expect(said).not.toMatch(new RegExp(`${HOUSE}[^.]*\\(\\d+, ?\\d+\\)`))
   })

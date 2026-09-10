@@ -53,7 +53,7 @@ describe('what the camera is allowed to say', () => {
 
   it('writes the caption as who, then why, and says only who when there is no why', () => {
     expect(whyOf('Nadia & Yusuf', ['quarrel', 'slight'])).toBe(
-      'Nadia & Yusuf — falling out, a slight',
+      'Nadia & Yusuf: falling out, a slight',
     )
     expect(whyOf('Omar', [])).toBe('Omar')
   })

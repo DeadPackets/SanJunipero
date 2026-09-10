@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { facingFrom } from './iso.js'
@@ -125,11 +124,8 @@ describe('★ the line before this one stays, and dims', () => {
     expect(PRIOR_ALPHA).toBe(0.6)
   })
 
-  it('★ the character layer turns a talking body toward its partner', () => {
-    const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
-    expect(SRC).toContain('partnerOf(')
-    expect(SRC).toMatch(/facingFrom\(/)
-  })
+  // The layer's own wiring is driven in characters.test.ts, '★ turns the two of them toward
+  // each other while the scene runs', which reads the facing off the sheet frame it drew.
 })
 
 // ★ Nothing ever ended a thought, so they stacked until each timed out and the desk frame caught
@@ -237,12 +233,6 @@ describe('★ the room looks at whoever has the floor', () => {
     expect(faceInScene('amara', CAST, [voice('amara', 1)])).toBe(null)
   })
 
-  it('★ the character layer turns its bodies by this rule and rings the one holding it', () => {
-    const SRC = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
-    expect(SRC).toContain('faceInScene(a.id, cast!, heard)')
-    expect(SRC).toContain('floorHolder(cast, heard)')
-    // 1px of honey, on the ground point rather than on the bobbing body
-    expect(SRC).toContain('ring.stroke({ width: 1, color: FLOOR_RING_INK })')
-    expect(SRC).toContain('e.ring.position.set(sx, sy)')
-  })
+  // Driven through the real layer in characters.test.ts: '★ moves the ring from body to body as
+  // the exchange alternates' and '★ is one pixel of honey on the GROUND point'.
 })

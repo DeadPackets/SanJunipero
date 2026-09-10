@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 // Driven for real below, so which config priced the flame is read off the sprite it painted.
@@ -22,17 +21,33 @@ vi.mock('pixi.js', () => {
     blendMode = ''
     autoGarbageCollect = true
     destroyed = false
+    zIndex = 0
+    sortableChildren = false
+    destroyOpts: unknown = undefined
     position = new Point()
     scale = new Point()
     anchor = new Point()
     addChild(...cs: Container[]): void {
       this.children.push(...cs)
     }
-    destroy(): void {
+    destroy(opts?: unknown): void {
       this.destroyed = true
+      this.destroyOpts = opts
     }
   }
-  class Sprite extends Container {}
+  class Sprite extends Container {
+    texture: { destroyed?: boolean }
+    constructor(texture?: { destroyed?: boolean }) {
+      super()
+      this.texture = texture ?? Texture.EMPTY
+    }
+    // pixi frees the shared texture on `destroy(true)` and on `{ texture: true }`
+    destroy(opts?: { texture?: boolean } | boolean): void {
+      super.destroy(opts)
+      if (opts === true || (typeof opts === 'object' && opts.texture === true))
+        this.texture.destroyed = true
+    }
+  }
   class Graphics extends Container {
     circle(): this {
       return this
@@ -47,18 +62,21 @@ vi.mock('pixi.js', () => {
   const Texture = { EMPTY: {} }
   return { Container, Graphics, Point, Sprite, Texture }
 })
-vi.mock('./entities.js', () => ({ entitySpriteOf: () => null }))
+const held = vi.hoisted((): { sprite: unknown } => ({ sprite: null }))
+vi.mock('./entities.js', () => ({ entitySpriteOf: () => held.sprite }))
 import {
   DEFAULT_CONFIG,
   flamesAt,
   isDark,
   type AssetRecord,
+  type BuildingPoints,
   type LitWorld,
   type SimConfig,
 } from '@sj/shared'
 import { CLOCK_STOPS, skyLevel } from './tints.js'
 import { TILE_H, TILE_W, feetOf } from './iso.js'
 import { phaseOf } from './charAnim.js'
+import type { ViewRect } from './cull.js'
 import { cellPointOf } from './textures.js'
 import {
   BLOOM_ALPHA,
@@ -94,6 +112,7 @@ const lamp = (x: number, y: number, fueledUntilTick?: number): LitWorld =>
   world({
     structures: {
       lamp_1: {
+        id: 'lamp_1',
         kind: 'lamp_post',
         x,
         y,
@@ -101,9 +120,134 @@ const lamp = (x: number, y: number, fueledUntilTick?: number): LitWorld =>
         h: 1,
         stage: 'complete',
         ...(fueledUntilTick === undefined ? {} : { fueledUntilTick }),
-      },
+      } as LitWorld['structures'][string],
     },
   })
+
+type Drawn = {
+  visible: boolean
+  alpha: number
+  width: number
+  height: number
+  tint: number
+  eventMode: string
+  zIndex: number
+  sortableChildren: boolean
+  autoGarbageCollect: boolean
+  destroyed: boolean
+  destroyOpts: { texture?: boolean } | undefined
+  position: { x: number; y: number }
+  children: Drawn[]
+}
+type Box = { children: Drawn[]; addChild: (c: Drawn) => void }
+type Baked = { source: { autoGarbageCollect?: boolean }; destroyed: boolean; destroy(): void }
+
+const box = (): Box => {
+  const children: Drawn[] = []
+  return { children, addChild: (c) => children.push(c) }
+}
+
+const art = (kind: string, cell: number, points: BuildingPoints): AssetRecord => ({
+  id: `asset_${kind}`,
+  seq: 1,
+  class: 'building',
+  desc: kind,
+  kind,
+  footprint: { w: 1, h: 1 },
+  widthPx: cell,
+  heightPx: cell,
+  status: 'ready',
+  score: null,
+  attempts: 1,
+  costUsd: 0,
+  createdAt: '2026-09-01 00:00:00',
+  meta: JSON.stringify({
+    version: 'v4-hires-building',
+    kind,
+    footprint: { w: 1, h: 1 },
+    cell: { w: cell, h: cell, feetX: cell / 2, feetY: cell - 4 },
+    points,
+  }),
+})
+
+/** The sprite the entity layer placed, which is where a cell point is measured from. */
+const SPRITE = {
+  x: 400,
+  y: 300,
+  anchor: { x: 0.5, y: 1 },
+  scale: { x: 1, y: 1 },
+  texture: { width: 512, height: 512 },
+}
+
+const rig = (
+  o: {
+    state?: LitWorld
+    tick?: number
+    motion?: boolean
+    view?: ViewRect
+    records?: AssetRecord[]
+    entity?: unknown
+  } = {},
+) => {
+  const state = o.state ?? lamp(10, 10, MIDNIGHT + 500)
+  const records = o.records ?? []
+  const lights = box()
+  const elsewhere = {
+    ground: box(),
+    entities: box(),
+    world: box(),
+    grade: box(),
+    flash: box(),
+  }
+  const baked: Baked[] = []
+  const scene = {
+    app: {
+      renderer: {
+        generateTexture: () => {
+          const t: Baked = {
+            source: {},
+            destroyed: false,
+            destroy(): void {
+              this.destroyed = true
+            },
+          }
+          baked.push(t)
+          return t
+        },
+      },
+    },
+    screen: { lights, grade: elsewhere.grade, flash: elsewhere.flash },
+    layers: { ground: elsewhere.ground, entities: elsewhere.entities, world: elsewhere.world },
+    viewRect: () => o.view ?? { x: -1e4, y: -1e4, w: 2e4, h: 2e4 },
+    wantsMotion: () => o.motion ?? true,
+  } as unknown as Scene
+  let tick = o.tick ?? MIDNIGHT
+  const store = {
+    getState: () => state,
+    getTick: () => tick,
+    getConfig: () => DEFAULT_CONFIG,
+    assetRecords: () => records,
+    assetsSeq: () => records.length,
+    onEvents: () => () => {},
+  } as unknown as WorldStore
+  held.sprite = o.entity ?? null
+  const pools = createLightPools(scene, store)
+  return {
+    baked,
+    elsewhere,
+    tick: (dtMs: number): void => {
+      held.sprite = o.entity ?? null
+      pools.tick(dtMs)
+    },
+    count: (): number => pools.count(),
+    lit: (): Drawn[] => lights.children,
+    root: (): Drawn => lights.children[0]!,
+    drawn: (): Drawn[] => lights.children[0]!.children,
+    at: (t: number): void => void (tick = t),
+  }
+}
+
+const walk = (n: Drawn): Drawn[] => [n, ...n.children.flatMap(walk)]
 
 // One source, two consumers: before it, the render darkened the screen with a clock tint that
 // knew nothing about fire while `isDark` walked the flames.
@@ -155,18 +299,43 @@ describe('the breath (U3) — two incommensurate sines, phased by the id', () =>
     expect(breath(phaseOf('x'), 1.234)).toBe(breath(phaseOf('x'), 1.234))
   })
 
-  it('never reaches the photosensitive band: 1.7 Hz and 2.9 Hz, not 7', () => {
-    const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
-    expect(src).toContain('2 * Math.PI * 1.7 * tSec')
-    expect(src).toContain('2 * Math.PI * 2.9 * tSec')
-    expect(src).not.toMatch(/FIRE_HZ|\* 7 \*/)
+  it('never reaches the photosensitive band, measured off the wave itself', () => {
+    // Every tone in the wave, read by fitting a sine at each frequency over ten whole seconds.
+    const SPAN = 10,
+      STEPS = 4000
+    const toneAt = (hz: number): number => {
+      let re = 0,
+        im = 0
+      for (let i = 0; i < STEPS; i++) {
+        const t = (i * SPAN) / STEPS
+        const v = breath(0, t)
+        re += v * Math.cos(2 * Math.PI * hz * t)
+        im += v * Math.sin(2 * Math.PI * hz * t)
+      }
+      return (2 * Math.hypot(re, im)) / STEPS
+    }
+    const tones: number[] = []
+    for (let hz = 0.5, prev = 0, cur = toneAt(0.5); hz <= 20; hz += 0.05) {
+      const next = toneAt(hz + 0.05)
+      if (cur > 0.02 && cur >= prev && cur >= next) tones.push(Number(hz.toFixed(2)))
+      prev = cur
+      cur = next
+    }
+    expect(tones).toEqual([1.7, 2.9])
+    expect(Math.max(...tones), 'the photosensitive band starts at 3 Hz').toBeLessThan(3)
   })
 
   it('keeps every light under its ceiling with the breath on top', () => {
-    // the pool breathes about its ceiling and is clamped to it, so it only ever dips
-    const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
-    expect(src).toMatch(
-      /Math\.min\(\s*POOL_MAX_ALPHA,\s*\(POOL_MAX_ALPHA \+ \(b \* POOL_MAX_ALPHA\) \/ FIRE_ALPHA\) \* strength/,
+    // The pool breathes about its ceiling and is clamped to it, so it only ever dips.
+    const r = rig()
+    let peak = 0
+    for (let i = 0; i < 3000; i++) {
+      r.tick(7)
+      peak = Math.max(peak, r.drawn()[0]!.alpha)
+    }
+    expect(peak).toBeLessThanOrEqual(POOL_MAX_ALPHA)
+    expect(peak, 'not vacuous: it does breathe up to the ceiling').toBeGreaterThan(
+      POOL_MAX_ALPHA * 0.99,
     )
     expect(POOL_MAX_ALPHA).toBeLessThanOrEqual(0.5)
     expect(GLOW_BASE_ALPHA + 2 * BREATH_AMP).toBeLessThanOrEqual(0.5)
@@ -315,60 +484,139 @@ describe('★ a lit hearth is seen through a window (task 18)', () => {
 })
 
 describe('what this pass must not have broken', () => {
-  const src = readFileSync(new URL('./lightPools.ts', import.meta.url), 'utf8')
-  const code = src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .filter((l) => !l.trim().startsWith('//'))
-    .join('\n')
+  const HEARTH: LitWorld = world({
+    structures: {
+      house_1: {
+        id: 'house_1',
+        kind: 'house',
+        x: 4,
+        y: 4,
+        w: 2,
+        h: 2,
+        stage: 'complete',
+        fueledUntilTick: MIDNIGHT + 500,
+      } as LitWorld['structures'][string],
+    },
+  })
+  const LAMP_LIT = { records: [art('lamp_post', 64, { flame: { x: 32, y: 10 } })], entity: SPRITE }
 
   it('★ draws ABOVE the night grade, in the screen lights layer, and never into the bake (D1)', () => {
-    expect(src).toContain('scene.screen.lights.addChild(root)')
-    expect(code).not.toContain('layers.ground')
-    expect(code).not.toMatch(/groundBake|rebake|chunk/i)
+    const r = rig(LAMP_LIT)
+    r.tick(16)
+    expect(r.lit()).toHaveLength(1)
+    expect(r.drawn().length).toBeGreaterThan(0)
+    for (const [name, b] of Object.entries(r.elsewhere))
+      expect(b.children, `${name} was handed a light`).toHaveLength(0)
   })
 
   it("★ writes no zIndex and joins no sorted layer, so the painter's order is untouched", () => {
-    expect(code).not.toMatch(/\.zIndex\s*=(?!=)/)
-    expect(code).not.toContain('sortableChildren')
-    expect(code).not.toContain('layers.entities')
+    const r = rig(LAMP_LIT)
+    r.tick(16)
+    for (const n of walk(r.root())) {
+      expect(n.zIndex).toBe(0)
+      expect(n.sortableChildren).toBe(false)
+    }
+    expect(r.elsewhere.entities.children).toHaveLength(0)
   })
 
   it('★ culls: an offscreen light is not drawn, through the one function everything asks', () => {
-    expect(src).toContain('rectInView(')
-    expect(src).toContain('scene.viewRect()')
+    const near = rig()
+    near.tick(16)
+    expect(near.count()).toBe(1)
+    expect(near.drawn()[0]!.visible).toBe(true)
+
+    const far = rig({ view: { x: 5e5, y: 5e5, w: 100, h: 100 } })
+    far.tick(16)
+    expect(far.count()).toBe(0)
+    expect(far.drawn()[0]!.visible).toBe(false)
   })
 
   it('honours prefers-reduced-motion through the scene, the one owner of the question', () => {
-    expect(src).toContain('const still = !scene.wantsMotion()')
-    expect(src).toContain('still ? 0 : breath(')
+    const alphas = new Set<number>()
+    const still = rig({ motion: false })
+    for (let i = 0; i < 40; i++) {
+      still.tick(100)
+      alphas.add(still.drawn()[0]!.alpha)
+    }
+    expect(alphas.size, 'a viewer who asked for stillness gets one alpha, forever').toBe(1)
+
+    const breathing = new Set<number>()
+    const moving = rig({ motion: true })
+    for (let i = 0; i < 40; i++) {
+      moving.tick(100)
+      breathing.add(moving.drawn()[0]!.alpha)
+    }
+    expect(breathing.size).toBeGreaterThan(1)
   })
 
   it('never swallows a pointer: a decoration that takes a click is a picking bug', () => {
-    expect(src).toContain("root.eventMode = 'none'")
-    expect(src).toContain("s.eventMode = 'none'")
+    const r = rig(LAMP_LIT)
+    r.tick(16)
+    const nodes = walk(r.root())
+    expect(nodes.length).toBeGreaterThan(2)
+    for (const n of nodes) expect(n.eventMode).toBe('none')
   })
 
   it('★ NO door glow: light comes only from a source the art shows lit (ruling 21)', () => {
-    expect(code).not.toMatch(/door/i)
-    expect(src).toContain('pts.flame')
-    expect(src).toContain('points.window')
+    const post = rig(LAMP_LIT)
+    post.tick(16)
+    expect(
+      post.drawn(),
+      'the pool and the bloom over the painted flame, and nothing else',
+    ).toHaveLength(2)
+
+    const house = rig({
+      state: HEARTH,
+      records: [art('house', 512, { window: { x: 130, y: 370 } })],
+      entity: SPRITE,
+    })
+    house.tick(16)
+    expect(house.drawn(), 'the pool and the window, and no light at the door').toHaveLength(2)
+    const at = cellPointOf(SPRITE as never, { x: 130, y: 370 })!
+    const glow = house.drawn()[1]!
+    expect([glow.position.x, glow.position.y]).toEqual([at.sx, at.sy])
+    expect(glow.position.y, 'the window is up the wall, not down at the threshold').toBeLessThan(
+      SPRITE.y,
+    )
   })
 
   it("★ pins BOTH the texture and the sprites against pixi's GC", () => {
-    expect(src).toContain('bakeTexture(') // the one baker pins the source
-    expect(src).toContain('s.autoGarbageCollect = false')
+    const r = rig(LAMP_LIT)
+    r.tick(16)
+    expect(r.baked.length).toBeGreaterThan(0)
+    for (const t of r.baked) expect(t.source.autoGarbageCollect).toBe(false)
+    for (const s of r.drawn()) expect(s.autoGarbageCollect).toBe(false)
   })
 
   it('★ does not churn the pool on a clock boundary — that churn is what fed the GC', () => {
-    expect(src).toContain(
-      'const flames = flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)',
-    )
-    expect(code).not.toMatch(/strength === 0 \? \[\]/)
-    for (const m of code.match(/(\w+)\.destroy\(([^)]*)\)/g) ?? []) {
-      if (/^(root|tex|fireTex)\.destroy/.test(m)) continue
-      expect(m, `${m} could destroy the texture every sprite shares`).toContain('texture: false')
-    }
+    const r = rig({ state: lamp(10, 10, 10_000) })
+    r.tick(16)
+    const pool = r.drawn()[0]!
+    expect(r.count()).toBe(1)
+
+    r.at(NOON)
+    r.tick(16)
+    expect(r.count(), 'nothing is painted by day').toBe(0)
+    expect(r.drawn()[0], 'and nothing was thrown away either').toBe(pool)
+    expect(pool.destroyed).toBe(false)
+    expect(r.baked[0]!.destroyed).toBe(false)
+
+    r.at(MIDNIGHT)
+    r.tick(16)
+    expect(r.drawn()[0], 'the same sprite lights again at dusk').toBe(pool)
+    expect(r.count()).toBe(1)
+  })
+
+  it('★ a light that leaves the world takes its sprite, never the texture every light shares', () => {
+    const r = rig()
+    r.tick(16)
+    const pool = r.drawn()[0]!
+
+    r.at(MIDNIGHT + 600) // the lamp is fueled to +500, so this one is out
+    r.tick(16)
+    expect(pool.destroyed).toBe(true)
+    expect(pool.destroyOpts).toMatchObject({ texture: false })
+    expect(r.baked[0]!.destroyed, 'the disc every other light draws with').toBe(false)
   })
 })
 

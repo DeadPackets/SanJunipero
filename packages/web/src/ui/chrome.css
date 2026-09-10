@@ -31,6 +31,12 @@
   --ember: #E8785A;
   /* Ember is 2.70:1 on cream, which no word may be set in. This is 6.30:1. */
   --ember-ink: #9E3B2B;
+  /* The step under it, so the stakes band is one heat at two strengths rather than a heat and
+     the accent. 8.27:1 on deep. */
+  --ember-pale: #F2A893;
+  /* Struck metal, for the tier the town's own work is cut at. Honey drew that mark at 1.31:1 on
+     the paper it stands on, which is a shadow nobody could see. This is 3.29:1. */
+  --gilt: #A9761F;
   --sage: #93B573;
   --sage-pale: #DCE8C8;
   --rose: #C47876;
@@ -40,6 +46,9 @@
   /* State, which is us and not the world: the one you are in, and the control that is on. The
      ink's own hue at reading strength — 4.88:1 under deep, 3.08:1 on cream, where ember was 2.70. */
   --current: #AA7ACD;
+  /* The other half of us: a mark our own hand made, on a page the town never prints. Cool,
+     because nothing the town prints is. Ink on it is 6.77:1. */
+  --operator: #BFCCE8;
 
   /* A 2px base, not 4px: 4px cannot spell the hairline pads the chips are built from. */
   --s-1: 2px;
@@ -429,16 +438,6 @@ body {
 }
 /* positioned, never transitioned: `.playhead` is dragged on pointermove, and a transition
    lags the finger and lies about which minute is on screen. */
-.live-pill {
-  border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em; text-transform: uppercase;
-  padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
-  box-shadow: var(--ledge);
-  transition-property: background-color, translate, box-shadow;
-}
-.live-pill:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
-.live-pill:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-.live-pill.live { background: var(--honey); }
 
 /* ── interiors: the room the camera stepped into, and the way back out ──
    Every line is omitted when the world has nothing to put in it, so an honest empty room is short. */
@@ -836,7 +835,6 @@ body {
   padding: var(--s-3) 0; border-bottom: 1px dotted var(--ink-quiet);
 }
 .law-row { grid-template-columns: minmax(0, 1fr) auto; }
-.law-row.changed { background: var(--honey) var(--grain); box-shadow: var(--frame-tight); padding: var(--s-3); }
 /* the human title leads; the machine path is the operator's subtitle underneath it */
 .law-title { grid-column: 1 / -1; margin: 0; font-size: var(--f-4); line-height: 1.3; }
 .law-says { grid-column: 1 / -1; margin: var(--s-1) 0 0; font-size: var(--f-3); text-wrap: pretty; }
@@ -886,7 +884,7 @@ body {
   font-family: var(--font-px); font-size: var(--f-3); letter-spacing: 0.04em;
   padding: var(--s-2) var(--s-4); background: var(--cream); box-shadow: var(--frame-tight);
 }
-.ops-word.stopped { background: var(--honey) var(--grain); }
+.ops-word.stopped { background: var(--operator) var(--grain); }
 .ops-at {
   font-family: var(--font-data); font-size: var(--f-1); color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
@@ -978,11 +976,11 @@ body {
 /* Hover arrives in 150ms and leaves the instant the pointer does. A transition reads the
    duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
-  .feed-tab, .live-pill, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
+  .feed-tab, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
   .roster-row, .key-summary, .discovery-leaf, .stage-exit, .stage-live {
     transition-duration: 0s;
   }
-  .feed-tab:hover, .live-pill:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
+  .feed-tab:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
   .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
   .discovery-leaf:hover, .stage-exit:hover, .stage-live:hover {
     transition-duration: var(--t-fast);
@@ -1240,7 +1238,7 @@ body {
 .day-bar-cursor {
   position: absolute; top: 0; bottom: 0; left: clamp(0px, var(--at), 100%);
   width: 2px; translate: -50% 0;
-  background: var(--honey); box-shadow: 0 0 0 1px var(--deep);
+  background: var(--current); box-shadow: 0 0 0 1px var(--deep);
 }
 
 /* No `min-width: 0`: every mark in the flank is one nowrap word, so the flank keeps its own
@@ -1260,14 +1258,18 @@ body {
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.18em; white-space: nowrap; color: var(--honey);
 }
-/* Under 900 the two flanks shrink to what they hold and the track takes the slack: a 114px
-   track puts thirteen minutes on a pixel, which is not a day anybody can aim at. */
+/* Under 900 the band takes a SECOND ROW and the track spans it. Sharing one row left a 96px
+   track at 390px, which is fifteen minutes on a pixel and not a day anybody can aim at. */
 @media (max-width: 900px) {
   .day-bar {
-    padding: 0 var(--s-5); gap: var(--s-5);
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: max(0px, env(safe-area-inset-top)) var(--s-5) var(--s-2);
+    gap: var(--s-1) var(--s-5);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .day-bar-when, .day-bar-weather, .day-bar .camera-chip { display: none; }
+  .day-bar-left { grid-row: 1; grid-column: 1; }
+  .day-bar-right { grid-row: 1; grid-column: 2; }
+  .day-bar-mid { grid-row: 2; grid-column: 1 / -1; }
+  .day-bar .camera-chip { display: none; }
 }
 
 .stage-cue {
@@ -1325,9 +1327,9 @@ body {
   width: calc(var(--stakes, 0) * 100%); height: var(--s-1);
   background: currentColor;
 }
-/* 6.92:1 and 5.56:1 on --deep. A closed scene keeps neither: stakes is a live pressure, and a
+/* 8.27:1 and 5.56:1 on --deep. A closed scene keeps neither: stakes is a live pressure, and a
    summary has none left. */
-.stage-scene-stamp[data-stakes='warm'] { color: var(--honey); }
+.stage-scene-stamp[data-stakes='warm'] { color: var(--ember-pale); }
 .stage-scene-stamp[data-stakes='hot'] { color: var(--ember); }
 /* The reason the camera is here is a sentence the town could have said, so it keeps the scene
    line's own case rather than the shot caption's capitals. */
@@ -1832,7 +1834,7 @@ body:has(.cold-open) .scene-card { display: none; }
 }
 .sheet-note.operator {
   padding: var(--s-3) var(--s-4); color: var(--ink);
-  background: var(--honey) var(--grain); box-shadow: var(--frame-tight);
+  background: var(--operator) var(--grain); box-shadow: var(--frame-tight);
 }
 
 .person-head { display: flex; gap: var(--s-5); align-items: flex-start; margin: 0 0 var(--s-5); }
@@ -1899,7 +1901,6 @@ body:has(.cold-open) .scene-card { display: none; }
   font-family: var(--font-data); font-size: var(--f-1); font-style: normal;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums;
 }
-.day-strip .live-pill { justify-self: start; }
 
 .strip-list {
   list-style: none; margin: 0 0 var(--s-5); padding: 0;
@@ -2075,7 +2076,7 @@ body:has(.cold-open) .scene-card { display: none; }
 /* A finger cannot hover: every lift the sheet paints on :hover stayed lit after the tap. */
 @media (hover: none) {
   .roster-row:hover, .place-row:hover, .moment-card:hover, .discovery-leaf:hover,
-  .live-pill:hover, .key-summary:hover, .legend-chip:hover, .signpost-arm:hover,
+  .key-summary:hover, .legend-chip:hover, .signpost-arm:hover,
   .room-door:hover, .rx-full:hover, .roster-sort:hover, .mark:hover .mark-glyph {
     translate: 0 0;
   }
@@ -2417,7 +2418,7 @@ body:has(.cold-open) .scene-card { display: none; }
   --plate-ink: var(--sand);
   box-shadow: var(--frame-tight), 4px 4px 0 0 var(--plate-ink);
 }
-.first-plate[data-material='gilded'] { --plate-ink: var(--honey); background: var(--cream); }
+.first-plate[data-material='gilded'] { --plate-ink: var(--gilt); background: var(--cream); }
 .first-plate[data-material='ember'] { --plate-ink: var(--ember); }
 .first-plate[data-material='sage'] { --plate-ink: var(--sage); }
 .first-plate[data-material='sand'] { --plate-ink: var(--sand); }

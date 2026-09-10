@@ -117,11 +117,11 @@ describe('marks a minted verb left', () => {
       }),
     )
     expect(prose).toContain(
-      'Omar (omar) stands right beside you, to the east; marked: debt two planks; marked: oath sworn.',
+      'Omar (omar) stands right beside you, to the east, marked: debt two planks, marked: oath sworn.',
     )
     expect(prose).toMatch(/well.*marked: keeper Omar/)
     expect(prose).toContain(
-      'You can see 2 plank (item_1) right beside you, to the south; marked: promised to Omar.',
+      'You can see 2 plank (item_1) right beside you, to the south, marked: promised to Omar.',
     )
     expect(prose).not.toMatch(FORBIDDEN_FRAMING)
   })

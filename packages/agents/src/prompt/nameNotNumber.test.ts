@@ -164,13 +164,13 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
 
   it('outside, the doorway is a fact and not a tile', () => {
     const said = seeing({ structures: [cabin({})] })
-    expect(said).toContain('you are at its door; enter it and you are in.')
+    expect(said).toContain('You are at its door. Enter it and you are in.')
     expect(sentenceWith(said, 'structure_1')).not.toMatch(PAIR)
   })
 
   it('a full room is still told apart from a wall, and still without the tile', () => {
     const full = seeing({ structures: [cabin({ full: true })] })
-    expect(full).toContain('it has a doorway, and there is no room left inside.')
+    expect(full).toContain('It has a doorway, and there is no room left inside.')
     expect(sentenceWith(full, 'structure_1')).not.toMatch(PAIR)
     expect(seeing({ structures: [cabin({ door: undefined })] })).not.toContain('doorway')
   })
@@ -188,7 +188,7 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
     expect(said).toContain('you cannot walk anywhere or enter anything')
     expect(said).toContain('the doorway at (12, 10) is the way back out')
     // And the roof line, which used to say the same pair a second time, now only says which roof.
-    expect(said).toContain('this is the building you are in.')
+    expect(said).toContain('This is the building you are in.')
     expect(sentenceWith(said, 'structure_1) stands')).not.toMatch(PAIR)
   })
 })

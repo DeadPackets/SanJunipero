@@ -41,7 +41,7 @@ export const TurnSchema = z
       .string()
       .min(1)
       .describe(
-        'What is going through your head this moment, in one or two sentences. Yours alone; nobody else ever hears it.',
+        'What is going through your head this moment, in one or two sentences. Yours alone. Nobody else ever hears it.',
       ),
     speech: z
       .string()
@@ -99,7 +99,7 @@ const StrictActionSchema = z
         'The exact word of the act, such as walk or eat. Null only when no word on the list fits and you are saying it in your own words instead.',
       ),
     params: ClosedIntentParams.describe(
-      'Exactly what the act asks for, named by its keys; every other key is null.',
+      'Exactly what the act asks for, named by its keys. Every other key is null.',
     ),
     freeform: z
       .string()
@@ -302,7 +302,7 @@ export async function parseTurnWithRepair(
     return rested
   }
   const again = readMindTurn(
-    await repair(`your last answer left ${empty} empty; name what it asks for, or act otherwise`),
+    await repair(`your last answer left ${empty} empty. Name what it asks for, or act otherwise`),
   )
   if (again.success) {
     const retried = waitIsRest(again.data)

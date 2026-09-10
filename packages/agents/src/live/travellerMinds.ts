@@ -65,7 +65,7 @@ export const TRAVELLER_MINDS: Traveller[] = [
     personality: {
       temperament: 'brisk, cheerful, never off duty',
       values: ['a fair trade, in her favour', 'a road that is open'],
-      beliefs: ['nobody gives anything away; they only forget to charge'],
+      beliefs: ['nobody gives anything away, they only forget to charge'],
       current: {
         mood: 'appraising',
         worries: ['a valley with no coin in it, and a pass that may not open twice'],
@@ -123,7 +123,7 @@ export const TRAVELLER_MINDS: Traveller[] = [
     sex: 'm',
     ageDays: 58 * DAYS_PER_YEAR,
     arrival:
-      'Came over the pass behind the last of his flock; the flock did not come over with him.',
+      'Came over the pass behind the last of his flock. The flock did not come over with him.',
     identity: {
       name: 'Reza',
       age: 58,

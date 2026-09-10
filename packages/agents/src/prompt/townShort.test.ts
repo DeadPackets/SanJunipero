@@ -70,7 +70,7 @@ describe('★ the road a high esteem is given', () => {
 
   it('turns the want back on the town when nothing is short', () => {
     expect(usefulLine('esteem', STOCKED, seeing([]), world)).toBe(
-      'Today the thing you want most is to be counted on. Nobody is short of anything; who have you not helped lately?',
+      'Today the thing you want most is to be counted on. Nobody is short of anything. Who have you not helped lately?',
     )
   })
 
@@ -113,7 +113,7 @@ describe('★ the road a high esteem is given', () => {
       foodSources: () => ({ bank: { x: 14, y: 27 }, woods: null }),
     }
     expect(usefulLine('esteem', stock({ food: 0 }), seeing([]), bare)).toContain(
-      'The town has 0 meals for 12 mouths. Fish are in the river; the nearest bank to stand on is at (14, 27),',
+      'The town has 0 meals for 12 mouths. Fish are in the river. The nearest bank to stand on is at (14, 27),',
     )
   })
 

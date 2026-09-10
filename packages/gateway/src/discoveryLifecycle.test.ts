@@ -105,7 +105,7 @@ describe('GATE G-D — a discovery is credited, recorded, replayed, served, mark
 
   it('3. reads as a sentence, weighted second in the feed, with a glyph of its own', () => {
     const ev: SimEvent = { seq: 1, tick: 40, type: DISCOVERY_EVENT, payload: PAYLOAD }
-    expect(chronicleLine(ev, LOOK)).toBe('Maret found the way of it — stitch a waterskin.')
+    expect(chronicleLine(ev, LOOK)).toBe('Maret found the way of it, stitch a waterskin.')
     expect(CHRONICLE_WEIGHTS.discovery_made).toBe(19)
     expect(CHRONICLE_WEIGHTS.agent_died!).toBeGreaterThan(19)
     expect(chronicleIcon('discovery_made')).toBe('key')

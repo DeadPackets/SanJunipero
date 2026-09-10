@@ -39,7 +39,7 @@ export function wireBirths(opts: BirthsOpts): () => void {
       insertAlert(opts.opsDb, {
         agentId: born.id,
         kind: 'birth_over_max_minds',
-        detail: `${born.id} was born into a town already holding ${opts.maxMinds} minds; the body lives and no mind was booted for it`,
+        detail: `${born.id} was born into a town already holding ${opts.maxMinds} minds. The body lives and no mind was booted for it`,
       })
       return
     }

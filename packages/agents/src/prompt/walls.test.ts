@@ -216,7 +216,7 @@ describe('★ and the prose says it where the mind will read it', () => {
 
   it('still tells the mind it can get to the walls, which is the half that lets it join', () => {
     const said = say({ done: 1440, needs: 2880 })
-    expect(said).toContain('its walls are half up; walk to it and you end up beside it.')
+    expect(said).toContain('its walls are half up. Walk to it and you end up beside it.')
     // The site is named, and a walk that names it lands on the ring: no tile is offered to copy.
     expect(said).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
   })
@@ -289,14 +289,14 @@ describe('★ a full room, said in the prose and not in a refusal', () => {
 
   it('names the doorway either way — a full room is not a wall', () => {
     expect(seeing({ door: { x: 6, y: 7 } })).toContain(
-      'it has a doorway; walk to it and you can go in.',
+      'It has a doorway. Walk to it and you can go in.',
     )
-    expect(seeing({ full: true })).toContain('it has a doorway, and there is no room left inside.')
+    expect(seeing({ full: true })).toContain('It has a doorway, and there is no room left inside.')
   })
 
   // r24: 176 walks of no length to a door already reached, 58 of them followed by a step in.
   it('at the door, the walk is over and the step inside is the thing named', () => {
-    expect(seeing({})).toContain('you are at its door; enter it and you are in.')
+    expect(seeing({})).toContain('You are at its door. Enter it and you are in.')
     expect(seeing({})).not.toContain('walk to it and you can go in')
   })
 

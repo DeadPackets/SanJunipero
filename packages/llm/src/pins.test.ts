@@ -238,10 +238,10 @@ it('an unpinned caller keeps the routing it has always had', () => {
   expect(callSettingsFor('nobody-pinned-this')).toEqual({})
 })
 
-/** A fresh module with the trial route set, because the pins are read once at import. */
-async function pinsWithRoute(route: string): Promise<typeof import('./pins.js')> {
+/** A fresh module with the trial route set or deleted, because the pins are read once at import. */
+async function pinsWithRoute(route: string | undefined): Promise<typeof import('./pins.js')> {
   vi.resetModules()
-  vi.stubEnv('LLM_MIND_ROUTE', route)
+  vi.stubEnv('SJ_MIND_ROUTE', route)
   try {
     return await import('./pins.js')
   } finally {
@@ -249,6 +249,16 @@ async function pinsWithRoute(route: string): Promise<typeof import('./pins.js')>
     vi.resetModules()
   }
 }
+
+// ★ The knob is a trial door, not a flip. With nothing set, every live call still goes to the one
+// model and the one back end that were measured, whatever else is in the operator's environment.
+it('★ an unset trial route leaves the pinned model and its one back end untouched', async () => {
+  const pins = await pinsWithRoute(undefined)
+  expect(pins.MIND_MODEL).toBe('openai/gpt-5.6-luna')
+  expect(pins.PROVIDER_ORDER).toEqual(['OpenAI'])
+  expect(pins.callSettingsFor('turn').providerOrder).toEqual(['OpenAI'])
+  expect(pins.PRICE_PER_M).toEqual({ input: 0.25, output: 1.2, cacheRead: 0.02 })
+})
 
 // ★ The pinned back ends are an allow-list, so swapping the model alone sends every call to a
 // home the new model is not served by: measured 2026-09-10 as 100% of calls refused.
@@ -266,7 +276,7 @@ it('★ a trial route moves the model and its back ends as one word', async () =
 
 it('a model with no back end named is refused at boot, not at every call', async () => {
   for (const bad of ['z-ai/glm-5.3-flash', '@DeepInfra', 'z-ai/glm-5.3-flash@', 'glm@ , '])
-    await expect(pinsWithRoute(bad), bad).rejects.toThrow(/LLM_MIND_ROUTE/)
+    await expect(pinsWithRoute(bad), bad).rejects.toThrow(/SJ_MIND_ROUTE/)
   expect((await pinsWithRoute('   ')).MIND_MODEL).toBe(MIND_MODEL)
 })
 

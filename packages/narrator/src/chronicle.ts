@@ -13,9 +13,9 @@ import type {
 // Every line here is a rule against inventing: hurt is never a number, sickness never a
 // severity, care is credited only where somebody sat down, and a killing names only the hand.
 export const NARRATOR_VOCABULARY_NOTES = [
-  'Write "hurt" or "wounded"; never how much.',
-  'Write "sickness" or "a bad turn"; never how bad.',
-  'You may credit care — "after days at her side" — only where the digest records somebody tending them. Detect, never invent.',
+  'Write "hurt" or "wounded". Never say how much.',
+  'Write "sickness" or "a bad turn". Never say how bad.',
+  'You may credit care, such as "after days at her side", only where the digest records somebody tending them. Detect, never invent.',
   'Write "sat with" or "nursed". Never call anybody a healer unless the town calls them one first.',
   'A death by another hand may name the hand that was seen. It may never say whether it was deserved.',
   'The world growing wider is never explained.',
@@ -25,13 +25,13 @@ export const NARRATOR_VOCABULARY_NOTES = [
 // and wrote "no bad turn came to any household" over five graves. A chapter may name nobody the
 // world has not got, and a day nobody lived through is a still day, not an empty stage to fill.
 const ROLL_LAW =
-  'This roll is everyone who has ever lived here. Name no one else — no neighbour, no elder, no' +
+  'This roll is everyone who has ever lived here. Name no one else. No neighbour, no elder, no' +
   ' visitor, no household you were not given. A name not on this roll is a lie in the record.'
 
 const STILLNESS =
   'No person acted today: the digests hold only weather and animals. Write that stillness' +
-  ' plainly — the empty lanes, the standing graves, the river and the sky — and do not fill the' +
-  ' day with people or households to make it a story.'
+  ' plainly, the empty lanes, the standing graves, the river and the sky, and do not fill' +
+  ' the day with people or households to make it a story.'
 
 export function castLaw(cast: readonly CastMember[], anyoneActed: boolean): string {
   const living = cast.filter((c) => c.alive).map((c) => c.name)
@@ -158,7 +158,7 @@ export function publishClean(
 ): string {
   const { text: clean, dropped } = withoutProseIds(text)
   if (dropped.length === 0) return text
-  const detail = `${where}: ${dropped.length} sentence(s) dropped for a number in the prose — ${dropped
+  const detail = `${where}: ${dropped.length} sentence(s) dropped for a number in the prose: ${dropped
     .slice(0, 3)
     .join(' | ')}`
   deps.store.insertAlert('prose_id_leak', detail)
@@ -188,7 +188,7 @@ export function withoutStrangers(
   if (dropped === 0) return text
   const detail =
     `${where}: ${dropped} sentence(s) dropped for naming somebody the town does not have` +
-    ` — ${[...strangers].slice(0, 6).join(', ')}`
+    `: ${[...strangers].slice(0, 6).join(', ')}`
   deps.store.insertAlert('cast_leak', detail)
   deps.alert?.(`cast_leak: ${detail}`)
   return kept.replace(/\n{3,}/gu, '\n\n').trim()
@@ -197,7 +197,7 @@ export function withoutStrangers(
 export const FOOTNOTE_RULE =
   'Never put a number inside a sentence: no brackets, no tick counts, no event numbers, no parenthesised runs. ' +
   `End every paragraph with a trailing line of its own, spelled exactly "${FOOTNOTE_PREFIX}" and then that ` +
-  "paragraph's numbers separated by commas — only numbers given to you below, never invented. " +
+  "paragraph's numbers separated by commas. Use only numbers given to you below, never invented. " +
   'These words are banned from your prose: record, ledger, entered, numbered.'
 
 export function verifyCitations(

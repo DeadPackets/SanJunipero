@@ -267,8 +267,8 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
     // The mind's own words never reach a sentence a mind can read; the name does.
     const said = (await chronicle()).filter((e) => e.type === 'discovery_made').map((e) => e.label)
     expect(said).toEqual([
-      'Alice found the way of it — stitch a waterskin.',
-      'Bob gave the town a word for it — dance.',
+      'Alice found the way of it, stitch a waterskin.',
+      'Bob gave the town a word for it, dance.',
     ])
     for (const line of said) expect(line).not.toContain('i want to')
   })

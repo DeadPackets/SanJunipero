@@ -19,9 +19,15 @@ state that is ours. `--ember` was read at nine sites answering six questions at 
 body ill, is this the one I am in, which material is this first cut from, is a filter on, where
 is the tape, how much is at stake — and nobody can learn a colour like that. It is down to two
 sites and one question, how hot, plus the material a first is cut from that takes its name, and
-`ui/contrast.test.ts` fails if a third site reads it. `--honey` is the next one: 47 sites, and
-under the accent it also carries warm stakes, a changed law, a stopped run and gilded, so its
-own split is the next lane's.
+`ui/contrast.test.ts` fails if a third site reads it. `--honey` was next: **52 sites**, and under
+the accent it also carried how hot a scene is, what a first is cut from, what our own hand
+changed, and where the tape stands on the day's track. Those four are off it. Most of what is
+left is one question asked four ways: focus rings, grounds under a pointer, marks on the one
+that is on, and the places the accent is the ground of a control or a mark of ours. Three sites
+still answer a different question and are not yet split: `.bond-level` and
+`.matrix [data-level='close']` use it as the warm end of a valence, which is `--sage`'s job, and
+`.day-bar-state` uses it for provenance. No test bounds `--honey` the way `ROLES` bounds the
+five, so that claim is prose until it does.
 
 | Role, and the one question it answers | Token | Value |
 |---|---|---|
@@ -32,19 +38,22 @@ own split is the next lane's.
 | ink, quiet | `--ink-quiet` | `#5F5568` — 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand |
 | ground, dark | `--deep` / `--night` | `#241F2B` / `#322B38` |
 | cream, quiet | `--cream-quiet` | `#C4B8AE` — 8.28:1 on deep, 7.03:1 on night |
-| the accent, this one here, and the four states that still borrow it | `--honey` / `--honey-l` | `#F2C879` / `#F8DCA2` |
+| **this one, here**: the accent, the ring, the ground under a pointer, the one that is on | `--honey` / `--honey-l` | `#F2C879` / `#F8DCA2` |
 | the nameplate's own wood | `--honey-deep` | `#7E512B` — cream on it is 6.33:1 |
 | the feed's zebra | `--parchment-zebra` | `#F1E1CC` — the sand-over-parchment composite, computed once |
 | **how hot**: the top of the stakes band, and the material a first is cut from | `--ember` | `#E8785A` |
 | a word ember cannot be set in | `--ember-ink` | `#9E3B2B` — ember is 2.70:1 on cream, this is 6.30:1 |
+| the step under it, so the stakes band is one heat at two strengths | `--ember-pale` | `#F2A893` — 8.27:1 on deep |
+| **struck metal**: the tier the town's own work is cut at | `--gilt` | `#A9761F` — 3.29:1 on parchment, where honey drew that drop at 1.31:1 |
 | **the good half** of a valence: a gain, a full need, a warm tie | `--sage` / `--sage-pale` | `#93B573` / `#DCE8C8` |
 | **the bad half**: unwell, a low need, a cost, a strained tie | `--rose` / `--rose-pale` | `#C47876` / `#F2C6C2` |
 | **the weather**, and nothing else | `--sky` | `#3E6786` |
-| **the one you are in**, and the control that is on | `--current` | `#AA7ACD` — the ink's own hue at reading strength: 4.88:1 under deep, 3.08:1 on cream |
+| **the one you are in**, the control that is on, and where the tape stands | `--current` | `#AA7ACD` — the ink's own hue at reading strength: 4.88:1 under deep, 3.08:1 on cream |
+| **our own hand**, on a page the town never prints | `--operator` | `#BFCCE8` — ink on it is 6.77:1, and it is 178° off the accent |
 
-`--current` is us and not the world, which is why it is the ink's hue and not a warm one: six
-sites read it — the feed entry, the moment card, the discovery leaf, the room door, the filtered
-count and the playhead — and every one of them answers *this one, now*. Illness keeps the rose it
+`--current` is us and not the world, which is why it is the ink's hue and not a warm one: seven
+sites read it, the feed entry, the moment card, the discovery leaf, the room door, the filtered
+count and the playhead on both tracks, and every one of them answers *this one, now*. Illness keeps the rose it
 already wore and its rail is cream at 3.12:1, where the ember rail it replaces was **1.15:1** and
 could not be seen at all.
 
@@ -314,7 +323,7 @@ and the sheet's own lists read the sheet rather than the window.
 | Query | What it is for |
 |---|---|
 | `max-width: 640px` | the sheet takes 96% × 100% of its own row; the arms move to the top edge as a 2×2 block |
-| `max-width: 900px` | the band drops the weekday, the weather and the camera chip, and its three columns become auto · 1fr · auto |
+| `max-width: 900px` | the band takes a second row. The flanks share the first, the track spans the second, and only the camera chip goes. On one row the track was 96px at 390px, and on two it is 366px |
 | `max-width: 480px` | the paper's masthead steps down one, to `--f-6` |
 | `max-width: 1919.98px` | the head becomes a grid — date and marginalia on one row, tabs scrolling along the next. With the weekday in the dateline the one-row section line needs ~723px of head, which only the 1040px sheet above 1920px has |
 | `min-width: 700px` | the caption and the cue stop 320px short of the corner, so neither ever reaches the signpost |

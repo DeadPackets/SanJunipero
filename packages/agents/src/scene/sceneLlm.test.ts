@@ -337,7 +337,7 @@ describe('a join does not throw the cached prefix away', () => {
   it('lets a line run to the persona’s burst, and says the typical length as the usual', () => {
     expect(sceneWordCap(CARDED.voiceCard)).toBe(22)
     expect(sceneWordUsual(CARDED.voiceCard)).toBe(11)
-    expect(block()).toContain('About 11 words is normal for you; 22 at the very most.')
+    expect(block()).toContain('About 11 words is normal for you, and 22 at the very most.')
   })
 
   it('falls back to the town’s median line for a persona with no card', () => {

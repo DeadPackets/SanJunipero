@@ -81,13 +81,13 @@ export function sceneWordUsual(voice: IdentityCore['voiceCard']): number {
 // one place that has to say so.
 export const SCENE_ANSWER = `Your turn to talk. Your hands are not doing anything right now, so this is not an act.
 
-Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off; what you say in the same answer is said before you go. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
+Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off. What you say in the same answer is said before you go. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
 
 move says what this line is doing. tell: bring up something new, like news, a plan, or a thing you noticed. ask: a real question you want the answer to. joke: make light of it, even if the moment is not light. agree: you are with them. shift: change the subject. press: push your point. give_way: let them have it. deflect: dodge. tease: needle them. none: plain talk.
 
-To ask the person you are talking to for something, put court, propose or lie_with in "ask"; otherwise leave it empty. If you were asked such a thing, put accept or refuse in "answer".
+To ask the person you are talking to for something, put court, propose or lie_with in "ask". Otherwise leave it empty. If you were asked such a thing, put accept or refuse in "answer".
 
-thought is one short line nobody else hears. mood is how you feel right now, in one or two plain words of your own; null unless it has changed.`
+thought is one short line nobody else hears. mood is how you feel right now, in one or two plain words of your own, and null unless it has changed.`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what they had to say.',
@@ -218,7 +218,7 @@ function renderProposal(scene: Scene, agentId: string, nameOf: (id: string) => s
   if (proposal.proposedBy === agentId) {
     return (
       `You have proposed a rule to everyone here: "${proposal.lawText}" Hear them out. ` +
-      'If more are for it than against, the town votes on it another day; it means nothing if nobody answers.'
+      'If more are for it than against, the town votes on it another day. It means nothing if nobody answers.'
     )
   }
   return `${nameOf(proposal.proposedBy)} has proposed a rule to everyone here: "${proposal.lawText}" ${stand}`
@@ -243,7 +243,7 @@ function renderFloor(opts: {
       : `${opts.lastSpeaker} just spoke.`
   const ask = opts.wrapUp
     ? 'This has gone on a while. Say your last thing and let it end.'
-    : `Say what you would actually say next, or say nothing and let it end. You do not have to answer what ${them} said; you can ask something, bring up your own thing, or change the subject.`
+    : `Say what you would actually say next, or say nothing and let it end. You do not have to answer what ${them} said. You can ask something, bring up your own thing, or change the subject.`
   return [
     opts.others.length === 0 ? '' : `Standing with you: ${opts.others.join(', ')}.`,
     opts.silent.length === 0 ? '' : `Not a word yet from ${opts.silent.join(', ')}.`,
@@ -251,7 +251,7 @@ function renderFloor(opts: {
       ? ''
       : `Within earshot and not in the talk: ${opts.audience.join(', ')}.`,
     `It is your turn. ${spoke} ${ask}`,
-    `About ${opts.usual} words is normal for you; ${opts.words} at the very most. Do not repeat ${them}'s words back, and do not end on a comeback unless that is how you talk.`,
+    `About ${opts.usual} words is normal for you, and ${opts.words} at the very most. Do not repeat ${them}'s words back, and do not end on a comeback unless that is how you talk.`,
   ]
     .filter((p) => p.length > 0)
     .join('\n')

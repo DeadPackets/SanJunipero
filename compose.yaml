@@ -35,6 +35,9 @@ services:
       - SJ_JOINT
       - SJ_LIVE
       - SJ_ARBITER
+      # One word, `model@Provider` or `model@ProviderA,ProviderB`: the back ends are an allow-list,
+      # so a model set without them is refused on every call it makes.
+      - SJ_MIND_ROUTE
       - SJ_SPEND_DAILY_USD
       - SJ_SPEND_CAP_USD
       - SJ_MAX_MINDS

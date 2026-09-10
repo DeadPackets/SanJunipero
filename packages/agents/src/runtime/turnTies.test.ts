@@ -167,7 +167,7 @@ describe('the ordinary turn knows what a mind is owed', () => {
       { personId: YUSUF, kind: 'debt', text: 'two days of his work on your roof' },
       { personId: YUSUF, kind: 'slight', text: 'he named you a poor neighbour' },
     ])
-    expect(said).toContain('a promise: bring back the long rope; a debt: two days of his work')
+    expect(said).toContain('a promise: bring back the long rope | a debt: two days of his work')
     expect(said).not.toContain('poor neighbour')
   })
 

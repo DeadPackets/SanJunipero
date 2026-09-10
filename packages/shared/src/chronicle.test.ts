@@ -672,8 +672,8 @@ describe('a discovery, in the town’s own words', () => {
   })
 
   it('credits the person by name and says what they worked out', () => {
-    expect(chronicleLine(craft, look)).toBe('Rahel found the way of it — stitch a waterskin.')
-    expect(chronicleLine(word, look)).toBe('Rahel gave the town a word for it — dance.')
+    expect(chronicleLine(craft, look)).toBe('Rahel found the way of it, stitch a waterskin.')
+    expect(chronicleLine(word, look)).toBe('Rahel gave the town a word for it, dance.')
   })
 
   it('NEVER puts the mind’s own words into a line a mind can read', () => {
@@ -774,9 +774,9 @@ describe('a discovery says why, in the words it was said in', () => {
 
   it('appends the spoken reason when there is one, and reads as today when there is not', () => {
     expect(chronicleLine(made({ saying: 'The roof will not hold without them.' }), look)).toBe(
-      'Rahel found the way of it — shape wooden pegs. “The roof will not hold without them.”',
+      'Rahel found the way of it, shape wooden pegs. “The roof will not hold without them.”',
     )
-    expect(chronicleLine(made({}), look)).toBe('Rahel found the way of it — shape wooden pegs.')
+    expect(chronicleLine(made({}), look)).toBe('Rahel found the way of it, shape wooden pegs.')
   })
 
   it('clips a reason that runs on, so a feed line stays a line', () => {

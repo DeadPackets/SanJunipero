@@ -128,7 +128,7 @@ describe('the satchel is read out once, grouped by kind', () => {
 
   it('a single thing keeps its own mark, with nothing trailing it', () => {
     const said = proseFor(town([{ id: 'item_9', kind: 'bucket', qty: 1 }]))
-    expect(said).toContain('Your hands hold bucket ×1 (item_9);')
+    expect(said).toContain('Your hands hold bucket ×1 (item_9).')
   })
 
   // r28: Halim read the one note in his hand 56 times, because nothing else told him what it said.
@@ -136,7 +136,7 @@ describe('the satchel is read out once, grouped by kind', () => {
     const said = proseFor(
       town([{ id: 'item_9', kind: 'note', qty: 1, text: 'Two planks owed to Omar.' }]),
     )
-    expect(said).toContain('Your hands hold note ×1 (item_9; it reads "Two planks owed to Omar.")')
+    expect(said).toContain('Your hands hold note ×1 (item_9, it reads "Two planks owed to Omar.")')
   })
 
   it("another's thing is a tally of its own, and still says whose it is", () => {
@@ -146,7 +146,7 @@ describe('the satchel is read out once, grouped by kind', () => {
         { id: 'item_2', kind: 'bread', qty: 1, owner: 'omar' },
       ]),
     )
-    expect(said).toContain("Your hands hold bread ×1 (item_1), bread ×1 (item_2; Omar's)")
+    expect(said).toContain("Your hands hold bread ×1 (item_1), bread ×1 (item_2, Omar's)")
   })
 })
 

@@ -169,5 +169,5 @@ export function castWords(names: readonly string[]): string {
 export function whyOf(names: string, top: readonly StakeTerm[]): string {
   const said = top.map((t) => WHY_PHRASE[t])
   if (said.length === 0) return names
-  return `${names} — ${said.join(', ')}`
+  return `${names}: ${said.join(', ')}`
 }

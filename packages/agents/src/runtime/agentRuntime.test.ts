@@ -1487,7 +1487,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 1, 80)
     expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
-      'You were already there; no step was needed.',
+      'You were already there. No step was needed.',
     ])
     expect(runtime.snapshot().plan.lastResult).toBe('idle')
   })
@@ -1812,7 +1812,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     await stepUntil(loop, () => runtime.stats().turns >= 1, 30)
     // A storehouse is a thing you can walk into, so the prose says it has a doorway rather than
     // offering ground beside the wall — and names neither as a tile.
-    expect(runtime.dayLogSnapshot()[0]).toContain('it has a doorway; walk to it and you can go in')
+    expect(runtime.dayLogSnapshot()[0]).toContain('It has a doorway. Walk to it and you can go in')
   })
 
   it('the body answers its own alarm: a sleeper whose turn submits nothing is woken by a runtime wake', async () => {

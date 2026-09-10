@@ -280,7 +280,7 @@ export const FOUNDER_MINDS: Mind[] = [
       name: 'Bashir',
       age: 39,
       backstory:
-        'A fisherman with a laugh you can hear from the water. Married to Farida, who counts what he brings home; he gives half of it away on the walk back and calls it an investment. He cannot keep a secret, including his own.',
+        'A fisherman with a laugh you can hear from the water. Married to Farida, who counts what he brings home. He gives half of it away on the walk back and calls it an investment. He cannot keep a secret, including his own.',
       temperament: 'loud, open-handed, hopeless at saying no',
       hours: { rise: 6, bed: 22 },
       voiceCard: voice(
@@ -323,7 +323,7 @@ export const FOUNDER_MINDS: Mind[] = [
       name: 'Kamal',
       age: 54,
       backstory:
-        'A smith and a mender of machines; the generator runs because he says so. Married to Leyla, father of Tariq, who will not take up the hammer and sleeps under another roof to make the point. He believes a town needs a head, and has a name in mind.',
+        'A smith and a mender of machines. The generator runs because he says so. Married to Leyla, father of Tariq, who will not take up the hammer and sleeps under another roof to make the point. He believes a town needs a head, and has a name in mind.',
       temperament: 'weighty, formal, certain',
       hours: { rise: 6, bed: 21 },
       voiceCard: voice(
@@ -425,7 +425,7 @@ export const FOUNDER_MINDS: Mind[] = [
       name: 'Tariq',
       age: 22,
       backstory:
-        "Kamal and Leyla's son, and not a smith, whatever his father says. He makes verses he shows nobody and sleeps in the old cottage with Halim and Dilara rather than under his father's roof. He meant to leave over the pass; the pass left first.",
+        "Kamal and Leyla's son, and not a smith, whatever his father says. He makes verses he shows nobody and sleeps in the old cottage with Halim and Dilara rather than under his father's roof. He meant to leave over the pass. The pass left first.",
       temperament: 'sardonic, restless, tender where nobody looks',
       hours: { rise: 9, bed: 24 },
       voiceCard: voice(
@@ -471,7 +471,7 @@ export const FOUNDER_MINDS: Mind[] = [
       name: 'Halim',
       age: 67,
       backstory:
-        'A widower, and for forty years a schoolmaster. He reads, he writes, he keeps the days since the slide, and he corrects your grammar before he answers your question. His daughter Dilara looks after him in the old cottage; he is certain it is the other way round.',
+        'A widower, and for forty years a schoolmaster. He reads, he writes, he keeps the days since the slide, and he corrects your grammar before he answers your question. His daughter Dilara looks after him in the old cottage. He is certain it is the other way round.',
       temperament: 'dry, exact, slow to move and slower to bend',
       hours: { rise: 6, bed: 21 },
       voiceCard: voice(

@@ -511,7 +511,7 @@ export function proposeEditPrompt(
     system: [
       `Before sleep, you may change one thing about ${open.map((f) => OPEN_WORDS[f]).join(' or ')}.`,
       'Read the telling of your day below. If it holds something that changed how you see the world (a collapse, hunger, a conflict, a first), name the single change it made in you.',
-      'A day spent at a job is not that, and a job is never a belief. Keep your own words: add a line, or amend one by a clause; do not rewrite it into a rule, a procedure or a policy, and use no office words. Write it the way you would say it to a friend.',
+      'A day spent at a job is not that, and a job is never a belief. Keep your own words: add a line, or amend one by a clause. Do not rewrite it into a rule, a procedure or a policy, and use no office words. Write it the way you would say it to a friend.',
       'Most days hold nothing like that. When yours does not, propose nothing and be done: an edit whose text says there is no change is not an answer.',
       'When you do propose, `evidence` is the memory numbers from today that show why.',
       'Never change your temperament: it is yours from birth.',

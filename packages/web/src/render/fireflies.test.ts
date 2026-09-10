@@ -1,31 +1,94 @@
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+// Driven for real below, so the swarm is counted off the sprites it wrote to.
+const built = vi.hoisted(() => ({ sprites: 0, graphics: 0 }))
+vi.mock('pixi.js', () => {
+  class Point {
+    x = 0
+    y = 0
+    set(x: number, y: number = x): void {
+      this.x = x
+      this.y = y
+    }
+  }
+  class Container {
+    children: Container[] = []
+    visible = true
+    alpha = 1
+    tint = 0xffffff
+    eventMode = ''
+    blendMode = ''
+    autoGarbageCollect = true
+    destroyed = false
+    zIndex = 0
+    sortableChildren = false
+    position = new Point()
+    scale = new Point()
+    anchor = new Point()
+    addChild(...cs: Container[]): void {
+      this.children.push(...cs)
+    }
+    destroy(): void {
+      this.destroyed = true
+    }
+  }
+  class Sprite extends Container {
+    constructor() {
+      super()
+      built.sprites++
+    }
+  }
+  class Graphics extends Container {
+    constructor() {
+      super()
+      built.graphics++
+    }
+    rect(): this {
+      return this
+    }
+    fill(): this {
+      return this
+    }
+  }
+  return { Assets: {}, Container, Graphics, Point, Sprite, Texture: { EMPTY: {} } }
+})
 import type { TileId } from '@sj/engine/state'
+import type { WorldStore } from '../state/worldStore.js'
+import type { ViewRect } from './cull.js'
 import {
   FIREFLY_BLINK_HZ,
   FIREFLY_DUSK,
   FIREFLY_MAX,
   FIREFLY_MAX_ALPHA,
+  createFireflies,
   fireflyBlink,
   fireflyDrift,
   fireflySeeds,
   fireflyStrength,
   isClearSky,
 } from './fireflies.js'
-
-const src = readFileSync(new URL('./fireflies.ts', import.meta.url), 'utf8')
+import type { Scene } from './scene.js'
+import { WEATHER_DIAG } from './tints.js'
 
 const NIGHT = 0,
   NOON = 720,
   DUSK = 1140
+
+const terrain = (rows: number[][]): TileId[][] => rows as TileId[][]
 
 describe('★ fireflies come out on a clear night and on no other (task 18)', () => {
   // Clear is not a second list of weather words: it is exactly the weather the picture is not
   // graded for, so a kind added to `WEATHER_DIAG` cannot forget to put the swarm away.
   it('★ reads clear off the one grading table, never a list of its own', () => {
     expect(isClearSky('sunny')).toBe(true)
-    for (const k of ['cloudy', 'rain', 'storm', 'snow']) expect(isClearSky(k), k).toBe(false)
-    expect(src).toContain('WEATHER_DIAG[')
+    for (const k of Object.keys(WEATHER_DIAG)) expect(isClearSky(k), k).toBe(false)
+    const table = WEATHER_DIAG as Record<string, [number, number, number]>
+    table.hail = [0.9, 0.9, 1]
+    try {
+      expect(isClearSky('hail'), 'a kind added to the grade puts the swarm away').toBe(false)
+    } finally {
+      delete table.hail
+    }
   })
 
   it('★ none under any cloud, however dark the hour', () => {
@@ -55,8 +118,6 @@ describe('★ fireflies come out on a clear night and on no other (task 18)', ()
 })
 
 describe('★ over grass, and only over grass', () => {
-  const terrain = (rows: number[][]): TileId[][] => rows as TileId[][]
-
   it('★ seeds no firefly over water, forest, road or bare earth', () => {
     const t = terrain([
       [0, 2, 3],
@@ -116,33 +177,91 @@ describe('★ the drift and the blink', () => {
 })
 
 describe('what the swarm must not cost', () => {
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  type Node = {
+    visible: boolean
+    alpha: number
+    eventMode: string
+    zIndex: number
+    sortableChildren: boolean
+    position: { x: number; y: number }
+    children: Node[]
+  }
+  const MEADOW = terrain(Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => 0)))
+
+  const rig = (o: { motion?: boolean; view?: ViewRect; weather?: string } = {}) => {
+    const lights: Node[] = []
+    const elsewhere = { ground: [] as Node[], entities: [] as Node[], grade: [] as Node[] }
+    const box = (into: Node[]) => ({ addChild: (c: Node) => into.push(c) })
+    const scene = {
+      app: { renderer: { generateTexture: () => ({ source: {}, destroy: () => {} }) } },
+      screen: { lights: box(lights), grade: box(elsewhere.grade) },
+      layers: { ground: box(elsewhere.ground), entities: box(elsewhere.entities) },
+      viewRect: () => o.view ?? { x: -1e4, y: -1e4, w: 2e4, h: 2e4 },
+      wantsMotion: () => o.motion ?? true,
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ terrain: MEADOW, weather: { kind: o.weather ?? 'sunny' } }),
+      getTick: () => NIGHT,
+    } as unknown as WorldStore
+    built.sprites = 0
+    built.graphics = 0
+    const swarm = createFireflies(scene, store)
+    return { swarm, elsewhere, root: (): Node => lights[0]!, made: (): number => built.sprites }
+  }
 
   // ★ POOLED, NEVER PER FRAME. The review just took the per-frame rebuilds out of this
   // renderer; a swarm that allocates ninety sprites a frame would put them straight back.
   it('★ builds its sprites once and only writes to them afterwards', () => {
-    const at = code.lastIndexOf('tick(dtMs')
-    expect(at).toBeGreaterThan(0)
-    const body = code.slice(at)
-    expect(body).not.toContain('new Sprite')
-    expect(body).not.toContain('new Container')
-    expect(body).not.toContain('bakeTexture')
+    const r = rig()
+    expect(r.made()).toBe(FIREFLY_MAX)
+    const before = [...r.root().children]
+    const bakes = built.graphics
+    for (let i = 0; i < 60; i++) r.swarm.tick(16)
+    expect(r.made(), 'a frame that allocates is a frame that stutters').toBe(FIREFLY_MAX)
+    expect(built.graphics, 'and it bakes its one dot once').toBe(bakes)
+    expect(r.root().children).toEqual(before)
   })
 
   it('★ lives in the lights layer, above the night multiply, and sorts nothing', () => {
-    expect(code).toContain('screen.lights')
-    expect(code).not.toMatch(/\.zIndex\s*=(?!=)/)
+    const r = rig()
+    r.swarm.tick(16)
+    expect(r.root().children).toHaveLength(FIREFLY_MAX)
+    for (const [name, held] of Object.entries(r.elsewhere))
+      expect(held, `${name} was handed a firefly`).toHaveLength(0)
+    for (const n of [r.root(), ...r.root().children]) {
+      expect(n.zIndex).toBe(0)
+      expect(n.sortableChildren).toBe(false)
+    }
   })
 
   it('★ culls: a firefly off the edge of the view is not drawn', () => {
-    expect(code).toContain('rectInView(')
+    const near = rig()
+    near.swarm.tick(16)
+    expect(near.swarm.count()).toBeGreaterThan(0)
+
+    const far = rig({ view: { x: 5e5, y: 5e5, w: 100, h: 100 } })
+    far.swarm.tick(16)
+    expect(far.swarm.count()).toBe(0)
+    for (const s of far.root().children) expect(s.visible).toBe(false)
   })
 
   it('honours prefers-reduced-motion through the scene, the one owner of the question', () => {
-    expect(code).toContain('scene.wantsMotion()')
+    const held = (r: ReturnType<typeof rig>): string[] => {
+      const seen: string[] = []
+      for (let i = 0; i < 30; i++) {
+        r.swarm.tick(100)
+        const s = r.root().children[0]!
+        seen.push(`${s.position.x},${s.position.y},${s.alpha}`)
+      }
+      return [...new Set(seen)]
+    }
+    expect(held(rig({ motion: false })), 'stillness is one frame, forever').toHaveLength(1)
+    expect(held(rig({ motion: true })).length).toBeGreaterThan(1)
   })
 
   it('never swallows a pointer', () => {
-    expect(code).toMatch(/eventMode = 'none'/)
+    const r = rig()
+    r.swarm.tick(16)
+    for (const n of [r.root(), ...r.root().children]) expect(n.eventMode).toBe('none')
   })
 })

@@ -5,13 +5,8 @@ import { captionFor, chapterIndex, type Chapter } from '../ui/chapterCaption.js'
 import { chaptersFeed } from '../ui/feeds.js'
 import { useFeed } from '../ui/useEndpoint.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
-import {
-  TITLE_CARD_MS,
-  castNames,
-  dipAlpha,
-  momentDateline,
-  type MomentPlay,
-} from '../ui/replayRun.js'
+import { momentStamp } from '../paper/stamp.js'
+import { TITLE_CARD_MS, castNames, dipAlpha, type MomentPlay } from '../ui/replayRun.js'
 
 const reducedMotion = (): boolean =>
   typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -106,7 +101,7 @@ export function ReplayScene({ store, play }: { store: WorldStore; play: MomentPl
       {play !== null && (
         // Non-modal and unfocusable: the plate is a caption on the town, not a thing to dismiss.
         <div className="replay-card" data-up={up ? 'yes' : 'no'} aria-hidden="true">
-          <p className="replay-card-when">{momentDateline(play.tick)}</p>
+          <p className="replay-card-when">{momentStamp(play.tick)}</p>
           {titled ? (
             <>
               <p className="replay-card-title">{play.title}</p>

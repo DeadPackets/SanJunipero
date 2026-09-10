@@ -605,7 +605,7 @@ export type PlotTile = {
  *  street corner. A plot outside the extent THROWS rather than being quietly dropped. */
 export function plattedPlots(rings: number = TOWN_RINGS_GENESIS): PlotTile[] {
   if (!Number.isInteger(rings) || rings < 1) {
-    throw new Error(`plattedPlots: a town of ${rings} ring(s) has no plots — ask for at least 1`)
+    throw new Error(`plattedPlots: a town of ${rings} ring(s) has no plots. Ask for at least 1`)
   }
   const o = townOrigin(rings)
   return freePlots(rings, CITY_GROUND).map((p) => {
@@ -646,8 +646,8 @@ export function growthPlots(
   const span = templateSpan(t)
   if (span !== townSpan(rings)) {
     throw new Error(
-      `growthPlots: a template ${span} tiles across is not a town of ${rings} ring(s)` +
-        ` — that wants ${townSpan(rings)}`,
+      `growthPlots: a template ${span} tiles across is not a town of ${rings} ring(s),` +
+        ` which wants ${townSpan(rings)}`,
     )
   }
   return genesisEmptyPlots(rings).map(({ dx, dy }) => ({ dx, dy }))

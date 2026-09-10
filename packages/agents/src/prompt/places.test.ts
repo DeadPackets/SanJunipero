@@ -288,7 +288,7 @@ describe('★ block 1 tells the truth about walking to a place', () => {
   it('teaches the naming law as physics: whose wall, and what reads as a name', () => {
     expect(inscribeLine).toContain('a building you raised yourself become what it is called')
     expect(inscribeLine).toContain('read as a name and not as a sentence')
-    expect(inscribeLine).toContain("what you cut into another's walls stays writing on the wall")
+    expect(inscribeLine).toContain("What you cut into another's walls stays writing on the wall")
   })
 
   it('and spends not one word on taste', () => {

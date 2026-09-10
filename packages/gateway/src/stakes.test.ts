@@ -69,7 +69,7 @@ describe('the director follows the stakes', () => {
     expect(f.cut?.agentIds).toEqual(['nadia', 'yusuf'])
     // 8 stakes doubled, one strong word, a give-way after three presses, two firsts today
     expect(f.cut?.score).toBe(16 + 2 + 6 + 6)
-    expect(f.cut?.why).toBe('Nadia & Yusuf — falling out, one of them gave way')
+    expect(f.cut?.why).toBe('Nadia & Yusuf: falling out, one of them gave way')
   })
 
   it('takes the council over the storm — a fire is weather and scores nothing', () => {
@@ -83,7 +83,7 @@ describe('the director follows the stakes', () => {
     expect(f.cut?.sceneId).toBe(COUNCIL)
     // 8 doubled, a rule in session, and 3 for the first council today
     expect(f.cut?.score).toBe(16 + 6 + 3)
-    expect(f.cut?.why).toBe('Omar, Salma & Bashir — putting a rule to the room')
+    expect(f.cut?.why).toBe('Omar, Salma & Bashir: putting a rule to the room')
   })
 
   it('drops the opening kind when the talk turns, rather than saying both', () => {
@@ -266,7 +266,7 @@ describe('the caption is the whole vocabulary', () => {
     for (const term of STAKE_TERMS) {
       const said = whyOf('Nadia & Yusuf', [term])
       expect(scanRulingForGlassLeak(said), term).toEqual([])
-      expect(said.startsWith('Nadia & Yusuf — '), term).toBe(true)
+      expect(said.startsWith('Nadia & Yusuf: '), term).toBe(true)
     }
   })
 

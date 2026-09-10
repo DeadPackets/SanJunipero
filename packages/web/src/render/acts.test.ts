@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   ACT_TRACK_MAX_TICKS,
@@ -35,12 +34,8 @@ const run = (over: Partial<ActRun> = {}): ActRun => ({ verb: 'chop', total: 30, 
 // a position before it is ever a hue — so the chip is one flat slab and the reader is never
 // asked to read a word through a wash.
 describe('the chip carries the word and nothing else', () => {
-  it('draws no wash, no waterline and no mask of its own', () => {
-    const src = readFileSync(new URL('./acts.ts', import.meta.url), 'utf8')
-    expect(src).not.toContain('drawWash')
-    expect(src).not.toContain('.mask =')
-    expect(src).not.toContain('ACT_FILL')
-  })
+  // Driven through the real layer in actsLayer.test.ts, '★ carries no mask of its own, and
+  // nothing under the word but its paper'.
 
   it('keeps the paper and the ink it always had', () => {
     const r = bandRatios(SPEECH_INK, SPEECH_FILL)

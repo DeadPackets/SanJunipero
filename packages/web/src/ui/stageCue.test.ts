@@ -64,7 +64,7 @@ describe('★ the stage says what just happened', () => {
       }),
       state,
     )
-    expect(cue?.text).toBe('Amara found the way of it — smoked fish.')
+    expect(cue?.text).toBe('Amara found the way of it, smoked fish.')
     expect(cue?.icon).toBe('key')
     expect(cue?.bodies).toEqual(['amara'])
   })

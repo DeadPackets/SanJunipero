@@ -227,7 +227,7 @@ describe('food that is turning', () => {
     const packet = bridge.perception('amara')
     const carried = packet.self.inventory.find((i) => i.id === 'item_fresh_fish')
     expect(carried?.spoiling).toBe(true)
-    expect(proseFor(bridge, 'amara')).toContain('fish ×1 (item_fresh_fish; it is turning)')
+    expect(proseFor(bridge, 'amara')).toContain('fish ×1 (item_fresh_fish, it is turning)')
   })
 })
 
@@ -310,7 +310,7 @@ describe('the road to a fed fire, opened before the light goes', () => {
     const warm: ProseWorld = { ...coldNight, nightWillBeCold: () => false }
     expect(cold(evening(17, 'cold'))).toContain('Tonight will be cold')
     expect(cold(evening(17, 'cold'), warm)).toBe(
-      'Plank needs 1 wood; the nearest standing tree is at (31, 44).',
+      'Plank needs 1 wood, and the nearest standing tree is at (31, 44).',
     )
   })
 

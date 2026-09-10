@@ -8,11 +8,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { DEFAULT_CONFIG, MINUTES_PER_DAY, type SimEvent } from '@sj/shared'
 import { fold, genesisState, type TileId } from '@sj/engine'
 import { createWorldStore, type WorldStore } from '../state/worldStore.js'
+import { momentStamp } from '../paper/stamp.js'
 import { DayBar, dayStart, playPause, trackTick } from '../stage/DayBar.js'
 import { App, wayBack } from '../App.js'
 import { ReplayScene } from '../stage/ReplayScene.js'
 import { SCENE_IN_MS, SCENE_OUT_MS, SCENE_TOTAL_MS, SCENES } from './sceneTransition.js'
-import { TITLE_CARD_MS, castNames, dipAlpha, momentDateline, pointPlay } from './replayRun.js'
+import { TITLE_CARD_MS, castNames, dipAlpha, pointPlay } from './replayRun.js'
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
 const src = (f: string): string => readFileSync(join(import.meta.dirname, f), 'utf8')
@@ -160,8 +161,12 @@ describe('★ the title card names the minute and gets out of the way', () => {
     expect(CSS).toMatch(/\.replay-card \{[^}]*pointer-events: none;/)
   })
 
-  it('carries the day, the minute and the people, in the town’s own words', () => {
-    expect(momentDateline(1500)).toBe('Day 1 · 01:00')
+  // The card had its own formatter and the sheet had another, so one minute read two ways on
+  // two surfaces of one frame.
+  it('carries the day, the minute and the people, in the town’s own words', async () => {
+    const host = await mount(createElement(ReplayScene, { store: createWorldStore(), play: PLAY }))
+    expect(host.querySelector('.replay-card-when')?.textContent).toBe(momentStamp(DAY))
+    expect(momentStamp(1500)).toBe('Day 1 01:00')
     const names: Record<string, string> = { a1: 'Rahel', a2: 'Tomas', a3: 'Omar' }
     expect(castNames(['a1'], (id) => names[id])).toBe('Rahel')
     expect(castNames(['a1', 'a2'], (id) => names[id])).toBe('Rahel and Tomas')
@@ -250,6 +255,34 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
     expect(wayBack(false, true), 'a stream frame has no hands').toBe(false)
     expect(wayBack(true, true)).toBe(false)
     expect(bar(REPLAYING), 'the bar grew a second way back').not.toContain('Return to now')
+  })
+
+  // ★ The same ruling, on the surface it was still broken on: the paper's day strip carried its
+  // own `Return to now`, so a scrub with the sheet open put two of them on one frame.
+  it('★ stands ONE way back on the whole frame, the sheet open over it and all', async () => {
+    const host = await mount(createElement(App))
+    const store = world!
+    townArrives(store)
+    await act(async () => {
+      store.applyServer({ t: 'scrubbed', reqId: 1, tick: DAY, state: store.getState() })
+    })
+    await act(async () => {
+      host.querySelector<HTMLElement>('.signpost-arm[data-arm="chronicle"]')!.click()
+    })
+    await act(async () => {
+      host.querySelector<HTMLElement>('#paper-tab-Days')!.click()
+    })
+    expect(host.querySelector('.day-strip'), 'the day strip never opened').not.toBeNull()
+    const back = [...host.querySelectorAll('button')].filter((b) =>
+      b.textContent.includes('Return to now'),
+    )
+    expect(
+      back.map((b) => b.className),
+      'a second way back stood beside the one',
+    ).toEqual(['stage-live'])
+    // ★ A voice-control user says the word they can see, and the strip's pill used to be named
+    // something else: no label may rename the one way back out from under the word on it.
+    expect(back.map((b) => b.getAttribute('aria-label'))).toEqual([null])
   })
 
   // ★ NO SPEED CONTROL. `bubbleLife` is 3500 ms + 55/char and the leg timing is tuned to the

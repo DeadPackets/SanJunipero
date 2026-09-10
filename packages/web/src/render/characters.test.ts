@@ -1,10 +1,19 @@
-import { readFileSync } from 'node:fs'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { WorldState } from '@sj/engine/state'
 import type { SimEvent } from '@sj/shared'
 import type { TownScene, WorldStore } from '../state/worldStore.js'
+import { SLOT_ABOVE_HEAD_PX, SLOT_PX } from './overhead.js'
+import { shadowCast } from '../ui/skyModel.js'
 import { createTension, TENSION_DESATURATE_MS } from './tension.js'
 
+// A pass-through spy: the real sun, counted, so "once a frame" is a measured call count.
+vi.mock('../ui/skyModel.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../ui/skyModel.js')>()
+  return { ...real, shadowCast: vi.fn(real.shadowCast) }
+})
+
+// Every Texture pixi hands out, counted: an uncached slice is a listener that is never freed.
+const cut = vi.hoisted(() => ({ textures: 0 }))
 vi.mock('pixi.js', () => {
   class Point {
     x = 0
@@ -30,7 +39,9 @@ vi.mock('pixi.js', () => {
         this.children.push(c)
       }
     }
-    on(): this {
+    handlers: Record<string, () => void> = {}
+    on(ev: string, fn: () => void): this {
+      this.handlers[ev] = fn
       return this
     }
     destroy(): void {
@@ -73,7 +84,9 @@ vi.mock('pixi.js', () => {
     rect(): this {
       return this
     }
-    stroke(): this {
+    lastStroke: { width?: number; color?: number } | null = null
+    stroke(o?: { width?: number; color?: number }): this {
+      this.lastStroke = o ?? null
       return this
     }
   }
@@ -114,6 +127,7 @@ vi.mock('pixi.js', () => {
     constructor(opts?: { source?: unknown; frame?: unknown }) {
       this.source = opts?.source ?? { autoGenerateMipmaps: false, scaleMode: 'nearest' }
       this.frame = opts?.frame
+      cut.textures++
     }
     destroy(): void {}
   }
@@ -181,6 +195,7 @@ function makeStore(agents: MutableAgents): {
   emit: (evts: SimEvent[]) => void
   setScene: (s: TownScene | null) => void
   setMoving: (v: boolean) => void
+  setTick: (t: number) => void
 } {
   const handlers = new Set<(evts: SimEvent[]) => void>()
   const tension = createTension({
@@ -191,12 +206,13 @@ function makeStore(agents: MutableAgents): {
   })
   let scene: TownScene | null = null
   let moving = true
+  let tick = 0
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
     getMode: () =>
       moving ? { live: true as const } : { live: false as const, replaying: false, tick: 0 },
     timeMoving: () => moving,
-    getTick: () => 0,
+    getTick: () => tick,
     latestThought: () => null,
     thoughtsLog: () => [],
     recentEvents: () => [],
@@ -218,6 +234,9 @@ function makeStore(agents: MutableAgents): {
     },
     setMoving: (v) => {
       moving = v
+    },
+    setTick: (t) => {
+      tick = t
     },
     emit: (evts) => {
       for (const fn of handlers) fn(evts)
@@ -247,7 +266,7 @@ function makeScene(): Scene & { sortDepth: () => void } {
     getZoomStop: () => 1,
     wantsMotion: () => true,
     viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
-    tags: { occupied: () => [], show: () => {}, hide: () => {} },
+    tags: { occupied: () => [], show: vi.fn(), hide: vi.fn() },
     addDepthSource: (fn: () => { box: { id: string }; node: unknown }[]) => {
       sources.add(fn)
       return () => sources.delete(fn)
@@ -403,26 +422,68 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   // ★ ONE OCCUPANCY. A person's plate goes through the same owner a building's does, so it is
   // placed by one rule and published where every other label can read it.
   it('asks the label layer for the hover plate, rather than keeping one per body', () => {
-    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
-    expect(src).toContain("scene.tags.show(\n          'hover',")
-    expect(src).toContain("hoverPlate(state, 'agent', a.id,")
-    expect(src).not.toContain('createPlate')
+    layer.tick(1000)
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    const before = placed(scene).length
+    const sprite = l.entities!.children[0] as unknown as {
+      handlers: Record<string, () => void>
+    }
+    const tags = scene.tags as unknown as { show: Mock; hide: Mock }
+
+    sprite.handlers.pointerover!()
+    layer.tick(1016)
+    expect(tags.show, 'the one owner every other label goes through').toHaveBeenCalledWith(
+      'hover',
+      expect.arrayContaining([expect.objectContaining({ text: 'nadia', tone: 'name' })]),
+      expect.anything(),
+    )
+    expect(placed(scene), 'and no plate of its own is built for the body').toHaveLength(before)
+
     // ...and the head box it may flip above measures what is actually drawn up there
-    expect(src).toContain('CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX')
+    const anchor = tags.show.mock.calls.at(-1)![2] as { sy: number; topY: number; halfW: number }
+    expect(anchor.sy - anchor.topY).toBe(CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX)
+    expect(anchor.halfW).toBe(SHOULDER_W / 2)
+
+    sprite.handlers.pointerout!()
+    expect(tags.hide).toHaveBeenCalledWith('hover')
   })
 
   // ★ Pixi v8's Texture registers a `resize` listener on its source through the constructor's
   // own setter, and only `destroy()` takes it off. An uncached slice therefore leaves a
   // permanent listener AND a strong reference on the long-lived atlas, per kind change.
-  it('★ cuts an emote frame once for the layer, not once per kind change', () => {
-    const src = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
-    const setGlyph = /const setGlyph = [\s\S]*?\n  \}/.exec(src)![0]
-    expect(setGlyph).toContain('cached(')
-    // there are only EMOTE_KINDS.length distinct frames in the whole atlas
-    expect(setGlyph).toContain('`emote:${kind}`')
-    expect(setGlyph, 'a bare Texture here is one that is never freed').not.toMatch(
-      /=\s*new Texture\(/,
-    )
+  it('★ cuts an emote frame once for the layer, not once per kind change', async () => {
+    const bodies: MutableAgents = { nadia: makeBodyAgent('nadia', 3, 4) }
+    const own = makeScene()
+    const { store } = makeStore(bodies)
+    const l = createCharacterLayer(own, loadedBook(), store, () => {})
+    await Promise.resolve()
+    await Promise.resolve() // the emote atlas lands off the book
+    l.tick(1000)
+
+    const body = bodies.nadia!
+    const glyph = (own.layers.worldText as unknown as { children: { children: unknown[] }[] })
+      .children[0]!
+    const wear = (over: Record<string, unknown>, ms: number): void => {
+      Object.assign(body, over)
+      l.tick(ms)
+    }
+    const frames = new Set<string>()
+    cut.textures = 0
+    for (let i = 0; i < 20; i++) {
+      for (const [j, over] of [
+        { asleep: true, ill: false, needs: NEEDS_WELL },
+        { asleep: false, ill: false, needs: NEEDS_HUNGRY },
+        { asleep: false, ill: true, needs: NEEDS_WELL },
+      ].entries()) {
+        wear(over, 2000 + i * 60 + j * 20)
+        const t = (glyph.children[1] as { texture?: { frame?: { x: number } } } | undefined)
+          ?.texture
+        frames.add(JSON.stringify(t?.frame ?? null))
+      }
+    }
+    // not vacuous: the slot really did wear three different frames over those sixty changes
+    expect(frames.size, 'sleep, hunger and exclaim are three different cells').toBe(3)
+    expect(cut.textures, 'sixty kind changes, three frames').toBe(3)
   })
 
   it('removing an agent destroys its 4 objects and drops the entry', () => {
@@ -1088,6 +1149,16 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     (scene.layers as unknown as Record<string, { children: { alpha: number; visible: boolean }[] }>)
       .groundDecal!.children
 
+  type Drawn = {
+    position: { x: number; y: number }
+    scale: { y: number }
+    lastStroke: { width?: number; color?: number } | null
+  }
+  const drawnRing = (scene: Scene): Drawn =>
+    (scene.layers as unknown as Record<string, { children: Drawn[] }>).groundDecal!.children[0]!
+  const drawnBody = (scene: Scene): Drawn =>
+    (scene.layers as unknown as Record<string, { children: Drawn[] }>).entities!.children[0]!
+
   const facingOf = (layer: ReturnType<typeof createCharacterLayer>, id: string): string | null => {
     const s = layer.getSprite(id) as unknown as { texture: { frame?: { x: number } } } | null
     const x = s?.texture.frame?.x
@@ -1300,26 +1371,108 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     layer.tick(1000 + FADE_MS)
     expect(rings(scene).map((r) => r.alpha)).toEqual([0, 0])
   })
+
+  it('★ is one pixel of honey on the GROUND point, never on the bobbing body', async () => {
+    const { scene, layer, setScene, say } = await rig()
+    setScene(openScene(['amara', 'salma']))
+    say('amara', 0, 1000)
+    const ring = drawnRing(scene)
+    expect(ring.lastStroke).toEqual({ width: 1, color: 0xf2c879 }) // --honey, the one accent
+    const resting = { x: ring.position.x, y: ring.position.y }
+    const breathed = new Set<number>()
+    for (let ms = 1000; ms < 7000; ms += 60) {
+      layer.tick(ms)
+      breathed.add(drawnBody(scene).scale.y)
+      const at = drawnRing(scene).position
+      expect([at.x, at.y], `${ms}ms`).toEqual([resting.x, resting.y])
+    }
+    expect(breathed.size, 'not vacuous: the body really was breathing').toBeGreaterThan(1)
+  })
 })
 
 // ── ★ GOLDEN HOUR ON THE GROUND (task 18) ────────────────────────────────────────────────
 
 describe('★ the contact shadow reads the sun the arc draws', () => {
-  const shadowSrc = readFileSync(new URL('./characters.ts', import.meta.url), 'utf8')
+  type Node = { alpha: number; position: { x: number; y: number }; scale: { x: number; y: number } }
+  const HOURS = [6 * 60, 7 * 60, 12 * 60, 19 * 60, 20 * 60, 0]
 
-  it('★ takes the cast off `skyModel`, so the arc and the ground agree about the hour', () => {
-    expect(shadowSrc).toContain("from '../ui/skyModel.js'")
-    expect(shadowSrc).toMatch(/const sun = shadowCast\(nowTick\)/)
-    expect(shadowSrc).toContain('e.shadow.position.set(sx + sun.dx, sy)')
-    expect(shadowSrc).toContain('e.shadow.scale.set(sun.scaleX, sun.scaleY)')
-    expect(shadowSrc).toContain('e.shadow.alpha = SHADOW_ALPHA * sun.alpha')
+  /** The layer, driven a frame at a time with the town's clock under the test's hand. */
+  async function sundial(): Promise<{
+    at: (minuteOfDay: number) => { sprite: Node; shadow: Node }
+  }> {
+    const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 3, 4) }
+    const scene = makeScene()
+    const { store, setTick } = makeStore(agents)
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    await Promise.resolve()
+    await Promise.resolve()
+    let ms = 0
+    const l = scene.layers as unknown as Record<string, InstanceType<typeof MockContainer>>
+    return {
+      at: (minuteOfDay) => {
+        setTick(minuteOfDay)
+        ms += 400
+        layer.tick(ms)
+        // read off, not held: the layer writes to the same two nodes every frame
+        const snap = (n: Node): Node => ({
+          alpha: n.alpha,
+          position: { x: n.position.x, y: n.position.y },
+          scale: { x: n.scale.x, y: n.scale.y },
+        })
+        return {
+          sprite: snap(l.entities!.children[0] as unknown as Node),
+          shadow: snap(l.shadow!.children[0] as unknown as Node),
+        }
+      },
+    }
+  }
+
+  it('★ takes the cast off `skyModel`, so the arc and the ground agree about the hour', async () => {
+    const dial = await sundial()
+    const ratios = new Set<string>()
+    for (const minute of HOURS) {
+      const sun = shadowCast(minute)
+      const { sprite, shadow } = dial.at(minute)
+      const why = `minute ${minute}`
+      expect(shadow.position.x - sprite.position.x, why).toBeCloseTo(sun.dx, 6)
+      expect(shadow.position.y, why).toBe(sprite.position.y)
+      expect([shadow.scale.x, shadow.scale.y], why).toEqual([sun.scaleX, sun.scaleY])
+      ratios.add((shadow.alpha / sun.alpha).toFixed(9))
+    }
+    expect(ratios.size, 'one constant turns the sun into ink').toBe(1)
+    expect(Number([...ratios][0])).toBeLessThan(1)
+  })
+
+  it('★ the golden hour draws it out and lays it away from the light', async () => {
+    const dial = await sundial()
+    const dawn = dial.at(6 * 60)
+    const noon = dial.at(12 * 60)
+    const dusk = dial.at(20 * 60)
+    expect(noon.shadow.scale.x, 'noon puts it back under the feet').toBe(1)
+    expect(dawn.shadow.scale.x).toBeGreaterThan(1)
+    expect(dusk.shadow.scale.x).toBeGreaterThan(1)
+    const dawnDx = dawn.shadow.position.x - dawn.sprite.position.x
+    const duskDx = dusk.shadow.position.x - dusk.sprite.position.x
+    expect(dawnDx * duskDx, 'the two ends of the day lie opposite ways').toBeLessThan(0)
+    expect(noon.shadow.alpha).toBeGreaterThan(dawn.shadow.alpha)
   })
 
   // ★ ONE READ FOR THE WHOLE CAST. The sun's height is a function of the minute, not of who is
   // standing in it, so asking it per body would be twelve calls a frame for one answer.
-  it('★ asks once a frame, outside the loop over the bodies', () => {
-    const after = shadowSrc.slice(shadowSrc.indexOf('const sun = shadowCast'))
-    expect(after.indexOf('for (const { a, e, pos, bobY } of drawing)')).toBeGreaterThan(0)
-    expect(shadowSrc.split('shadowCast(')).toHaveLength(2) // exactly one call in the file
+  it('★ asks once a frame, outside the loop over the bodies', async () => {
+    const spy = vi.mocked(shadowCast)
+    const agents: MutableAgents = Object.fromEntries(
+      ['nadia', 'omar', 'yusuf', 'amara'].map((id) => [id, makeBodyAgent(id, 3, 4)]),
+    )
+    const scene = makeScene()
+    const { store } = makeStore(agents)
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    await Promise.resolve()
+    await Promise.resolve()
+    layer.tick(400)
+    expect(scene.layers.shadow.children.length, 'four bodies, four shadows').toBe(4)
+    spy.mockClear()
+    layer.tick(800)
+    expect(spy, 'one answer serves the whole cast').toHaveBeenCalledTimes(1)
   })
 })

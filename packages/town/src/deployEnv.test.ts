@@ -47,8 +47,11 @@ function knobsTheCodeReads(): string[] {
   return [...names].sort()
 }
 
-const passedThrough = (name: string): boolean =>
-  COMPOSE.split('\n').some((l) => new RegExp(`^\\s*-?\\s*${name}\\s*(=|:|$)`).test(l))
+/** Only the town runs the code. A knob listed under `caddy:` or `litestream:` never reaches it. */
+const TOWN_SERVICE = COMPOSE.split(/\n {2}(?=[a-z])/).find((s) => s.startsWith('town:')) ?? ''
+
+const passedThrough = (name: string, block: string = COMPOSE): boolean =>
+  block.split('\n').some((l) => new RegExp(`^\\s*-?\\s*${name}\\s*(=|:|$)`).test(l))
 
 /** Properties, not rosters: a named five-founder backup puts every child born in play outside
  *  it, and the failure is invisible until a restore. */
@@ -114,15 +117,15 @@ describe('★ every knob the docs promise reaches the container', () => {
   it('★ passes every SJ_* knob the code reads, documented or not', () => {
     const read = knobsTheCodeReads()
     expect(read).toContain('SJ_IDLE_GAP')
-    const missing = read.filter((n) => !passedThrough(n))
-    expect(missing, `read by the code, never passed to a container: ${missing.join(', ')}`).toEqual(
-      [],
-    )
+    // A knob from a second package, so the walk is proved to reach past `packages/town`.
+    expect(read).toContain('SJ_MIND_ROUTE')
+    const missing = read.filter((n) => !passedThrough(n, TOWN_SERVICE))
+    expect(missing, `read by the code, never passed to the town: ${missing.join(', ')}`).toEqual([])
   })
 
   it('passes the live key too, which is what SJ_LIVE=1 spends', () => {
     expect(ENV_EXAMPLE).toContain('OPENROUTER_API_KEY')
-    expect(passedThrough('OPENROUTER_API_KEY')).toBe(true)
+    expect(passedThrough('OPENROUTER_API_KEY', TOWN_SERVICE)).toBe(true)
   })
 
   /** The one knob that must NOT follow `.env`: a stray `SJ_FRESH=1` left over from a reset

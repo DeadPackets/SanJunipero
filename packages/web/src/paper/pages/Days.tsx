@@ -49,7 +49,6 @@ function MarkGlyph({ mark }: { mark: Mark }) {
 function DayStripView({
   edge,
   viewTick,
-  live,
   marks,
   marksDown,
   onScrub,
@@ -58,7 +57,6 @@ function DayStripView({
 }: {
   edge: number
   viewTick: number
-  live: boolean
   marks: readonly Mark[]
   marksDown: boolean
   onScrub: (tick: number) => void
@@ -169,14 +167,6 @@ function DayStripView({
         ))}
         <span className="playhead" style={{ left: `${frac * 100}%` }} />
       </div>
-      <button
-        type="button"
-        className={live ? 'live-pill live' : 'live-pill'}
-        onClick={onLive}
-        aria-pressed={live}
-      >
-        {live ? 'LIVE' : 'Return to now'}
-      </button>
     </div>
   )
 }
@@ -203,7 +193,6 @@ export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
     <DayStripView
       edge={edge}
       viewTick={viewTick}
-      live={mode.live}
       marks={marks}
       marksDown={marksRead.failed && marksRead.data === null}
       onScrub={(tick) => {

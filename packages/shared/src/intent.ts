@@ -48,7 +48,7 @@ export const Intent = z
   .object({
     verb: z.string().min(1).describe('The exact word of the act, such as walk or eat.'),
     params: ClosedIntentParams.describe(
-      'Exactly what the act asks for, named by its keys; every other key is null.',
+      'Exactly what the act asks for, named by its keys. Every other key is null.',
     ),
   })
   .strict()

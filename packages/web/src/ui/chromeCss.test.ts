@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -681,7 +681,9 @@ const STEP_OF: Readonly<Record<string, string>> = {
   'cream-quiet': 'cream',
   'honey-l': 'honey',
   'honey-deep': 'honey',
+  gilt: 'honey',
   'ember-ink': 'ember',
+  'ember-pale': 'ember',
   'sage-pale': 'sage',
   'rose-pale': 'rose',
 }
@@ -690,7 +692,7 @@ const STEP_OF: Readonly<Record<string, string>> = {
 const SEMANTIC = ['ember', 'sage', 'rose', 'sky']
 
 /** Outside the five the other way: what WE are doing, which no valence may be borrowed for. */
-const STATE = ['current']
+const STATE = ['current', 'operator']
 
 /** The only colour literals the sheet may carry outside `:root`: a gradient stop and a shadow
  *  take no `var()` for their alpha. Each names the token it is a transparency of. */
@@ -773,7 +775,85 @@ describe('★ four faces, ruled by role, and five colours', () => {
       expect(apart, `${step} is ${apart.toFixed(0)}° off ${base}`).toBeLessThan(15)
     }
   })
+})
 
+// ── ★ THE COLOURS OUTSIDE THE SHEET ───────────────────────────────────────────────────────
+// #E8785A is written into eight TypeScript files no CSS test can see, and the chart it comes
+// from is the forge's, which @sj/web cannot import: forge pulls sharp and better-sqlite3. So
+// the chart is read off disk here, and the art is measured against it.
+
+const FORGE = readFileSync(join(HERE, '../../../forge/src/palette.ts'), 'utf8')
+const MASTER = new Set([...FORGE.matchAll(/'(#[0-9A-F]{6})'/g)].map((m) => m[1]!))
+
+/** Every `.ts`/`.tsx` under `packages/web/src` that ships, tests excluded. */
+function sources(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const at = join(dir, e.name)
+    if (e.isDirectory()) sources(at, out)
+    else if (/\.tsx?$/.test(e.name) && !e.name.includes('.test.')) out.push(at)
+  }
+  return out
+}
+
+/** Every colour a source file writes down, as `0xrrggbb` or `#RRGGBB`, with the line it is on. */
+const INKS = sources(join(HERE, '..')).flatMap((file) =>
+  readFileSync(file, 'utf8')
+    .split('\n')
+    .flatMap((text, i) =>
+      [...text.matchAll(/(?:0x|#)([0-9a-fA-F]{6})\b/g)].map((m) => ({
+        where: `${file.slice(file.indexOf('packages/'))}:${i + 1}`,
+        hex: `#${m[1]!.toUpperCase()}`,
+        text: text.trim(),
+      })),
+    ),
+)
+
+/** What the world paints that the forge's chart does not hold, and why each one is allowed. */
+const OFF_CHART: Readonly<Record<string, string>> = {
+  '#FFFFFF': 'a mask and a tint identity, never a surface',
+  '#000000': 'the shadow mask, the same',
+  '#CFE3EE': 'rain and snow, lit rather than surfaced',
+  '#CDD8FF': 'the moon, which is a light',
+  '#B8AD9E': 'road, a placeholder the ground texture owns',
+  '#A9946B': 'path, the same',
+  '#6F9152': 'sapling, the same',
+  '#8FBFD6': 'channel, the same',
+  '#5F5568': 'a spent tension bar is chrome drawn in pixi, and reads --ink-quiet',
+  '#9A9490': 'what a body’s own colour falls toward while a turn drains it',
+}
+
+describe('★ the colours the sheet cannot see', () => {
+  it('★ paints world art from the forge’s chart, and names every colour that is not on it', () => {
+    expect(MASTER.size, 'the forge chart did not parse').toBeGreaterThan(30)
+    expect(INKS.length, 'no colour was found in the source at all').toBeGreaterThan(100)
+    const off = INKS.filter((k) => !MASTER.has(k.hex) && !(k.hex in OFF_CHART))
+    expect(
+      off.map((k) => `${k.where} ${k.hex} — ${k.text}`),
+      'a colour that is on no chart',
+    ).toEqual([])
+    expect(
+      Object.keys(OFF_CHART).filter((hex) => !INKS.some((k) => k.hex === hex)),
+      'a colour is excused here and gone from the source',
+    ).toEqual([])
+  })
+
+  // Nineteen constants name a sheet token in a comment beside a number nothing checks. A token
+  // moved in `:root` used to leave every one of them behind, silently and only in the picture.
+  it('★ makes a world ink that claims a sheet token carry that token’s value', () => {
+    const claims = INKS.flatMap((k) =>
+      [...k.text.matchAll(/--([a-z-]+)/g)].map((m) => ({ ...k, token: m[1]! })),
+    )
+    expect(claims.length, 'no world ink claims a token any more').toBeGreaterThan(10)
+    expect(
+      claims
+        .filter((c) => COLOURS[c.token] !== c.hex)
+        .map((c) => `${c.where} ${c.hex} is not --${c.token}`),
+      'a world ink drifted off the token it names',
+    ).toEqual([])
+  })
+})
+
+describe('★ the colour names the sheet keeps honest', () => {
   it('names no colour it never uses, and uses none it never named', () => {
     for (const name of Object.keys(COLOURS)) {
       expect(SHEET.includes(`var(--${name})`), `--${name} is declared and never used`).toBe(true)
@@ -781,8 +861,9 @@ describe('★ four faces, ruled by role, and five colours', () => {
     const used = new Set([...SHEET.matchAll(/var\(--([a-z-]+)\)/g)].map((m) => m[1]!))
     const undeclared = [...used].filter(
       (n) =>
-        /^(cream|parchment|sand|ink|deep|night|honey|ember|sage|rose|sky|current)/.test(n) &&
-        !(n in COLOURS),
+        /^(cream|parchment|sand|ink|deep|night|honey|ember|gilt|sage|rose|sky|current|operator)/.test(
+          n,
+        ) && !(n in COLOURS),
     )
     expect(undeclared).toEqual([])
   })

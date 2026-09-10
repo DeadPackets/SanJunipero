@@ -351,7 +351,7 @@ describe('★ the director frame', () => {
     expect(cuts).toHaveLength(1)
     expect(cuts[0]!.cut?.sceneId).toBe('scene_2_abcd1234')
     expect(cuts[0]!.cut?.agentIds).toEqual(['nadia', 'yusuf'])
-    expect(cuts[0]!.cut?.why).toBe('Nadia & Yusuf — falling out')
+    expect(cuts[0]!.cut?.why).toBe('Nadia & Yusuf: falling out')
 
     // Nothing has changed, so nothing is sent again.
     frames.length = 0

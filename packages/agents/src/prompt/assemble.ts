@@ -107,18 +107,18 @@ function renderIdentity(id: IdentityCore): string {
     `Age: ${id.age}`,
     `Temperament: ${id.temperament}`,
     `Backstory: ${id.backstory}`,
-    ...(hands.length === 0 ? [] : [`Your hands: ${hands.join('; ')}.`]),
+    ...(hands.length === 0 ? [] : [`Your hands: ${hands.join(', ')}.`]),
     ...(id.hours === undefined
       ? []
       : [`Hours: up around ${id.hours.rise}, abed by ${hourWord(id.hours.bed)}.`]),
     `Voice: ${v.register} ${v.rhythm}`,
-    `Habits: ${v.tics.join('; ')}`,
-    `Never says: ${v.neverSays.join('; ')}`,
+    `Habits: ${v.tics.join(' | ')}`,
+    `Never says: ${v.neverSays.join(' | ')}`,
     `Example lines, to show the voice and not to be reused word for word: ${v.exampleLines.join(' | ')}`,
   ]
   if (v.wordBudget) {
     lines.push(
-      `You usually say about ${v.wordBudget.typical} words at a time; when it really matters to you, up to ${v.wordBudget.burst}.`,
+      `You usually say about ${v.wordBudget.typical} words at a time, and up to ${v.wordBudget.burst} when it really matters to you.`,
     )
   }
   return lines.join('\n')
@@ -129,10 +129,10 @@ const AUTOBIOGRAPHY_DAYS = 7
 function renderPersonality(p: PromptBlocks['personality']): string {
   const doc = p.doc
   const lines = [
-    `Values: ${doc.values.join('; ')}`,
-    `Beliefs: ${doc.beliefs.join('; ')}`,
-    `Worries: ${doc.current.worries.join('; ')}`,
-    `Goals: ${doc.current.goals.join('; ')}`,
+    `Values: ${doc.values.join(' | ')}`,
+    `Beliefs: ${doc.beliefs.join(' | ')}`,
+    `Worries: ${doc.current.worries.join(' | ')}`,
+    `Goals: ${doc.current.goals.join(' | ')}`,
   ]
   // One paragraph a night, so the whole story would be 6,000 tokens of system prompt by day 60;
   // a week of it rides in every prompt and the rest stays in the book, where recall reaches it.

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
+import { Signpost } from '../paper/Signpost.js'
 import { SoundButton } from '../stage/SoundButton.js'
 import {
   BELL_MS,
@@ -174,10 +175,16 @@ describe('★ a cue chip appears with every sound that starts', () => {
     for (const s of SOUND_SOURCES) expect(seen.has(s), s).toBe(true)
   })
 
+  // The render is driven end to end in `stage/soundscape.test.ts`; this is the same rule at the
+  // model, where the list is made: a chip with nothing behind it cannot be stamped.
   it('★ the engine is handed the same list the chips are drawn from', () => {
-    expect(src('../stage/Soundscape.tsx')).toMatch(/synth\.current\?\.play\(cues\)/)
-    expect(src('../stage/Soundscape.tsx')).toMatch(/standingChips\(/)
-    expect(src('../stage/Soundscape.tsx')).toMatch(/trackStarts\(/)
+    for (const w of worlds) {
+      const cues = soundCues(w)
+      const stamped = standingChips(trackStarts([], cues, 0), 0)
+      expect(stamped.map((c) => c.source)).toEqual(cues.map((c) => c.source))
+      for (const c of stamped)
+        expect(cueChip(c.source)).toBe(cues.find((x) => x.source === c.source)?.text)
+    }
   })
 
   // ★ EVERY START GETS ITS WORD, and a voice that is merely still running does not: the sun arc
@@ -403,7 +410,9 @@ describe('★ the ♪ toggle', () => {
   })
 
   it('★ stands in the corner cluster with the other two, off the signpost', () => {
-    expect(src('../paper/Signpost.tsx')).not.toContain('sound')
+    const post = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    expect(post).not.toContain('sound')
+    expect(post).not.toContain('Sound')
     expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')
   })
 

@@ -1,7 +1,14 @@
+// @vitest-environment happy-dom
 import { readFileSync } from 'node:fs'
-import { createElement } from 'react'
+import { join } from 'node:path'
+import { act, createElement, type ReactElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { Scene } from '../render/scene.js'
+import { createWorldStore } from '../state/worldStore.js'
+import { DirectorMode } from './DirectorMode.js'
+import { Signpost } from '../paper/Signpost.js'
 import { ThoughtsButton } from '../stage/ThoughtsButton.js'
 import {
   BUBBLE_IMPORTANCE,
@@ -12,7 +19,48 @@ import {
   thoughtsSetting,
 } from './thoughts.js'
 
-const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
+// happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
+const src = (f: string): string => readFileSync(join(import.meta.dirname, f), 'utf8')
+
+type FakeScene = { pickedId: string | null; cameraSubject: string | null } & Record<string, unknown>
+
+/** The Pixi handle the director writes to, holding only the fields a shot touches. */
+const fakeScene = (): FakeScene => ({
+  app: { screen: { width: 1280, height: 720 } },
+  pickedId: null,
+  cameraSubject: null,
+  setZoom: () => {},
+  setFollow: () => {},
+  centerHome: () => {},
+  pointOf: () => null,
+  anchorOf: () => null,
+})
+
+const roots: { unmount: () => void }[] = []
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+
+/** Mounts a tree and hands back its re-render, so a prop can change under a live one. */
+async function mount(el: ReactElement): Promise<(next: ReactElement) => Promise<void>> {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  roots.push(root)
+  await act(async () => {
+    root.render(el)
+  })
+  return async (next: ReactElement) => {
+    await act(async () => {
+      root.render(next)
+    })
+  }
+}
+
+afterEach(async () => {
+  await act(async () => {
+    for (const root of roots.splice(0)) root.unmount()
+  })
+  document.body.replaceChildren()
+})
 
 const store = (seed?: string): Storage & { held: Map<string, string> } => {
   const held = new Map<string, string>()
@@ -136,16 +184,40 @@ describe('★ the importance gate over the heads', () => {
     ).toBe(false)
   })
 
-  it('★ the director writes the subject the gate reads', () => {
-    expect(src('./DirectorMode.tsx')).toContain('scene.cameraSubject =')
-    expect(src('../render/StageMount.tsx')).toContain('bubbleSubject(s)')
+  it('★ the director writes the subject the gate reads', async () => {
+    const scene = fakeScene()
+    await mount(
+      createElement(DirectorMode, {
+        store: createWorldStore(),
+        scene: scene as unknown as Scene,
+        autoCut: false,
+        pinned: 'omar',
+      }),
+    )
+    expect(scene.cameraSubject).toBe('omar')
+    expect(bubbleSubject(scene)).toBe('omar')
+    expect(shouldBubble(t('omar', 1), bubbleSubject(scene), ALONE)).toBe(true)
+  })
+
+  it('★ and the wisps move with the camera when the director turns to somebody else', async () => {
+    const scene = fakeScene()
+    const store = createWorldStore()
+    const props = { store, scene: scene as unknown as Scene, autoCut: false }
+    const again = await mount(createElement(DirectorMode, { ...props, pinned: 'omar' }))
+    expect(scene.cameraSubject).toBe('omar')
+    await again(createElement(DirectorMode, { ...props, pinned: 'leyla' }))
+    expect(scene.cameraSubject).toBe('leyla')
+    expect(shouldBubble(t('omar', 1), bubbleSubject(scene), ALONE)).toBe(false)
+    expect(shouldBubble(t('leyla', 1), bubbleSubject(scene), ALONE)).toBe(true)
   })
 
   // ★ The T toggle is upstream of all of it: a viewer who turned the wisps off gets none,
   // subject and scene included. `bubbles.ts` asks `thoughtsHidden` before it draws.
+  // The spawn loop lives inside the Pixi ticker closure, which no test can reach without a GPU,
+  // so its two calls are read off the file. Everything either one decides is driven above.
   it('★ the spawner still asks the T gate, so this one never overrules it', () => {
     expect(src('../render/bubbles.ts')).toMatch(/isThought && thoughtsHidden\(/)
-    expect(src('../render/StageMount.tsx')).toContain('shouldBubble(')
+    expect(src('../render/StageMount.tsx')).toMatch(/shouldBubble\(t, bubbleSubject\(s\)/)
   })
 })
 
@@ -174,7 +246,9 @@ describe('the thoughts button', () => {
 
   // The post's four arms are the town's four sections; how the town is SHOWN is not a fifth.
   it('★ stands in the corner cluster, off the signpost', () => {
-    expect(src('../paper/Signpost.tsx')).not.toContain('thoughts')
+    const post = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    expect(post).not.toContain('thoughts')
+    expect(post).not.toContain('Thought')
     expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')
   })
 

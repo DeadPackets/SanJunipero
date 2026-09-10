@@ -210,7 +210,7 @@ describe('perceptionMemoryText: the moment, remembered short', () => {
       { speakerId: 'halim', name: 'Halim', text: 'Four fish, no more.', distance: 5 },
     ]
     const text = perceptionMemoryText(packet)
-    expect(text).toContain('Heard: Nadia said "Has anyone seen Kamal today?"; Omar said "')
+    expect(text).toContain('Heard: Nadia said "Has anyone seen Kamal today?". Omar said "')
     expect(text).toContain(`"${'x'.repeat(120)}"`)
     expect(text).not.toContain('x'.repeat(121))
     expect(text).not.toContain('Halim said')

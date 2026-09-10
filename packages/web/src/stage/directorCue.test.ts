@@ -45,7 +45,7 @@ describe('★ the scene stamp is prose, never the wire’s own word for the scen
 // prints it under the shot, in the sentence case a thing the town could have said is set in.
 describe('★ the two slots, and the order the four things claim them in', () => {
   const CSS = readFileSync(new URL('../ui/chrome.css', import.meta.url), 'utf8')
-  const WHY = 'Nadia & Yusuf — falling out, a slight'
+  const WHY = 'Nadia & Yusuf: falling out, a slight'
   const MOMENT = { text: 'Rahel died.', icon: 'star', bodies: ['rahel'] }
   const SCENE = {
     kind: 'quarrel' as const,

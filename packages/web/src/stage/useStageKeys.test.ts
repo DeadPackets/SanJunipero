@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { afterEach, describe, expect, it } from 'vitest'
 import { cameraActionFor } from '../render/cameraNav.js'
+import { FpsOverlay } from '../ui/FpsOverlay.js'
 import { KEY_MAP_KEY } from './KeyMap.js'
 import { stageKeyAllowed, stageKeyFor } from './useStageKeys.js'
 
@@ -58,19 +61,50 @@ describe('typing an s is a letter, never a signpost', () => {
 // ★ Both listeners are on the window and neither reads the other's `defaultPrevented`, so a key
 // two of them claim fires twice: `f` used to go fullscreen AND raise the frame meter.
 describe('★ no other window listener in the tree claims a stage key', () => {
-  const FPS = readFileSync(new URL('../ui/FpsOverlay.tsx', import.meta.url), 'utf8')
+  const roots: { unmount: () => void }[] = []
+  ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-  it('★ leaves the frame meter on a key the stage does not own', () => {
-    const key = /e\.key\.toLowerCase\(\) !== '(.)'/.exec(FPS)![1]!
-    expect(stageKeyFor(key), `the meter and the stage both claim "${key}"`).toBeNull()
-    // and it is a chord, so the bare letter still belongs to whoever wants it next
-    expect(FPS).toContain('e.shiftKey')
+  async function meter(): Promise<() => boolean> {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(FpsOverlay))
+    })
+    return () => host.querySelector('.fps-overlay') !== null
+  }
+
+  const press = async (key: string, shiftKey = false): Promise<void> => {
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey, bubbles: true }))
+    })
+  }
+
+  afterEach(async () => {
+    await act(async () => {
+      for (const root of roots.splice(0)) root.unmount()
+    })
+    document.body.replaceChildren()
   })
 
-  it('★ the key map owns `?` alone', () => {
-    const MAP = readFileSync(new URL('./KeyMap.tsx', import.meta.url), 'utf8')
+  it('★ leaves the frame meter on a key the stage does not own', async () => {
+    const up = await meter()
+    for (const key of ['s', 'S', 'f', 'F', 'd', 'D', 't', 'T', 'Escape', KEY_MAP_KEY]) {
+      await press(key)
+      expect(up(), `the meter and the stage both claim "${key}"`).toBe(false)
+    }
+    // and it is a chord, so the bare letter still belongs to whoever wants it next
+    await press('p')
+    expect(up()).toBe(false)
+    await press('P', true)
+    expect(up()).toBe(true)
+  })
+
+  it('★ the key map owns `?` alone', async () => {
     expect(stageKeyFor(KEY_MAP_KEY)).toBeNull()
-    expect(MAP).toContain('e.key !== KEY_MAP_KEY')
-    expect(FPS).not.toContain("'?'")
+    const up = await meter()
+    await press(KEY_MAP_KEY)
+    expect(up()).toBe(false)
   })
 })

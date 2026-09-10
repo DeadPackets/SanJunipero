@@ -14,7 +14,7 @@ export type GistLlm = { gist(text: string): Promise<string> }
 export const GIST_SYSTEM = [
   'One moment of your day comes back to you. Write it down short.',
   'Copy every mark exactly as it is written (item_..., structure_..., node_...) beside the thing',
-  'it names. Write each mark out in full, one for each thing; never shorten one, never rename one,',
+  'it names. Write each mark out in full, one for each thing. Never shorten one, never rename one,',
   'never merge several into one, never leave one out.',
   'Keep every number, every promise made or owed, every want of yours, and who did what to whom.',
   'Drop the weather, the scenery, and anything the moment says twice.',

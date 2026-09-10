@@ -18,13 +18,13 @@ function trialRoute(raw: string | undefined): { model: string; providers: string
     .filter((p) => p.length > 0)
   if (at < 0 || model.length === 0 || providers.length === 0)
     throw new Error(
-      `LLM_MIND_ROUTE names a model and the back ends that may serve it, as model@Provider or ` +
+      `SJ_MIND_ROUTE names a model and the back ends that may serve it, as model@Provider or ` +
         `model@ProviderA,ProviderB. Got '${raw}'.`,
     )
   return { model, providers }
 }
 
-const TRIAL = trialRoute(process.env.LLM_MIND_ROUTE)
+const TRIAL = trialRoute(process.env.SJ_MIND_ROUTE)
 
 export const MIND_MODEL: string = TRIAL?.model ?? LUNA
 // One home, not two: the `openai` tier is the one that was measured, and `openai/fast` bills 2x

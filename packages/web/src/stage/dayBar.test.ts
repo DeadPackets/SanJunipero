@@ -21,8 +21,6 @@ import {
   pickTick,
   sleepField,
   stampWord,
-  stateField,
-  stateSaysSky,
   trackTick,
 } from './DayBar.js'
 
@@ -138,26 +136,27 @@ describe('★ the day bar the viewer actually gets', () => {
     )
   })
 
-  // ★ Two boxes saying one fact, 40px apart, is the whole defect this bar exists to end. The
-  // state field takes a severe sky for itself, so the chip beside it says only how cold it is.
-  it('★ prints a storm once, never in both the sky and the state', () => {
+  // ★ Two boxes saying one fact, 40px apart, is the whole defect this bar exists to end: the
+  // storm is said once, by the chip that owns the sky, and never by the field beside it.
+  it('★ prints a storm once, and says it is live in the same breath', () => {
     const html = bar(townAt(DAY_12, { weather: { kind: 'storm', temperatureC: 4 } }))
     expect(html.match(/STORM/g)).toHaveLength(1)
-    expect(html).toContain('>4°</p>')
-    expect(marksOf(html)).toContain('STORM')
+    expect(html).toContain('STORM 4°')
+    expect(marksOf(html)).toEqual(['LIVE'])
   })
 
   // ★ THE WORLD HOLDS THE STORM IN EVERY STATE. The strip assumed the state field had taken it,
   // so a storm watched back, or watched with the socket down, was printed by neither box.
-  it('★ still says the weather when the state field is busy saying something else', () => {
+  it('★ still says the weather whatever the picture is doing', () => {
     const stormy = townAt(DAY_12, { weather: { kind: 'storm', temperatureC: 4 } })
     const back: WorldStore = {
       ...stormy,
       getMode: () => ({ live: false, replaying: false, tick: DAY_12 }),
     }
     expect(bar(back)).toContain('STORM 4°')
-    expect(marksOf(bar(back))).toContain('REPLAY')
+    expect(marksOf(bar(back))).toEqual(['REPLAY'])
     expect(bar(stormy, 'reconnecting')).toContain('STORM 4°')
+    expect(marksOf(bar(stormy, 'reconnecting'))).toEqual(['OFFLINE'])
   })
 })
 
@@ -189,12 +188,13 @@ describe('★ what the town says it is', () => {
     expect(marksOf(html), 'the picture, and what the town is doing').toEqual(['REPLAY', 'ASLEEP'])
   })
 
-  it('★ the state field says where the picture came from, never what the town is doing', () => {
-    expect(stateField('OFFLINE', 'storm')).toBe('OFFLINE')
-    expect(stateField('REPLAY', 'storm')).toBe('REPLAY')
-    expect(stateField('PAUSED', 'storm')).toBe('PAUSED')
-    expect(stateField('LIVE', 'storm')).toBe('STORM')
-    expect(stateField('LIVE', 'sunny')).toBe('LIVE')
+  // ★ A SEVERE SKY USED TO TAKE THIS SLOT, and the phone hides the chip that would have carried
+  // the other fact, so under LIVE plus a storm a viewer on a phone was told neither.
+  it('★ the state field says where the picture came from, never what the sky is doing', () => {
+    const storm = { weather: { kind: 'storm', temperatureC: 4 } }
+    expect(marksOf(bar(townAt(DAY_12, storm))), 'live under a storm').toEqual(['LIVE'])
+    expect(marksOf(bar(townAt(DAY_12, storm), 'reconnecting'))).toEqual(['OFFLINE'])
+    expect(marksOf(bar(townAt(DAY_12)))).toEqual(['LIVE'])
   })
 
   it('★ reaches the viewer as a field in the bar, never as a slab over the town', () => {
@@ -212,13 +212,6 @@ describe('★ what the town says it is', () => {
       const html = bar(townAt(at(h), { agents: { a: body(true, true) } } as never))
       expect(marksOf(html), `${h}:00`).toContain('ASLEEP')
     }
-  })
-
-  it('★ answers whether it took the sky, so the strip beside it never has to guess', () => {
-    expect(stateSaysSky('LIVE', 'storm')).toBe(true)
-    expect(stateSaysSky('REPLAY', 'storm')).toBe(false)
-    expect(stateSaysSky('OFFLINE', 'storm')).toBe(false)
-    expect(stateSaysSky('LIVE', 'sunny')).toBe(false)
   })
 
   it('★ stands only when every living body is asleep', () => {
@@ -406,6 +399,25 @@ describe('★ the current time, at a screen nobody is touching', () => {
     expect(narrow, 'the narrow bar must be restated').toContain('grid-template-columns:')
     expect(/\.day-bar \{([^}]*)\}/.exec(narrow)?.[1]).toMatch(/grid-template-columns:/)
     expect(narrow).toMatch(/\.day-bar \.camera-chip[^{]*\{[^}]*display: none/)
+  })
+
+  // ★ THE PHONE SAID LESS THAN THE DESKTOP. The weekday, the season and the act were hidden and
+  // nothing else carried them. Measured at 390px: 96px of track on one row, 366px on two.
+  it('★ gives the phone a second row, and hides nothing in the band but the camera', () => {
+    const narrow = /@media \(max-width: 900px\) \{(.*?)\n\}/s.exec(CSS)?.[1] ?? ''
+    const mid = /\.day-bar-mid[^{]*\{([^}]*)\}/.exec(narrow)?.[1] ?? ''
+    expect(mid, 'the track must take a row of its own').toMatch(/grid-row: 2/)
+    expect(mid, 'and span the whole band').toMatch(/grid-column: 1 \/ -1/)
+    expect(
+      [...narrow.matchAll(/([^{}]+)\{[^}]*display: none/g)].flatMap(([, sel]) =>
+        (sel ?? '').split(',').map((one) => one.trim()),
+      ),
+    ).toEqual(['.day-bar .camera-chip'])
+    const gone = [...CSS.matchAll(/([^{}]+)\{[^}]*display: none/g)].flatMap(([, sel]) =>
+      (sel ?? '').split(',').map((one) => one.trim().split('\n').at(-1)!.trim()),
+    )
+    for (const sel of ['.day-bar-when', '.day-bar-weather'])
+      expect(gone, `${sel} is hidden somewhere in the sheet`).not.toContain(sel)
   })
 })
 

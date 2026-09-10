@@ -667,9 +667,9 @@ describe('perceptionToProse', () => {
       },
     })
     expect(prose).toContain(
-      "basket (item_3) right beside you, to the south; Rahel's, marked by Yusuf",
+      "basket (item_3) right beside you, to the south, Rahel's, marked by Yusuf",
     )
-    expect(prose).toContain("hold plank ×1 (item_9; Bex's)")
+    expect(prose).toContain("hold plank ×1 (item_9, Bex's)")
   })
 
   it('leaves an unclaimed thing exactly as it always read', () => {
@@ -933,7 +933,7 @@ describe('perceptionToProse', () => {
     // a finished roof's size is the builder's business, not the walker's
     expect(prose).not.toContain('tiles wide')
     // (12, 9) touches a footprint at (10..11, 10): this body is already as near as a walk gets.
-    expect(prose).toContain('you are beside it now; there is nothing nearer to walk to.')
+    expect(prose).toContain('You are beside it now. There is nothing nearer to walk to.')
   })
 
   // r26: Farida walked to a fire pit she stood beside 37 times in 22 hours, told each time that a
@@ -961,11 +961,11 @@ describe('perceptionToProse', () => {
       },
     }
     const prose = perceptionToProse(packet)
-    expect(prose).toContain('you are beside it now; there is nothing nearer to walk to.')
-    expect(prose).not.toContain('walk to it and you end up beside it')
+    expect(prose).toContain('You are beside it now. There is nothing nearer to walk to.')
+    expect(prose).not.toContain('Walk to it and you end up beside it')
     // One tile further off and it is a walk again.
     const off = { ...packet, self: { ...packet.self, x: 13 } }
-    expect(perceptionToProse(off)).toContain('walk to it and you end up beside it')
+    expect(perceptionToProse(off)).toContain('Walk to it and you end up beside it')
   })
 
   it('says when nothing beside a structure can hold a body, and offers no tile either way', () => {
@@ -991,18 +991,18 @@ describe('perceptionToProse', () => {
     }
     // Which tile is the walk's to pick, so the sentence turns only on whether one exists at all.
     const open = perceptionToProse(packet, undefined, { isWalkable: () => true })
-    expect(open).toContain('walk to it and you end up beside it')
+    expect(open).toContain('Walk to it and you end up beside it')
     expect(open).not.toMatch(/structure_1[^.]*\(\d+, ?\d+\)/)
 
     // One tile of open ground is ground enough, and it is still never named.
     const oneGap = perceptionToProse(packet, undefined, {
       isWalkable: (x, y) => x === 10 && y === 11,
     })
-    expect(oneGap).toContain('walk to it and you end up beside it')
+    expect(oneGap).toContain('Walk to it and you end up beside it')
 
     // No open ground at all: say so instead of pointing at a wall.
     const walled = perceptionToProse(packet, undefined, { isWalkable: () => false })
-    expect(walled).toContain('there is no open ground beside it')
+    expect(walled).toContain('There is no open ground beside it')
   })
 
   it('names the food in hand when hunger gnaws (g3 round 6)', () => {
@@ -1184,7 +1184,7 @@ describe('capabilities', () => {
     expect(a.system).toContain('name it walk')
     expect(a.system).toContain('give x and y as two numbers')
     expect(a.system).toContain('speak')
-    expect(a.system).toContain('nothing more is needed')
+    expect(a.system).toContain('Nothing more is needed')
     expect(a.system).toContain('experiment')
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -1607,7 +1607,7 @@ describe('what a pair of hands has done', () => {
     const system = assemblePrompt({ ...base, identity }).system
 
     expect(system).toContain(
-      `Backstory: ${base.identity.backstory}\nYour hands: fishing you are known for; farming you have taken up.\nVoice:`,
+      `Backstory: ${base.identity.backstory}\nYour hands: fishing you are known for, farming you have taken up.\nVoice:`,
     )
   })
 

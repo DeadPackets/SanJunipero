@@ -415,7 +415,7 @@ function claimPhrase(i: PerceptionItem): string {
   if (i.ownerName !== undefined) parts.push(`${i.ownerName}'s`)
   if (i.crafterMarkName !== undefined) parts.push(`marked by ${i.crafterMarkName}`)
   if (i.spoiling === true) parts.push('it is turning')
-  return `${parts.length === 0 ? '' : `; ${parts.join(', ')}`}${markedPhrase(i.marks)}`
+  return `${parts.length === 0 ? '' : `, ${parts.join(', ')}`}${markedPhrase(i.marks)}`
 }
 
 // What a minted verb wrote on a thing, as read by anyone who can see it: "marked: debt two planks".
@@ -423,7 +423,7 @@ function markedPhrase(marks: Record<string, string> | undefined): string {
   if (marks === undefined) return ''
   return Object.keys(marks)
     .sort()
-    .map((k) => `; marked: ${k} ${marks[k]}`)
+    .map((k) => `, marked: ${k} ${marks[k]}`)
     .join('')
 }
 
@@ -627,16 +627,16 @@ function sourcePhrase(from: SourceKind, kind: string): string {
 function placeOf(want: Want, packet: PerceptionPacket, world: ProseWorld): string {
   if (want.cond === 'fire') {
     const fire = nearestHearth(packet, 'lit')
-    return fire === null ? '' : `; the hearth in ${placeSaid(fire)} (${fire.id}) is lit`
+    return fire === null ? '' : `, and the hearth in ${placeSaid(fire)} (${fire.id}) is lit`
   }
   if (want.cond === 'water') {
     const w = world.nearestWater?.(packet.self.x, packet.self.y) ?? null
-    return w === null ? '' : `; the nearest water is at (${w.x}, ${w.y})`
+    return w === null ? '' : `, and the nearest water is at (${w.x}, ${w.y})`
   }
   for (const kind of want.kinds) {
     const at = world.nearestSource?.(kind, packet.self.x, packet.self.y) ?? null
     if (at === null) continue
-    return `; the nearest ${sourcePhrase(at.from, kind)} is at (${at.x}, ${at.y})`
+    return `, and the nearest ${sourcePhrase(at.from, kind)} is at (${at.x}, ${at.y})`
   }
   return ''
 }
@@ -1077,11 +1077,11 @@ function foodSourceRoad(packet: PerceptionPacket, world?: ProseWorld): string {
   const said: string[] = []
   if (at.bank !== null)
     said.push(
-      `Fish are in the river; the nearest bank to stand on is at (${at.bank.x}, ${at.bank.y}), ${wayTo(at.bank.x - x, at.bank.y - y)}.`,
+      `Fish are in the river. The nearest bank to stand on is at (${at.bank.x}, ${at.bank.y}), ${wayTo(at.bank.x - x, at.bank.y - y)}.`,
     )
   if (at.woods !== null)
     said.push(
-      `Berries grow at the edge of the woods; the nearest is at (${at.woods.x}, ${at.woods.y}), ${wayTo(at.woods.x - x, at.woods.y - y)}.`,
+      `Berries grow at the edge of the woods. The nearest is at (${at.woods.x}, ${at.woods.y}), ${wayTo(at.woods.x - x, at.woods.y - y)}.`,
     )
   return said.join(' ')
 }
@@ -1098,7 +1098,7 @@ export function usefulLine(
   const head = 'Today the thing you want most is to be counted on.'
   const wood = woodIsShort(stock)
   const food = foodIsShort(stock)
-  if (!wood && !food) return `${head} Nobody is short of anything; who have you not helped lately?`
+  if (!wood && !food) return `${head} Nobody is short of anything. Who have you not helped lately?`
   const thinner =
     stock.wood / (LOGS_PER_HEARTH * stock.hearths) <= stock.food / (MEALS_PER_MOUTH * stock.mouths)
       ? 'wood'
@@ -1118,7 +1118,7 @@ export function inTalkLine(withNames: readonly string[]): string {
     withNames.length === 1
       ? withNames[0]!
       : `${withNames.slice(0, -1).join(', ')} and ${withNames.at(-1)}`
-  return `You are in a conversation with ${them} right now. Stay where you are unless you have a reason to go: answer wait and keep talking. If you do leave, say so out loud first; ${them} will remember whether you walked off or said goodbye.`
+  return `You are in a conversation with ${them} right now. Stay where you are unless you have a reason to go: answer wait and keep talking. If you do leave, say so out loud first. ${them} will remember whether you walked off or said goodbye.`
 }
 
 /** How long a mind goes without anybody's company before the road out is worth saying. */
@@ -1178,9 +1178,9 @@ export function gatheringLine(packet: PerceptionPacket, tick: number): string {
     .map((a) => a.name)
   const said = `${opening(placeSaid(fire))} (${fire.id}) is lit now that it is getting dark`
   if (there.length === 0) return `${said}, and nobody is standing at it.`
-  if (there.length === 1) return `${said}; ${there[0]} is standing at it.`
+  if (there.length === 1) return `${said}. ${there[0]} is standing at it.`
   const who = `${there.slice(0, -1).join(', ')} and ${there.at(-1)}`
-  return `${said}; ${who} are standing at it.`
+  return `${said}. ${who} are standing at it.`
 }
 
 /** One road a turn, and the cold picks first: a mind that freezes tonight builds nothing. */
@@ -1255,7 +1255,7 @@ function heldPhrase(held: PerceptionItem[]): string {
   type Group = { kind: string; qty: number; id: string; claim: string; more: boolean }
   const groups = new Map<string, Group>()
   for (const i of held) {
-    const claim = `${claimPhrase(i)}${i.text === undefined ? '' : `; it reads "${i.text}"`}`
+    const claim = `${claimPhrase(i)}${i.text === undefined ? '' : `, it reads "${i.text}"`}`
     const at = groups.get(`${i.kind}${claim}`)
     if (at === undefined) {
       groups.set(`${i.kind}${claim}`, { kind: i.kind, qty: i.qty, id: i.id, claim, more: false })
@@ -1321,8 +1321,8 @@ function affordanceLines(packet: PerceptionPacket): string[] {
   if (packet.reach !== undefined) {
     hands +=
       near.length === 0
-        ? `; nothing${held.length === 0 ? '' : ' else'} is close enough to touch`
-        : `; close enough to touch but not in your hands yet: ${near.map(itemPhrase).join(', ')}`
+        ? `. Nothing${held.length === 0 ? '' : ' else'} is close enough to touch`
+        : `. Close enough to touch but not in your hands yet: ${near.map(itemPhrase).join(', ')}`
   }
   lines.push(`${hands}.`)
   return lines
@@ -1642,8 +1642,8 @@ export function perceptionToProse(
     // ★ A DOORWAY IS A FACT, NOT A TILE. `enter` takes any ground within one of the door and a
     // walk that names the place is scored to land on exactly that ground, so the pair the line
     // used to carry bought nothing the name does not — and it was the easier thing to copy.
-    let approach = 'walk to it and you end up beside it.'
-    if (s.id === inside?.id) approach = 'this is the building you are in.'
+    let approach = 'Walk to it and you end up beside it.'
+    if (s.id === inside?.id) approach = 'This is the building you are in.'
     else if (s.door !== undefined) {
       // ★ FULL IS A FACT, NOT A REFUSAL. It names the doorway either way, so a mind can tell a
       // room that is full now from a wall with no way through it ever — and can come back.
@@ -1655,25 +1655,25 @@ export function perceptionToProse(
         Math.abs(packet.self.y - s.door.y) <= 1
       approach =
         s.full === true
-          ? 'it has a doorway, and there is no room left inside.'
+          ? 'It has a doorway, and there is no room left inside.'
           : atDoor
-            ? 'you are at its door; enter it and you are in.'
-            : 'it has a doorway; walk to it and you can go in.'
+            ? 'You are at its door. Enter it and you are in.'
+            : 'It has a doorway. Walk to it and you can go in.'
     } else if (inside === undefined && touching(packet.self, s)) {
       // The same fact at a wall with no door. r26's Farida walked to a fire pit she stood
       // beside 37 times in 22 hours, told each time that a walk would put her beside it.
-      approach = 'you are beside it now; there is nothing nearer to walk to.'
+      approach = 'You are beside it now. There is nothing nearer to walk to.'
     } else if (world?.isWalkable && !openGroundBeside(s, world.isWalkable)) {
-      approach = 'there is no open ground beside it.'
+      approach = 'There is no open ground beside it.'
     }
     // Said at the wall instead of at the refusal: how far up the walls are never said that
     // there is nothing behind them yet.
     const hollow = s.stage === 'construction' ? ' There is no inside to it yet.' : ''
     const size = s.stage === 'construction' ? `, ${footprintPhrase(s.w, s.h)}` : ''
     lines.push(
-      `${opening(placeSaid(s))} (${s.id}) stands ${inSight(packet.self, s)}${size}${state}; ${
+      `${opening(placeSaid(s))} (${s.id}) stands ${inSight(packet.self, s)}${size}${state}${markedPhrase(s.marks)}. ${
         approach
-      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id, late)}${markedPhrase(s.marks)}`,
+      }${hollow}${hearthClause(s, s.id === inside?.id)}${bedClause(s, s.id === inside?.id, late)}`,
     )
   }
 
@@ -1783,7 +1783,7 @@ export function perceptionMemoryText(packet: PerceptionPacket): string {
   const heard = packet.heard.slice(0, MEMORY_HEARD_MAX)
   if (heard.length > 0)
     lines.push(
-      `Heard: ${heard.map((h) => `${h.name} said "${h.text.slice(0, MEMORY_HEARD_CHARS)}"`).join('; ')}.`,
+      `Heard: ${heard.map((h) => `${h.name} said "${h.text.slice(0, MEMORY_HEARD_CHARS)}"`).join('. ')}.`,
     )
 
   return lines.join(' ')

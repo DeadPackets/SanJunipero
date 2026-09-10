@@ -136,8 +136,8 @@ describe('the narrator vocabulary (§12)', () => {
   })
 
   it('binds the chapter writer: no numbers for hurt, no titles, no verdicts, no explanations', () => {
-    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never how much/i)
-    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never how bad/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never say how much/i)
+    expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never say how bad/i)
     expect(NARRATOR_VOCABULARY_NOTES).toMatch(/detect, never invent/i)
     expect(NARRATOR_VOCABULARY_NOTES).toMatch(/healer/i)
     expect(NARRATOR_VOCABULARY_NOTES).toMatch(/never say whether it was deserved/i)

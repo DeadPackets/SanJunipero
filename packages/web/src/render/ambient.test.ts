@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 // The director is driven for real below: the create/destroy half runs on a new world state
@@ -23,6 +22,18 @@ vi.mock('pixi.js', () => {
     scale = new Point()
     anchor = new Point()
     skew = new Point()
+    get x(): number {
+      return this.position.x
+    }
+    set x(v: number) {
+      this.position.x = v
+    }
+    get y(): number {
+      return this.position.y
+    }
+    set y(v: number) {
+      this.position.y = v
+    }
     addChild(...cs: Container[]): void {
       this.children.push(...cs)
     }
@@ -59,6 +70,7 @@ import {
   sampleDecorations,
 } from './ambient.js'
 import { bigTown } from './bigTown.js'
+import { advanceWind } from './wind.js'
 
 describe('HEARTH_KINDS', () => {
   it('is read off the C13 template, not hand-listed', () => {
@@ -79,6 +91,59 @@ describe('HEARTH_KINDS', () => {
   })
 })
 
+type Node = {
+  blendMode: string
+  alpha: number
+  position: { x: number; y: number }
+  skew: { x: number; y: number }
+  children: Node[]
+}
+const FOREST: TileId = 3
+
+/** A wood, so the canopies are really built, and a world whose structure set counts its reads. */
+const wooded = (motion = true) => {
+  const groundDecal = new MockContainer()
+  const read = { agents: 0, structures: 0 }
+  const state = {
+    terrain: Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => FOREST)),
+    items: {},
+    get agents() {
+      read.agents++
+      return {}
+    },
+    get structures() {
+      read.structures++
+      return {}
+    },
+  }
+  const scene = {
+    app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
+    layers: { groundDecal, overhead: new MockContainer() },
+    wantsMotion: () => motion,
+    reachableBox: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
+  } as unknown as Scene
+  const store = {
+    getState: () => state,
+    getTick: () => 0,
+    onEvents: () => () => {},
+  } as unknown as WorldStore
+  const dir = createAmbient(scene, store, {
+    weather: { setSuppressed: () => {} },
+    bubbles: { setSuppressed: () => {} },
+  } as unknown as Parameters<typeof createAmbient>[2])
+  const walk = (n: Node): Node[] => [n, ...n.children.flatMap(walk)]
+  return {
+    dir,
+    read,
+    // the frame StageMount runs: the one wind clock moves, then the director draws
+    frame: (dtMs: number): void => {
+      advanceWind(dtMs)
+      dir.tick(dtMs)
+    },
+    nodes: (): Node[] => walk(groundDecal),
+  }
+}
+
 describe('the ambient effects stay quiet', () => {
   it('smoke is warm grey, never cream — cream read as white glass', () => {
     expect(SMOKE_COLOR).toBe(0xcfc6bc)
@@ -86,20 +151,43 @@ describe('the ambient effects stay quiet', () => {
   })
 
   it('draws no light of its own — every additive glow lives above the night grade (D1)', () => {
-    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
-    expect(src).not.toContain("blendMode = 'add'")
+    const r = wooded()
+    for (let i = 0; i < 20; i++) r.frame(16)
+    expect(r.nodes().length).toBeGreaterThan(3)
+    for (const n of r.nodes()) expect(n.blendMode).not.toBe('add')
   })
 
   it('★ holds every oscillator at base under prefers-reduced-motion (D6)', () => {
-    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
-    expect(src).toContain('const still = !scene.wantsMotion()')
-    expect(src).toContain('if (!grave && !still) t += dtMs')
+    const frames = (motion: boolean): number => {
+      const r = wooded(motion)
+      const seen = new Set<string>()
+      for (let i = 0; i < 40; i++) {
+        r.frame(50)
+        seen.add(
+          r
+            .nodes()
+            .map((n) => `${n.position.x},${n.position.y},${n.alpha}`)
+            .join('|'),
+        )
+      }
+      return seen.size
+    }
+    expect(frames(false), 'stillness is one frame, held').toBe(1)
+    expect(frames(true)).toBeGreaterThan(1)
   })
 
   it('sways a canopy by whole pixels of its crown, never by a shear (D14)', () => {
-    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
-    expect(src).not.toContain('skew')
-    expect(src).toMatch(/crown\.position\.x = tr\.trunk\.x \+ crownOffsetPx\(/)
+    const r = wooded()
+    const offsets = new Set<number>()
+    for (let i = 0; i < 200; i++) {
+      r.frame(97)
+      for (const n of r.nodes()) {
+        expect(Number.isInteger(n.position.x), 'a crown moves by whole pixels').toBe(true)
+        expect([n.skew.x, n.skew.y], 'a shear would smear the pixel art').toEqual([1, 1])
+      }
+      offsets.add(r.nodes().at(-1)!.position.x)
+    }
+    expect(offsets.size, 'not vacuous: the wood really did sway').toBeGreaterThan(1)
   })
 })
 
@@ -129,11 +217,13 @@ describe('the frame loop does not walk the world', () => {
       )
       expect(perSecond).toBeGreaterThan(0)
     }
-    const src = readFileSync(new URL('./ambient.ts', import.meta.url), 'utf8')
-    const tick = src.slice(src.indexOf('const tick = (dtMs: number)'))
-    expect(tick, 'the frame loop must not walk the world again').not.toContain(
-      'Object.values(state.structures)',
-    )
+    const r = wooded()
+    r.frame(16)
+    // not vacuous: the counter fires, once, on the fold that changed the world
+    expect(r.read.agents, 'the working sync reads the bodies when the world changes').toBe(1)
+    for (let i = 0; i < 60; i++) r.frame(16)
+    expect(r.read.agents, 'and never again on a frame that changed nothing').toBe(1)
+    expect(r.read.structures, 'the smoke follows events, not the frame loop').toBe(0)
   })
 })
 

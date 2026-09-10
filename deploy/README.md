@@ -93,6 +93,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
 | `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |
+| `SJ_MIND_ROUTE` | unset | The model every mind runs on and the back ends allowed to serve it, as one word: `model@Provider` or `model@ProviderA,ProviderB`. Unset, the town keeps its pinned model at its pinned home. Both move together because the back ends are an allow-list, and a route the ledger has no price for is refused at boot rather than at every call. |
 | `SJ_ADMIN_TOKEN` | unset | **The only write path into the world.** Set it to open the loopback operator channel. |
 | `SJ_ADMIN_PORT` | `8788` | Where that channel listens, on `127.0.0.1` inside the container. |
 | `SJ_GIT_SHA` | unset | Stamped into `/admin/export`'s manifest. Without it a replay cannot know which code folded the events. |

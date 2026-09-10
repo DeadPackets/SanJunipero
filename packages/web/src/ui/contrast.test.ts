@@ -168,7 +168,7 @@ describe('the filtered-count badge on the shut bonds key', () => {
 
 /** The sites that paint each role's colour, and the one question it answers there. */
 const ROLES: Readonly<Record<string, readonly string[]>> = {
-  // the one you are in, and the control that is on
+  // the one you are in, the control that is on, and where the tape stands on either track
   current: [
     ".feed-jump[aria-current='true']",
     ".moment-card[data-open='yes']",
@@ -176,9 +176,16 @@ const ROLES: Readonly<Record<string, readonly string[]>> = {
     ".room-door[aria-pressed='true']",
     '.key-filtered',
     '.playhead',
+    '.day-bar-cursor',
   ],
   // how hot: the top of the stakes band, and the material cut for a mind's own working out
   ember: [".stage-scene-stamp[data-stakes='hot']", ".first-plate[data-material='ember']"],
+  // the step under it, so the band is one heat at two strengths
+  'ember-pale': [".stage-scene-stamp[data-stakes='warm']"],
+  // struck metal: the tier the town's own work is cut at
+  gilt: [".first-plate[data-material='gilded']"],
+  // a mark our own hand made, on a page the town never prints
+  operator: ['.ops-word.stopped', '.sheet-note.operator'],
 }
 
 /** Every selector in the sheet whose own declarations read `--name`. */
@@ -215,6 +222,41 @@ describe('★ a colour that means two things means neither', () => {
 
   it('records the ember it took the six questions off, so they cannot come back', () => {
     expect(contrast(T.ember!, T.cream!), 'the rail ember drew on cream').toBeCloseTo(2.7, 1)
+  })
+})
+
+// ── ★ AND THE ACCENT WAS ANSWERING FOUR MORE ──────────────────────────────────────────────
+// --honey was read at 52 sites. Four of them were never the accent: how hot a scene is, what a
+// first is cut from, what our own hand changed, and where the tape stands on the day's track.
+
+describe('★ the questions taken off the accent', () => {
+  it('★ paints the warm step of the stakes band in a heat, never in the accent', () => {
+    expect(T['ember-pale']).not.toBe(T.honey)
+    const apart = Math.abs(hue(T['ember-pale']!) - hue(T.ember!))
+    expect(apart, 'the band must read as one heat at two strengths').toBeLessThan(15)
+    expect(contrast(T['ember-pale']!, T.deep!), 'warm on the band').toBeGreaterThanOrEqual(AA)
+    expect(contrast(T['ember-pale']!, T.ember!), 'and the two steps must differ').toBeGreaterThan(
+      1.3,
+    )
+  })
+
+  it('★ gives the gilded plate an ink a reader can find on the paper it drops on', () => {
+    for (const paper of ['parchment', 'cream'] as const) {
+      expect(contrast(T.gilt!, T[paper]!), `the gilded drop on ${paper}`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('records the honey it replaced, so an invisible plate cannot come back', () => {
+    expect(contrast(T.honey!, T.parchment!), 'the drop honey threw').toBeCloseTo(1.31, 2)
+  })
+
+  it('★ prints our own hand in a colour nothing the town prints is', () => {
+    expect(contrast(T.ink!, T.operator!), 'ink on the operator slab').toBeGreaterThanOrEqual(AA)
+    const apart = Math.min(
+      Math.abs(hue(T.operator!) - hue(T.honey!)),
+      360 - Math.abs(hue(T.operator!) - hue(T.honey!)),
+    )
+    expect(apart, `--operator is ${apart.toFixed(0)}° off the accent`).toBeGreaterThanOrEqual(60)
   })
 })
 

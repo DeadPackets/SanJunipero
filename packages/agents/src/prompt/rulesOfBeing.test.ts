@@ -31,7 +31,7 @@ describe('SPEECH_RULES', () => {
   // and a forty-line plank loop; silence and the decay ladder are what replaced them.
   it('makes silence the default and gives a repeat somewhere to go', () => {
     expect(SPEECH_RULES).toMatch(/Most of the time you say nothing/)
-    expect(SPEECH_RULES).toMatch(/once it is said, it is said/)
+    expect(SPEECH_RULES).toMatch(/Once it is said, it is said/)
     expect(SPEECH_RULES).not.toMatch(/never wasted|words spent on/i)
     expect(SPEECH_RULES).not.toContain('in the words they said it')
   })
@@ -73,13 +73,13 @@ describe('SPEECH_RULES', () => {
 describe('CAPABILITIES — C9 verbs and ownership', () => {
   it('names enter, exit, stow and inscribe with their exact parameter keys', () => {
     expect(CAPABILITIES).toMatch(/enter: [^\n]*structureId/)
-    expect(CAPABILITIES).toMatch(/exit: [^\n]*nothing more is needed/)
+    expect(CAPABILITIES).toMatch(/exit: [^\n]*Nothing more is needed/)
     expect(CAPABILITIES).toMatch(/stow: [^\n]*itemId[^\n]*structureId/)
     expect(CAPABILITIES).toMatch(/inscribe: [^\n]*structureId[^\n]*text/)
   })
 
   it('teaches that things are owned and that ownership is visible to all', () => {
-    expect(CAPABILITIES).toContain("some things are someone's; all can see whose")
+    expect(CAPABILITIES).toContain("some things are someone's, and all can see whose")
   })
 
   it('replaces the "nothing can be shelved" paragraph with stow guidance', () => {
@@ -103,7 +103,7 @@ describe('CAPABILITIES — C9 verbs and ownership', () => {
   // Nothing in the prompt said "you may invent"; the old closing line said the opposite.
   it('carries the invitation, not the old promise of a lesson', () => {
     expect(CAPABILITIES).toContain(
-      'Anything you can name, you can try; the world tells you what it cost.\n',
+      'Anything you can name, you can try. The world tells you what it cost.\n',
     )
     expect(CAPABILITIES).not.toContain('the world will show you')
   })
@@ -226,11 +226,11 @@ describe('★ block 1 tells the truth about sleep', () => {
   const trySleep = (s: WorldState) => submitIntent(s, CFG, 'a1', 'sleep', {})
 
   it('no longer says the thing that was false', () => {
-    expect(sleepLine).not.toContain('nothing more is needed')
+    expect(sleepLine).not.toContain('Nothing more is needed')
   })
 
   it('a roof over you is what it takes — and the verb agrees, both ways', () => {
-    expect(sleepLine).toContain('a roof over you is what it takes')
+    expect(sleepLine).toContain('A roof over you is what it takes')
     expect(trySleep(body({ indoors: true })).ok).toBe(true)
     expect(trySleep(body({ indoors: false })).ok).toBe(false)
   })
@@ -304,7 +304,7 @@ describe('word budgets', () => {
       }),
     )
     expect(a.system).toContain(
-      'You usually say about 10 words at a time; when it really matters to you, up to 40.',
+      'You usually say about 10 words at a time, and up to 40 when it really matters to you.',
     )
     expect(a.system).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -345,10 +345,10 @@ describe('word budgets', () => {
       }),
     )
     expect(terse.system).toContain(
-      'about 4 words at a time; when it really matters to you, up to 12.',
+      'about 4 words at a time, and up to 12 when it really matters to you.',
     )
     expect(talkative.system).toContain(
-      'about 30 words at a time; when it really matters to you, up to 90.',
+      'about 30 words at a time, and up to 90 when it really matters to you.',
     )
     expect(terse.system).not.toBe(talkative.system)
   })
@@ -358,7 +358,7 @@ describe('CAPABILITIES — the four acts that need another person to agree', () 
   const RELATIONSHIP_VERBS = ['court', 'propose', 'lie_with', 'leave_partner']
 
   it.each(RELATIONSHIP_VERBS)('names %s with the word the registry answers to', (verb) => {
-    expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}; give targetId`, 'm'))
+    expect(CAPABILITIES).toMatch(new RegExp(`^${verb}: name it ${verb}. Give targetId`, 'm'))
   })
 
   it('says who answers, and that three of the four need a yes', () => {
@@ -450,7 +450,7 @@ describe('★ a mind is told the town can hold a rule', () => {
   // pinned above and presence was never the problem, so this pins where the words sit.
   it("★ stands on its own, not buried in a verb's grammar", () => {
     const speak = CAPABILITIES.split('\n').find((l) => l.startsWith('speak:')) ?? ''
-    expect(speak).toBe('speak: name it speak; give text, the words you say aloud')
+    expect(speak).toBe('speak: name it speak. Give text, the words you say aloud')
     expect(CAPABILITIES).toContain("\n\nSome things are not one person's to decide.")
   })
 })

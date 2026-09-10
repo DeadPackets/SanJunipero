@@ -362,7 +362,7 @@ describe('★ the words a relationship is asked for in', () => {
     expect(scanPromptForGlassLeak(CAPABILITIES)).toEqual([])
     for (const verb of ['court', 'propose', 'lie_with', 'leave_partner']) {
       expect(CAPABILITIES, verb).toContain(`${verb}: name it ${verb}`)
-      expect(scanPromptForGlassLeak(`name it ${verb}; give targetId`), verb).toEqual([])
+      expect(scanPromptForGlassLeak(`name it ${verb}. Give targetId`), verb).toEqual([])
     }
     expect(scanPromptForGlassLeak(SCENE_ANSWER)).toEqual([])
   })

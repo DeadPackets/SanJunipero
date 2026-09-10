@@ -250,8 +250,8 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     // walk can be aimed at this pair: it says where the body comes out, and the roof line, which
     // used to repeat it, now only says which roof it is.
     expect(prose).toContain('the doorway at (81, 99) is the way back out')
-    expect(prose).toContain('this is the building you are in.')
-    expect(prose).not.toContain('walk to it and you can go in')
+    expect(prose).toContain('This is the building you are in.')
+    expect(prose).not.toContain('Walk to it and you can go in')
     // The world's answer to the instruction that used to be given: both acts now stand, the
     // first because she is already under that roof, the second by way of its door.
     expect(submitIntent(inside, CFG, 'nadia', 'enter', { structureId: house.id }).ok).toBe(true)
@@ -342,9 +342,9 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const prose = perceptionToProse(prosePacket(bare, 'nadia'), undefined, sources)
     expect(prose).toContain('You are hungry. You should eat before long.')
     expect(prose).toContain(
-      'No food you know of is left in the town. Fish are in the river; the nearest bank to stand on is at (14, 27),',
+      'No food you know of is left in the town. Fish are in the river. The nearest bank to stand on is at (14, 27),',
     )
-    expect(prose).toContain('Berries grow at the edge of the woods; the nearest is at (71, 14),')
+    expect(prose).toContain('Berries grow at the edge of the woods. The nearest is at (71, 14),')
     // A meal somebody knows of still outranks the river: the source road is for when there is none.
     const stocked = perceptionToProse(prosePacket(bare, 'nadia'), undefined, {
       ...sources,
@@ -420,8 +420,8 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     ])
     expect(craftable).toEqual(['cloth', 'garment', 'plank'])
     // The one place a mind is taught its verbs asks for both nouns and names neither.
-    expect(CAPABILITIES).toContain('give kind, the thing to raise')
-    expect(CAPABILITIES).toContain('give recipe, the name of what you shape')
+    expect(CAPABILITIES).toContain('Give kind, the thing to raise')
+    expect(CAPABILITIES).toContain('Give recipe, the name of what you shape')
     // Not one buildable kind, and only the two recipes whose product another verb needs in hand.
     // `house` and `storehouse` are the exception: both are named as the places a thing keeps,
     // which is a rule of being about the ground and not a vocabulary for raising anything.

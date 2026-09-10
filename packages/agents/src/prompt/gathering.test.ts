@@ -62,7 +62,7 @@ describe('★ the dusk gathering: the cue line at the town fire', () => {
       ],
     )
     expect(gatheringLine(packet, DUSK)).toBe(
-      'A fire pit (fire_1) is lit now that it is getting dark; Nadia and Tamar are standing at it.',
+      'A fire pit (fire_1) is lit now that it is getting dark. Nadia and Tamar are standing at it.',
     )
   })
 
@@ -85,7 +85,7 @@ describe('★ the dusk gathering: the cue line at the town fire', () => {
       [person('Nadia', 20, 21), person('Omar', 21, 20), person('Tamar', 19, 19)],
     )
     expect(gatheringLine(packet, DUSK)).toBe(
-      'The old fire (fire_1) is lit now that it is getting dark; Nadia, Omar and Tamar are standing at it.',
+      'The old fire (fire_1) is lit now that it is getting dark. Nadia, Omar and Tamar are standing at it.',
     )
   })
 
