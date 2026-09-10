@@ -4,7 +4,7 @@ import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Subject } from '../stage/index.js'
 import { PageBoundary } from './PageBoundary.js'
-import { dateline } from './stamp.js'
+import { stamp } from './stamp.js'
 import { PageBody } from './pages/index.js'
 import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
@@ -125,7 +125,7 @@ export function Paper({
 
   // The dateline is the sheet's own clock: it moves with the town, or with the scrub.
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
-  const date = dateline(tick)
+  const date = stamp(tick)
 
   const title =
     key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
@@ -205,7 +205,7 @@ export function Paper({
             {title}
           </h2>
           <div className="paper-dateline">
-            <p className="paper-date">{date.day}</p>
+            <p className="paper-date">{`${date.weekday} · DAY ${date.day} · ${date.season}`}</p>
             <div
               className="paper-tabs"
               role="tablist"

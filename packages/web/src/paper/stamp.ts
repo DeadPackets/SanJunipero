@@ -1,16 +1,21 @@
 import { simTimeFromTick, tickToMoment, weekdayFromTick } from '@sj/shared'
 
-export const momentStamp = (tick: number): string => {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} ${m.time}`
-}
+export type Stamp = { day: number; time: string; season: string; weekday: string }
 
-/** The two ends of the broadsheet's dateline: what day it is on the left, what hour on the
- *  right. Capitals because the pixel face has no lowercase to set them in. */
-export function dateline(tick: number): { day: string; time: string } {
+/** ONE read of the town clock. Every date and time a viewer sees is composed from this, so no
+ *  two marks on screen can disagree about which minute it is. Capitals because the pixel face
+ *  has no lowercase to set the words in. */
+export function stamp(tick: number): Stamp {
   const m = tickToMoment(tick)
   return {
-    day: `${weekdayFromTick(tick).toUpperCase()} · DAY ${m.day} · ${simTimeFromTick(tick).season.toUpperCase()}`,
+    day: m.day,
     time: m.time,
+    season: simTimeFromTick(tick).season.toUpperCase(),
+    weekday: weekdayFromTick(tick).toUpperCase(),
   }
+}
+
+export const momentStamp = (tick: number): string => {
+  const s = stamp(tick)
+  return `Day ${s.day} ${s.time}`
 }

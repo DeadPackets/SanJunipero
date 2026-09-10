@@ -77,13 +77,15 @@ describe('the type scale the reader resolves against', () => {
     })
   })
 
-  // Two mediums the reading ladder does not govern: the sign face lands on its own 8px grid,
+  // Two mediums the reading ladder does not govern: the pixel face lands on its own 8px grid,
   // and the stream is read at quarter scale. Named in `:root` all the same, so the floor and
   // the resolvability checks below cover them rather than skipping them.
+  // Silkscreen's caps are 0.70em against Press Start 2P's 1.00em, so the signage holds its
+  // drawn size across the face it lost by stepping one multiple of eight.
   it('names the drawn sizes too, so no size in the sheet is a bare literal', () => {
     expect(scale(CSS)).toMatchObject({
-      'f-sign': 16,
-      'f-sign-wide': 24,
+      'f-sign': 24,
+      'f-sign-wide': 32,
       'f-bcast': 24,
       'f-bcast-lead': 32,
     })

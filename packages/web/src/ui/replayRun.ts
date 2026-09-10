@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { tickToMoment } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { stamp } from '../paper/stamp.js'
 import { SCENE_OUT_MS, SCENE_TOTAL_MS, transitionAlpha } from './sceneTransition.js'
 
 /** A point event is watched from three sim-minutes before it to ten after: long enough for the
@@ -97,8 +97,8 @@ export function dipAlpha(elapsedMs: number, reducedMotion = false): number {
 
 /** `Day 3 · 04:57` — the dateline of the minute the moment starts at. */
 export function momentDateline(tick: number): string {
-  const m = tickToMoment(tick)
-  return `Day ${m.day} · ${m.time}`
+  const s = stamp(tick)
+  return `Day ${s.day} · ${s.time}`
 }
 
 /** The cast as the card names them, in the town's own words. */

@@ -1,9 +1,10 @@
 # The Signpost UI
 
 The town is the whole viewport. Every mark over it is a thing **of** the town — a signpost, a
-plate, a ring, a sheet of paper, a stamp, a caption. There are no bars, no sidebars, no dock and
-no minimap. You watch; when you want to know, you ask the town, and a sheet of paper comes up
-while the town keeps living behind it.
+plate, a ring, a sheet of paper, a stamp, a caption — and one band across the top that says when.
+Nothing is docked in a way that resizes the picture and nothing stands over the middle of it, so
+there is no sidebar, no dock and no minimap. You watch; when you want to know, you ask the town,
+and a sheet of paper comes up while the town keeps living behind it.
 
 Everything below is read off the built world. `ui/chrome.css` is the one sheet; `ui/motion.ts` is
 the one motion table; `paper/pageModel.ts` is the one page table. Tests pin each of them.
@@ -51,8 +52,7 @@ was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 
 | Face | Token | Where |
 |---|---|---|
-| Silkscreen | `--font-px` | the pixel face: the nameplate, section heads, chips |
-| Press Start 2P | `--font-sign` | the signpost's arms only: 16px is twice its 8px grid, a 14px cap, and every stroke lands on the plank's own pixels |
+| Silkscreen | `--font-px` | the pixel face: the signpost's arms, the nameplate, the corner slabs, section heads, chips |
 | Manrope | `--font-body` | paper body, ring arms, roster names, place names, and the two letter-spaced marks — the stamp (0.14em) and the cue (0.18em, uppercase) |
 | Fraunces | `--font-title` | paper headings |
 | system mono | `--font-data` | law paths, stamps, every column of figures |
@@ -60,9 +60,10 @@ was 15.6px on a landscape phone and 57.6px at 2560, and under the notch on both.
 Only **400 and 600** of Manrope are loaded. Six marks asked for 500 and were served 400 by the
 browser's own font matching; every mark that stands over the town takes 600, a weight that exists.
 
-Silkscreen at 13px had an 8px cap on the arms and read as a smear over the wood; Press Start 2P
-at an integer multiple of its grid is the one place the sheet uses it (`render/textFaces.ts` also
-draws with it on the canvas).
+The arms are the one place off the seven-step ladder: `--f-sign` is 24px and `--f-sign-wide` 32,
+whole multiples of the 8px grid the pixel face is drawn on, so every stroke lands on the plank's
+own pixels. Press Start 2P is the last fallback in `--font-px` and the face `render/textFaces.ts`
+bakes for world speech, which needs lowercase; the sheet has no token of its own for it.
 
 **Silkscreen has no lowercase**, so it may not carry a name or a place: a roster row and a
 `.place-name` are Manrope 600, and "Amara's house" is not "AMARA'S HOUSE".
@@ -70,12 +71,43 @@ draws with it on the canvas).
 Self-hosted through `@fontsource`, never a CDN link. **Nothing renders below 12 CSS px** —
 `ui/chromeType.test.ts` is the law, and it outranks any smaller number a sketch asks for.
 
+## The frame
+
+`.app` is one CSS grid and every mark over the town names an area in it and nothing else. Nothing
+measures a neighbour and nothing resizes the canvas: the world hangs off `.app` itself at
+`1 / 1 / -1 / -1` and every panel sits over it. A row is as tall as what stands in it, and nothing
+at all when that is absent, which is what a hand-written band height used to assert.
+
+Two column tracks. `frame` is the inner width, inset by `--mark-inset` or the safe area, whichever
+is the larger; `edge` is the window's own, and the band is the one thing that takes it. The middle
+row, `open`, is the slack: a mark that hangs over the picture rather than standing in a row of its
+own spans it, so it can make no row taller. Three rows carry a floor instead — the corner rows at
+44px and the cue's at two lines — so a cue arriving may not move the caption over it, and a button
+that only exists inside a room may not move the card under it.
+
+| Area | What stands in it |
+|---|---|
+| `bar` | the Day Bar, the window's full width, over the top inset |
+| `head` | the frame meter (`Shift+P`) |
+| `left-1` · `right-1` | Back to town · Return to now |
+| `left-2` | the scene card |
+| `open` | the slack row; the cold open stands at the top of it |
+| `third` | the lower third, and the replay card |
+| `cue` | the director cue |
+| `sound` · `wisp` · `foot-left` | the corner cluster, one 44px slab to a row, bottom up: the key map, thought bubbles, sound |
+| `foot-right` | the signpost |
+
+**The one exemption is the key map**, which is `position: fixed; inset: 0` and centred. It is a
+modal sheet over the whole app, not a mark over the town, and it is the only thing allowed to
+stand over the middle of the picture.
+
 ## The marks on the stage
 
-`packages/web/src/stage/`. Each is DOM, absolutely positioned inside `.app`, placed against the
-camera every frame by **one** rAF loop (`stage/anchor.ts`, `joinStageLoop`) that writes
-`style.transform` directly — a camera at 60fps through React state would re-render the whole
-overlay sixty times a second.
+`packages/web/src/stage/`. Each is DOM. A mark that stands in the frame names one of `.app`'s
+areas and nothing else. The two that follow a body — the nameplate and the ring — sit in
+`.stage-figures` over the canvas and are placed against the camera every frame by **one** rAF loop
+(`stage/anchor.ts`, `joinStageLoop`) that writes `style.transform` directly: a camera at 60fps
+through React state would re-render the whole overlay sixty times a second.
 
 | Mark | What it is | Where |
 |---|---|---|
@@ -85,41 +117,37 @@ overlay sixty times a second.
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
 | `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case; or, while the gateway's own cut owns the shot, **why the camera is here** in the same sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
-| `SceneCard` | a struck stamp for what the town calls the scene, and `At the fire pit · Nadia & Yusuf` under it; written at the cut and gone 6s later | top-left, level with `.stage-live` across the picture |
+| `SceneCard` | a struck stamp for what the town calls the scene, and `At the fire pit · Nadia & Yusuf` under it; written at the cut and gone 6s later | the `left-2` row, under the way out of a room |
 | `LowerThird` | the speaker's 28px bust (96 on the stream), their name on an ink slab, and their line typing in at 28 characters a second over a hidden ghost that holds the width | bottom-centre, directly over the cue; only while its speaker is in the shot |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
-| `SkyArc` | the sun's road and everything the frame says about when: `STORM 4°` · the arc · `HH:MM · LIVE\|REPLAY\|OFFLINE\|PAUSED`, with `DAY n · SEASON` and the day's act on a line under it, plus `ASLEEP · 12m 00s` while every living body is asleep | the top edge, `--mark-inset`, permanent |
+| `DayBar` | everything the frame says about when: `DAY n` over `SEASON WEEKDAY · ACT n`; the day's own track in the middle, which IS the scrub, with the clock riding it, the day's milestones marked along it and a play control once the town is off live; the weather, one word for the town's state (`LIVE\|REPLAY\|OFFLINE\|PAUSED`, a storm, or `ASLEEP`) and the camera chip | the `bar` row, the window's full width, permanent |
 
 **The three story marks all read one answer.** The gateway scores the town and pushes one
 `{ t: 'director' }` frame — a cut, a quiet beat and the day's act — and `ui/DirectorMode.tsx` is
 its only reader. It holds the cut for `CUT_MIN_MS` (8s) so a gateway that changes its mind is not
 a cut, then hands the same shot to the card, the caption and the camera. Nothing on the stage
 gets a second opinion about who is in frame, so nothing on the stage can name somebody the camera
-is not on. The two lines a visitor arrives to (`ui/firstFrame.ts`, `#first-frame-lines` in
-`index.html`) are the fourth: they stand over the town until the first cut, the first hand on the
-camera, or twenty seconds.
+is not on. The two lines a visitor arrives to (`ui/coldOpen.ts`, `.cold-open` in the frame's own
+`open` row) are the fourth: they stand at the top of the picture until the first cut, the first
+hand on the camera, or twenty seconds.
 
-**The sun arc is the one permanent mark.** `ui/skyModel.ts` puts one traveller on one curve —
-the sun from 05:00 to 21:00, then the moon over the same road — and the boundary is
-`dayPhaseFromTick`'s own, so the arc and the light on the town cannot disagree about when it got
-dark. The token's position says the hour before the words beside it are read; the words are the
-day, the season, the weather kind and the temperature, in `WEATHER_GLYPH`'s 8×8 pixels rather
-than an emoji. It eases its position on the world's tick and runs no loop at all. Below 900px the
-arc flattens and the position stops meaning anything, so the road goes and the two chips close
-up. The arc is DRAWN at `--sky-h` rather than at a second number — the token said 30px while the
-bar drew 34 and the road came out 4px off. The two flanks are equal fractions of the group, so
-the arc is centred whatever the weather word or the clock runs to.
+**The sun and the moon are not drawn on the chrome at all.** `ui/skyModel.ts` still puts one
+traveller on one curve — the sun from 05:00 to 21:00, then the moon over the same hours — and the
+boundary is `dayPhaseFromTick`'s own, so the light on the town and the hour the band prints cannot
+disagree. What reads it is the picture itself: the moon over the town (`render/atmosphere.ts`) and
+the length and lie of every shadow (`render/characters.ts`). The weather reaches the band as its
+kind and its temperature, in `WEATHER_GLYPH`'s 8×8 pixels rather than an emoji.
 
-**And it is the only mark that says when.** The day and the season used to be printed twice, by
-this bar and by a second box under it, from two formatters that could disagree about the minute.
-`townStamp` is one read of the clock split into the two slots the bar has, and the bar is always
-up: the old stamp shipped at `opacity: 0` and woke for three seconds on a pointer move, so a
-viewer who put the town on a tab and watched never saw the time at all. The field on the same
-line is what the town says when nobody in it is doing anything, which today is one state: every
-living body asleep, counted down in real seconds to the light the world itself keeps. It says
-`ASLEEP` with no number when the world cannot say. Sleep is a chosen act, so a town that all
-lies down at 14:00 has no hour anything can promise, and promising one was the whole of the
-full-screen card this replaced.
+**The Day Bar is the only mark over the town that says when.** The day and the season used to be
+printed twice, by a bar and by a second box under it, from two formatters that could disagree
+about the minute; `paper/stamp.ts` is the one read of the clock and the band splits it into the
+slots it has. The clock is always up: it shipped at `opacity: 0` and woke for three seconds on a
+pointer move, so a viewer who put the town on a tab and watched never saw the time at all. It
+rides the track at the fraction of the day it is, so where the day has got to is read before the
+digits are. The state field beside the weather is ONE WORD and never a number, the last of them
+`ASLEEP` while every living body is down. Sleep is a chosen act, so a town that all lies down at
+14:00 has no hour anything can promise, and promising one was the whole of the full-screen card
+this replaced.
 
 **The hover is a footprint plate.** `render/plate.ts` draws it, `ui/interaction.ts` decides its
 words and `ui/plateModel.ts` shapes its rows. There is ONE for the whole stage — the tooltip
@@ -324,14 +352,14 @@ before `SOUND_MASTER` (0.55), so the mix cannot clip. Every continuous voice is 
 off a single two-second noise loop, built once on the first unmute and only ramped afterwards;
 the bell is the one exception and strikes two partials on the bell ratio (784 Hz × 2.76).
 
-**A chip stands for a START, never for a running voice.** The sun arc is the one permanent mark
+**A chip stands for a START, never for a running voice.** The Day Bar is the one permanent mark
 over the town, so "♪ WIND" may not sit in the corner all day: `trackStarts` stamps a voice the
 instant it enters the mix and `standingChips` holds it `CUE_CHIP_MS` (4.2 s). The chip is the
 cue mark's own material — cream, `--font-body` 600 at `--f-1`, 0.18em, on the four-way
 `--halo-deep` — stacked `column-reverse` above the corner cluster, so a bell arriving on top
 leaves every chip under it where the eye left it. The "♪" toggle is the cluster's third 44px
-slab, its mark drawn on the 8×8 grid for the same reason the wisp is: `--font-sign` has no ♪ and
-no legal size under 16px. Off empties the note rather than darkening the paper.
+slab, its mark drawn on the 8×8 grid for the same reason the wisp is: `--font-px` has no ♪ at
+any size. Off empties the note rather than darkening the paper.
 
 ## Motion
 

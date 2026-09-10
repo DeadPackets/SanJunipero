@@ -1,16 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { playhead, seekTick } from '../stage/Transport.js'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { MINUTES_PER_DAY } from '@sj/shared'
+import { createWorldStore, type WorldStore } from '../state/worldStore.js'
+import { DayBar, dayStart, playPause, trackTick } from '../stage/DayBar.js'
+import { wayBack } from '../App.js'
 import { SCENE_IN_MS, SCENE_OUT_MS, SCENE_TOTAL_MS, SCENES } from './sceneTransition.js'
-import { TITLE_CARD_MS, castNames, dipAlpha, momentDateline, pointPlay } from './replayRun.js'
+import { TITLE_CARD_MS, castNames, dipAlpha, momentDateline } from './replayRun.js'
 
 const src = (f: string): string => readFileSync(new URL(f, import.meta.url), 'utf8')
 const CSS = src('./chrome.css')
 const APP = src('../App.tsx')
-const TRANSPORT = src('../stage/Transport.tsx')
 const SCENE = src('../stage/ReplayScene.tsx')
-
-const PLAY = pointPlay(1500, 100_000, 'A grave was made for Rahel.', ['a1', 'a2'])
 
 describe('★ the dip: the town leaves, the past arrives', () => {
   it('★ is the machine that was already there, not a second one', () => {
@@ -73,11 +75,10 @@ describe('★ the title card names the minute and gets out of the way', () => {
   })
 
   it('never stands in the cue’s slot at the same time as the cue', () => {
-    // both sit above the strip; the card leaves on the event that is the only thing that
-    // brings the cue up, so the two are exclusive by construction rather than by z-index
-    expect(CSS).toContain("[data-replay='on'] .stage-cue")
-    for (const rule of ['.replay-card {', "[data-replay='on'] .stage-cue {"])
-      expect(CSS.slice(CSS.indexOf(rule)), rule).toContain('+ var(--transport-h)')
+    // the frame gives the card and the cue a row each, bottom up, so the two can never collide
+    // and neither has to know how tall the other is
+    expect(CSS.slice(CSS.indexOf('.replay-card {'))).toContain('grid-area: third')
+    expect(CSS.slice(CSS.indexOf('.stage-cue {'))).toContain('grid-area: cue')
   })
 })
 
@@ -104,53 +105,88 @@ describe('★ the grade: warm, a tenth less saturated, and NEVER sepia', () => {
   })
 })
 
-describe('★ the transport is a thing in the town', () => {
+const DAY = 12 * MINUTES_PER_DAY + 9 * 60 + 40
+
+/** The bar a viewer watching the past is given, off the store the app hands it. */
+const REPLAYING: WorldStore = {
+  ...createWorldStore(),
+  getTick: () => DAY,
+  liveEdge: () => 400 * MINUTES_PER_DAY,
+  getMode: () => ({ live: false, replaying: true, tick: DAY }),
+}
+
+const bar = (store: WorldStore): string =>
+  renderToStaticMarkup(
+    createElement(DayBar, {
+      store,
+      link: 'online' as const,
+      handle: null,
+      onAt: () => undefined,
+      autoCut: true,
+      handbackAt: () => null,
+    }),
+  )
+
+describe('★ the cut is a thing in the town, and the day bar is its one control', () => {
   it('★ NO LETTERBOX: the Signpost ruling holds, and the sheet already takes 66%', () => {
     // a selector, not the word: the block's own comment says why there is none
     for (const bar of ['letterbox', 'cinema-bar', 'pillarbox'])
       expect(CSS, bar).not.toMatch(new RegExp(`\\.${bar}[\\s,{:]`))
-    // and every mark of the cut hangs off an edge at the one inset, like every other mark
-    expect(CSS.slice(CSS.indexOf('.transport {'))).toContain('bottom: max(var(--mark-inset)')
   })
 
+  // The strip was a second control with a second clock on it, 800px from the first. The day
+  // bar's own track carries the scrub now, so pause and resume are the same two messages.
   it('★ costs the protocol nothing: pause is a scrub, resume is a replay', () => {
-    expect(TRANSPORT).toContain('handle?.scrub(tick)')
-    expect(TRANSPORT).toContain('handle?.replay(tick >= play.until ? play.from : tick)')
+    const said: string[] = []
+    const handle = {
+      scrub: (t: number) => said.push(`scrub ${t}`),
+      replay: (t: number) => said.push(`replay ${t}`),
+    } as unknown as Parameters<typeof playPause>[0]
+    playPause(handle, true, 1500)
+    playPause(handle, false, 1500)
+    expect(said).toEqual(['scrub 1500', 'replay 1500'])
+    playPause(null, true, 1500)
+    expect(said).toHaveLength(2)
   })
 
-  it('★ offers no speed at all: the bubbles and the legs are tuned to the live cadence', () => {
-    const code = TRANSPORT.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-    expect(code).not.toMatch(/speed/i)
-    expect(code).not.toContain('×')
-  })
-
-  it('★ its scrubber is bounded to the moment, not to the whole history', () => {
-    expect(playhead(PLAY.from, PLAY)).toBe(0)
-    expect(playhead(PLAY.until, PLAY)).toBe(1)
-    expect(playhead(0, PLAY)).toBe(0) // a tick before the moment pins to its start
-    expect(playhead(99_999, PLAY)).toBe(1)
-    expect(seekTick(0, PLAY)).toBe(PLAY.from)
-    expect(seekTick(1, PLAY)).toBe(PLAY.until)
-    expect(seekTick(0.5, PLAY)).toBeGreaterThanOrEqual(PLAY.from)
-    expect(seekTick(2, PLAY)).toBe(PLAY.until)
-    expect(seekTick(-1, PLAY)).toBe(PLAY.from)
-  })
-
-  it('carries the clock and the one way out, and every control is reachable', () => {
-    expect(TRANSPORT).toContain('momentStamp(tick)')
-    expect(TRANSPORT).toContain('Return to now')
-    expect(TRANSPORT).toContain('role="slider"')
-    expect(TRANSPORT).toContain('tabIndex={0}')
-    expect(CSS).toMatch(/\.player-btn \{[^}]*min-width: 44px; min-height: 44px;/)
-    expect(CSS).toContain('.player-track::after')
-  })
-
+  // ★ The strip carried its own way back and the app hid its one behind it. The strip is gone,
+  // so the app's exit stands for as long as the town is off its live edge.
   it('★ replaces the lone way back rather than standing a second one beside it', () => {
-    expect(APP).toContain('!mode.live && !route.broadcast && play === null')
+    expect(wayBack(false, false), 'a replay with no way out of it').toBe(true)
+    expect(wayBack(true, false), 'a way back offered at the live edge').toBe(false)
+    expect(wayBack(false, true), 'a stream frame has no hands').toBe(false)
+    expect(wayBack(true, true)).toBe(false)
+    expect(bar(REPLAYING), 'the bar grew a second way back').not.toContain('Return to now')
+  })
+
+  // ★ NO SPEED CONTROL. `bubbleLife` is 3500 ms + 55/char and the leg timing is tuned to the
+  // live cadence: above 2x a replayed conversation is unreadable, and 2x is not worth a control.
+  it('★ offers no speed at all: the bubbles and the legs are tuned to the live cadence', () => {
+    const html = bar(REPLAYING)
+    expect(html, 'the bar has no transport at all').toContain('day-bar-play')
+    expect(html.match(/<button/g), 'a second control stands beside the one').toHaveLength(1)
+    const said = [
+      ...[...html.matchAll(/>([^<>]+)</g)].map((m) => m[1]!),
+      ...[...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]!),
+    ]
+    for (const words of said) expect(words, words).not.toMatch(/speed|faster|slower|\d\s*[x×]/i)
+    expect(playPause, 'pause and resume carry a rate').toHaveLength(3)
+  })
+
+  // ★ THE BOUND MOVED, and this is the ruling: the strip scrubbed inside the moment it was
+  // replaying, and the day bar's track replaced it, so the bound is the day the viewer is on.
+  it('★ its track is bounded to the day on screen, not to the whole history', () => {
+    const from = dayStart(DAY)
+    const edge = 400 * MINUTES_PER_DAY
+    expect(trackTick(0, DAY, edge)).toBe(from)
+    expect(trackTick(1, DAY, edge)).toBe(from + MINUTES_PER_DAY - 1)
+    expect(trackTick(-1, DAY, edge), 'a hand off the end asked for another day').toBe(from)
+    expect(trackTick(2, DAY, edge)).toBe(from + MINUTES_PER_DAY - 1)
+    // ...and never a minute the town has not lived through
+    expect(trackTick(1, DAY, DAY)).toBe(DAY)
   })
 
   it('is never drawn into a stream frame, which has no hands', () => {
-    expect(APP).toContain('{!route.broadcast && (\n        <Transport')
     expect(APP).toContain('{!route.broadcast && <ReplayScene')
   })
 })

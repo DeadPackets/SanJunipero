@@ -4,9 +4,13 @@ import {
   MARK_GLYPH,
   MARK_GLYPH_PX,
   MARK_GLYPH_SCALE,
+  EMPTY_SOURCES,
+  MARKS_POLL_MS,
+  MARKS_URL,
   coalesceMarks,
   gridDays,
   markLeft,
+  markSources,
   markWindow,
   marksFrom,
   tipSide,
@@ -21,31 +25,6 @@ import type { PageProps } from './types.js'
 
 const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY
-
-/** Refreshed slowly: a mark is a thing that already happened. */
-const MARKS_REFETCH_MS = 30_000
-
-/** The firsts are `/api/milestones`' to serve; `/api/timeline/marks` carries the other five. */
-type WireSources = Omit<MarkSources, 'milestones'>
-
-const EMPTY_SOURCES: WireSources = {
-  chapters: [],
-  moments: [],
-  changes: [],
-  events: [],
-  discoveries: [],
-}
-
-const markSources = (body: unknown): WireSources => {
-  const b = body as Partial<WireSources>
-  return {
-    chapters: b.chapters ?? [],
-    moments: b.moments ?? [],
-    changes: b.changes ?? [],
-    events: b.events ?? [],
-    discoveries: b.discoveries ?? [],
-  }
-}
 
 const NO_FIRSTS: MarkSources['milestones'] = []
 
@@ -207,7 +186,7 @@ export function Days({ store, onScrub, onPlay, onLive }: PageProps) {
   const liveEdge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
-  const marksRead = usePolled('/api/timeline/marks', markSources, MARKS_REFETCH_MS)
+  const marksRead = usePolled(MARKS_URL, markSources, MARKS_POLL_MS)
   const sources = marksRead.data ?? EMPTY_SOURCES
   const firsts = useFeed(milestonesFeed).data ?? NO_FIRSTS
 

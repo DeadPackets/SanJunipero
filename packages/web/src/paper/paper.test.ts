@@ -22,7 +22,7 @@ import {
   type PageKey,
 } from './pageModel.js'
 
-import { dateline } from './stamp.js'
+import { stamp } from './stamp.js'
 
 const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url), 'utf8')
 const PAGES = Object.keys(PAGE_TABS) as PageKey[]
@@ -115,8 +115,9 @@ describe('the signpost', () => {
       /^\.help-button, \.thoughts-button(?:, \.sound-button)? \{([^}]*)\}/m.exec(css)?.[1] ?? ''
     expect(body).toContain('width: 44px')
     expect(body).toContain('height: 44px')
-    expect(body).toMatch(/left: max\(var\(--mark-inset\), env\(safe-area-inset-/)
-    expect(body).toMatch(/bottom: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    expect(css).toMatch(
+      /\.help-button, \.thoughts-button, \.sound-button, \.sound-cues \{[^}]*grid-area: foot-left/,
+    )
   })
 
   // The button toggles, so the click-away that shuts the sheet must not count it as away — and
@@ -252,9 +253,9 @@ describe('the paper', () => {
     const html = paper({ page: 'chronicle', tab: 'Today' })
     expect(html).toContain('class="paper-dateline"')
     expect(html).toMatch(/class="paper-title" id="paper-title">Chronicle</)
-    const { day, time } = dateline(0)
-    expect(html).toContain(`class="paper-date">${day}<`)
-    expect(html).toContain(`class="paper-clock">${time}<`)
+    const when = stamp(0)
+    expect(html).toContain(`class="paper-date">${when.weekday} · DAY ${when.day} · ${when.season}<`)
+    expect(html).toContain(`class="paper-clock">${when.time}<`)
   })
 
   it('★ runs the section line INSIDE the dateline, with the keyboard path untouched', () => {

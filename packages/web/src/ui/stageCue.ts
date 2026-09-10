@@ -154,28 +154,45 @@ export function sceneCueFor(
     : { kind: scene.kind, text, stakes: scene.stakes, band: stakesBand(scene.stakes) }
 }
 
-/** One at a time: the slot is one line, and a second moment replaces the first rather than
- *  queueing behind it — a stale moment is worse than a missed one. */
+/** How many moments may stand behind the one on screen. Past this the line is minutes behind
+ *  the town, and a stale moment is worse than a missed one. */
+export const CUE_QUEUE_MAX = 4
+
+/** The moments the slot still has to say, once a batch has landed. A batch that carried three
+ *  used to be its third one: each replaced the one before it inside the same render. */
+export function queuedCues(
+  held: readonly StageCue[],
+  evts: readonly SimEvent[],
+  state: Parameters<typeof cueFor>[1],
+): readonly StageCue[] {
+  const arrived = evts.map((ev) => cueFor(ev, state)).filter((cue) => cue !== null)
+  if (arrived.length === 0) return held
+  const all = [...held, ...arrived]
+  // The one being read keeps its place; a burst drops the oldest of those still waiting.
+  return all.length <= CUE_QUEUE_MAX ? all : [...all.slice(0, 1), ...all.slice(1 - CUE_QUEUE_MAX)]
+}
+
+/** One at a time, in the order the town said them: the slot is one line, and each moment stands
+ *  for its six seconds before the next takes it. */
 export function useStageCue(store: WorldStore): StageCue | null {
-  const [cue, setCue] = useState<StageCue | null>(null)
+  const [queue, setQueue] = useState<readonly StageCue[]>([])
+  useEffect(
+    () =>
+      store.onEvents((evts) => {
+        const state = store.getState()
+        setQueue((held) => queuedCues(held, evts, state))
+      }),
+    [store],
+  )
+  const shown = queue[0] ?? null
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null
-    const off = store.onEvents((evts) => {
-      const state = store.getState()
-      for (const ev of evts) {
-        const next = cueFor(ev, state)
-        if (next === null) continue
-        setCue(next)
-        if (timer !== null) clearTimeout(timer)
-        timer = setTimeout(() => {
-          setCue(null)
-        }, CUE_HOLD_MS)
-      }
-    })
+    if (shown === null) return
+    const timer = setTimeout(() => {
+      setQueue((held) => held.slice(1))
+    }, CUE_HOLD_MS)
     return () => {
-      off()
-      if (timer !== null) clearTimeout(timer)
+      clearTimeout(timer)
     }
-  }, [store])
-  return cue
+  }, [shown])
+  return shown
 }

@@ -1,23 +1,30 @@
 import { useEffect } from 'react'
 import type { Scene } from '../render/scene.js'
 
-/** The chrome that stands over the canvas at its top edge and at its bottom edge. */
-export const TOP_BAND: readonly string[] = ['.sky-bar']
+/** The chrome that stands over the canvas at its top edge and at its bottom edge. The arms are
+ *  a top mark on a short or a narrow window and a bottom-right corner mark otherwise, and
+ *  `insetsOf` reads which edge they actually reached rather than being told. */
+export const TOP_BAND: readonly string[] = ['.day-bar', '.signpost', '.stage-exit', '.stage-live']
 export const BOTTOM_BAND: readonly string[] = ['.stage-cue', '.lower-third']
 
 type Box = { top: number; bottom: number; height: number }
 
 /** How far each band reaches into the canvas, in screen px, from the boxes the marks draw: an
- *  empty or hidden mark has no height and reserves nothing. */
+ *  empty or hidden mark has no height and reserves nothing, and a mark listed for an edge it is
+ *  not standing at this size reserves nothing either. */
 export function insetsOf(
   canvas: Box,
   tops: readonly Box[],
   bottoms: readonly Box[],
 ): { top: number; bottom: number } {
-  const top = Math.max(0, ...tops.filter((r) => r.height > 0).map((r) => r.bottom - canvas.top))
+  const middle = canvas.top + canvas.height / 2
+  const top = Math.max(
+    0,
+    ...tops.filter((r) => r.height > 0 && r.top < middle).map((r) => r.bottom - canvas.top),
+  )
   const bottom = Math.max(
     0,
-    ...bottoms.filter((r) => r.height > 0).map((r) => canvas.bottom - r.top),
+    ...bottoms.filter((r) => r.height > 0 && r.bottom > middle).map((r) => canvas.bottom - r.top),
   )
   return { top: Math.min(top, canvas.height), bottom: Math.min(bottom, canvas.height) }
 }

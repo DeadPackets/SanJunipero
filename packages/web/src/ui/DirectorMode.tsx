@@ -11,6 +11,7 @@ import { sceneBox, sceneShot } from '../render/sceneFraming.js'
 import type { TensionTurn } from '../render/tension.js'
 import { CUT_MIN_MS, type CameraClaim, cameraClaim, townAsleep } from './directorCut.js'
 import { cutFloor, quietRound } from './autoCut.js'
+import { openingShot } from './coldOpen.js'
 import {
   driftAt,
   nextShot,
@@ -315,6 +316,7 @@ export function DirectorMode({
   autoCut,
   pinned = null,
   moment = NO_CAST,
+  opening = false,
   onCue,
   onWhy,
   onShot,
@@ -323,6 +325,8 @@ export function DirectorMode({
   scene: Scene | null
   autoCut: boolean
   pinned?: string | null
+  /** whether the cold open is still running, which the session's first shot opens with */
+  opening?: boolean
   /** the cast of the moment being replayed, which the shot is FOR */
   moment?: readonly string[]
   onCue?: (text: string | null) => void
@@ -343,6 +347,7 @@ export function DirectorMode({
   const [floor] = useState(() => cutFloor<StakeScore>(setHeld, keyOf))
   const [round] = useState(() => quietRound())
   const [hold] = useState(() => shotHold())
+  const [openShot] = useState(() => openingShot())
   useEffect(() => floor.clear, [floor])
   // The one moment worth pushing over: a give_way the world recorded after three presses. The
   // fold is the store's, so a remount cannot take the turn signal down with it.
@@ -382,10 +387,10 @@ export function DirectorMode({
   const want = shotOf(claim, held)
   const wantCast = want.castKey
   const wantFollowed = want.followed
+  // Never before there is a town to look at: a claim that asks for no shot at all would spend
+  // the session's one opening on nothing.
   const wantKind = shotKindFor({
-    // The browser is never told which scenes it has already shown, so it never claims a shot is
-    // opening one. `peak` is the gateway's own number, which it does send.
-    opening: false,
+    opening: openShot(opening && awake && claimBy !== 'hold'),
     peak: claimBy === 'cut' && (held?.score ?? 0) >= PEAK_SCORE,
     indoors: wantRoom !== null,
     walking: wantFollowed !== null && state?.agents[wantFollowed]?.activity?.path !== undefined,

@@ -86,20 +86,48 @@ describe('★ the signpost and the paper hold their own shape', () => {
   })
 
   // A percentage inset is 15.6px on a landscape phone and 57.6px at 2560 — the same chrome
-  // 3.7x further from the edge across the range, and under the notch on both.
+  // 3.7x further from the edge across the range, and under the notch on both. The mark that
+  // used to carry that sum now names a corner and the FRAME carries the inset, once.
   it('hangs the signpost in the corner the direction picked, at one measured inset', () => {
     const post = topRule('.signpost')
     expect(post, '.signpost is not a top-level rule in the sheet').not.toBe('')
-    expect(post).toMatch(/right:\s*max\(var\(--mark-inset\), env\(safe-area-inset-right\)\)/)
-    expect(post).toMatch(/bottom:\s*max\(var\(--mark-inset\), env\(safe-area-inset-bottom\)\)/)
+    expect(post).toMatch(/grid-area:\s*foot-right/)
+    expect(post).toMatch(/justify-self:\s*end/)
+    expect(post).toMatch(/align-self:\s*end/)
     expect(BARE).toMatch(/--mark-inset:\s*clamp\(16px, 3vmin, 40px\)/)
   })
 
-  // Every mark that hangs off an edge takes the same inset and the same notch guard.
-  it('gives the bar and the cue the signpost’s own inset', () => {
-    for (const sel of ['.sky-bar', '.stage-cue']) {
-      expect(rulesFor(BARE, sel), sel).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-/)
-    }
+  /** The two marks that carry a device edge themselves, and what the frame's outer tracks
+   *  cannot do for them. Anything else naming one is placing itself twice. */
+  const OWN_EDGE: Readonly<Record<string, string>> = {
+    '.day-bar': 'takes the frame’s top row, so the notch is the band’s own padding',
+    '.paper-sheet': 'is bottom anchored, so its last line sits under the home indicator',
+  }
+
+  // ★ Every mark that hangs off an edge took the same inset and the same notch guard, which
+  // meant twenty copies of one sum. The frame's own outer tracks ARE that inset now, so a mark
+  // that writes it again is a mark placing itself twice.
+  it('★ writes the edge inset in the frame and nowhere else', () => {
+    const frame = topRule('.app')
+    expect(frame, '.app is not a top-level rule in the sheet').not.toBe('')
+    expect(frame).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-top\)\)/)
+    expect(frame).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-bottom\)\)/)
+    expect(frame).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-left\)\)/)
+    expect(frame).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-right\)\)/)
+    // Whole blocks, and any property: the first declaration in a block and a `padding` both
+    // reached a device edge while a scan anchored on `top|bottom|left|right|inset` was green.
+    const carrying = [...BARE.replace(frame, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, , body]) => (body ?? '').includes('env(safe-area-inset'))
+      .flatMap(([, list]) => (list ?? '').split(','))
+      .map((sel) => sel.trim().split(/\s+/).at(-1) ?? '')
+    expect(
+      carrying.filter((sel) => !(sel in OWN_EDGE)),
+      'a mark re-derives an edge the frame already holds',
+    ).toEqual([])
+    expect(
+      Object.keys(OWN_EDGE).filter((sel) => !carrying.includes(sel)),
+      'a mark is excused an edge it no longer carries',
+    ).toEqual([])
   })
 
   // Below 1400px a centred sheet sliced the arms mid-word; below 640 it buried them entirely.
@@ -107,7 +135,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
   // out from under the hand: the position may not depend on `data-open` at any size any more.
   it('★ keeps the signpost reachable with the sheet open, without moving it to do so', () => {
     expect(BARE).toMatch(
-      /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*left:/,
+      /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*grid-column: edge-start \/ foot-right-start/,
     )
     expect(BARE).toMatch(
       /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*grid-template-columns: repeat\(2, auto\)/,
@@ -121,32 +149,27 @@ describe('★ the signpost and the paper hold their own shape', () => {
     ).toEqual([])
   })
 
-  // The arms hold the top edge below 1001px, so every mark that shared that band starts under
-  // them. Hiding five of them on the same click was the other half of the jump.
-  it('★ steps the top marks below the arms rather than hiding them when the sheet opens', () => {
-    expect(rulesFor(BARE, '.app')).toMatch(/--sign-band:\s*0px/)
+  // ★ The arms hold the top edge below 1001px, so every mark that shared that band started
+  // under them. `--sign-band` asserted that depth as 0px, 88px or 44px at three breakpoints and
+  // fourteen sums downstream changed meaning with it. A row measures the arms instead: the arms
+  // take `head`, `head` is as tall as they are, and no other rule is told anything.
+  it('★ steps the top marks below the arms by giving the arms a row of their own', () => {
+    expect(BARE, 'a rule still asserts the arms’ depth by hand').not.toContain('--sign-band')
+    expect(topRule('.app')).toMatch(/grid-template-areas:[\s\S]*?'\.\s+head\s+head\s+head\s+\.'/)
     expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.app \{[^}]*--sign-band: 88px/,
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.signpost \{[^}]*grid-area: head/,
     )
-    expect(BARE).toMatch(
-      /@media \(min-width: 641px\) and \(max-height: 620px\) \{[\s\S]*?\.app \{[^}]*--sign-band: 44px/,
-    )
-    for (const sel of ['.sky-bar', '.scene-card', '.stage-live']) {
-      expect(rulesFor(BARE, sel), sel).toContain('var(--sign-band)')
-    }
-    expect(selectorsMatching(BARE, /data-paper='on'\] :is\(\.sky-bar/)).toEqual([])
+    expect(selectorsMatching(BARE, /data-paper='on'\] :is\(\.day-bar/)).toEqual([])
   })
 
   // Height is what a landscape phone runs out of.
   it('★ answers the window’s height as well as its width', () => {
-    expect(BARE).toMatch(
-      /@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: calc\(100dvh - 64px\)/,
-    )
+    expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: 100%/)
     expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.signpost-post \{ display: none/)
     // 390px wide: the arms go two by two. They stand on the top edge in both states now, so the
     // 88px the cue and the lower third used to leave them at the bottom is the picture's again.
     expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*top: max\(var\(--mark-inset\)/,
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*grid-area: head/,
     )
     expect(rulesFor(BARE, '.stage-cue')).not.toContain('88px')
     expect(rulesFor(BARE, '.lower-third')).not.toContain('88px')
@@ -166,25 +189,27 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(topRule('.signpost-arm')).toMatch(/transition-timing-function:\s*var\(--ease-tap\)/)
   })
 
-  it('sizes the paper off the stage, capped, and never over the whole of it', () => {
+  // ★ The sheet is 66% of the screen and it worked out where the arms end four times over, at
+  // 96px, 200px, 64px and 106px. Its row starts under the band and the arms, so the percentage
+  // is of what is left and the four sums are gone.
+  it('★ sizes the paper off its own row, and never over the whole of it', () => {
     expect(BARE).toMatch(/--paper-w:\s*min\(78%, 760px\)/)
-    // `dvh`, not `vh`: iOS moves the bottom edge the sheet is anchored to as the URL bar goes.
-    expect(BARE).toMatch(/--paper-h:\s*min\(66%, 100dvh - 96px\)/)
+    expect(BARE).toMatch(/--paper-h:\s*66%/)
     const paper = topRule('.paper')
+    expect(paper).toMatch(/grid-row:\s*head-end \/ -1/)
     expect(paper).toMatch(/width:\s*var\(--paper-w\)/)
     expect(paper).toMatch(/height:\s*var\(--paper-h\)/)
+    expect(BARE, 'the sheet still sums a band').not.toMatch(/\.paper \{[^}]*100dvh/)
   })
 
   it('rises from the bottom edge in the sheet’s own 300ms enter curve', () => {
     const paper = topRule('.paper')
-    expect(paper, 'the sheet must start below the edge').toMatch(
-      /transform:\s*translate\(-50%, 102%\)/,
-    )
+    expect(paper, 'the sheet must start below the edge').toMatch(/transform:\s*translateY\(102%\)/)
     expect(paper).toMatch(/transition:\s*transform var\(--t-slow\) var\(--ease-enter\)/)
-    expect(BARE).toMatch(/\.paper\[data-open='yes'\] \{[^}]*transform:\s*translate\(-50%, 0\)/)
-    // A separate `translate` gets folded into `transform` by the minifier and the open state
-    // then throws the centring away — one property has to carry both axes.
-    expect(paper, 'the sheet centres itself with `transform`, never `translate`').not.toMatch(
+    expect(BARE).toMatch(/\.paper\[data-open='yes'\] \{[^}]*transform:\s*translateY\(0\)/)
+    // The frame centres it, so the slide carries one axis. A separate `translate` would still
+    // be folded into `transform` by the minifier and the open state would throw the slide away.
+    expect(paper, 'the sheet slides with `transform`, never `translate`').not.toMatch(
       /^\s*translate:/m,
     )
   })
@@ -211,23 +236,27 @@ describe('★ the signpost and the paper hold their own shape', () => {
   // A broadcast frame is the town with nobody operating it, and the sheet takes the picture.
   // Every other mark in the corner is taken off both; the newest one was taken off neither.
   it('★ takes the camera chip out of a broadcast frame and out from under the sheet', () => {
-    for (const state of ['data-broadcast', 'data-paper']) {
-      for (const mark of ['.camera-chip', '.sound-cues'])
-        expect(rulesFor(BARE, `[${state}='on'] ${mark}`), `${state} ${mark}`).toMatch(
-          /display:\s*none/,
-        )
-    }
+    for (const mark of ['.camera-chip', '.sound-cues'])
+      expect(rulesFor(BARE, `[data-broadcast='on'] ${mark}`), mark).toMatch(/display:\s*none/)
+    expect(rulesFor(BARE, "[data-paper='on'] .sound-cues")).toMatch(/display:\s*none/)
+    // ★ `display: none` took a sibling out of a flex row ranged right, and the weather and the
+    // state slid 54px on every arm the sheet was opened from. The column has to stand.
+    expect(rulesFor(BARE, "[data-paper='on'] .camera-chip")).toMatch(/visibility:\s*hidden/)
   })
 
-  // The chip reserved a 44px row on EVERY frame for a button that renders on almost none:
-  // `.stage-exit` is drawn only inside a room, and `.stage-live` stands in the other corner.
-  it('★ hangs the camera chip on the corner’s first row, stepping down only under a way out', () => {
-    const chip = rulesFor(BARE, '.camera-chip')
-    expect(chip, 'the chip is not a top-level rule in the sheet').toContain('var(--sign-band)')
-    expect(chip, 'the chip reserves a row on a frame with no button in it').not.toContain('44px')
-    expect(rulesFor(BARE, 'body:has(.stage-exit) .camera-chip')).toContain('44px')
+  // ★ The chip hung 47px below a button drawn only inside a room, because the step-down was a
+  // rule the chip carried on every frame. It stands in the day bar's right flank now, beside
+  // the sky and the state: whose hand is on the lens is a fact about the picture, and every
+  // fact about the picture is in one band. It places itself against nothing at all.
+  it('★ stands the camera chip in the bar, placed against no neighbour', () => {
+    expect(rulesFor(BARE, '.stage-exit')).toContain('grid-area: left-1')
+    expect(rulesFor(BARE, '.camera-chip')).not.toMatch(/grid-area|position|top:|left:/)
+    expect(
+      selectorsMatching(BARE, /^body:has\(\.stage-exit\)/),
+      'the chip still steps down by a rule instead of by a row',
+    ).toEqual([])
     expect(rulesFor(BARE, '.stage-live'), '.stage-live is in the right-hand corner').toContain(
-      'left: auto',
+      'grid-area: right-1',
     )
   })
 
@@ -250,17 +279,177 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(PLATE_DROP_PX, `the plate must start below ${armBottom}px`).toBeGreaterThan(armBottom)
   })
 
-  // The stamp that used to own the right-hand corner is folded into the bar, which takes the
-  // top CENTRE. The meter still has the left corner to itself, and nothing else claims it.
-  it('★ keeps the fps meter out of the corner the town clock owns', () => {
-    // both selectors carry a second rule for their frame recipe; the placement one positions
-    const placed = (sel: string): string =>
-      [...CSS.matchAll(new RegExp(`\\${sel} \\{([^}]*)\\}`, 'g'))]
-        .map((m) => m[1]!)
-        .find((body) => body.includes('position:'))!
-    expect(placed('.sky-bar')).toContain('left: 50%')
-    expect(placed('.fps-overlay')).toMatch(/left:/)
-    expect(placed('.fps-overlay')).not.toMatch(/right:/)
+  // ★ The band took every click over the top 56px of the picture: `.stage-figures` carries the
+  // same z-index and stands earlier in the DOM, so the bar won the hit test over open town.
+  it('★ takes no click the band is not a control for', () => {
+    const bar = rulesFor(BARE, '.day-bar')
+    expect(bar).toMatch(/pointer-events:\s*none/)
+    for (const control of ['.day-bar-track', '.day-bar-play'])
+      expect(rulesFor(BARE, control), control).toMatch(/pointer-events:\s*auto/)
+    // and the track's 44px of reach stood past the band, scrubbing a viewer who clicked the town
+    expect(bar).toMatch(/overflow:\s*hidden/)
+  })
+
+  // ★ Asked for and then paid for: the clock hid until a pointer moved, so a viewer who left the
+  // town up on a tab saw no time at all, and a phone saw none either way. It never fades now.
+  it('★ never fades the clock out of the band that says when', () => {
+    expect(rulesFor(BARE, '.day-bar-stamp')).not.toMatch(/opacity/)
+    expect(
+      selectorsMatching(BARE, /^\.day-bar-stamp\[/),
+      'the stamp still has a state it hides in',
+    ).toEqual([])
+  })
+
+  // The rest of a day nobody has reached, so a partly lived day reads as one. A step of the ink
+  // the band is drawn in, never a second bar filling up and never a colour of its own.
+  it('paints the track past the cursor in the band’s own ink', () => {
+    const dead = rulesFor(BARE, '.day-bar-dead')
+    expect(dead, '.day-bar-dead has no rule').not.toBe('')
+    expect(dead).toMatch(/left:\s*clamp\(0px, var\(--at\), 100%\)/)
+    expect(dead).toMatch(/right:\s*0/)
+    expect(dead).toMatch(/background:\s*var\(--ink\)/)
+  })
+
+  // The stamp that used to own the right-hand corner is folded into the bar, and the bar takes
+  // the whole top band edge to edge. The meter has the left corner under it to itself.
+  it('★ keeps the fps meter out of the band the town clock owns', () => {
+    expect(rulesFor(BARE, '.day-bar')).toMatch(/grid-column:\s*edge/)
+    // The meter took the top-left corner by hand and painted over the day and the season. It
+    // stands in the row under the band now, at the end the arms never take.
+    expect(rulesFor(BARE, '.fps-overlay')).toMatch(/grid-area:\s*head/)
+    expect(rulesFor(BARE, '.fps-overlay')).toMatch(/justify-self:\s*end/)
+  })
+
+  // ── the frame ────────────────────────────────────────────────────────────────────────────
+  // Forty-eight media queries and no layout owner: fourteen rules summed `--sign-band` plus
+  // `--sky-h` plus a magic 44 or 88 to find the top of the picture, and four breakpoints
+  // redefined `--sign-band` under them. These ask for the RULE, never the arithmetic.
+
+  /** Every area the frame declares, read off its own template rather than transcribed. */
+  const AREAS = new Set(
+    [...topRule('.app').matchAll(/'([^']*)'/g)]
+      .flatMap((m) => m[1]!.trim().split(/\s+/))
+      .filter((n) => n !== '.'),
+  )
+
+  /** Every line the frame names: an area, an area's own two edges, and the column pairs the
+   *  template writes out by hand. Read off the template, so a renamed cell breaks here first. */
+  const PLACES = new Set<string>()
+  for (const line of [...topRule('.app').matchAll(/\[([\w-]+)\]/g)].map((m) => m[1]!))
+    PLACES.add(line)
+  for (const name of [
+    ...AREAS,
+    ...[...PLACES].filter((l) => l.endsWith('-start')).map((l) => l.slice(0, -6)),
+  ]) {
+    PLACES.add(name)
+    PLACES.add(`${name}-start`)
+    PLACES.add(`${name}-end`)
+  }
+
+  /** Every rule that puts a class in the app's own stack, read off the SHEET. A hand-typed list
+   *  cannot fail for the panel a phase just moved, and one of twelve names had gone stale. */
+  const OVER_TOWN = [
+    ...new Set(
+      [...BARE.matchAll(/\n([^\s{}][^{}]*)\{([^{}]*)\}/g)]
+        .filter(([, , body]) => /(?:^|;)\s*z-index:/.test(body ?? ''))
+        .flatMap(([, list]) => (list ?? '').split(','))
+        .map((sel) => /(\.[\w-]+)\s*$/.exec(sel.trim())?.[1] ?? '')
+        .filter((n) => n !== ''),
+    ),
+  ]
+
+  /** The marks the frame does NOT place, each for a reason written down. Every one of these is
+   *  the whole picture or a thing inside another mark, and none of them is a panel. */
+  const NOT_PLACED: Readonly<Record<string, string>> = {
+    '.mark-tip': 'the word for a mark on the day strip, inside the sheet',
+    '.signpost-post': 'the pole the arms are nailed to, inside the signpost',
+    '.skip': 'the first tab stop, held off the top edge until it is focused',
+    '.stage-figures': 'the layer the bodies are drawn on, the canvas edge to edge',
+    '.town-dim': 'the scrim behind the sheet, the whole picture',
+    '.replay-grade': 'the wash over an old day, the whole picture',
+    '.replay-dip': 'the curtain over a cut, the whole picture',
+    '.key-map': 'a modal sheet over the app, and the one mark centred over the picture',
+  }
+
+  /** Every mark that stands over the town: in the app's stack, and not one of the eight above. */
+  const MARKS = OVER_TOWN.filter((m) => !(m in NOT_PLACED))
+
+  // ★ The policy was enforced over twelve names typed by hand, and the cold open was not one of
+  // them: put back to `position: fixed; inset: 0; place-content: center`, the exact thing this
+  // phase exists to kill, it stayed green through 1305 tests.
+  it('★ reads the marks over the town off the sheet, never off a list', () => {
+    for (const moved of ['.day-bar', '.cold-open', '.paper', '.fps-overlay', '.stage-ticker'])
+      expect(MARKS, `${moved} is a mark the frame places`).toContain(moved)
+    expect(MARKS.length, 'the derivation found nothing').toBeGreaterThan(12)
+    expect(
+      Object.keys(NOT_PLACED).filter((n) => !OVER_TOWN.includes(n)),
+      'a mark is excused a frame it is no longer in',
+    ).toEqual([])
+  })
+
+  /** Everything the sheet says about a mark ITSELF, wherever it says it: its own rule, a state
+   *  rule, a breakpoint. A rule for something inside the mark is not the mark being placed. */
+  const saidOf = (mark: string, css: string): string => {
+    const own = new RegExp(`^\\${mark}(?![\\w-])`)
+    return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, list]) =>
+        (list ?? '').split(',').some((sel) => own.test(sel.trim().split(/\s+/).at(-1) ?? '')),
+      )
+      .map(([, , body]) => body ?? '')
+      .join(';')
+  }
+
+  /** Every line a rule outside the frame actually places something on. A WORD is not a
+   *  placement: `\bfoot\b` matched `foot-left`, and `foot` was a dead cell reading as live. */
+  const placedOn = (css: string): string[] =>
+    [...css.matchAll(/grid-(?:area|row|column):\s*([^;}]+)/g)]
+      .flatMap((m) => m[1]!.split('/'))
+      .map((v) => v.trim())
+
+  it('★ places every mark over the town in an area the frame declares', () => {
+    expect(AREAS.size, 'the frame declares no areas at all').toBeGreaterThan(0)
+    for (const mark of MARKS) {
+      const said = saidOf(mark, BARE)
+      expect(said, `${mark} has no rule in the sheet`).not.toBe('')
+      const on = placedOn(said)
+      expect(on.length, `${mark} names no cell of the frame`).toBeGreaterThan(0)
+      for (const line of on)
+        expect(
+          PLACES.has(line) || /^-?\d+$/.test(line),
+          `${mark} stands on "${line}", which the frame has no cell for`,
+        ).toBe(true)
+    }
+    const named = new Set(
+      placedOn(BARE.replace(topRule('.app'), '')).flatMap((v) => [
+        v,
+        v.replace(/-(?:start|end)$/, ''),
+      ]),
+    )
+    expect(
+      [...AREAS].filter((n) => !named.has(n)),
+      'the frame declares an area no mark ever names',
+    ).toEqual([])
+  })
+
+  it('★ lets no mark over the town work out where the picture starts', () => {
+    const byHand = MARKS.flatMap((mark) =>
+      [
+        ...saidOf(mark, BARE).matchAll(
+          /(?:^|;)\s*(?:position|top|bottom|left|right|inset):[^;}]*/g,
+        ),
+      ].map((m) => `${mark} {${m[0].replace(/^;/, '')} }`),
+    )
+    expect(byHand, 'a mark places itself instead of naming an area').toEqual([])
+  })
+
+  it('★ moves a mark at a breakpoint by naming another area, never by a new sum', () => {
+    const queries = [...BARE.matchAll(/@media[^{]*\{[\s\S]*?\n\}/g)].map((m) => m[0])
+    const moved = queries.flatMap((q) => MARKS.flatMap((mark) => placedOn(saidOf(mark, q))))
+    expect(moved.length, 'no breakpoint moves any mark between areas').toBeGreaterThan(0)
+    expect(
+      moved.filter((n) => !PLACES.has(n) && !/^-?\d+$/.test(n)),
+      'a breakpoint names an area the frame has no cell for',
+    ).toEqual([])
   })
 
   it('leaves nothing of the bars the signpost replaced', () => {
@@ -274,6 +463,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
       '.digest-modal',
       '.stage-veil',
       '#panel-outlet',
+      '.sleep-card',
     ]) {
       expect(CSS, `${gone} is still styled`).not.toContain(`${gone} `)
     }
@@ -404,5 +594,145 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
   it('lands the scrim and the sheet together, on one duration', () => {
     expect(rulesFor(BARE, '.town-dim')).toMatch(/transition: opacity var\(--t-slow\)/)
     expect(rulesFor(BARE, '.paper')).toMatch(/transition: transform var\(--t-slow\)/)
+  })
+})
+
+// ── four faces and five colours ───────────────────────────────────────────────────────────
+// Measured on the shipped webfonts with fontTools: Silkscreen's digits carry TWO advances
+// (625 and 750 per 1000em) and the face has no `tnum` feature, so a live number set in it
+// shifts its own box. Manrope has `tnum`; `--font-data` is monospace.
+
+const SHEET = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+const ROOT = /:root\s*\{[\s\S]*?\n\}/.exec(SHEET)?.[0] ?? ''
+
+/** Every `--font-*` the sheet declares, in `:root`. */
+const FACES = [...ROOT.matchAll(/--font-([a-z]+):/g)].map((m) => m[1]!)
+
+/** Every colour token in `:root`, by name, as an uppercase hex. */
+const COLOURS: Readonly<Record<string, string>> = Object.fromEntries(
+  [...ROOT.matchAll(/--([a-z-]+):\s*(#[0-9A-Fa-f]{6});/g)].map(([, n, h]) => [
+    n!,
+    h!.toUpperCase(),
+  ]),
+)
+
+/** The five, and what each one means. A colour that means two things means neither. */
+const FIVE: Readonly<Record<string, string>> = {
+  cream: 'the lit ground, and a mark on a dark one',
+  parchment: 'the sheet the town prints itself on',
+  ink: 'a mark on a light ground',
+  deep: 'the night under everything, and every shadow it casts',
+  honey: 'the accent: this one, here',
+}
+
+/** A step is the SAME colour at another strength. The base it steps from, by token name. */
+const STEP_OF: Readonly<Record<string, string>> = {
+  sand: 'parchment',
+  'parchment-zebra': 'parchment',
+  night: 'deep',
+  'ink-quiet': 'ink',
+  'cream-quiet': 'cream',
+  'honey-l': 'honey',
+  'honey-deep': 'honey',
+  'ember-ink': 'ember',
+  'sage-pale': 'sage',
+  'rose-pale': 'rose',
+}
+
+/** Outside the five, because each is a valence the world holds rather than a voice of ours. */
+const SEMANTIC = ['ember', 'sage', 'rose', 'sky']
+
+/** The only colour literals the sheet may carry outside `:root`: a gradient stop and a shadow
+ *  take no `var()` for their alpha. Each names the token it is a transparency of. */
+const ALPHAS: Readonly<Record<string, string>> = {
+  'rgba(255, 246, 233, 0.25)': 'cream, the stripe drawn along a need bar',
+  'rgba(36, 31, 43, 0.35)': 'deep, the drop the sheet throws on the town',
+  'rgba(242, 200, 121, 0.07)': 'honey, the warm half of the replay wash',
+  'rgba(242, 200, 121, 0)': 'honey, the same wash where it runs out',
+  'rgba(36, 31, 43, 0)': 'deep, the vignette at the middle of the picture',
+  'rgba(36, 31, 43, 0.34)': 'deep, the vignette at its corners',
+}
+
+const hue = (hex: string): number => {
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ]
+  const hi = Math.max(r, g, b)
+  const lo = Math.min(r, g, b)
+  if (hi === lo) return 0
+  const d = hi - lo
+  const h = hi === r ? (g - b) / d + (g < b ? 6 : 0) : hi === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return h * 60
+}
+const hueApart = (a: string, b: string): number => {
+  const d = Math.abs(hue(a) - hue(b))
+  return Math.min(d, 360 - d)
+}
+
+describe('★ four faces, ruled by role, and five colours', () => {
+  it('★ declares four faces and sets every word from one of them', () => {
+    expect([...FACES].sort()).toEqual(['body', 'data', 'px', 'title'])
+    const named = [...SHEET.matchAll(/font-family:\s*([^;}]+)/g)].map((m) => m[1]!.trim())
+    expect(named.filter((v) => !/^var\(--font-(px|body|data|title)\)$/.test(v))).toEqual([])
+    for (const f of FACES) expect(SHEET, f).toContain(`var(--font-${f})`)
+  })
+
+  it('★ gives a site that asks for tabular figures a face that has them', () => {
+    const bad: string[] = []
+    for (const [, sel, body] of SHEET.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!(body ?? '').includes('tabular-nums')) continue
+      if ((body ?? '').includes('var(--font-px)')) bad.push((sel ?? '').trim().split('\n').at(-1)!)
+    }
+    expect(bad, 'Silkscreen has two digit advances and no tnum, so the number moves').toEqual([])
+  })
+
+  it('★ decides every colour in one place', () => {
+    // A mask reads the alpha channel alone, so its stops are a ramp and not a palette value.
+    const rest = SHEET.replace(ROOT, '').replace(/mask-image:[^;]+;/g, '')
+    // Hex only, and six rgba literals decided colours outside `:root` while this was green.
+    const literals = [
+      ...rest.matchAll(/#[0-9A-Fa-f]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)/g),
+    ].map((m) => m[0])
+    expect(literals.filter((l) => !(l in ALPHAS))).toEqual([])
+    expect(
+      Object.keys(ALPHAS).filter((l) => !literals.includes(l)),
+      'an alpha is named here and gone from the sheet',
+    ).toEqual([])
+  })
+
+  it('★ is one of the five, a step of one, or a valence — never a sixth colour', () => {
+    for (const name of Object.keys(COLOURS)) {
+      const classed = name in FIVE || name in STEP_OF || SEMANTIC.includes(name)
+      expect(classed, `${name} belongs to no class`).toBe(true)
+    }
+    expect(Object.keys(FIVE).length).toBe(5)
+    for (const named of [...Object.keys(FIVE), ...Object.keys(STEP_OF), ...SEMANTIC]) {
+      expect(COLOURS, `${named} is classed here and declared nowhere`).toHaveProperty(named)
+    }
+  })
+
+  it('★ keeps a step the colour it steps from, so no sixth colour enters as one', () => {
+    for (const [step, base] of Object.entries(STEP_OF)) {
+      const [a, b] = [COLOURS[step], COLOURS[base]]
+      expect(a, `${step} is undeclared`).toBeDefined()
+      expect(b, `${base} is undeclared`).toBeDefined()
+      const apart = hueApart(a!, b!)
+      expect(apart, `${step} is ${apart.toFixed(0)}° off ${base}`).toBeLessThan(15)
+    }
+  })
+
+  it('names no colour it never uses, and uses none it never named', () => {
+    for (const name of Object.keys(COLOURS)) {
+      expect(SHEET.includes(`var(--${name})`), `--${name} is declared and never used`).toBe(true)
+    }
+    const used = new Set([...SHEET.matchAll(/var\(--([a-z-]+)\)/g)].map((m) => m[1]!))
+    const undeclared = [...used].filter(
+      (n) =>
+        /^(cream|parchment|sand|ink|deep|night|honey|ember|sage|rose|sky)/.test(n) &&
+        !(n in COLOURS),
+    )
+    expect(undeclared).toEqual([])
   })
 })

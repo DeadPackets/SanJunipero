@@ -9,6 +9,7 @@ import { contrast, tokens } from './contrast.test.js'
 import {
   CUE_HOLD_MS,
   CUE_ICON_PX,
+  CUE_QUEUE_MAX,
   CUE_TYPES,
   SCENE_SUMMARY_MS,
   STAKES_HOT,
@@ -16,6 +17,7 @@ import {
   STAKES_WARM,
   bodiesOf,
   cueFor,
+  queuedCues,
   sceneCueFor,
   sceneNames,
   sceneStageOf,
@@ -156,13 +158,37 @@ describe('★ the moment stands for six seconds, then the slot goes back to nami
     expect(CUE_ICON_PX).toBe(16)
   })
 
-  it('★ lands on the frame the event arrives on, and clears on a timer of its own', () => {
-    const SRC = src('./stageCue.ts')
-    // set INSIDE the event callback — no polling, no wait for the next world state
-    expect(SRC).toMatch(/store\.onEvents\(\(evts\) => \{[\s\S]*?setCue\(next\)/)
-    expect(SRC).toMatch(/setTimeout\(\(\) => \{\s*setCue\(null\)\s*\}, CUE_HOLD_MS\)/)
-    // and a second moment replaces the first rather than leaving two timers running
-    expect(SRC).toContain('if (timer !== null) clearTimeout(timer)')
+  // ★ THE QUEUE IS AT THE SOURCE. Three moments in one batch were three writes inside one
+  // render, so a viewer read the third and the world's other two were never said at all.
+  it('★ keeps every moment a batch carried, in the order the town said them', () => {
+    const state = town()
+    const batch = ['agent_died', 'agent_born', 'structure_completed'].map((type) =>
+      ev(type, { agentId: 'amara', id: 'yusuf', byId: 'amara', name: 'a wall', kind: 'craft' }),
+    )
+    const queue = queuedCues([], batch, state)
+    expect(queue.map((c) => c.text)).toEqual(batch.map((e) => cueFor(e, state)?.text))
+    expect(new Set(queue.map((c) => c.text)).size, 'the three lines are three lines').toBe(3)
+  })
+
+  it('★ stands a later moment behind the one being read, never over it', () => {
+    const state = town()
+    const first = queuedCues([], [ev('agent_died', { agentId: 'amara' })], state)
+    const both = queuedCues(first, [ev('agent_born', { id: 'yusuf', motherId: 'amara' })], state)
+    expect(both[0]).toBe(first[0])
+    expect(both).toHaveLength(2)
+    // a batch that says nothing the stage prints leaves the queue exactly as it was
+    expect(queuedCues(both, [ev('tick_advanced', {})], state)).toBe(both)
+  })
+
+  it('★ drops the middle of a burst rather than the line a viewer is reading', () => {
+    const state = town()
+    const burst = Array.from({ length: CUE_QUEUE_MAX + 3 }, (_, i) =>
+      ev('law_ratified', { lawId: `l${String(i)}`, text: `No fire after dark ${String(i)}` }),
+    )
+    const queue = queuedCues([], burst, state)
+    expect(queue).toHaveLength(CUE_QUEUE_MAX)
+    expect(queue[0]?.text).toContain('dark 0')
+    expect(queue[queue.length - 1]?.text).toContain(`dark ${String(burst.length - 1)}`)
   })
 
   it('★ the cue slot draws the glyph, and the App feeds it from the world’s own events', () => {
@@ -325,7 +351,7 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
       'text-wrap: pretty',
     )
     // a WIDTH: shrink-to-fit would equalise the chyron's lines instead of ranging them left
-    expect(scene).toMatch(/width: calc\(100% - 2 \* var\(--mark-inset\)\)/)
+    expect(scene).toMatch(/width: 100%/)
     expect(scene, 'the stamp sits on the sentence’s first line').toContain('align-items: baseline')
     // and the cap that keeps it off the signpost still composes with that width
     expect(CSS).toMatch(
@@ -340,7 +366,10 @@ describe('★ a quarrel at nine does not look like a talk at two', () => {
     for (const sel of ['.stage-cue', '.replay-card']) {
       const body = new RegExp(`\\${sel} \\{([^}]*)\\}`).exec(CSS)?.[1] ?? ''
       expect(body, sel).not.toContain('left: 50%')
-      expect(body, sel).toMatch(/(?:^|;) ?width: /)
+      // the frame's own row is the width now, so shrink-to-fit is bounded by the stage and
+      // not by half of it, and the plate says which row it stands in
+      expect(body, sel).toMatch(/grid-area: (?:cue|third)/)
+      expect(body, sel).toContain('justify-self: center')
     }
   })
 

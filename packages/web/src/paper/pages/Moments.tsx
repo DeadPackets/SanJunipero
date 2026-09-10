@@ -123,8 +123,7 @@ const MomentCardView = memo(function MomentCardView({
   )
 })
 
-/** The cards alone: the sheet CLOSES on play, so a transport inside it could never be seen.
- *  The town's own strip is the one that runs a moment (`stage/Transport`). */
+/** The cards alone: the sheet CLOSES on play, so a control inside it could never be seen. */
 export function Moments({ store, momentId, onPlay, onMoment }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)

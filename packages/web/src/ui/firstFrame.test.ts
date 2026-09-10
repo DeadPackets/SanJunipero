@@ -2,14 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   FIRST_FRAME_COPY,
-  FIRST_LINES,
-  FIRST_LINES_MS,
   detachFirstFrame,
   firstFrameNote,
   firstFrameStuck,
-  firstLinesHead,
-  firstWorryLine,
-  peopleWords,
 } from './firstFrame.js'
 import { MOTION } from './motion.js'
 
@@ -57,77 +52,5 @@ describe('the first frame', () => {
     firstFrameNote(FIRST_FRAME_COPY.looking)
     expect(note.textContent, 'nothing writes over it').toBe(FIRST_FRAME_COPY.blind)
     vi.unstubAllGlobals()
-  })
-})
-
-// ★ THE FIRST TWO LINES. The title card says the town is being looked for; these say what it IS,
-// over the town itself, and get out of the way the moment there is something better to watch.
-describe('★ the two lines over the first shot', () => {
-  const APP = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
-
-  it('★ counts the town in words, because the first thing a visitor reads is prose', () => {
-    expect(firstLinesHead(12)).toBe(
-      'Twelve people, one valley, and everything between them still to be settled.',
-    )
-    expect(peopleWords(1)).toBe('One person')
-    expect(peopleWords(20)).toBe('Twenty people')
-    // past the words the figure is honest rather than wrong
-    expect(peopleWords(24)).toBe('24 people')
-  })
-
-  // The second line is a person, not a count: the one thing a first page owes a reader.
-  it('★ names one person and what is on their mind, by the day, in their card’s own words', () => {
-    const aims = [
-      { agentId: 'amara', worry: null },
-      { agentId: 'farida', worry: 'Bashir gives away what the two of them will need by winter.' },
-      { agentId: 'tariq', worry: "being Kamal's boy for the rest of his life" },
-    ]
-    const names: Record<string, string> = { farida: 'Farida', tariq: 'Tariq' }
-    const nameOf = (id: string): string | undefined => names[id]
-    expect(firstWorryLine(aims, nameOf, 0)).toBe(
-      'On Farida’s mind: Bashir gives away what the two of them will need by winter.',
-    )
-    expect(firstWorryLine(aims, nameOf, 1)).toBe(
-      "On Tariq’s mind: being Kamal's boy for the rest of his life.",
-    )
-    expect(firstWorryLine(aims, nameOf, 2)).toBe(firstWorryLine(aims, nameOf, 0))
-    expect(firstWorryLine([{ agentId: 'amara', worry: null }], nameOf, 0)).toBe(null)
-    expect(HTML).toMatch(/<p class="first-lines-worry" hidden><\/p>/)
-  })
-
-  it('★ stands outside `#root`, which React clears on mount, and starts hidden', () => {
-    expect(HTML).toMatch(/<div class="first-lines" id="first-frame-lines" hidden>/)
-    expect(HTML.indexOf('first-frame-lines')).toBeGreaterThan(HTML.indexOf('</noscript>') - 1000)
-    expect(HTML).toContain(`>${FIRST_LINES.take}</p>`)
-    // the count is written in by the app, so the static file cannot carry a stale number
-    expect(HTML).toMatch(/<p class="first-lines-head"><\/p>/)
-    // an author `display` beats the UA's `[hidden]`, so the sheet has to honour the attribute
-    const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8')
-    expect(CSS).toContain('.first-lines[hidden] { display: none; }')
-    // r31's first look: the lines stood over a deep-linked person page. The slab they also
-    // stood over is gone: the town's one empty-frame line is a field in the bar now.
-    expect(CSS).toContain("body:has(.app[data-paper='on']) .first-lines { display: none; }")
-    expect(CSS).not.toContain('.sleep-card')
-  })
-
-  it('★ goes on the first cut, the first hand on the camera, or twenty seconds', () => {
-    expect(FIRST_LINES_MS).toBe(20_000)
-    expect(SRC).toContain("const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const")
-    expect(SRC).toContain('setTimeout(fadeFirstLines, FIRST_LINES_MS)')
-    // ...and the first cut is the app telling it there is something better to look at
-    expect(APP).toContain('if (cut) fadeFirstLines()')
-    expect(APP).toMatch(
-      /onShot = useCallback\(\(cast: readonly string\[\], sceneId: string \| null, cut: boolean\)/,
-    )
-    expect(APP).toContain('showFirstLines(livingCount(store.getState()?.agents))')
-  })
-
-  it('★ fades on the world’s own `scene` motion, and the fallback timer outlasts it', () => {
-    expect(SRC).toMatch(/function fade\(el: HTMLElement\)/)
-    expect(SRC).toContain('MOTION.scene.ms +')
-  })
-
-  it('★ never comes back once it has gone, and never shows over an empty town', () => {
-    expect(SRC).toContain('if (linesDone || lines !== null || count < 1) return')
   })
 })

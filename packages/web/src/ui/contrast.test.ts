@@ -106,7 +106,7 @@ const QUIET_SITES = [
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
 // surface where the town is actually speaking.
-const DARK_QUIET_SITES = ['.player-clock']
+const DARK_QUIET_SITES = ['.day-bar-when']
 
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const
@@ -266,9 +266,9 @@ describe('C3, C4, C5 · three marks that were painted below their own floor', ()
   })
 
   it('draws the grip at the 3:1 non-text floor on the parchment it lies on', () => {
-    const hex = /background:\s*(#[0-9A-Fa-f]{6})/.exec(ruleBody(CSS, '.paper-grip'))?.[1]
-    expect(hex).toBeDefined()
-    expect(contrast(hex!, T.parchment!)).toBeGreaterThanOrEqual(3)
+    const colour = /background:\s*var\(--([\w-]+)\)/.exec(ruleBody(CSS, '.paper-grip'))?.[1]
+    expect(colour).toBe('ink-quiet')
+    expect(contrast(T[colour!]!, T.parchment!)).toBeGreaterThanOrEqual(3)
     expect(contrast('#B89D7E', T.parchment!), 'the bar it replaced').toBeLessThan(3)
   })
 
@@ -309,9 +309,11 @@ describe('C6, C11, C12 · the sheet stops thinning colours it cannot measure', (
   // The clock used to ship at opacity 0 and wake for three seconds on a pointer move, so a
   // viewer who put the town on a tab and watched never saw the time, the season or LIVE at all.
   it('★ states the clock at full strength, and never thins it behind a hand', () => {
-    expect(ruleBody(CSS, '.sky-chip')).toContain('color: var(--cream)')
-    expect(ruleBody(CSS, '.sky-line')).toContain('color: var(--cream)')
-    expect(CSS).not.toMatch(/\.sky-(bar|chip|line) \{[^}]*opacity:/)
+    expect(ruleBody(CSS, '.day-bar-stamp')).toContain('color: var(--cream)')
+    expect(ruleBody(CSS, '.day-bar-day')).toContain('color: var(--cream)')
+    expect(ruleBody(CSS, '.day-bar-weather')).toContain('color: var(--cream)')
+    expect(ruleBody(CSS, '.day-bar-state')).toContain('color: var(--honey)')
+    expect(CSS).not.toMatch(/\.day-bar[\w-]*[^{]*\{[^}]*opacity:/)
   })
 
   it('names the feed zebra as a computed composite rather than an alpha', () => {

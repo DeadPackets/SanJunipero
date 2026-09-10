@@ -16,7 +16,7 @@ import {
   SpeechLive,
   SubjectRing,
   SceneCard,
-  SkyArc,
+  DayBar,
   toggleFullscreen,
   useSafeInsets,
   useStageKeys,
@@ -25,25 +25,16 @@ import {
 } from './stage/index.js'
 import { HelpButton } from './stage/HelpButton.js'
 import { ReplayScene } from './stage/ReplayScene.js'
-import { Transport } from './stage/Transport.js'
 import { KeyMap } from './stage/KeyMap.js'
 import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
-import { CameraChip } from './stage/CameraChip.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
-import {
-  FIRST_FRAME_COPY,
-  dismissFirstFrame,
-  fadeFirstLines,
-  firstWorryLine,
-  tellFirstWorry,
-  firstFrameNote,
-  showFirstLines,
-} from './ui/firstFrame.js'
+import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
+import { firstWorryLine, useColdOpen } from './ui/coldOpen.js'
 import { aimsFeed } from './ui/feeds.js'
 import { useFeed } from './ui/useEndpoint.js'
 import { escapeStep } from './ui/interaction.js'
@@ -63,12 +54,16 @@ const NO_CAST: readonly string[] = []
  *  town" is a lie by then, and an empty field is what dismissing the card early reveals. */
 const DRESSING_NOTE = 'The town is coming into focus…'
 
+/** The one way back out of a replay, which stands for as long as the town is off its live edge.
+ *  A stream frame has no hands, and the strip that used to carry a second one is gone. */
+export const wayBack = (live: boolean, broadcast: boolean): boolean => !live && !broadcast
+
 function waitingNote(link: LinkStatus): string {
   if (link === 'reconnecting') return FIRST_FRAME_COPY.lost
   return link === 'online' ? DRESSING_NOTE : FIRST_FRAME_COPY.looking
 }
 
-/** How many minds are alive to be watched — what the first two lines count. */
+/** How many minds are alive to be watched — what the cold open's first line counts. */
 const livingCount = (agents: Record<string, { alive: boolean }> | undefined): number =>
   Object.values(agents ?? {}).filter((a) => a.alive).length
 
@@ -177,8 +172,8 @@ export function App() {
     }
   }, [store])
 
-  // The worries ride the aims feed, a beat behind the town; the effect below runs again when
-  // they land, and the first lines gain their second sentence if they are still up.
+  // The worries ride the aims feed, a beat behind the town, so the second line is added when
+  // they land rather than waited for.
   const aims = useFeed(aimsFeed).data
   // The card leaves when the town is DRESSED, never when the scene object exists: art in hand
   // is the only thing that makes the reveal a town rather than an empty field.
@@ -192,29 +187,35 @@ export function App() {
       live = false
     }
   }, [])
+  // A primitive, never the folded state: `getState()` is a fresh object every tick and would
+  // re-render the whole app sixty times for a count that has not moved.
+  const readLiving = (): number => livingCount(store.getState()?.agents)
+  const living = useSyncExternalStore(store.subscribe, readLiving, readLiving)
+  const cold = useColdOpen(dressed && scene !== null && link === 'online', living)
+  const worry =
+    cold.frame.line === null || aims === null
+      ? null
+      : firstWorryLine(
+          aims.aims,
+          (id) => store.getState()?.agents[id]?.name,
+          tickToMoment(store.getTick()).day,
+        )
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
-    if (scene !== null && link === 'online' && dressed) {
-      dismissFirstFrame()
-      // ...and the two lines take the card's place, over the town they are about.
-      showFirstLines(livingCount(store.getState()?.agents))
-      if (aims !== null)
-        tellFirstWorry(
-          firstWorryLine(
-            aims.aims,
-            (id) => store.getState()?.agents[id]?.name,
-            tickToMoment(store.getTick()).day,
-          ),
-        )
-    } else firstFrameNote(waitingNote(link))
-  }, [scene, link, store, aims, dressed])
+    if (scene !== null && link === 'online' && dressed) dismissFirstFrame()
+    else firstFrameNote(waitingNote(link))
+  }, [scene, link, dressed])
 
-  // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
-  // round turn is not one: it happens the instant the town arrives, before anybody has read them.
-  const onShot = useCallback((cast: readonly string[], sceneId: string | null, cut: boolean) => {
-    if (cut) fadeFirstLines()
-    setShot({ cast, sceneId })
-  }, [])
+  // The first cut is the first thing worth watching, so the line gets out of its way. A quiet
+  // round turn is not one: it happens the instant the town arrives, before anybody has read it.
+  const coldDismiss = cold.dismiss
+  const onShot = useCallback(
+    (cast: readonly string[], sceneId: string | null, cut: boolean) => {
+      if (cut) coldDismiss()
+      setShot({ cast, sceneId })
+    },
+    [coldDismiss],
+  )
 
   // The address bar moves without a page load, so nothing else would ever rename the tab.
   const named = subject?.kind === 'agent' && subject.id === route.agentId ? subject.name : null
@@ -440,8 +441,7 @@ export function App() {
           <span aria-hidden="true">← </span>Back to town
         </button>
       )}
-      {/* The one way back out of a replay: a stream frame has no hands. */}
-      {!mode.live && !route.broadcast && play === null && (
+      {wayBack(mode.live, route.broadcast) && (
         <button type="button" className="stage-live" onClick={onLive}>
           Return to now<span aria-hidden="true"> →</span>
         </button>
@@ -457,8 +457,21 @@ export function App() {
       />
       <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
-      <SkyArc store={store} link={link} />
+      <DayBar
+        store={store}
+        link={link}
+        handle={handle}
+        onAt={address}
+        autoCut={autoCut}
+        handbackAt={handbackAt}
+      />
       <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
+      {cold.frame.line !== null && (
+        <div className="cold-open" data-gone={cold.frame.gone ? 'yes' : undefined}>
+          <p className="cold-open-line">{cold.frame.line}</p>
+          {worry !== null && <p className="cold-open-worry">{worry}</p>}
+        </div>
+      )}
       <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />
       <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
@@ -468,14 +481,11 @@ export function App() {
         autoCut={autoCut}
         pinned={following}
         moment={play?.cast ?? NO_CAST}
+        opening={!cold.frame.spent}
         onCue={setCue}
         onWhy={setWhy}
         onShot={onShot}
       />
-      <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
-      {!route.broadcast && (
-        <Transport store={store} play={play} handle={handle} onLive={onLive} onAt={address} />
-      )}
       <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
       <HelpButton
         open={keysOpen}

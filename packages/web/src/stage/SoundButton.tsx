@@ -2,7 +2,7 @@ import type { SoundSetting } from '../ui/sound.js'
 import { PixelGlyph } from './PixelGlyph.js'
 
 /** The note, on the same 8×8 grid the wisp, the weather and the sun token are drawn on. The
- *  sheet's `--font-sign` has no ♪ and no legal size under 16px, so the mark is drawn, not set. */
+ *  sheet's `--font-px` has no ♪ at any size, so the mark is drawn, not set. */
 const NOTE: readonly (readonly [number, number])[] = [
   [5, 0],
   [5, 1],

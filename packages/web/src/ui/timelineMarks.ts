@@ -19,7 +19,14 @@ export const MARK_KINDS = [
 ] as const
 export type MarkKind = (typeof MARK_KINDS)[number]
 
-export type Mark = { tick: number; kind: MarkKind; words: string; weight: number }
+export type Mark = {
+  tick: number
+  kind: MarkKind
+  words: string
+  weight: number
+  /** the source dated this to a DAY, so no track finer than a day may stand it at a minute */
+  dayOnly?: true
+}
 
 /** `discovery` sits above the old ceiling on two arguments: it is rarer than every other kind, so a
  *  high weight costs them almost nothing, and it is the only PERMANENT one. */
@@ -78,7 +85,8 @@ const DEEP = '#241F2B',
   WATER = '#7FB0C9'
 const ROSE = '#C47876',
   EMBER = '#E8785A',
-  INK = '#43394A'
+  INK = '#43394A',
+  CREAM = '#FFF6E9'
 
 /** Every fill a mark may use — all MASTER_PALETTE members, asserted as a set. */
 export const MARK_GLYPH_PALETTE: readonly string[] = [DEEP, HONEY, SAGE, WATER, ROSE, EMBER, INK]
@@ -139,6 +147,12 @@ export const MARK_GLYPH: Readonly<Record<MarkKind, MarkPixel[]>> = {
   discovery: art('..iii..', '.ii.ii.', '.ii.ii.', '..iii..', '...i...', '...ihi.', '...ih..'),
 }
 
+/** The one hue a kind carries where a 6px diamond has no room for its glyph: the warm fill its
+ *  own art already uses, or cream for the marks drawn in outline alone. */
+export function markInk(kind: MarkKind): string {
+  return MARK_GLYPH[kind].find(([, , fill]) => !MARK_STRUCTURE_INKS.includes(fill))?.[2] ?? CREAM
+}
+
 // ── the sources ───────────────────────────────────────────────────────────────────────────
 
 /** What the world log records that the town would remember, and what to call it. */
@@ -171,6 +185,33 @@ export const MARK_WORDS: Readonly<Record<MarkKind, { one: string; many: (n: numb
     },
   }
 
+export const MARKS_URL = '/api/timeline/marks'
+/** Refreshed slowly: a mark is a thing that already happened. One number and one url, so the
+ *  day bar and the paper's own strip share a reader rather than polling twice. */
+export const MARKS_POLL_MS = 30_000
+
+/** The firsts are `/api/milestones`' to serve; `/api/timeline/marks` carries the other five. */
+export type WireSources = Omit<MarkSources, 'milestones'>
+
+export const EMPTY_SOURCES: WireSources = {
+  chapters: [],
+  moments: [],
+  changes: [],
+  events: [],
+  discoveries: [],
+}
+
+export const markSources = (body: unknown): WireSources => {
+  const b = body as Partial<WireSources>
+  return {
+    chapters: b.chapters ?? [],
+    moments: b.moments ?? [],
+    changes: b.changes ?? [],
+    events: b.events ?? [],
+    discoveries: b.discoveries ?? [],
+  }
+}
+
 export type MarkSources = {
   chapters: readonly { day: number; title: string }[]
   milestones: readonly { label: string; day: number; tick: number }[]
@@ -199,14 +240,21 @@ export function gridDays(span: number): number[] {
 
 export function marksFrom(sources: MarkSources): Mark[] {
   const out: Mark[] = []
-  const push = (tick: number, kind: MarkKind, words?: string): void => {
-    out.push({ tick, kind, words: words ?? MARK_WORDS[kind].one, weight: MARK_WEIGHT[kind] })
+  const push = (tick: number, kind: MarkKind, words?: string, dayOnly = false): void => {
+    const mark: Mark = {
+      tick,
+      kind,
+      words: words ?? MARK_WORDS[kind].one,
+      weight: MARK_WEIGHT[kind],
+    }
+    if (dayOnly) mark.dayOnly = true
+    out.push(mark)
   }
 
   const titledDays = new Set<number>()
   for (const c of sources.chapters) {
     titledDays.add(c.day)
-    push(c.day * MINUTES_PER_DAY, 'chapter', c.title)
+    push(c.day * MINUTES_PER_DAY, 'chapter', c.title, true)
   }
   // A scene the narrator kept without a chapter is still a day worth aiming at; a scene on a
   // day that HAS a chapter is the same day, and must not be marked twice.

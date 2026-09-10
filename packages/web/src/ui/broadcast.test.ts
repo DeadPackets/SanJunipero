@@ -103,6 +103,31 @@ describe('what a stream viewer is left with', () => {
     for (const r of BROADCAST_REMOVED) expect(r.why.length, r.selector).toBeGreaterThan(10)
   })
 
+  // ANTI-VACUITY, the mirror of the one below: a caption measured on a surface the frame takes
+  // out is a size in a report and nothing at all on a screen.
+  it('★ measures no caption the stream frame hides', () => {
+    const hidden = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter(([, , decls]) => /display:\s*none/.test(decls ?? ''))
+      .flatMap(([, list]) => (list ?? '').split(','))
+      .map((s) => s.trim())
+    expect(hidden, 'nothing is hidden, so this guard found nothing').toContain(
+      "[data-broadcast='on'] .paper",
+    )
+    expect(
+      BROADCAST_CAPTIONS.filter((c) => c.from === 'sheet' && hidden.includes(c.selector)),
+    ).toEqual([])
+  })
+
+  // ANTI-VACUITY for the list itself: the guard above catches a caption whose own selector is
+  // hidden, and misses a caption quietly dropped from the list. The clock was dropped once.
+  it('★ names the town clock, so a stream can never ship without a time on it', () => {
+    const clock = BROADCAST_CAPTIONS.find((c) => c.what === 'the town clock')
+    expect(clock?.from, 'no caption claims to be the clock').toBe('sheet')
+    expect(sheetPx((clock as { selector: string }).selector)).toBe(
+      sheetPx("[data-broadcast='on'] .day-bar-day"),
+    )
+  })
+
   // ANTI-VACUITY, the shape batch 6 caught six of: a hidden selector the sheet never had is a
   // row that hides nothing. Every removed surface must be a surface that exists.
   it('★ hides only surfaces the product actually has', () => {
@@ -135,8 +160,11 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
       'the speaker’s name — 6.00px',
       'the caption — 8.00px',
       'the chronicle ticker — 6.00px',
-      'the town clock — 6.00px',
+      'the day — 6.00px',
       'the dateline — 6.00px',
+      'the town clock — 6.00px',
+      'the weather — 6.00px',
+      "the town's state — 6.00px",
       'the director’s cue — 6.00px',
       'the scene card — 7.00px',
       'the scene card’s stamp — 6.00px',
@@ -146,8 +174,9 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
 
   it('★ measures every caption the frame draws, not only the one it added', () => {
     const promised = [
-      'the town clock',
+      'the day',
       'the dateline',
+      'the town clock',
       'the director’s cue',
       'the chronicle ticker',
       'the scene card',

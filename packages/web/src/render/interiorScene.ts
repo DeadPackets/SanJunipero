@@ -91,9 +91,6 @@ export const INTERIOR_HEARTH_GLOW = ROOM_SHELL_PAINT.hearthPool
 
 export { ROOM_ZOOM, roomZoomFor } from './roomShell.js'
 export { ROOM_TILES } from './interiorMap.js'
-/** How far the room is lifted clear of the transport bar AT MOST — `roomOriginY` clamps it to
- *  the headroom the stage has, because a courtesy that pushes a wall off the top is not one. */
-export const ROOM_OFFSET_Y = 40
 export const HEARTH_GLOW_PX = 26 * INTERIOR_PX_SCALE
 /** How far above the floor line a chimney breast's firebox sits, in interior px — where the
  *  fire is in the authored strip, and so where its light comes from. */
@@ -885,7 +882,7 @@ export function createInteriorScene(
     // the top of the stage, which is what the browser showed.
     room.position.set(
       roomOriginX(app.screen.width, zoom, roomTiles) + camX,
-      roomOriginY(app.screen.height, ROOM_OFFSET_Y, zoom, roomTiles, WALL_H_PX) + camY,
+      roomOriginY(app.screen.height, 0, zoom, roomTiles, WALL_H_PX) + camY,
     )
     if (activeId !== null) layoutRoom(dtMs)
   }

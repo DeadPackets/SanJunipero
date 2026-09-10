@@ -1,25 +1,39 @@
 /* Observatory chrome: chunky stepped frames over the night backdrop. World art renders
    pixelated; chrome itself is crisp. */
 :root {
+  /* The five, one meaning each: the lit ground, the sheet's paper, the mark on a light ground,
+     the night under everything, and the accent that says "this one, here". */
   --cream: #FFF6E9;
   --parchment: #F6E8D5;
-  --sand: #E8D5BC;
   --ink: #43394A;
+  --deep: #241F2B;
+  --honey: #F2C879;
+
+  /* Below: a step of one of the five, never a sixth colour. */
+  --sand: #E8D5BC;
+  --night: #322B38;
   /* De-emphasis is a colour, never `opacity` — a transparency's ratio is unknowable at the
      call site. 6.57:1 on cream, 5.83:1 on parchment, 4.91:1 on sand. */
   --ink-quiet: #5F5568;
   /* The same rule turned over, for the dark grounds: 8.28:1 on deep, 7.03:1 on night, and
      1.81x quieter than cream. */
   --cream-quiet: #C4B8AE;
-  --deep: #241F2B;
-  --night: #322B38;
-  --honey: #F2C879;
   --honey-l: #F8DCA2;
-  --ember: #E8785A;
-  --sage: #93B573;
-  --rose: #C47876;
+  /* The town's wood is the accent at its dark end: the nameplate art's own body, which its
+     border-image draws the edge of. Cream on it is 6.33:1. */
+  --honey-deep: #7E512B;
   /* The zebra is a computed composite, never an alpha: ink on it is 9.5:1. */
   --parchment-zebra: #F1E1CC;
+
+  /* Semantic, outside the five: a valence the world holds, and nothing else may borrow one. */
+  --ember: #E8785A;
+  /* Ember is 2.70:1 on cream, which no word may be set in. This is 6.30:1. */
+  --ember-ink: #9E3B2B;
+  --sage: #93B573;
+  --sage-pale: #DCE8C8;
+  --rose: #C47876;
+  --rose-pale: #F2C6C2;
+  --sky: #3E6786;
 
   /* A 2px base, not 4px: 4px cannot spell the hairline pads the chips are built from. */
   --s-1: 2px;
@@ -47,7 +61,6 @@
   --ease-ambient: linear;
 
   --font-px: 'Silkscreen', 'Press Start 2P', monospace;
-  --font-sign: 'Press Start 2P', 'Silkscreen', monospace;
   --font-body: Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-title: Fraunces, Georgia, serif;
   --font-data: ui-monospace, 'SF Mono', monospace;
@@ -60,11 +73,11 @@
   --f-5: 18px;
   --f-6: 22px;
   --f-7: 28px;
-  /* Off the seven-step reading ladder on purpose. The sign face is drawn on an 8px grid and
+  /* Off the seven-step reading ladder on purpose. The pixel face is drawn on an 8px grid and
      only whole multiples of it land on the plank's own pixels; the stream is a second medium
      at a fixed size, read at quarter scale in a 480px player. */
-  --f-sign: 16px;
-  --f-sign-wide: 24px;
+  --f-sign: 24px;
+  --f-sign-wide: 32px;
   --f-bcast: 24px;
   --f-bcast-lead: 32px;
 
@@ -93,27 +106,17 @@
   --grain: url('./px/dither-warm.webp');
 
   --paper-w: min(78%, 760px);
-  --paper-h: min(66%, 100dvh - 96px);
+  /* Of the sheet's OWN ROW, which starts under the band and the arms: the depth of those was
+     written out by hand at four sites and every one of them was a different number. */
+  --paper-h: 66%;
   /* 78% of a phone is 304px, which no roster row fits in: the sheet takes the width there. */
   --paper-w-narrow: 96%;
-  --paper-h-narrow: 80%;
+  --paper-h-narrow: 100%;
   --dim: 0.4;
 
   /* The stage marks hang off percentages, which is 15.6px on a landscape phone and 57.6px at
      2560. One inset, and it clears the notch on the phones that have one. */
   --mark-inset: clamp(16px, 3vmin, 40px);
-
-  /* The sun arc owns the top edge, and everything the frame says about when is inside it. The
-     clock ran to 680px before the road had any room left to mean anything. */
-  --sky-w: 680px;
-  --sky-h: 34px;
-
-  /* The transport strip's own height, named because the cue and the title card both step over
-     it and neither can measure a sibling: 44px of button in --s-3 of padding, plus a gap. */
-  --transport-h: calc(44px + 2 * var(--s-3) + var(--s-4));
-  /* ...and the cue's own row above it, reserved so the narrator's plate never lands on the
-     town's own caption. Two lines of --f-1 at 1.4, plus the gap. */
-  --cue-h: calc(2 * 1.4 * var(--f-1) + var(--s-4));
 
   /* 44px of reach from a transparent pseudo-element, so the bar keeps its drawn size. */
   --reach-44: calc((44px - 100%) / -2);
@@ -154,11 +157,12 @@ body {
 /* the stage fills its cell; canvas is a block so no inline descender gap seeds resizeTo */
 .stage-mount { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
 .stage-mount canvas { display: block; }
-.stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
+.stage-mount:focus-visible { outline: 2px solid var(--honey); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle `f`) ── */
 .fps-overlay {
-  position: absolute; top: var(--s-5); left: var(--s-6); z-index: 30;
+  grid-area: head; grid-row: head-start / open-end;
+  justify-self: end; align-self: start; z-index: 30;
   display: grid; gap: var(--s-1); justify-items: start;
   padding: var(--s-1) var(--s-2);
   font-family: var(--font-px); font-size: var(--f-2);
@@ -244,8 +248,8 @@ body {
   padding: var(--s-4); overflow-x: auto; margin: var(--s-3) 0 0;
 }
 .diff-line { padding: 0 var(--s-2); }
-.diff-line.add { background: #DCE8C8; }
-.diff-line.del { background: #F2C6C2; text-decoration: line-through; }
+.diff-line.add { background: var(--sage-pale); }
+.diff-line.del { background: var(--rose-pale); text-decoration: line-through; }
 
 .biography { margin: 0; padding-left: var(--s-4); border-left: 2px solid var(--honey); }
 .biography-head { margin: 0; font-size: var(--f-3); font-weight: 600; }
@@ -284,8 +288,8 @@ body {
 .feed-text { text-wrap: pretty; }
 .feed-line.death .feed-text { color: var(--deep); font-weight: 600; }
 .feed-line.done .feed-text::before { content: '■ '; color: var(--honey); }
-.feed-line.fire .feed-text { color: #9E3B2B; font-weight: 600; }
-.feed-line.weather .feed-text { color: #3E6786; }
+.feed-line.fire .feed-text { color: var(--ember-ink); font-weight: 600; }
+.feed-line.weather .feed-text { color: var(--sky); }
 .feed-empty { color: var(--ink-quiet); font-style: italic; text-wrap: pretty; }
 
 /* ── the curated chronicle: what mattered, and the way back to it ── */
@@ -346,7 +350,7 @@ body {
   margin: 0 0 var(--s-3); padding-bottom: var(--s-2); border-bottom: 2px solid var(--ink);
 }
 .edition-day {
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em;
+  font-family: var(--font-data); font-size: var(--f-1); letter-spacing: 0.08em;
   text-transform: uppercase; font-variant-numeric: tabular-nums;
 }
 .edition-temper { font-size: var(--f-1); font-style: italic; color: var(--ink-quiet); }
@@ -417,7 +421,7 @@ body {
   background: var(--ember); box-shadow: var(--frame-tight);
 }
 /* positioned, never transitioned: `.playhead` is dragged on pointermove, and a transition
-   lags the finger and lies about which minute is on screen — the same rule `.player-head` keeps. */
+   lags the finger and lies about which minute is on screen. */
 .live-pill {
   border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
   color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.08em; text-transform: uppercase;
@@ -485,7 +489,7 @@ body {
 }
 .hold-qty {
   flex: none;
-  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
+  font-family: var(--font-data); font-size: var(--f-1); color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .room-more {
@@ -618,11 +622,7 @@ body {
 }
 .bond-earlier { margin: var(--s-3) 0 0; font-size: var(--f-1); color: var(--ink-quiet); }
 
-/* ── the days the town kept: postcard rail + transport ── */
-
-/* max(), not min-height on the strip alone: that gave a 71px top band over an 88px strip on a
-   594px stage, and a lopsided frame is not a frame. One number, both bands. */
-
+/* ── the days the town kept: the postcard rail ── */
 .moment-card {
   display: flex; gap: var(--s-3); align-items: flex-start;
   min-height: 44px; padding: var(--s-3);
@@ -663,35 +663,6 @@ body {
 .thumb-cast, .thumb-where { font-size: var(--f-1); color: var(--ink-quiet); }
 .thumb-cast { overflow: hidden; text-overflow: ellipsis; }
 .thumb-where { flex: none; font-style: italic; }
-
-.player-btn {
-  flex: none; display: inline-flex; align-items: center; justify-content: center;
-  min-width: 44px; min-height: 44px; cursor: pointer;
-  background: var(--deep); color: var(--cream);
-  border: 2px solid var(--ink); border-radius: 0;
-  font-family: var(--font-px); font-size: var(--f-1);
-}
-.player-btn:hover { background: var(--ink); }
-.player-btn:active { translate: 0 1px; }
-.player-btn[aria-pressed='true'] { background: var(--ink); }
-.player-btn.live { background: var(--ember); color: var(--deep); }
-.player-glyph { display: block; }
-.player-track {
-  flex: 1; position: relative; height: var(--s-5); cursor: pointer;
-  background: var(--deep); border: 2px solid var(--ink);
-}
-.player-track::after { content: ''; position: absolute; inset: var(--reach-44) 0; }
-/* positioned, never transitioned: a transition would lag a drag and lie about the town */
-.player-head {
-  position: absolute; top: -4px; width: 6px; height: 18px;
-  background: var(--honey); box-shadow: 0 0 0 2px var(--deep);
-  translate: -50% 0;
-}
-.player-clock {
-  flex: none; font-family: var(--font-data); font-size: var(--f-1);
-  color: var(--cream-quiet);
-  font-variant-numeric: tabular-nums;
-}
 
 .chapter { margin: 0; }
 .chapter-head { margin: 0 0 var(--s-1); font-weight: 600; text-wrap: balance; }
@@ -877,7 +848,7 @@ body {
 .law-path { grid-column: 1 / -1; margin-top: var(--s-2); }
 /* AUDIT M2, the other half: an unwrappable value pushed the row 77px past the viewport. The
    operator's dashboard still prints a raw value, so it wraps too. */
-.law-value { font-family: var(--font-px); font-size: var(--f-1); min-width: 0; overflow-wrap: anywhere; }
+.law-value { font-family: var(--font-data); font-size: var(--f-1); min-width: 0; overflow-wrap: anywhere; }
 /* In the viewer's panel the value is the law's OWN small table, never a JSON blob. */
 .law-row .law-value {
   grid-column: 1 / -1; margin: var(--s-3) 0 0; font-family: var(--font-body); font-size: var(--f-3);
@@ -929,7 +900,7 @@ body {
   padding: var(--s-4); background: var(--cream); box-shadow: var(--frame-tight);
 }
 .ops-figure {
-  flex: none; font-family: var(--font-px); font-size: var(--f-7); line-height: 1;
+  flex: none; font-family: var(--font-data); font-size: var(--f-7); line-height: 1;
   font-variant-numeric: tabular-nums; color: var(--ink);
 }
 .ops-answer-says { text-wrap: pretty; }
@@ -1127,7 +1098,7 @@ body {
   font-family: var(--font-px); font-size: var(--f-2); line-height: 18px;
   letter-spacing: 0.04em; white-space: nowrap;
   color: var(--cream);
-  background: #7E512B;
+  background: var(--honey-deep);
   padding: 0 var(--s-1);
   border: 4px solid transparent; border-image: url('./px/nameplate.webp') 4 repeat;
   opacity: 0;
@@ -1183,88 +1154,119 @@ body {
   @keyframes stage-arm-in { from { opacity: 0; scale: 0.85; } }
 }
 
-/* ── the sun arc: the one permanent mark over the town ──────────────────────────────────── */
-/* Where the token sits on the curve says the hour before any word beside it is read. Quiet
-   chrome and no loop: the token EASES to its next position on the world's own tick, and that is
-   the only thing on this bar that ever moves. */
-.sky-bar {
-  position: absolute; z-index: 21;
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
-  /* ONE GROUP, centred and bounded. Spread across a 1440px window the arc stretches to a
-     556px-wide 26px-tall smear and its position stops meaning anything — the same failure the
-     900px rule below names, arriving from the other end. */
-  left: 50%; translate: -50% 0;
-  width: min(var(--sky-w), calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left))));
-  /* Equal flanks, so the arc is centred whatever the day number or the weather word runs to. */
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  align-items: center; gap: var(--s-5);
-  pointer-events: none;
+/* ── THE DAY BAR: the one band that says when ───────────────────────────────────────────── */
+/* One clock, one control. The day, the season and the weekday on the left; the day's own track
+   in the middle, which IS the scrub; the sky, the town's state and the camera on the right.
+   Never fades and never moves: a viewer glances up at the same place every time. */
+.day-bar {
+  grid-area: bar; grid-column: edge; grid-row: 1 / bar-end; z-index: 21;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 640px) minmax(0, 300px);
+  justify-content: space-between; align-items: center;
+  gap: var(--s-5);
+  /* The band takes the frame's top row, so the notch is its own padding and no town shows
+     above the one thing that says when. */
+  padding: max(0px, env(safe-area-inset-top)) var(--s-6) 0;
+  /* 92%, so the town keeps moving behind the band rather than being cut off by it */
+  background: color-mix(in srgb, var(--deep) 92%, transparent);
+  box-shadow: inset 0 -2px 0 0 var(--ink);
+  /* The band is a readout: only the two controls in it take a click, and the track's reach is
+     clipped to the band rather than reaching three pixels into the town under it. */
+  pointer-events: none; overflow: hidden;
 }
-.sky-chip {
-  display: flex; align-items: center; gap: var(--s-3); margin: 0; min-width: 0;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
-  letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
+.day-bar p { margin: 0; }
+.day-bar-left { display: grid; gap: var(--s-1); min-width: 0; }
+.day-bar-day {
+  font-family: var(--font-data); font-size: var(--f-3); font-weight: 600;
+  letter-spacing: 0.08em; font-variant-numeric: tabular-nums; white-space: nowrap;
   color: var(--cream);
-  /* Cream on the daylight tile is 1.40:1, so the four-way halo is load-bearing, not decoration. */
-  text-shadow: var(--halo-deep);
 }
-.sky-glyph { display: block; flex: none; image-rendering: pixelated; }
-/* The clock is the right flank; its words end at the bar's edge, not against the road. */
-.sky-clock { justify-content: flex-end; }
-/* The dateline runs under the road, across the whole group: one box says the day, the season,
-   the act the day has reached and what the town itself is doing. */
-.sky-line {
-  grid-column: 1 / -1; justify-self: center; margin: 0;
-  display: flex; align-items: center; gap: var(--s-5);
+.day-bar-when {
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
-  letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
-  color: var(--cream);
-  text-shadow: var(--halo-deep);
-}
-/* The one thing the town says about itself when nobody in it is doing anything. Honey, so it
-   reads as news rather than as another number in the dateline. */
-.sky-state { color: var(--honey); }
-.sky-arc { position: relative; height: var(--sky-h); }
-.sky-arc-line { display: block; width: 100%; height: 100%; }
-/* The road brings its own ground with it, the way every mark over the town does. Whole pixels:
-   `preserveAspectRatio: none` scales the stroke unevenly, and a fractional width lands the road
-   between two rows of a surface where every other edge is on one. */
-.sky-arc-ground { fill: none; stroke: var(--deep); stroke-width: 5; }
-.sky-arc-track { fill: none; stroke: var(--honey-l); stroke-width: 2; stroke-dasharray: 1 3; }
-/* Placed at the arc's origin and carried by a translate: easing `left` and `top` relaid the
-   whole bar out on every frame, and this one runs on the world's tick. */
-.sky-token {
-  position: absolute; left: 0; top: 0; color: var(--cream);
-  translate: calc(var(--sky-x) - 50%) calc(var(--sky-y) - 50%);
-}
-.sky-token[data-kind='sun'] { color: var(--honey); }
-@media (prefers-reduced-motion: no-preference) {
-  /* The one easing on the bar, and it is a position, not an effect. */
-  .sky-token { transition: translate var(--t-slow) var(--ease-move); }
-}
-/* An arc needs width: below 900px it flattens and the position stops carrying meaning, so the
-   road goes and the two chips close up rather than lie about the hour. */
-@media (max-width: 900px) {
-  /* NOT `width: auto`: on an abspos box offset only by `left: 50%` that shrinks to fit HALF the
-     viewport, and two nowrap chips overran it as `DAY 0 · SPRINGLOUDY 8°`. */
-  .sky-bar {
-    width: calc(100% - 2 * max(var(--mark-inset), env(safe-area-inset-left)));
-    grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
-  }
-  .sky-arc { display: none; }
-  /* With the road gone the two chips close up and the dateline takes the row under them. A
-     phone at night has no 358px to spend on one unbreakable line. */
-  .sky-line { flex-wrap: wrap; justify-content: center; white-space: normal; }
+  letter-spacing: 0.18em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--cream-quiet);
 }
 
-/* A WIDTH, not only a cap: an offset with no `right` leaves shrink-to-fit half the stage. */
+.day-bar-mid { display: flex; align-items: center; gap: var(--s-5); min-width: 0; }
+.day-bar-play {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; cursor: pointer;
+  background: var(--deep); color: var(--cream);
+  border: 2px solid var(--ink); border-radius: 0;
+}
+.day-bar-play:hover { background: var(--ink); }
+.day-bar-play:active { translate: 0 1px; }
+.day-bar-glyph { display: block; }
+
+/* Two rows: the time rides above the track it belongs to, never beside it. */
+.day-bar-rail { flex: 1; min-width: 0; display: grid; grid-template-rows: auto auto; gap: var(--s-2); }
+.day-bar-stamp {
+  position: relative; justify-self: start;
+  left: clamp(24px, var(--at), calc(100% - 24px)); translate: -50% 0;
+  font-family: var(--font-data); font-size: var(--f-1); font-weight: 600;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--cream);
+}
+/* The track is the scrub bar. 44px of reach from a transparent pseudo-element, so the drawn
+   hairline stays a hairline. */
+.day-bar-track { position: relative; height: var(--s-5); cursor: pointer; }
+.day-bar-track, .day-bar-play { pointer-events: auto; }
+.day-bar-track::after { content: ''; position: absolute; inset: var(--reach-44) 0; }
+.day-bar-track:focus-visible { outline: 2px solid var(--honey); outline-offset: 4px; }
+.day-bar-line {
+  position: absolute; left: 0; right: 0; top: 50%; height: 2px; translate: 0 -50%;
+  background: var(--cream-quiet);
+}
+/* The rest of a day nobody has reached: the same hairline in the band's own ink, so the track
+   reads as a day half lived rather than as a second bar filling up. */
+.day-bar-dead {
+  position: absolute; top: 0; bottom: 0; right: 0;
+  left: clamp(0px, var(--at), 100%);
+  background: var(--ink);
+}
+/* A diamond, so a mark on a 2px rule is still a shape with the colour taken away. */
+.day-bar-mark {
+  position: absolute; top: 50%; left: clamp(5px, var(--at), calc(100% - 5px));
+  width: 6px; height: 6px; translate: -50% -50%; rotate: 45deg;
+}
+.day-bar-cursor {
+  position: absolute; top: 0; bottom: 0; left: clamp(0px, var(--at), 100%);
+  width: 2px; translate: -50% 0;
+  background: var(--honey); box-shadow: 0 0 0 1px var(--deep);
+}
+
+.day-bar-right {
+  display: flex; align-items: center; justify-content: flex-end; gap: var(--s-5); min-width: 0;
+}
+.day-bar-weather {
+  display: flex; align-items: center; gap: var(--s-3);
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--cream);
+}
+.day-bar-sky { display: block; flex: none; image-rendering: pixelated; }
+/* Honey, so the one word about the town itself reads as news and not as another number. */
+.day-bar-state {
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.18em; white-space: nowrap; color: var(--honey);
+}
+/* Under 900 the two flanks shrink to what they hold and the track takes the slack: a 114px
+   track puts thirteen minutes on a pixel, which is not a day anybody can aim at. */
+@media (max-width: 900px) {
+  .day-bar {
+    padding: 0 var(--s-5); gap: var(--s-5);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .day-bar-when, .day-bar-weather, .day-bar .camera-chip { display: none; }
+}
+
 .stage-cue {
-  position: absolute; z-index: 21; left: 0; right: 0; margin: 0 auto; width: fit-content;
-  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  grid-area: cue; justify-self: center; align-self: end; z-index: 21; margin: 0;
   /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
      room that thing takes, so the reading width is the same line to line. */
   --cue-aside: 0px;
-  max-width: min(calc(60ch + var(--cue-aside)), calc(100% - 2 * var(--mark-inset)));
+  max-width: min(calc(60ch + var(--cue-aside)), 100%);
   text-align: center; text-wrap: balance;
   pointer-events: none;
   font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
@@ -1273,9 +1275,10 @@ body {
   text-shadow: var(--halo-deep);
   opacity: 1;
 }
-/* Its own case, not the caption's capitals: a law is a sentence the town wrote, and setting it
-   in caps is the machine shouting it back. */
-.stage-cue[data-moment='on'] {
+/* What just happened, on a row of its own over what the town is doing. Its own case, not the
+   caption's capitals: setting a sentence the town wrote in caps is the machine shouting it back. */
+.stage-cue-news {
+  order: -1; flex-basis: 100%;
   display: flex; align-items: center; justify-content: center; gap: var(--s-4);
   letter-spacing: 0.04em; text-transform: none;
 }
@@ -1287,13 +1290,12 @@ body {
    lines, which on a phone left the sentence 112px wide with 100px of slot empty each side.
    The sentence is body text — `pretty`, ranged left, its first line on the stamp's baseline. */
 .stage-cue[data-scene='on'] {
-  display: flex; align-items: baseline; justify-content: center; gap: var(--s-4);
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: var(--s-4);
   letter-spacing: 0.04em; text-transform: none;
   text-align: start; text-wrap: pretty;
-  /* A WIDTH, not only a cap: `left: 50%` with no `right` leaves shrink-to-fit half the stage to
-     work in, and on a phone that clamped the sentence to 117px. `max-width` still does the
-     capping — the two rules above compose. */
-  width: calc(100% - 2 * var(--mark-inset));
+  /* A WIDTH, not only a cap: shrink-to-fit clamped the sentence to 117px on a phone while a
+     third of the slot stood empty. `max-width` still does the capping. */
+  width: 100%;
   /* The stamp's own room, so the sentence keeps its 60ch: inside it, a 51-character topic
      wrapped onto two lines while there was a third of the slot standing empty. */
   --cue-aside: calc(3 * var(--s-8));
@@ -1326,22 +1328,15 @@ body {
    The stamp's opposite corner and the stamp's own material — a struck slab for what the town
    calls the scene, a body line for the place and the people. It is a TITLE, not a readout: it
    is written at the cut and stands still while the people in it walk. */
+/* Over the slack row, so a card three chips deep hangs rather than pushing the caption under
+   it up: on a landscape phone the row it used to take was 164px of a 544px window. */
 .scene-card {
-  position: absolute; z-index: 21;
-  /* the second row of the top-left corner, level with `.stage-live` across the picture */
-  top: calc(
-    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--sky-h) +
-      var(--s-4) + var(--s-7)
-  );
-  left: max(var(--mark-inset), env(safe-area-inset-left));
+  grid-area: left-2; grid-row: left-2-start / open-end;
+  justify-self: start; align-self: start; z-index: 21;
+  margin-top: var(--s-3);
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3);
-  max-width: min(38ch, calc(100% - 2 * var(--mark-inset)));
+  max-width: 38ch;
   pointer-events: none;
-}
-@media (max-width: 900px) {
-  .scene-card {
-    top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--s-7) * 2);
-  }
 }
 .scene-card-title {
   padding: var(--s-2) var(--s-3);
@@ -1381,14 +1376,9 @@ body {
    camera is on is talking. The ghost holds the box at the width of the finished line so the
    slab does not grow a letter at a time under the words arriving in it. */
 .lower-third {
-  position: absolute; z-index: 26;
-  /* A WIDTH, not an offset — the cue's own trick. It sits directly over the cue rather than in
-     the bottom-left corner, which already carries three 44px slabs and the sound cues stacking
-     upward off them. */
-  left: 0; right: 0; margin: 0 auto; width: fit-content;
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--s-8));
+  grid-area: third; justify-self: center; align-self: end; z-index: 26; margin: 0;
   display: flex; align-items: stretch; gap: var(--s-3);
-  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  max-width: min(46ch, 100%);
   padding: var(--s-3);
   pointer-events: none;
   background: var(--parchment); color: var(--ink);
@@ -1424,71 +1414,44 @@ body {
 .lower-third-ghost { visibility: hidden; }
 .lower-third-typed { position: absolute; inset: 0; }
 
-/* ── the first two lines a visitor reads ────────────────────────────────────────────────────
-   Fixed, not absolute: this mark stands outside `.app`, so React clearing `#root` cannot take
-   it. It goes on the first cut, the first hand on the camera, or twenty seconds. */
-.first-lines {
-  position: fixed; inset: 0; z-index: 30;
-  display: grid; place-content: center; justify-items: center;
-  gap: var(--s-5);
-  padding: var(--mark-inset);
-  text-align: center;
+/* ── the cold open ──────────────────────────────────────────────────────────────────────────
+   The first sentence a visitor reads, in the picture's own area at its top edge rather than
+   centred over the middle of it. The frame gives it the row; it sums nothing. */
+.cold-open {
+  grid-area: open; grid-row: head-end / open-end;
+  justify-self: start; align-self: start; z-index: 30;
+  display: grid; gap: var(--s-5);
   pointer-events: none;
   opacity: 1;
 }
-/* An author `display` beats the UA's `[hidden]` rule whatever the specificity says, so the
-   attribute the static file ships with has to be honoured here or the lines paint on load. */
-.first-lines[hidden] { display: none; }
-.first-lines p { margin: 0; max-width: 34ch; }
-.first-lines-head {
+.cold-open p { margin: 0; max-width: 34ch; }
+.cold-open-line {
   font-family: var(--font-body); font-size: var(--f-6); font-weight: 600;
   letter-spacing: -0.01em; text-wrap: balance;
   color: var(--cream);
   text-shadow: var(--halo-deep);
 }
-/* the second line is a person: the head's face at the note's weight, in the head's ink */
-.first-lines .first-lines-worry {
+/* the second line is a person: the first line's face at the note's weight, in its ink */
+.cold-open-worry {
   font-family: var(--font-body); font-size: var(--f-4); font-weight: 500;
   text-wrap: pretty; max-width: 44ch;
   color: var(--cream);
   text-shadow: var(--halo-deep);
 }
-.first-lines-worry[hidden] { display: none; }
-.first-lines-note {
-  font-family: var(--font-body); font-size: var(--f-3); font-weight: 400;
-  text-wrap: pretty;
-  color: var(--cream-quiet);
-  text-shadow: var(--halo-deep);
-}
-.first-lines.gone { opacity: 0; }
-/* The lines are the town's first page, not the paper's: a deep link that opens a sheet, or a
-   sheet opened while they stand, takes them down. */
-body:has(.app[data-paper='on']) .first-lines { display: none; }
+.cold-open[data-gone='yes'] { opacity: 0; }
+/* The line is the town's first page, not the paper's: a deep link that opens a sheet, or a
+   sheet opened while it stands, takes it down. */
+body:has(.app[data-paper='on']) .cold-open { display: none; }
 
 .stage-exit, .stage-live {
-  position: absolute; z-index: 25;
-  left: max(var(--mark-inset), env(safe-area-inset-left));
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
+  grid-area: left-1; justify-self: start; align-self: start; z-index: 25;
   min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
   font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
 }
-/* Under the bar that reads REPLAY, in the top-right: the word and the way out of it are one
-   thing, and the offset keeps this button off the bar's own row. */
-.stage-live {
-  left: auto;
-  right: max(var(--mark-inset), env(safe-area-inset-right));
-  top: calc(
-    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--sky-h) +
-      var(--s-4) + var(--s-7)
-  );
-}
-@media (max-width: 900px) {
-  .stage-live {
-    top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--s-7) * 2);
-  }
-}
+/* The word REPLAY and the way out of it are one thing, so this one takes the other corner. */
+.stage-live { grid-area: right-1; justify-self: end; }
 @media (prefers-reduced-motion: no-preference) {
   .stage-exit, .stage-live { transition-property: background-color, translate, box-shadow; }
 }
@@ -1514,7 +1477,10 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   /* A cut's card and the night's card arrive the same way the cue does — a fade, nothing else:
      a mark that slid in would be moving the picture the camera just settled. */
   .scene-card { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
-  .first-lines { transition: opacity var(--t-slow) var(--ease-enter); }
+  .cold-open {
+    transition: opacity var(--t-slow) var(--ease-enter);
+    animation: cue-in var(--t-slow) var(--ease-enter) backwards;
+  }
   @keyframes cue-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -1526,23 +1492,58 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   .stage-ring-arms button:active { scale: 1; }
 }
 
-/* `clip`, never `hidden`: `hidden` is still a scroll container, and a `.focus()` or a
-   `scrollIntoView` inside the sheet walked up to it and carried the whole town with it. */
+/* ── THE FRAME: one grid, named areas, and nothing that measures a neighbour ────────────────
+   A panel says which area it is in and nothing else. A row is as tall as what stands in it and
+   nothing at all when that is absent, which is the whole of what `--sign-band` used to assert
+   by hand. `grid-column: frame` widens a mark to the full inner width and `grid-column: edge`
+   to the window's; a mark that hangs over the picture rather than standing in a row of its own
+   spans `open`, the slack row, because an item that spans it makes no row taller.
+   Three rows carry a floor instead: a cue arriving may not move the caption over it, and a
+   button that only exists inside a room may not move the card under it.
+   `clip`, never `hidden`: `hidden` is still a scroll container, and a `.focus()` inside the
+   sheet walked up to it and carried the whole town with it. */
 .app {
-  position: relative; display: block; height: 100%; overflow: clip;
+  position: relative; height: 100%; overflow: clip;
   background: var(--night); user-select: none;
-  /* How much of the top edge the signpost's arms take, so the marks that share it start below. */
-  --sign-band: 0px;
+  display: grid;
+  grid-template-columns:
+    [edge-start] max(var(--mark-inset), env(safe-area-inset-left))
+    [frame-start] auto minmax(0, 1fr) auto [frame-end]
+    max(var(--mark-inset), env(safe-area-inset-right)) [edge-end];
+  grid-template-rows:
+    max(var(--mark-inset), env(safe-area-inset-top))
+    auto auto
+    minmax(44px, auto)
+    auto
+    minmax(0, 1fr)
+    minmax(44px, auto)
+    minmax(calc(2 * 1.5 * var(--f-2)), auto)
+    auto auto auto
+    max(var(--mark-inset), env(safe-area-inset-bottom));
+  grid-template-areas:
+    '.    .          .      .           .'
+    '.    bar        bar    bar         .'
+    '.    head       head   head        .'
+    '.    left-1     .      right-1     .'
+    '.    left-2     .      .           .'
+    '.    open       open   open        .'
+    '.    third      third  third       .'
+    '.    cue        cue    cue         .'
+    '.    sound      .      foot-right  .'
+    '.    wisp       .      foot-right  .'
+    '.    foot-left  .      foot-right  .'
+    '.    .          .      .           .';
 }
+/* The world is under every area, not in one: the canvas hangs off `.app` itself. */
+.app > main { grid-area: 1 / 1 / -1 / -1; min-height: 0; }
 .town-lost {
   display: grid; place-content: center; height: 100%; margin: 0; padding: var(--s-8);
   font-size: var(--f-3); color: var(--cream-quiet); text-align: center; text-wrap: pretty;
 }
 
 .signpost {
-  position: absolute; z-index: 25;
-  right: max(var(--mark-inset), env(safe-area-inset-right));
-  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
+  grid-area: foot-right; grid-row: open-start / foot-right-end;
+  justify-self: end; align-self: end; z-index: 25;
   display: grid; justify-items: start; padding-bottom: calc(10px * var(--px));
   /* one drawn pixel is --px screen pixels: every size below is a whole number of them */
   --px: 2;
@@ -1553,7 +1554,7 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   display: flex; align-items: center;
   min-height: calc(22px * var(--px));
   padding: 0 calc(4px * var(--px)) calc(1px * var(--px)) calc(2px * var(--px));
-  font-family: var(--font-sign); font-size: var(--f-sign); line-height: 1; white-space: nowrap;
+  font-family: var(--font-px); font-size: var(--f-sign); line-height: 1; white-space: nowrap;
   color: var(--deep); cursor: pointer;
   /* deep ink on the plank's own wood is 8.9:1 idle, 5.5:1 pressed; the 1px light under each
      glyph is the cut edge of painted lettering, not a halo */
@@ -1595,20 +1596,18 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   .signpost-post { display: none; }
 }
 /* No corner left with the sheet up at 768px, and an arm that re-anchored on the click that
-   pressed it took the control out from under the hand. One home per size, up or down. */
+   pressed it took the control out from under the hand. One home per size, up or down. The
+   band the arms then own is the `head` row's own height, so nothing else has to be told. */
 @media (max-width: 1000px), (max-height: 620px) {
   .signpost {
-    top: max(var(--mark-inset), env(safe-area-inset-top)); bottom: auto;
-    left: max(var(--mark-inset), env(safe-area-inset-left)); right: auto;
+    grid-area: head; justify-self: start; align-self: start;
     grid-template-columns: repeat(2, auto); padding-bottom: 0;
   }
   .signpost-post { display: none; }
-  .app { --sign-band: 88px; }
 }
 /* A short window puts the four arms in one row, so the band is one plank deep. */
 @media (min-width: 641px) and (max-height: 620px) {
   .signpost { grid-auto-flow: column; grid-template-columns: none; }
-  .app { --sign-band: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .signpost-arm:hover { translate: 0 0; }
@@ -1622,19 +1621,20 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 .town-dim[data-open='yes'] { opacity: var(--dim); pointer-events: auto; }
 
 .paper {
-  position: absolute; left: 50%; bottom: 0; z-index: 30;
+  /* The row starts under the band and the arms, so the sheet measures both instead of summing
+     them: `100dvh - 64px` and `100dvh - 106px` were that sum, written twice and differently. */
+  grid-column: edge; grid-row: head-end / -1;
+  justify-self: center; align-self: end; z-index: 30;
   width: var(--paper-w); height: var(--paper-h);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr);
-  /* One property carries both axes: a minifier folds a separate `translate` into `transform`,
-     and the open state's `transform` then throws the centring away. */
-  transform: translate(-50%, 102%);
+  transform: translateY(102%);
   background: var(--parchment) var(--grain); background-clip: padding-box;
   color: var(--ink);
   border: 24px solid transparent; border-bottom-width: 0; border-image: var(--px-paper);
   box-shadow: 0 -10px 30px rgba(36, 31, 43, 0.35);
   transition: transform var(--t-slow) var(--ease-enter);
 }
-.paper[data-open='yes'] { transform: translate(-50%, 0); }
+.paper[data-open='yes'] { transform: translateY(0); }
 .paper[aria-hidden='true'] { pointer-events: none; }
 /* No fade standing in for the slide: a 300ms fade is the same 300ms of waiting. */
 @media (prefers-reduced-motion: reduce) {
@@ -1643,29 +1643,19 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 @media (max-width: 640px) {
   .paper { width: var(--paper-w-narrow); height: var(--paper-h-narrow); }
 }
-/* Stepped left far enough to clear the signpost's arms, statically: nothing moves on open. */
+/* Stopped at the column the arms stand in, so it clears them statically: nothing moves on open. */
 @media (min-width: 641px) and (max-width: 1400px) {
-  .paper {
-    left: clamp(
-      calc(var(--paper-w) / 2),
-      calc(100% - var(--paper-w) / 2 - var(--mark-inset) - 200px),
-      50%
-    );
-  }
+  .paper { grid-column: edge-start / foot-right-start; }
 }
 /* A short window is all the reading area there is: 66% of 390px was 166px of sheet against
    575px of page — 29% of it visible. */
 @media (max-height: 620px) {
   /* the arms are along the top edge here, so the sheet takes the width as well as the height */
   .paper {
-    left: 50%; width: min(96%, 1040px);
-    height: calc(100dvh - 64px); border-top-width: var(--s-5);
+    grid-column: edge; width: min(96%, 1040px);
+    height: 100%; border-top-width: var(--s-5);
   }
   .paper-head { padding-block: var(--s-2) 0; }
-}
-/* short AND narrow: the arms are two rows there, so the sheet leaves two rows of room */
-@media (max-width: 640px) and (max-height: 620px) {
-  .paper { height: calc(100dvh - 106px); }
 }
 @media (min-width: 1920px) {
   .paper { --paper-w: min(78%, 1040px); }
@@ -1674,8 +1664,8 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 .paper-grip {
   position: relative; justify-self: center;
   width: 44px; height: 5px; margin: var(--s-3) 0;
-  /* 4.28:1 on parchment: the one "drag me down" affordance, so it clears the 3:1 floor. */
-  background: #8B6F4E;
+  /* 5.83:1 on parchment: the one "drag me down" affordance, well past the 3:1 floor. */
+  background: var(--ink-quiet);
   cursor: grab; touch-action: none;
 }
 .paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
@@ -1710,7 +1700,7 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
    moment its flank became a flexible track. */
 .paper-close { white-space: nowrap; }
 .paper-date, .paper-clock {
-  margin: 0; font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.06em;
+  margin: 0; font-family: var(--font-data); font-size: var(--f-1); letter-spacing: 0.06em;
   color: var(--ink-quiet); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .paper-tabs { display: flex; gap: var(--s-1); }
@@ -2000,7 +1990,7 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 /* The number is the SECOND channel, so the ladder survives a reader who cannot separate honey
    from sand — and an empty cell is two people who have never met. */
 .matrix-warmth {
-  font-family: var(--font-px); font-size: var(--f-1); color: var(--ink);
+  font-family: var(--font-data); font-size: var(--f-1); color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .matrix [data-level='self'] {
@@ -2059,7 +2049,7 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   .badge, .edition, .era-band, .mark-tip, .key-summary, .legend-chip, .moment-card,
   .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
-  .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
+  .rx-level, .portrait, .need-track, .day-track, .day-bar-cursor, .skeleton-row, .paper,
   .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
   .thoughts-button, .sound-button, .scene-card-title, .lower-third, .lower-third-bust {
     border: 2px solid CanvasText;
@@ -2084,16 +2074,20 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
   .paper-close-key { display: none; }
 }
 
-/* ── the corner cluster: two 44px targets, each with the glyph everyone already knows ─────── */
-/* Bottom-LEFT, not the top-right the pattern usually takes: the sun arc owns the top edge, so
-   this is the one corner nothing else stands in at any width. */
+/* ── the corner cluster: three 44px targets, each with the glyph everyone already knows ───── */
+/* Bottom-LEFT, not the top-right the pattern usually takes: the band that says when owns the
+   top edge, so this is the one corner nothing else stands in at any width. */
+.help-button, .thoughts-button, .sound-button, .sound-cues {
+  grid-area: foot-left; justify-self: start; align-self: end; z-index: 25;
+}
+/* A row each, bottom up from the corner, so the stack is the frame's and no slab sums 44, 88
+   or 132. The row the cue stands in is over them: a caption is never under a slab on a phone. */
+.thoughts-button { grid-area: wisp; }
+.sound-button { grid-area: sound; }
 .help-button, .thoughts-button, .sound-button {
-  position: absolute; z-index: 25;
-  left: max(var(--mark-inset), env(safe-area-inset-left));
-  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
   width: 44px; height: 44px;
   display: grid; place-items: center;
-  font-family: var(--font-sign); font-size: var(--f-4); line-height: 1;
+  font-family: var(--font-px); font-size: var(--f-sign); line-height: 1;
   /* deep ink on honey is 11.1:1 — the button brings its own ground, like every mark over town */
   color: var(--deep); background: var(--honey);
   border: 0; box-shadow: var(--frame); cursor: pointer;
@@ -2121,11 +2115,9 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 }
 [data-broadcast='on'] :is(.help-button, .thoughts-button, .sound-button) { display: none; }
 
-/* The second slab, an --s-3 gap over the first. It carries no text at all: `--font-sign` is on
+/* The second slab, an --s-3 gap over the first. It carries no text at all: `--font-px` is on
    an 8px grid and the ladder has no legal size for it under 16, so the mark is drawn as pixels. */
-.thoughts-button {
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 44px + var(--s-3));
-}
+.thoughts-button { margin-bottom: var(--s-3); }
 .thoughts-glyph { display: block; image-rendering: pixelated; }
 /* Off steps one notch inside the same family, the way `.legend-chip.off` does — honey to sand is
    1.10:1, so the paper is never the signal; the emptied wisp is. Deep holds 11.2:1 on sand. */
@@ -2135,10 +2127,8 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 .sound-button[aria-pressed='false']:hover { background: var(--parchment); }
 
 /* The third slab, one --s-3 over the wisp. Same drawn mark, same reason: the ladder has no
-   legal size for `--font-sign` under 16px and it has no ♪ at any size. */
-.sound-button {
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + 2 * var(--s-3));
-}
+   legal size for `--font-px` under 16px and it has no ♪ at any size. */
+.sound-button { margin-bottom: var(--s-3); }
 .sound-glyph { display: block; image-rendering: pixelated; }
 
 /* ── the sound cues: what the town is making a noise about, whether or not you can hear it ── */
@@ -2146,10 +2136,10 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
    the cue's own register — cream on the four-way halo, letter-spaced — because that is what a
    mark over the town is, and they stack UPWARD from the cluster so a bell arriving on top
    leaves every chip under it exactly where the eye left it. */
+/* Off the top of the cluster's own rows, over the slack row: a chip arriving moves nothing. */
 .sound-cues {
-  position: absolute; z-index: 25; margin: 0; padding: 0; list-style: none;
-  left: max(var(--mark-inset), env(safe-area-inset-left));
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 132px + 3 * var(--s-3));
+  grid-area: sound; grid-row: open-start / sound-start;
+  margin: 0 0 var(--s-3); padding: 0; list-style: none;
   display: flex; flex-direction: column-reverse; gap: var(--s-2);
   pointer-events: none;
 }
@@ -2162,30 +2152,27 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 [data-broadcast='on'] .sound-cues, [data-paper='on'] .sound-cues { display: none; }
 
 /* ── the camera chip: whose hand is on the lens, and when the town takes it back ── */
-/* The cue's own register, in the top corner: a mark over the town, not a panel. It takes the
-   corner's own first row, which only the way out of a room ever wants, and steps under that. */
+/* The bar's right flank, beside the sky and the state: whose hand is on the lens is a fact
+   about the picture, and every fact about the picture is in one band now. */
 .camera-chip {
-  position: absolute; z-index: 25; margin: 0;
-  left: max(var(--mark-inset), env(safe-area-inset-left));
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
+  flex: none;
   font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: var(--cream); text-shadow: var(--halo-deep);
-  pointer-events: none;
+  color: var(--cream);
 }
-/* Honey holds 10.2:1 on the halo's own deep. The one state worth an ink change: the picture has
-   stopped answering the director. */
+/* Honey holds 10.2:1 on the deep the bar is drawn on. The one state worth an ink change: the
+   picture has stopped answering the director. */
 .camera-chip[data-hand='on'] { color: var(--honey); }
-body:has(.stage-exit) .camera-chip {
-  top: calc(
-    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + 44px + var(--s-3)
-  );
-}
-[data-broadcast='on'] .camera-chip, [data-paper='on'] .camera-chip { display: none; }
+[data-broadcast='on'] .camera-chip { display: none; }
+/* `visibility`, so the flank keeps the chip's width: `display: none` slid the weather and the
+   state 54px right on every arm the sheet opened from. */
+[data-paper='on'] .camera-chip { visibility: hidden; }
 
 
 
+/* The one mark that is centred over the picture: a modal sheet over the whole app, not a mark
+   standing in the town. Everything else in this sheet names a cell of the frame. */
 .key-map {
   position: fixed; inset: 0; z-index: 45;
   /* the one inset every other mark over the town hangs off, not a second percentage */
@@ -2253,22 +2240,21 @@ body:has(.stage-exit) .camera-chip {
   --bcast-safe: 88px;
 }
 
-/* On the stream the bar is the only clock, so the road and the weather go and the words take
-   the top-right corner to themselves. */
-[data-broadcast='on'] .sky-bar {
-  left: auto; translate: none; width: auto;
-  right: max(var(--mark-inset), env(safe-area-inset-right));
-  top: max(var(--mark-inset), env(safe-area-inset-top));
-  display: block; text-align: right;
-}
-[data-broadcast='on'] .sky-arc, [data-broadcast='on'] .sky-weather { display: none; }
-[data-broadcast='on'] .sky-clock { font-size: var(--f-bcast); justify-content: flex-end; }
-[data-broadcast='on'] .sky-line { font-size: var(--f-bcast); justify-content: flex-end; }
-[data-broadcast='on'] .stage-cue { font-size: var(--f-bcast); bottom: var(--bcast-safe); }
+/* On the stream nobody is scrubbing, so the hands go and the clock stays: a viewer who cannot
+   touch the track still has to be told the minute. */
+[data-broadcast='on'] .day-bar-play,
+[data-broadcast='on'] .day-bar-track { display: none; }
+[data-broadcast='on'] .day-bar-stamp { left: 0; translate: none; }
+[data-broadcast='on'] .day-bar-day { font-size: var(--f-bcast); }
+[data-broadcast='on'] .day-bar-when { font-size: var(--f-bcast); }
+[data-broadcast='on'] .day-bar-stamp { font-size: var(--f-bcast); }
+[data-broadcast='on'] .day-bar-weather { font-size: var(--f-bcast); }
+[data-broadcast='on'] .day-bar-state { font-size: var(--f-bcast); }
+[data-broadcast='on'] .stage-cue { font-size: var(--f-bcast); margin-bottom: var(--bcast-safe); }
 
-/* The bar takes the right corner on the stream, so the card has the left one to itself. */
+/* The bar has the whole band on the stream, so the card takes the corner under it. */
 [data-broadcast='on'] .scene-card {
-  top: max(var(--mark-inset), env(safe-area-inset-top));
+  grid-area: left-1; margin-top: 0;
   gap: 12px;
   max-width: 44%;
 }
@@ -2277,8 +2263,7 @@ body:has(.stage-exit) .camera-chip {
 [data-broadcast='on'] :is(.scene-card-turn, .scene-card-chip) { font-size: 20px; padding: 8px 12px; }
 
 [data-broadcast='on'] .lower-third {
-  position: absolute; left: 4%; right: auto; margin: 0; width: auto; z-index: 26;
-  bottom: var(--bcast-safe);
+  justify-self: start; margin-bottom: var(--bcast-safe); width: auto;
   display: flex; align-items: stretch; gap: var(--s-5);
   max-width: 64%;
   padding: var(--s-5);
@@ -2308,7 +2293,7 @@ body:has(.stage-exit) .camera-chip {
 }
 
 [data-broadcast='on'] .stage-ticker {
-  position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
+  grid-column: edge; grid-row: -2 / -1; align-self: end; z-index: 26;
   display: flex; align-items: center; height: 56px;
   overflow: hidden; white-space: nowrap;
   background: var(--ink);
@@ -2352,20 +2337,13 @@ body:has(.stage-exit) .camera-chip {
   background: var(--deep);
 }
 
-/* The card stands in the cue's own slot, over the transport — and the two can never collide:
-   the card goes down on the first thing that happens, which is the only thing that brings the
-   cue up. The corners are all taken (help and thoughts bottom-left, the signpost bottom-right,
-   the sky bar along the top), and a caption belongs on the centre line anyway.
-   Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
+/* Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
    Ranged left, not centred: the plate carries a paragraph more often than a title. */
 .replay-card {
-  position: absolute; z-index: 24; left: 0; right: 0; width: fit-content;
-  bottom: calc(
-    max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h) + var(--cue-h)
-  );
-  max-width: min(46ch, calc(100% - 2 * var(--mark-inset)));
+  grid-area: third; justify-self: center; align-self: end; z-index: 24;
+  max-width: min(46ch, 100%);
   text-align: start;
-  margin: 0 auto; padding: var(--s-4) var(--s-5);
+  margin: 0; padding: var(--s-4) var(--s-5);
   pointer-events: none;
   background: var(--deep); box-shadow: var(--frame);
   opacity: 0;
@@ -2396,45 +2374,12 @@ body:has(.stage-exit) .camera-chip {
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
 }
 
-/* The transport is a thing standing in the town, bottom-centre, as wide as its own controls. */
-.transport {
-  position: absolute; z-index: 25; left: 50%; translate: -50% 0;
-  bottom: max(var(--mark-inset), env(safe-area-inset-bottom));
-  display: flex; align-items: center; gap: var(--s-4);
-  width: min(560px, calc(100% - 2 * var(--mark-inset)));
-  padding: var(--s-3) var(--s-4);
-  background: var(--deep); box-shadow: var(--frame);
-}
-.transport .player-btn.live {
-  flex: none; padding: 0 var(--s-5);
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.transport .player-btn:focus-visible, .transport .player-track:focus-visible {
-  outline: 2px solid var(--honey); outline-offset: 2px;
-}
-
-/* The cue and the card both step over the strip rather than under it: one number, so the two
-   can never disagree about how tall it is. */
-[data-replay='on'] .stage-cue {
-  bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + var(--transport-h));
-}
-/* A replay already names itself — its own dateline card, its own cue and the transport bar.
-   The live director's three marks would be three more slabs in the same two corners. */
 [data-replay='on'] :is(.lower-third, .scene-card) { display: none; }
 
 /* The grade carries no transition: the curtain is fully black at the midpoint of the dip, so
    the grade arrives behind it and there is nothing to ease. */
 @media (prefers-reduced-motion: no-preference) {
   .replay-card { transition: opacity var(--t-slow) var(--ease-enter); }
-}
-
-@media (max-width: 640px) {
-  /* Under 640 the arms take the TOP edge, so the strip has the bottom to itself — but the
-     "Return to now" word and a 44px track cannot share 320px, and the word is the one that
-     wraps. It keeps its own row. */
-  .transport { flex-wrap: wrap; justify-content: center; }
-  .transport .player-track { order: 3; flex-basis: 100%; }
 }
 
 /* ── the firsts shelf: ceremony, not competition ─────────────────────────────────────────────

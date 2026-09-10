@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { momentTitle } from '@sj/shared'
 import { chronicleGlyph } from '../ui/importantFeed.js'
 import { CUE_ICON_PX, STAKES_MAX, type SceneCue, type StageCue } from '../ui/stageCue.js'
+import { type CueLine, type CueSlot, cueStep, NO_CUE_LINE } from './cueSlot.js'
 
 const GLYPH_GRID = 8
 
@@ -42,9 +44,40 @@ function SceneStamp({ kind, stakes, band }: SceneCue) {
   )
 }
 
-/** The slot says what just HAPPENED while there is something, what the town is DOING while a
- *  scene runs, WHY the camera is here when it is on a cut of its own, and what the shot is
- *  otherwise. There is only ever one line here. */
+/** What the town is DOING: the scene it is in, else why the camera came, else what the shot is. */
+type Doing = { scene: SceneCue } | { why: string } | { caption: string }
+
+function doingLine(
+  scene: SceneCue | null,
+  why: string | null,
+  text: string | null,
+): CueLine<Doing> {
+  if (scene !== null) return { key: scene.text, line: { scene } }
+  if (why !== null && why.trim() !== '') return { key: why, line: { why } }
+  if (text !== null && text.trim() !== '') return { key: text, line: { caption: text } }
+  return NO_CUE_LINE
+}
+
+function useCueSlot<T>(next: CueLine<T>): CueLine<T> {
+  const [slot, setSlot] = useState<CueSlot<T>>(() => ({ shown: next, until: 0, waiting: next }))
+  if (next.key !== slot.waiting.key) setSlot((s) => cueStep(s, next, Date.now()))
+  useEffect(() => {
+    if (slot.waiting.key === slot.shown.key) return
+    const timer = setTimeout(
+      () => {
+        setSlot((s) => cueStep(s, s.waiting, Date.now()))
+      },
+      Math.max(0, slot.until - Date.now()),
+    )
+    return () => {
+      clearTimeout(timer)
+    }
+  }, [slot])
+  return slot.shown.key === next.key ? next : slot.shown
+}
+
+/** Two slots, because news and the thing itself are two different answers: what just HAPPENED
+ *  stands over what the town is DOING, and neither takes the line the other is standing on. */
 export function DirectorCue({
   text,
   moment,
@@ -57,31 +90,32 @@ export function DirectorCue({
   /** the director's own sentence for the shot it took, in the town's words */
   why?: string | null
 }) {
-  if (moment !== null) {
-    return (
-      <p className="stage-cue" data-moment="on">
-        <CueGlyph icon={moment.icon} />
-        {moment.text}
-      </p>
-    )
-  }
-  if (scene !== null) {
-    return (
-      <p className="stage-cue" data-scene="on">
-        <SceneStamp {...scene} />
-        {scene.text}
-      </p>
-    )
-  }
-  // Sentence case, on the scene's own rule: the reason the camera is here is a sentence the
-  // town could have said, not a caption shouted in capitals for as long as the shot lasts.
-  if (why !== null && why.trim() !== '') {
-    return (
-      <p className="stage-cue" data-why="on">
-        {why}
-      </p>
-    )
-  }
-  if (text === null || text.trim() === '') return null
-  return <p className="stage-cue">{text}</p>
+  const news = useCueSlot<StageCue>(
+    moment === null ? NO_CUE_LINE : { key: moment.text, line: moment },
+  )
+  const doing = useCueSlot<Doing>(doingLine(scene, why, text))
+  const said = doing.line
+  if (news.line === null && said === null) return null
+  return (
+    <p
+      className="stage-cue"
+      data-scene={said !== null && 'scene' in said ? 'on' : undefined}
+      data-why={said !== null && 'why' in said ? 'on' : undefined}
+    >
+      {news.line !== null && (
+        <span className="stage-cue-news">
+          <CueGlyph icon={news.line.icon} />
+          {news.line.text}
+        </span>
+      )}
+      {said !== null && 'scene' in said && (
+        <>
+          <SceneStamp {...said.scene} />
+          {said.scene.text}
+        </>
+      )}
+      {said !== null && 'why' in said && said.why}
+      {said !== null && 'caption' in said && said.caption}
+    </p>
+  )
 }
