@@ -777,6 +777,36 @@ describe('★ four faces, ruled by role, and five colours', () => {
   })
 })
 
+// ── ★ THE BAND ON A PHONE ─────────────────────────────────────────────────────────────────
+// Measured in headless Chromium at 390x844 with the heaviest content the world can hand the
+// band: a two-word state, a long weather word and a long dateline. An `auto` right flank took
+// 295px of 390 and left the dateline 59px to hold 262px of words, so `· ACT 17` was ellipsised
+// off the phone entirely. Both flanks now take a share and wrap instead of starving each other.
+
+describe('★ the band on a phone says every fact it holds', () => {
+  const PHONE = CSS.slice(CSS.indexOf('@media (max-width: 900px)'))
+  const block = PHONE.slice(0, PHONE.indexOf('\n}'))
+
+  it('★ gives neither flank a track that can starve the other', () => {
+    const cols = /\.day-bar \{[^}]*grid-template-columns:\s*([^;]+);/.exec(block)?.[1]
+    expect(cols, 'the phone band declares no columns of its own').toBeDefined()
+    expect(cols, 'an intrinsic track takes what it needs and leaves the rest nothing').not.toMatch(
+      /\bauto\b|\bmax-content\b|\bfit-content\b/,
+    )
+    expect(cols).toMatch(/minmax\(0,\s*\d+fr\)\s+minmax\(0,\s*\d+fr\)/)
+  })
+
+  it('★ lets every mark in the band wrap rather than lose its own words', () => {
+    for (const mark of ['.day-bar-when', '.day-bar-weather']) {
+      const body = new RegExp(`\\${mark} \\{([^}]*)\\}`).exec(block)?.[1] ?? ''
+      expect(body, `${mark} is never released from nowrap on a phone`).toMatch(
+        /white-space:\s*normal/,
+      )
+    }
+    expect(block, 'the right flank cannot take a second line').toMatch(/flex-wrap:\s*wrap/)
+  })
+})
+
 // ── ★ THE COLOURS OUTSIDE THE SHEET ───────────────────────────────────────────────────────
 // #E8785A is written into eight TypeScript files no CSS test can see, and the chart it comes
 // from is the forge's, which @sj/web cannot import: forge pulls sharp and better-sqlite3. So

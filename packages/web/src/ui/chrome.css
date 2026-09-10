@@ -1264,10 +1264,14 @@ body {
   .day-bar {
     padding: max(0px, env(safe-area-inset-top)) var(--s-5) var(--s-2);
     gap: var(--s-1) var(--s-5);
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   }
   .day-bar-left { grid-row: 1; grid-column: 1; }
-  .day-bar-right { grid-row: 1; grid-column: 2; }
+  /* Both flanks wrap rather than starve each other. An `auto` right flank took 295 of 390 and
+     left the dateline 59px for 262px of words, so ACT 17 was ellipsised off the phone. */
+  .day-bar-right { grid-row: 1; grid-column: 2; flex-wrap: wrap; row-gap: 0; }
+  .day-bar-when { white-space: normal; overflow: visible; text-overflow: clip; }
+  .day-bar-weather { min-width: 0; white-space: normal; }
   .day-bar-mid { grid-row: 2; grid-column: 1 / -1; }
   .day-bar .camera-chip { display: none; }
 }
