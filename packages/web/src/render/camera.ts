@@ -292,6 +292,10 @@ export function fitStop(bounds: CameraBounds, screen: { w: number; h: number }):
   return best
 }
 
+/** A two-hander a tile apart fits at 4x, which spends the whole frame on one face. The live
+ *  camera and the offline pacing tool both read the cap here, so they cannot disagree. */
+export const TWO_SHOT_MAX_STOP: ZoomStop = 3
+
 /** The town has outgrown the widest stop, so the bar can say so rather than quietly showing part of it. */
 export function tooBigToFit(bounds: CameraBounds, screen: { w: number; h: number }): boolean {
   return !fitsAt(bounds, screen, ZOOM_STOPS[0])

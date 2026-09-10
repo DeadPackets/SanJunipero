@@ -1,4 +1,5 @@
 import type { Application, Container, FederatedPointerEvent } from 'pixi.js'
+import { type Move, type MoveFrame, moveFrame, planMove, travelViewports } from '../ui/shot.js'
 import {
   boundsCentre,
   type CameraBounds,
@@ -36,6 +37,9 @@ export type CameraRig = {
   centerOn: (x: number, y: number) => void
   centerOnScreen: (sx: number, sy: number) => void
   setZoom: (stop: ZoomStop) => void
+  /** The viewer's own zoom door. `setZoom` is shared with the director's push, which must not
+   *  cancel the cut it is pushing, so a hand gets its own way in. */
+  takeZoom: (stop: ZoomStop) => void
   setZoomAt: (stop: ZoomStop, screenX: number, screenY: number) => void
   getZoom: () => number
   getZoomStop: () => ZoomStop
@@ -52,12 +56,22 @@ export type CameraRig = {
   destroy: () => void
 }
 
+/** Under this the camera simply tracks: a body walking never moves this far in one frame, and
+ *  a reframe restarted every frame would crawl behind it. */
+const TRACK_VIEWPORTS = 0.05
+
 export function createCameraRig(
   app: Application,
   world: Container,
   deps: CameraRigDeps,
 ): CameraRig {
-  const screenBox = (): { w: number; h: number } => ({ w: app.screen.width, h: app.screen.height })
+  // One box, rewritten in place: this is read several times a frame and nobody keeps it.
+  const box = { w: 0, h: 0 }
+  const screenBox = (): { w: number; h: number } => {
+    box.w = app.screen.width
+    box.h = app.screen.height
+    return box
+  }
 
   const cameraCbs: (() => void)[] = []
   const notifyCamera = (): void => {
@@ -115,26 +129,75 @@ export function createCameraRig(
 
   let followFn: (() => { x: number; y: number } | null) | null = null
   const followEndCbs: (() => void)[] = []
+  /** The move in flight: the world points it left the middle of the picture at and is going to,
+   *  and when. Both ends are world points, so a scale change under a move does not shear its path. */
+  let move: {
+    plan: Move
+    from: { x: number; y: number }
+    to: { x: number; y: number }
+    startedMs: number
+  } | null = null
+  /** A hand on the camera ends the move too, or the fade and the punch run on under the drag. */
+  const cancelMove = (): void => {
+    if (move === null) return
+    move = null
+    app.stage.alpha = 1
+  }
   const breakFollow = (): void => {
+    cancelMove()
     if (followFn === null) return
     followFn = null
     for (const cb of followEndCbs) cb()
   }
-  const followTick = (): void => {
-    if (followFn === null) return
-    const t = followFn()
+  const camX = (wx: number): number => app.screen.width / 2 - wx * world.scale.x
+  const camY = (wy: number): number => app.screen.height / 2 - wy * world.scale.y
+  const followTick = (now: number, f: MoveFrame | null): void => {
+    const t = followFn?.() ?? null
+    if (move !== null && f !== null) {
+      app.stage.alpha = f.alpha
+      // A body out of the snapshot for a frame keeps the move it was cut to: a fade that landed
+      // back where it started was a black flash that went nowhere.
+      if (t !== null) move.to = t
+      const fx = camX(move.from.x),
+        fy = camY(move.from.y)
+      place(fx + (camX(move.to.x) - fx) * f.at, fy + (camY(move.to.y) - fy) * f.at)
+      if (f.done) move = null
+      return
+    }
     if (t === null) return
-    const tx = app.screen.width / 2 - t.x * world.scale.x
-    const ty = app.screen.height / 2 - t.y * world.scale.y
-    // frame-rate independent lerp (~12%/frame at 60fps)
-    const k = 1 - Math.pow(0.88, app.ticker.deltaMS / 16.7)
-    place(cam.x + (tx - cam.x) * k, cam.y + (ty - cam.y) * k)
+    const dx = camX(t.x) - cam.x,
+      dy = camY(t.y) - cam.y
+    if (travelViewports(dx, dy, screenBox()) <= TRACK_VIEWPORTS) {
+      place(camX(t.x), camY(t.y))
+      return
+    }
+    // What the clamp will ALLOW decides the move: a target it refuses leaves the camera where it
+    // is, and a plan measured from the target instead would replay the same cut every frame.
+    const to = clampCamera(
+      { x: camX(t.x), y: camY(t.y) },
+      world.scale.x,
+      deps.reachable(),
+      screenBox(),
+    )
+    const cdx = to.x - cam.x,
+      cdy = to.y - cam.y
+    if (travelViewports(cdx, cdy, screenBox()) <= TRACK_VIEWPORTS) {
+      place(to.x, to.y)
+      return
+    }
+    const k = world.scale.x || 1
+    move = {
+      plan: planMove(cdx, cdy, screenBox()),
+      from: { x: (app.screen.width / 2 - cam.x) / k, y: (app.screen.height / 2 - cam.y) / k },
+      to: t,
+      startedMs: now,
+    }
   }
-  app.ticker.add(followTick)
 
   // Rest stops stay exact so the pixel grid stays exact; the eased transit turns about the
   // world point under the POINTER, so zooming toward a thing keeps that thing where it is.
   let zoom: ZoomState = initialZoom(1)
+  let stopScale = 1
   let anchor = { sx: 0, sy: 0, wx: 0, wy: 0 }
 
   function captureAnchor(sx: number, sy: number): void {
@@ -155,16 +218,20 @@ export function createCameraRig(
 
   // The release lives here and not in `onWheel`, because the end of a gesture is the ABSENCE
   // of an event: nothing arrives to notice it, and the frame is the only thing still running.
-  const zoomTick = (): void => {
-    const now = performance.now()
+  const zoomTick = (now: number, f: MoveFrame | null): void => {
     // A pinch held still is still a hand on the camera; only a wheel goes quiet mid-gesture, so
     // the release is gated on `pinch`. Reduced motion takes the exact stop at once.
     if (pinch === null && zoomGestureEnded(zoom, now)) zoom = zoomRelease(zoom, now, !wantsMotion())
-    const s = zoomScaleAt(zoom, now)
+    // The scale the camera is on with no cut punch in it: `getZoom` hands this out, and a
+    // keypress or a label that stepped off a punched scale reads the wrong stop.
+    stopScale = zoomScaleAt(zoom, now)
+    const s = stopScale * (f === null ? 1 : f.scale)
     if (s === world.scale.x) return
+    // A follow re-pins on the middle of the picture every frame: the anchor a gesture captured
+    // goes stale the moment the camera moves under it, and the town slid out from under the subject.
+    if (followFn !== null) captureAnchor(app.screen.width / 2, app.screen.height / 2)
     world.scale.set(s)
-    if (followFn === null) place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s, false)
-    else place(cam.x, cam.y, false)
+    place(anchor.sx - anchor.wx * s, anchor.sy - anchor.wy * s, false)
     notifyCamera()
   }
 
@@ -270,6 +337,9 @@ export function createCameraRig(
     // A zoom pins the world point under the cursor; a camera still gliding would tear it out
     // from under the anchor.
     stopGlide()
+    // The wheel is a hand on the camera. Without this the fade and the punch run on until the
+    // director stands down, a React render later.
+    breakFollow()
     const now = performance.now()
     // Once per gesture, not once per step: a continuous zoom moves the scale on every event,
     // and re-pinning each time makes the town swim under the cursor instead of growing.
@@ -280,7 +350,15 @@ export function createCameraRig(
     zoom = zoomWheel(zoom, e.deltaY, now, e.ctrlKey)
   }
   app.canvas.addEventListener('wheel', onWheel, { passive: false })
-  app.ticker.add(zoomTick)
+  // One frame of the move for the whole tick, and zoom first: a follow that aimed at a target
+  // measured at the last frame's scale chases it.
+  const cameraTick = (): void => {
+    const now = performance.now()
+    const f = move === null ? null : moveFrame(move.plan, move.startedMs, now)
+    zoomTick(now, f)
+    followTick(now, f)
+  }
+  app.ticker.add(cameraTick)
 
   return {
     onResize: () => {
@@ -312,8 +390,13 @@ export function createCameraRig(
     centerOn,
     centerOnScreen,
     setZoom,
+    takeZoom: (stop) => {
+      stopGlide()
+      breakFollow()
+      setZoom(stop)
+    },
     setZoomAt,
-    getZoom: () => world.scale.x,
+    getZoom: () => stopScale,
     getZoomStop: () => zoom.stop,
     wantsMotion,
     fitToTown,
@@ -326,7 +409,8 @@ export function createCameraRig(
       }
     },
     setFollow: (target) => {
-      if (target !== null) {
+      if (target === null) cancelMove()
+      else {
         fitted = false
         stopGlide() // a follow owns the camera; a leftover throw would fight it
       }
@@ -344,8 +428,8 @@ export function createCameraRig(
     },
     wasDrag: () => isDrag(drag),
     destroy: () => {
-      app.ticker.remove(followTick)
-      app.ticker.remove(zoomTick)
+      cancelMove()
+      app.ticker.remove(cameraTick)
       app.ticker.remove(glideTick)
       app.canvas.removeEventListener('wheel', onWheel)
     },

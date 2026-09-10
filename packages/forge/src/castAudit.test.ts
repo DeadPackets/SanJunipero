@@ -175,14 +175,14 @@ describe('★ the committed cast against the gates as they now behave', () => {
 // ★ THE REASON THE SWEEP JUDGES ONLY THE AUTHORED FACINGS, asserted rather than left in prose.
 describe('the derived facings are exact mirrors, and the gate now agrees across them', () => {
   it.each(cast.map((c) => [c.id, c] as const))(
-    '%s: sw is flip(se) and nw is flip(ne), to the pixel',
+    '%s: sw is flip(se) and nw is flip(ne), to the pixel, the sleeper included',
     async (_id, c) => {
       const crop = cropper(c, await atlasOf(c))
       for (const [authored, derived] of [
         ['se', 'sw'],
         ['ne', 'nw'],
       ] as const) {
-        for (const p of ['idle', ...WALK]) {
+        for (const p of ['idle', ...WALK, 'sleep']) {
           const a = mirrorX(crop(`${p}-${authored}`)),
             b = crop(`${p}-${derived}`)
           expect(

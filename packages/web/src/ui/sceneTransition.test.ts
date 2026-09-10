@@ -160,9 +160,10 @@ describe('entering a room is a camera going in, not a card appearing', () => {
   })
 })
 
+// Which stop a followed shot asks for, and that a resize re-asks it, is driven over a fake rig
+// in directorCut.test.ts. What no such test can see is a scale written behind the rig's back.
 describe('following someone eases the zoom', () => {
-  it("goes through the camera's own stop machine, which eases — never a raw scale write", () => {
-    expect(DIRECTOR).toContain('scene.setZoom(directorZoom(')
+  it('never writes a raw scale: the stop goes through the camera, which eases every one', () => {
     expect(DIRECTOR).not.toMatch(/world\.scale/)
   })
 })

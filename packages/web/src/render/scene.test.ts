@@ -1,7 +1,16 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { Container, type FederatedPointerEvent } from 'pixi.js'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  type CameraBounds,
+  WHEEL_GESTURE_GAP_MS,
+  ZOOM_SETTLE_MS,
+  ZOOM_STOPS,
+  type ZoomStop,
+} from './camera.js'
+import { createCameraRig } from './cameraRig.js'
 import { BACKGROUND, rendererOptions, sceneClock } from './scene.js'
 
 const root = {} as HTMLElement
@@ -128,63 +137,237 @@ export function functionBody(src: string, name: string): string {
   return src.slice(i, ends.length === 0 ? src.length : Math.min(...ends))
 }
 
-describe('a glide is ended by anything that says where the camera should be', () => {
-  const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
-  const body = (name: string): string => functionBody(src, name)
+// Nothing below reads the text of cameraRig.ts. A throw is thrown with a pointer, a zoom is
+// turned with a wheel, and what is read back is the container the renderer draws.
 
-  it('the wheel stops it before it captures a zoom anchor', () => {
-    const wheel = body('const onWheel =')
-    expect(wheel.indexOf('stopGlide()')).toBeGreaterThan(-1)
-    expect(wheel.indexOf('stopGlide()')).toBeLessThan(wheel.indexOf('captureAnchor'))
+type Tick = () => void
+
+const WIDE: CameraBounds = { minX: -20000, maxX: 20000, minY: -20000, maxY: 20000 }
+
+const pointerAt = (id: number, x: number, y: number, target: unknown): FederatedPointerEvent =>
+  ({ pointerId: id, global: { x, y }, target }) as unknown as FederatedPointerEvent
+
+const wheelOf = (deltaY: number, x: number, y: number, ctrlKey: boolean): WheelEvent =>
+  ({
+    preventDefault: () => undefined,
+    deltaY,
+    offsetX: x,
+    offsetY: y,
+    ctrlKey,
+  }) as unknown as WheelEvent
+
+/** The real rig on a fake clock, with the canvas wheel listener and the stage in hand: every
+ *  gesture goes in the way a hand's does, and nothing reaches the camera another way. */
+function rigOn(stop: ZoomStop) {
+  const clock = { now: 1000 }
+  vi.spyOn(performance, 'now').mockImplementation(() => clock.now)
+  const ticks: Tick[] = []
+  const wheels: ((e: WheelEvent) => void)[] = []
+  const app = {
+    screen: { width: 1440, height: 900 },
+    ticker: {
+      add: (fn: Tick) => ticks.push(fn),
+      remove: (fn: Tick) => ticks.splice(ticks.indexOf(fn), 1),
+      deltaMS: 16.7,
+    },
+    stage: new Container(),
+    renderer: { events: { cursorStyles: { default: '' } } },
+    canvas: {
+      style: {},
+      addEventListener: (_t: string, fn: (e: WheelEvent) => void) => wheels.push(fn),
+      removeEventListener: (_t: string, fn: (e: WheelEvent) => void) =>
+        wheels.splice(wheels.indexOf(fn), 1),
+    },
+  }
+  const world = new Container()
+  app.stage.addChild(world)
+  const rig = createCameraRig(app as unknown as Parameters<typeof createCameraRig>[0], world, {
+    reachable: () => WIDE,
+    town: () => WIDE,
   })
+  const frame = (ms = 16.7): void => {
+    clock.now += ms
+    for (const t of [...ticks]) t()
+  }
+  rig.setZoom(stop)
+  frame(ZOOM_SETTLE_MS)
+  const stage = app.stage
+  const turn = (deltaY: number, x: number, y: number, ctrlKey: boolean): void => {
+    for (const w of wheels) w(wheelOf(deltaY, x, y, ctrlKey))
+  }
+  return {
+    rig,
+    world,
+    stage,
+    frame,
+    clock,
+    ticks,
+    hitArea: (): unknown => app.stage.hitArea,
+    screen: (): unknown => app.screen,
+    wheel: (deltaY: number, ctrlKey = false): void => {
+      turn(deltaY, 700, 400, ctrlKey)
+    },
+    /** The same gesture with the cursor travelling, which is where a stale anchor shows. */
+    wheelAt: (deltaY: number, x: number, y: number): void => {
+      turn(deltaY, x, y, false)
+    },
+    /** A hand that drags the camera and lets go while it is still moving. */
+    throwCamera: (): void => {
+      stage.emit('pointerdown', pointerAt(1, 700, 400, stage))
+      for (let i = 1; i <= 4; i++) {
+        clock.now += 10
+        stage.emit('pointermove', pointerAt(1, 700 + i * 20, 400, stage))
+      }
+      stage.emit('pointerup', pointerAt(1, 780, 400, stage))
+    },
+    /** The world point under a screen point: what a zoom about the cursor must keep still. */
+    under: (sx: number, sy: number): { x: number; y: number } => ({
+      x: (sx - world.position.x) / world.scale.x,
+      y: (sy - world.position.y) / world.scale.y,
+    }),
+  }
+}
 
-  for (const mover of [
-    'function fitTo(',
-    'panBy: (dx, dy) =>',
-    'centerHome: () => {',
-    'setFollow: (target) =>',
-    'travelTo: (sx, sy) =>',
-  ]) {
-    it(`${mover.replace(/[(:].*/, '')} stops it`, () => {
-      expect(body(mover)).toContain('stopGlide()')
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
+
+describe('a glide is ended by anything that says where the camera should be', () => {
+  const movers: readonly (readonly [string, (r: ReturnType<typeof rigOn>) => void])[] = [
+    [
+      'panBy',
+      (r) => {
+        r.rig.panBy(0, 0)
+      },
+    ],
+    [
+      'centerHome',
+      (r) => {
+        r.rig.centerHome()
+      },
+    ],
+    [
+      'travelTo',
+      (r) => {
+        r.rig.travelTo(0, 0)
+      },
+    ],
+    [
+      'setFollow',
+      (r) => {
+        r.rig.setFollow(() => null)
+      },
+    ],
+    [
+      'fitToTown',
+      (r) => {
+        r.rig.fitToTown()
+      },
+    ],
+    [
+      'the wheel',
+      (r) => {
+        r.wheel(0)
+      },
+    ],
+    [
+      'a pointer catching it',
+      (r) => {
+        r.stage.emit('pointerdown', pointerAt(2, 1, 1, r.stage))
+      },
+    ],
+  ]
+
+  for (const [name, mover] of movers) {
+    it(`${name} stops a throw dead`, () => {
+      // 0.25 is this box's own fit stop, so `fitToTown` names the stop the camera is already on
+      // and no zoom transit moves the picture under the assertion.
+      const r = rigOn(0.25)
+      r.throwCamera()
+      r.frame()
+      const flying = r.world.position.x
+      r.frame()
+      expect(r.world.position.x, 'the throw never left the ground').not.toBe(flying)
+      mover(r)
+      const at = r.world.position.x
+      for (let i = 0; i < 3; i++) r.frame()
+      expect(r.world.position.x, `${name} let the throw run on under it`).toBe(at)
     })
   }
 
-  it('catching the camera with a pointer stops it, as a hand would', () => {
-    expect(body("app.stage.on('pointerdown'")).toContain('stopGlide()')
+  it('asks about reduced motion before it starts one, so a viewer who said no is never thrown', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const r = rigOn(1)
+    r.throwCamera()
+    const at = r.world.position.x
+    for (let i = 0; i < 3; i++) r.frame()
+    expect(r.world.position.x, 'the camera was thrown at a viewer who asked for stillness').toBe(at)
   })
 
-  it('★ a tap and a throw read ONE tracker, so a click can never become a fling', () => {
-    expect(src).toMatch(/if \(isDrag\(drag\)\) return\b/)
-    // and no second, hand-rolled slop test survives anywhere in the scene
-    expect(src).not.toMatch(/Math\.abs\(dx\) \+ Math\.abs\(dy\) >/)
+  it('gives the glide back its ticker slot on teardown, mid-throw', () => {
+    const r = rigOn(1)
+    r.throwCamera()
+    r.frame()
+    const flying = r.world.position.x
+    r.frame()
+    expect(r.world.position.x).not.toBe(flying)
+    r.rig.destroy()
+    expect(r.ticks.length, 'a tick of the rig is still running').toBe(0)
+    const at = r.world.position.x
+    r.frame()
+    expect(r.world.position.x, 'a frame after teardown carried the throw on').toBe(at)
+  })
+})
+
+describe('★ a tap and a throw read ONE tracker, so a click can never become a fling', () => {
+  const picksOf = (r: ReturnType<typeof rigOn>): { x: number; y: number }[] => {
+    const picks: { x: number; y: number }[] = []
+    r.rig.onTilePointer((t) => picks.push(t))
+    return picks
+  }
+
+  it('★ a pan that came back to where it began is still a pan, and picks no tile', () => {
+    const r = rigOn(1)
+    const picks = picksOf(r)
+    r.stage.emit('pointerdown', pointerAt(1, 700, 400, r.stage))
+    for (const x of [760, 820, 760, 700]) {
+      r.clock.now += 10
+      r.stage.emit('pointermove', pointerAt(1, x, 400, r.stage))
+    }
+    r.stage.emit('pointerup', pointerAt(1, 700, 400, r.stage))
+    r.stage.emit('pointertap', pointerAt(1, 700, 400, r.stage))
+    expect(r.rig.wasDrag(), 'the gesture forgot it had travelled').toBe(true)
+    expect(picks, 'a pan that ended where it started picked a tile').toEqual([])
+  })
+
+  it('and a pointer that never moved picks the tile under it', () => {
+    const r = rigOn(1)
+    const picks = picksOf(r)
+    r.stage.emit('pointerdown', pointerAt(1, 700, 400, r.stage))
+    r.stage.emit('pointerup', pointerAt(1, 700, 400, r.stage))
+    r.stage.emit('pointertap', pointerAt(1, 700, 400, r.stage))
+    expect(picks).toHaveLength(1)
   })
 
   it('★ a tile pick means the pointer landed on the GROUND, not on a body or a building', () => {
-    expect(body("app.stage.on('pointertap'")).toContain('e.target !== app.stage')
+    const r = rigOn(1)
+    const picks = picksOf(r)
+    r.stage.emit('pointerdown', pointerAt(1, 700, 400, r.stage))
+    r.stage.emit('pointerup', pointerAt(1, 700, 400, r.stage))
+    r.stage.emit('pointertap', pointerAt(1, 700, 400, new Container()))
+    expect(picks, 'a click on a body picked the ground under it').toEqual([])
   })
 
   it('★ and the stage hit area survives, because the camera is standing on it', () => {
-    // CODE, not the file: the comment above the handler quotes this very line, and a guard
-    // that reads its own explanation is satisfied by the explanation. Caught by mutation.
-    const code = src
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'))
-      .join('\n')
-    expect(code).toContain('app.stage.hitArea = app.screen')
-    for (const gesture of ['pointerdown', 'pointermove', 'pointerup']) {
-      expect(code, gesture).toContain(`app.stage.on('${gesture}'`)
-    }
+    const r = rigOn(1)
+    expect(r.hitArea()).toBe(r.screen())
   })
 
-  it('asks about reduced motion before it starts one', () => {
-    expect(src).toContain("matchMedia('(prefers-reduced-motion: reduce)')")
-    expect(body('const endDrag =')).toContain('wantsMotion()')
-  })
-
-  it('gives the glide back its ticker slot on teardown', () => {
-    expect(src).toContain('app.ticker.remove(glideTick)')
+  it('keeps no second, hand-rolled slop test anywhere in the rig', () => {
+    expect(readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')).not.toMatch(
+      /Math\.abs\(dx\) \+ Math\.abs\(dy\) >/,
+    )
   })
 })
 
@@ -193,37 +376,64 @@ describe('a glide is ended by anything that says where the camera should be', ()
 // The end of a wheel gesture is the ABSENCE of an event, so the release lives on the frame;
 // without it the camera holds whatever fractional scale the hand left it at.
 describe('★ the wheel gesture is released on the frame, so the resting frame stays exact', () => {
-  const src = readFileSync(join(WEB_SRC, 'render', 'cameraRig.ts'), 'utf8')
-  const body = (name: string): string => functionBody(src, name)
-
-  it('zoomTick asks whether the hand has left, and releases when it has', () => {
-    const tick = body('const zoomTick =')
-    expect(tick).toContain('zoomGestureEnded(zoom, now)')
-    expect(tick).toContain('zoomRelease(zoom, now')
-    // and it does so BEFORE it reads the scale, or the release lands a frame late
-    expect(tick.indexOf('zoomRelease')).toBeLessThan(tick.indexOf('zoomScaleAt'))
+  it('★ holds a fractional scale under the hand, and lands on an exact stop when it leaves', () => {
+    const r = rigOn(1)
+    r.wheel(-110)
+    r.frame()
+    const under = r.world.scale.x
+    expect(under, 'the zoom did not follow the hand at all').not.toBe(1)
+    expect(
+      ZOOM_STOPS,
+      'the gesture was snapped to a stop while the hand was still on it',
+    ).not.toContain(under)
+    for (let i = 0; i < 40; i++) r.frame()
+    expect(r.world.scale.x, 'the camera rests on the scale the hand left it at').toBe(2)
+    expect(r.rig.getZoomStop()).toBe(2)
   })
 
   it('reduced motion reaches the release, so the settle is instant for a viewer who asked', () => {
-    expect(body('const zoomTick =')).toContain('!wantsMotion()')
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
+    const r = rigOn(1)
+    r.wheel(-110)
+    r.frame()
+    r.frame(WHEEL_GESTURE_GAP_MS + 1)
+    expect(r.world.scale.x).toBe(2)
   })
 
-  it('★ the anchor is captured ONCE PER GESTURE, not once per event', () => {
-    const wheel = body('const onWheel =')
-    // guarded by the gesture test, not fired unconditionally: re-pinning on every event makes
-    // the town swim under the cursor instead of growing beneath it
-    expect(wheel).toMatch(
-      /if \(zoom\.live === null \|\| now - zoom\.lastWheelMs > WHEEL_GESTURE_GAP_MS\)/,
-    )
-    expect(wheel.indexOf('captureAnchor')).toBeGreaterThan(wheel.indexOf('zoom.live === null'))
+  // ★ The cursor drifts across a long scroll, and a rig that re-pinned on every event grew the
+  // town about wherever the hand had reached, so the thing being zoomed toward slid away.
+  it('★ the anchor is captured ONCE PER GESTURE, so the town grows where the gesture began', () => {
+    const r = rigOn(1)
+    const began = r.under(700, 400)
+    for (let i = 0; i < 6; i++) {
+      r.wheelAt(-30, 700 + i * 40, 400 + i * 20)
+      r.frame(20)
+    }
+    for (let i = 0; i < 40; i++) r.frame()
+    expect(r.world.scale.x, 'the gesture moved no scale at all').not.toBe(1)
+    expect(r.under(700, 400).x, 'the town swam out from under the cursor').toBeCloseTo(began.x, 0)
+    expect(r.under(700, 400).y).toBeCloseTo(began.y, 0)
   })
 
-  it('the pinch flag reaches the rule — a trackpad pinch is not a scroll', () => {
-    expect(body('const onWheel =')).toContain('e.ctrlKey')
+  it('the pinch flag reaches the rule, so a trackpad pinch is not a scroll', () => {
+    const scroll = rigOn(1)
+    scroll.wheel(-90)
+    scroll.frame()
+    const scrolled = scroll.world.scale.x
+    const pinch = rigOn(1)
+    pinch.wheel(-90, true)
+    pinch.frame()
+    expect(pinch.world.scale.x, 'a pinch spent the same delta as a scroll').not.toBe(scrolled)
   })
 
-  it('gives the zoom back its ticker slot on teardown', () => {
-    expect(src).toContain('app.ticker.remove(zoomTick)')
+  it('the camera eases every stop it is given, rather than jumping to it', () => {
+    const r = rigOn(1)
+    r.rig.setZoom(3)
+    r.frame(ZOOM_SETTLE_MS / 3)
+    expect(r.world.scale.x).toBeGreaterThan(1)
+    expect(r.world.scale.x).toBeLessThan(3)
+    r.frame(ZOOM_SETTLE_MS)
+    expect(r.world.scale.x).toBe(3)
   })
 })
 

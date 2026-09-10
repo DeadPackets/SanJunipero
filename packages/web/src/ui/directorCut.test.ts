@@ -1,7 +1,18 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { WorldState } from '@sj/engine/state'
 import type { ServerDirector, StakeScore } from '@sj/shared'
 import { createWorldStore } from '../state/worldStore.js'
+import { tileToScreen } from '../render/iso.js'
+import { sceneShot } from '../render/sceneFraming.js'
+import {
+  DIRECTOR_ZOOM,
+  DIRECTOR_ZOOM_WIDE,
+  OVERVIEW_ZOOM,
+  type ShotCamera,
+  WIDE_VIEWPORT_PX,
+  driveShot,
+} from './DirectorMode.js'
 import {
   CUT_MIN_MS,
   QUIET_TURN_TICKS,
@@ -106,6 +117,42 @@ describe('★ the camera’s ladder of claims', () => {
     })
   })
 
+  // ★ `shot.ts` has encoded `indoors -> interior` since the grammar was written and nothing ever
+  // called it: a council sat in a room while the camera showed the street outside it.
+  it('★ a cut wholly inside ONE room is played in that room, not held on the street', () => {
+    const inside = new Set(['nadia', 'yusuf'])
+    const hall = (id: string): string | null => (inside.has(id) ? 'st_hall' : null)
+    expect(
+      cameraClaim(null, NO_MOMENT, inside, cut(['nadia', 'yusuf']), false, null, hall),
+    ).toEqual({ by: 'interior', structureId: 'st_hall', cast: ['nadia', 'yusuf'] })
+  })
+
+  it('★ holds rather than choosing when the cast is indoors in two different rooms', () => {
+    const inside = new Set(['nadia', 'yusuf'])
+    const apart = (id: string): string => (id === 'nadia' ? 'st_hall' : 'st_house')
+    expect(
+      cameraClaim(null, NO_MOMENT, inside, cut(['nadia', 'yusuf']), false, null, apart),
+    ).toEqual({ by: 'hold' })
+    // and a body whose room nobody recorded is not a room to cut to either
+    expect(
+      cameraClaim(null, NO_MOMENT, inside, cut(['nadia', 'yusuf']), false, null, () => null),
+    ).toEqual({ by: 'hold' })
+  })
+
+  it('★ one of them out on the street is still a street shot: the map can show that much', () => {
+    expect(
+      cameraClaim(
+        null,
+        NO_MOMENT,
+        new Set(['nadia']),
+        cut(['nadia', 'yusuf']),
+        false,
+        null,
+        () => 'st_hall',
+      ),
+    ).toEqual({ by: 'cut', cast: ['yusuf'] })
+  })
+
   it('★ a moment whose cast is all indoors holds too, rather than falling to the round', () => {
     expect(cameraClaim(null, ['amara'], new Set(['amara']), { cut: null }, false, 'omar')).toEqual({
       by: 'hold',
@@ -202,71 +249,156 @@ describe('★ every living body asleep, and not one more', () => {
   })
 })
 
-// ── what the viewer's own director does with the frame ────────────────────────────────────
+// ── the one thing the file’s own text can answer ──────────────────────────────────────────
 
-describe('★ DirectorMode reads the gateway’s frame, and asks nobody anything', () => {
-  it('★ hand-rolls no fetch and polls no endpoint: the cut arrives on the socket', () => {
+describe('★ DirectorMode asks nobody anything: the cut arrives on the socket', () => {
+  it('★ hand-rolls no fetch and polls no endpoint', () => {
     expect(SRC).not.toContain('fetch(')
     expect(SRC).not.toContain('/api/heat')
     expect(SRC).not.toContain('useEndpoint')
-    expect(SRC).toContain('useSyncExternalStore(store.subscribe, store.getDirector)')
   })
+})
 
-  it('★ keeps the eight-second floor over FRAMES: a gateway that changes its mind is not a cut', () => {
-    expect(SRC).toContain('now - lastCutRef.current >= CUT_MIN_MS')
-    // the same people with a fresher sentence is the same shot, and lands whatever the clock says
-    expect(SRC).toContain('if (keyOf(next) === keyOf(held))')
-  })
+// ── what the camera actually DOES with a claim ────────────────────────────────────────────
+//
+// Everything below used to be `expect(SRC).toContain(...)` about the text of DirectorMode.tsx,
+// and the owner reported director mode as completely broken while every one of them was green.
+// A shot is where the camera ended up, so it is taken over a fake rig and read off the picture.
 
-  it('★ reads indoors off the layer that draws the street', () => {
-    expect(SRC).toContain('rendersOnMap')
-    expect(SRC).toContain('indoorsIn(state)')
-  })
+const STAGE_BOX = { w: 1280, h: 720 }
+const FRAMED = { current: true }
+const NO_WORLD = { getState: (): null => null }
 
-  it('★ a held shot moves the camera nowhere at all', () => {
-    expect(SRC).toMatch(/if \(claimBy === 'hold'\) return/)
-  })
+/** A rig that remembers where it is, what it was asked in what order, and the follow tick the
+ *  real camera runs every frame. */
+function rig(
+  points: Map<string, { sx: number; sy: number }>,
+  anchors = new Map<string, { x: number; y: number }>(),
+) {
+  const cam = { x: 137, y: -42, scale: 3 }
+  const asked: string[] = []
+  let follow: (() => { x: number; y: number } | null) | null = null
+  const scene: ShotCamera = {
+    app: { screen: { width: STAGE_BOX.w, height: STAGE_BOX.h } },
+    setZoom(stop) {
+      asked.push('zoom')
+      cam.scale = stop
+    },
+    setFollow(target) {
+      follow = target
+    },
+    centerHome() {
+      asked.push('home')
+      cam.x = 0
+      cam.y = 0
+    },
+    pointOf: (_kind, id) => points.get(id) ?? null,
+    anchorOf: (id) => anchors.get(id) ?? null,
+  }
+  const tick = (): void => {
+    const p = follow?.() ?? null
+    if (p === null) return
+    cam.x = p.x
+    cam.y = p.y
+  }
+  return { scene, cam, asked, tick }
+}
 
-  it('★ the cut is re-framed every frame, so it follows the room as it shifts', () => {
-    expect(SRC).toContain('scene.setZoom(opening.stop)')
-    expect(SRC).toMatch(/scene\.setFollow\(\(\) => \{\s*const shot = where\(\)/)
-  })
+/** The window the stop is a function of, with its resize listeners in hand. */
+function stubWindow(width: number) {
+  const bound = new Set<() => void>()
+  const win = {
+    innerWidth: width,
+    addEventListener: (_type: string, fn: () => void) => void bound.add(fn),
+    removeEventListener: (_type: string, fn: () => void) => void bound.delete(fn),
+  }
+  vi.stubGlobal('window', win)
+  return {
+    resize(to: number) {
+      win.innerWidth = to
+      for (const fn of [...bound]) fn()
+    },
+    listeners: (): number => bound.size,
+  }
+}
 
-  it('★ the first viewport is the town at zoom 1, centred before the stop moves', () => {
-    expect(SRC).toContain('export const OVERVIEW_ZOOM = 1 as const')
-    expect(SRC).toMatch(/scene\.centerHome\(\)\s*\n\s*scene\.setZoom\(OVERVIEW_ZOOM\)/)
-  })
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
-  // Learned the hard way: a hand on the camera nulls the held cut, the claim falls to 'town',
-  // and the branch above ran again, so the first frame of a viewer's own drag was preceded by a
-  // jump home at 1x. The opening shot is taken once and never again.
-  it('★ standing a claim down moves the camera nowhere at all', () => {
-    expect(SRC).toContain('if (!awake || framedRef.current) return')
-    expect(SRC).toMatch(/framedRef\.current = true\s*\n\s*scene\.centerHome\(\)/)
-  })
-
-  it('★ re-asks the stop when the window crosses the wide breakpoint', () => {
-    expect(SRC).toContain("window.addEventListener('resize', stop)")
-    expect(SRC).toContain("window.removeEventListener('resize', stop)")
-  })
-
-  it('★ a hand on the camera stands the gateway AND the round down, for the same 20s', () => {
-    expect(SRC).toContain('autoCut ? (frame?.cut ?? null) : null')
-    expect(SRC).toContain('autoCut ? quietSubject(')
-  })
-
-  it('★ the caption names the shot the camera is HOLDING, never a frame it has not taken', () => {
-    expect(SRC).toContain("const why = claimBy === 'cut' ? (held?.why ?? null) : null")
-  })
-
-  it('★ hands the shot on as a string, so a fresh array cannot re-cut the card every tick', () => {
-    expect(SRC).toMatch(
-      /onShot\?\.\(shotKey === '' \? NO_CAST : shotKey\.split\(' '\), sceneId, isCut\)/,
+describe('★ the shot a claim takes, over a fake rig and a fake clock', () => {
+  it('★ re-frames the cut on every tick, so the shot follows the room as it shifts', () => {
+    const points = new Map([
+      ['nadia', { sx: 900, sy: 500 }],
+      ['yusuf', { sx: 964, sy: 532 }],
+    ])
+    const { scene, cam, tick } = rig(points)
+    driveShot(
+      scene,
+      NO_WORLD,
+      { by: 'cut', castKey: 'nadia yusuf', followed: null, structureId: null, awake: true },
+      FRAMED,
     )
-    expect(SRC).toMatch(/\}, \[shotKey, sceneId, isCut, onShot\]\)/)
-    // a quiet-round turn is a shot, but not a cut: the first lines must not go on it
-    expect(SRC).toContain("const isCut = claimBy === 'cut' || claimBy === 'moment'")
-    // a round turn is a shot too: the caption follows the face the camera moved to
-    expect(SRC).toContain("const shotKey = castKey !== '' ? castKey : (followed ?? '')")
+    tick()
+    const opening = sceneShot([...points.values()], STAGE_BOX)
+    expect(opening).not.toBeNull()
+    expect(cam).toEqual({ x: opening?.sx, y: opening?.sy, scale: opening?.stop })
+    points.set('yusuf', { sx: 1500, sy: 900 })
+    tick()
+    const moved = sceneShot([...points.values()], STAGE_BOX)
+    expect(moved?.sx).not.toBe(opening?.sx)
+    expect(cam, 'the shot was framed once and never again').toMatchObject({
+      x: moved?.sx,
+      y: moved?.sy,
+    })
+  })
+
+  it('★ centres the town before the stop moves, so the opening zoom eases about the middle', () => {
+    const { scene, cam, asked } = rig(new Map())
+    driveShot(
+      scene,
+      NO_WORLD,
+      { by: 'town', castKey: '', followed: null, structureId: null, awake: true },
+      { current: false },
+    )
+    expect(asked).toEqual(['home', 'zoom'])
+    expect(cam).toEqual({ x: 0, y: 0, scale: OVERVIEW_ZOOM })
+  })
+
+  it('★ follows the body itself: the sprite where the layer drew one, the tile where it did not', () => {
+    stubWindow(WIDE_VIEWPORT_PX)
+    const anchors = new Map([['ada', { x: 900, y: 500 }]])
+    const world = { getState: () => ({ agents: { ada: { x: 4, y: 6 } } }) as unknown as WorldState }
+    const { scene, cam, tick } = rig(new Map(), anchors)
+    driveShot(
+      scene,
+      world,
+      { by: 'round', castKey: '', followed: 'ada', structureId: null, awake: true },
+      FRAMED,
+    )
+    tick()
+    expect(cam).toMatchObject({ x: 900, y: 500 })
+    anchors.clear()
+    tick()
+    const tile = tileToScreen(4, 6)
+    expect(cam).toMatchObject({ x: tile.sx, y: tile.sy })
+  })
+
+  it('★ re-asks the stop when the window crosses the wide breakpoint, and lets go on the way out', () => {
+    const win = stubWindow(WIDE_VIEWPORT_PX)
+    const { scene, cam } = rig(new Map(), new Map([['ada', { x: 0, y: 0 }]]))
+    const off = driveShot(
+      scene,
+      NO_WORLD,
+      { by: 'round', castKey: '', followed: 'ada', structureId: null, awake: true },
+      FRAMED,
+    )
+    expect(cam.scale).toBe(DIRECTOR_ZOOM_WIDE)
+    win.resize(WIDE_VIEWPORT_PX - 1)
+    expect(cam.scale).toBe(DIRECTOR_ZOOM)
+    off?.()
+    expect(win.listeners()).toBe(0)
+    win.resize(WIDE_VIEWPORT_PX)
+    expect(cam.scale, 'a shot that ended is still driving the camera').toBe(DIRECTOR_ZOOM)
   })
 })

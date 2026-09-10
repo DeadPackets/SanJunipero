@@ -103,9 +103,11 @@ export type Scene = {
   centerOnScreen(sx: number, sy: number): void
   /** move to a named rest stop, turning about the screen centre */
   setZoom(stop: ZoomStop): void
+  takeZoom(stop: ZoomStop): void
   /** move to a named rest stop, keeping the world point under (screenX, screenY) fixed */
   setZoomAt(stop: ZoomStop, screenX: number, screenY: number): void
-  /** the scale being drawn this frame — animated during a transit */
+  /** The scale the camera is on this frame, animated through a transit. A cut's punch is the
+   *  picture's own kick and is not in it, so nothing outside the canvas steps off a punched scale. */
   getZoom(): number
   /** The one owner of `prefers-reduced-motion` for the whole canvas. */
   wantsMotion(): boolean
@@ -336,6 +338,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     centerOn: rig.centerOn,
     centerOnScreen: rig.centerOnScreen,
     setZoom: rig.setZoom,
+    takeZoom: rig.takeZoom,
     setZoomAt: rig.setZoomAt,
     getZoom: rig.getZoom,
     wantsMotion: rig.wantsMotion,

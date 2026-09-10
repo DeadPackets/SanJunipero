@@ -208,6 +208,29 @@ describe('★ the signpost and the paper hold their own shape', () => {
     }
   })
 
+  // A broadcast frame is the town with nobody operating it, and the sheet takes the picture.
+  // Every other mark in the corner is taken off both; the newest one was taken off neither.
+  it('★ takes the camera chip out of a broadcast frame and out from under the sheet', () => {
+    for (const state of ['data-broadcast', 'data-paper']) {
+      for (const mark of ['.camera-chip', '.sound-cues'])
+        expect(rulesFor(BARE, `[${state}='on'] ${mark}`), `${state} ${mark}`).toMatch(
+          /display:\s*none/,
+        )
+    }
+  })
+
+  // The chip reserved a 44px row on EVERY frame for a button that renders on almost none:
+  // `.stage-exit` is drawn only inside a room, and `.stage-live` stands in the other corner.
+  it('★ hangs the camera chip on the corner’s first row, stepping down only under a way out', () => {
+    const chip = rulesFor(BARE, '.camera-chip')
+    expect(chip, 'the chip is not a top-level rule in the sheet').toContain('var(--sign-band)')
+    expect(chip, 'the chip reserves a row on a frame with no button in it').not.toContain('44px')
+    expect(rulesFor(BARE, 'body:has(.stage-exit) .camera-chip')).toContain('44px')
+    expect(rulesFor(BARE, '.stage-live'), '.stage-live is in the right-hand corner').toContain(
+      'left: auto',
+    )
+  })
+
   // The plate's drop is written twice — once in the sheet, once in TS, because the placer that
   // keeps a bubble off the plate reasons about its box and cannot read CSS.
   it('★ keeps the plate drop in the sheet and in Nameplate.tsx the same number', () => {

@@ -1,4 +1,10 @@
-import { boundsCentre, type CameraBounds, fitStop, type ZoomStop } from './camera.js'
+import {
+  boundsCentre,
+  type CameraBounds,
+  fitStop,
+  TWO_SHOT_MAX_STOP,
+  type ZoomStop,
+} from './camera.js'
 import { TILE_H, TILE_W } from './iso.js'
 
 // What shot a scene asks the camera for. Pure: the rig applies it, this file decides it.
@@ -32,6 +38,8 @@ export function sceneBox(points: readonly ScenePoint[]): CameraBounds | null {
  *  fits at. `fitStop` is the town's one fit rule, so a scene and the overview never disagree. */
 export type SceneShot = { sx: number; sy: number; stop: ZoomStop }
 
+/** The room is the cast and its margin, never a count of tiles: a twelve-tile floor fits no
+ *  phone at any usable stop, and threw a two-hander on a 390 screen out to 0.5. */
 export function sceneShot(
   points: readonly ScenePoint[],
   screen: { w: number; h: number },
@@ -39,7 +47,8 @@ export function sceneShot(
   const box = sceneBox(points)
   if (box === null) return null
   const c = boundsCentre(box)
-  return { sx: c.sx, sy: c.sy, stop: fitStop(box, screen) }
+  const stop = fitStop(box, screen)
+  return { sx: c.sx, sy: c.sy, stop: stop > TWO_SHOT_MAX_STOP ? TWO_SHOT_MAX_STOP : stop }
 }
 
 /** Whose bodies the camera can actually frame: the participants the exterior view draws. A

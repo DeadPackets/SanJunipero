@@ -2142,6 +2142,29 @@ body:has(.app[data-paper='on']) .first-lines { display: none; }
 }
 [data-broadcast='on'] .sound-cues, [data-paper='on'] .sound-cues { display: none; }
 
+/* ── the camera chip: whose hand is on the lens, and when the town takes it back ── */
+/* The cue's own register, in the top corner: a mark over the town, not a panel. It takes the
+   corner's own first row, which only the way out of a room ever wants, and steps under that. */
+.camera-chip {
+  position: absolute; z-index: 25; margin: 0;
+  left: max(var(--mark-inset), env(safe-area-inset-left));
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--cream); text-shadow: var(--halo-deep);
+  pointer-events: none;
+}
+/* Honey holds 10.2:1 on the halo's own deep. The one state worth an ink change: the picture has
+   stopped answering the director. */
+.camera-chip[data-hand='on'] { color: var(--honey); }
+body:has(.stage-exit) .camera-chip {
+  top: calc(
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + 44px + var(--s-3)
+  );
+}
+[data-broadcast='on'] .camera-chip, [data-paper='on'] .camera-chip { display: none; }
+
 
 
 .key-map {

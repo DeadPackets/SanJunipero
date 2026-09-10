@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { momentPlay, momentRows } from '../paper/pages/Moments.js'
-import { onChrome } from './autoCut.js'
+import { onCamera } from './autoCut.js'
 import {
   MOMENT_LEAD_TICKS,
   MOMENT_TAIL_TICKS,
@@ -94,25 +94,24 @@ describe('★ a moment stops where the moment stops', () => {
 })
 
 // ★ `hold()` suspended the director for 20 s on ANY pointerdown on window, so the very click
-// that opens a replay disabled the thing meant to shoot it.
+// that opens a replay disabled the thing meant to shoot it. Naming the two surfaces to exempt
+// then left everything else on the list, and muting the town took the camera off auto too.
 describe('★ a click on the paper is a hand on the paper, not on the camera', () => {
-  // the one question `hold` asks of an event target, answered without a DOM
-  const at = (...ancestors: string[]): EventTarget =>
-    ({ closest: (sel: string) => (ancestors.some((a) => sel.includes(a)) ? {} : null) }) as never
+  // the one question `hold` asks of an event, answered without a DOM
+  const at = (...ancestors: string[]): Event =>
+    ({
+      type: 'pointerdown',
+      target: { closest: (sel: string) => (ancestors.some((a) => sel.includes(a)) ? {} : null) },
+    }) as never
 
-  it('★ ignores the sheet and the signpost', () => {
-    expect(onChrome(at('.paper'))).toBe(true)
-    expect(onChrome(at('.signpost'))).toBe(true)
+  it('★ ignores the sheet, the signpost and every other piece of the town’s chrome', () => {
+    expect(onCamera(at('.paper'))).toBe(false)
+    expect(onCamera(at('.signpost'))).toBe(false)
+    expect(onCamera(at('.sound-button'))).toBe(false)
   })
 
   it('★ still gives the town itself away: a pan or a click on the ground is a hand', () => {
-    expect(onChrome(at())).toBe(false)
-    expect(onChrome(null)).toBe(false)
-    expect(onChrome(new EventTarget())).toBe(false)
-  })
-
-  it('is the guard `hold` actually runs', () => {
-    expect(src('./autoCut.ts')).toContain('if (!armed || onChrome(e.target)) return')
+    expect(onCamera(at('.stage-mount'))).toBe(true)
   })
 })
 

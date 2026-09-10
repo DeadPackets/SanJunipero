@@ -30,6 +30,7 @@ import { KeyMap } from './stage/KeyMap.js'
 import { ThoughtsButton } from './stage/ThoughtsButton.js'
 import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
+import { CameraChip } from './stage/CameraChip.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
 import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
@@ -115,7 +116,7 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, toggle: toggleDirector } = useAutoCut()
+  const { autoCut, handbackAt, toggle: toggleDirector } = useAutoCut()
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
   const moment = useStageCue(store)
@@ -471,6 +472,7 @@ export function App() {
         onWhy={setWhy}
         onShot={onShot}
       />
+      <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
       {!route.broadcast && (
         <Transport store={store} play={play} handle={handle} onLive={onLive} onAt={address} />
       )}

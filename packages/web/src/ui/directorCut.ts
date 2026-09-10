@@ -47,11 +47,27 @@ export type CameraClaim =
   | { by: 'moment'; cast: readonly string[] }
   /** the gateway's cut: the people the shot is scored FOR, framed together */
   | { by: 'cut'; cast: readonly string[] }
+  /** a cut whose whole cast is in ONE room: the interior renderer draws that shot */
+  | { by: 'interior'; structureId: string; cast: readonly string[] }
   /** nothing scored: one face at a time, so an unattended stream is never empty */
   | { by: 'round'; agentId: string }
   /** a claim the map cannot show: the director stands down, and the shot HOLDS */
   | { by: 'hold' }
   | { by: 'town' }
+
+/** The one room a whole cast shares, or null: a camera cannot be in two rooms at once, and a
+ *  body whose room nobody recorded is not in a shot. */
+function sharedRoom(cast: readonly string[], roomOf: (id: string) => string | null): string | null {
+  let room: string | null = null
+  for (const id of cast) {
+    const r = roomOf(id)
+    if (r === null || (room !== null && r !== room)) return null
+    room = r
+  }
+  return room
+}
+
+const NO_ROOM = (): null => null
 
 export function cameraClaim(
   pinned: string | null,
@@ -60,6 +76,7 @@ export function cameraClaim(
   director: { readonly cut: StakeScore | null; readonly quiet?: boolean } | null = null,
   asleep = false,
   roundSubject: string | null = null,
+  roomOf: (id: string) => string | null = NO_ROOM,
 ): CameraClaim {
   if (pinned !== null) return { by: 'pinned', agentId: pinned }
   // A moment whose cast is all indoors HOLDS rather than handing the camera to a gateway that
@@ -73,7 +90,11 @@ export function cameraClaim(
   const cut = director?.cut ?? null
   if (cut !== null) {
     const cast = sceneCast(cut.agentIds, indoors)
-    return cast.length === 0 ? { by: 'hold' } : { by: 'cut', cast }
+    if (cast.length > 0) return { by: 'cut', cast }
+    const room = sharedRoom(cut.agentIds, roomOf)
+    return room === null
+      ? { by: 'hold' }
+      : { by: 'interior', structureId: room, cast: cut.agentIds }
   }
   // The beat after a peak is a HELD shot: the round may not turn under it, and a cast that has
   // walked indoors mid-beat is not a reason to go looking for somebody else either.

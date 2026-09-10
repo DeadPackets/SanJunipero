@@ -3,11 +3,22 @@ import type { AgentBody } from '@sj/engine/state'
 import type { StakeScore } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from '../render/scene.js'
-import { tileToScreen } from '../render/iso.js'
+import type { ZoomStop } from '../render/camera.js'
+import { type Facing, facingFrom, tileToScreen } from '../render/iso.js'
 import { rendersOnMap } from '../render/characters.js'
-import { agentName } from '@sj/shared'
+import { agentName, PEAK_SCORE } from '@sj/shared'
 import { sceneShot } from '../render/sceneFraming.js'
-import { CUT_MIN_MS, cameraClaim, quietSubject, townAsleep } from './directorCut.js'
+import { CUT_MIN_MS, type CameraClaim, cameraClaim, townAsleep } from './directorCut.js'
+import { cutFloor, quietRound } from './autoCut.js'
+import {
+  driftAt,
+  nextShot,
+  pushedStop,
+  type Shot,
+  type ShotKind,
+  type ShotSpec,
+  shotKindFor,
+} from './shot.js'
 
 export const DIRECTOR_ZOOM = 3 as const
 /** Two speakers two tiles apart are 156 world px apart, which a 1280-wide frame holds at 2×
@@ -22,6 +33,7 @@ export function directorZoom(width: number): typeof DIRECTOR_ZOOM | typeof DIREC
 }
 
 const NO_CAST: readonly string[] = []
+const NEVER_TAKEN = { current: false } as const
 
 /** Who is alive and has no body on the town map — indoors, where the exterior view draws
  *  nothing. `rendersOnMap` is the character layer's own answer, asked here rather than guessed. */
@@ -48,13 +60,219 @@ function outdoorLiving(
 
 /** The one string that says which shot is on screen. A cut whose people are the same people is
  *  the same shot, however the score under it moved. */
-const keyOf = (cut: StakeScore | null): string => (cut === null ? '' : cut.agentIds.join(' '))
+const keyOf = (cut: StakeScore): string => cut.agentIds.join(' ')
 
 /** The first name in a shot key, without cutting the whole key into an array for it. */
 function firstOf(key: string): string | null {
   if (key === '') return null
   const at = key.indexOf(' ')
   return at === -1 ? key : key.slice(0, at)
+}
+
+/** The camera surface the director drives, named on its own so a shot can be taken over a fake
+ *  one: where the camera ended up is the one thing a test of this file has to be able to read. */
+export type ShotCamera = Pick<
+  Scene,
+  'setZoom' | 'setFollow' | 'centerHome' | 'pointOf' | 'anchorOf' | 'interior'
+> & { app: { screen: { width: number; height: number } } }
+
+/** What the shot is OF, off the claim alone. Every rule the camera and the caption follow is
+ *  here rather than inside an effect, so a test can read them without a React tree. */
+export function shotOf(
+  claim: CameraClaim,
+  held: StakeScore | null,
+): {
+  castKey: string
+  followed: string | null
+  sceneId: string | null
+  shotKey: string
+  isCut: boolean
+  why: string | null
+} {
+  const framedTogether =
+    claim.by === 'cut' || claim.by === 'moment' || claim.by === 'interior' ? claim.cast : null
+  const castKey = framedTogether === null ? '' : framedTogether.join(' ')
+  const followed = claim.by === 'pinned' || claim.by === 'round' ? claim.agentId : null
+  // The sentence and the scene belong to the gateway's own shot, never to a moment being
+  // replayed: a caption off the live cut would describe people who are not in the picture.
+  const gateway = claim.by === 'cut' || claim.by === 'interior'
+  return {
+    castKey,
+    followed,
+    sceneId: gateway ? (held?.sceneId ?? null) : null,
+    // Who the camera is ON, which is not the same question as who it frames TOGETHER: a round
+    // turn is a shot too, and the caption over it has to follow the face it moved to.
+    shotKey: castKey !== '' ? castKey : (followed ?? ''),
+    isCut: framedTogether !== null,
+    why: gateway ? (held?.why ?? null) : null,
+  }
+}
+
+/** What the camera does for one claim, and how to put it back. A claim it cannot show HOLDS, and
+ *  a released claim moves nothing at all: the overview is an opening shot, never the thing the
+ *  camera does on its way out of a claim. */
+export function driveShot(
+  scene: ShotCamera,
+  store: Pick<WorldStore, 'getState'>,
+  claim: {
+    by: CameraClaim['by']
+    castKey: string
+    followed: string | null
+    structureId: string | null
+    awake: boolean
+  },
+  framed: { current: boolean },
+  /** Whether the viewer has ever taken the camera. `framed` says the world has been shown, which
+   *  is a different fact: a session that opened on a HOLD had shown nothing and jumped home. */
+  taken: { readonly current: boolean } = NEVER_TAKEN,
+  shot: Shot | null = null,
+): (() => void) | undefined {
+  // A shot the exterior view cannot show takes nobody, and it HOLDS where it is: a camera that
+  // cut away would be showing three closed doors while the room talks behind them.
+  if (claim.by === 'hold') return undefined
+  // ANY shot is the framing this viewer got. After one, a hand has been on the lens and the
+  // town may never be thrown home under its own drag.
+  const opening = !framed.current
+  if (claim.awake) framed.current = true
+  const room = claim.structureId
+  if (claim.by === 'interior' && room !== null) {
+    scene.setFollow(null)
+    // A viewer who opened a room keeps it: the director walks into an empty stage or none.
+    if ((scene.interior?.activeId() ?? null) === null) scene.interior?.setActive(room)
+    return () => {
+      if (scene.interior?.activeId() === room) scene.interior.setActive(null)
+    }
+  }
+  if (claim.castKey !== '') {
+    const cast = claim.castKey.split(' ')
+    const stageBox = { w: scene.app.screen.width, h: scene.app.screen.height }
+    const where = (): ReturnType<typeof sceneShot> =>
+      sceneShot(
+        cast
+          .map((id) => scene.pointOf('agent', id))
+          .filter((p): p is { sx: number; sy: number } => p !== null),
+        stageBox,
+      )
+    // The subject faces whoever they are framed with, which is the character layer's own rule
+    // for a body standing in a scene. One body alone has no direction and does not drift.
+    const facing = (): Facing | null => {
+      const agents = store.getState()?.agents
+      const a = agents?.[cast[0] ?? '']
+      const b = agents?.[cast[1] ?? '']
+      return a === undefined || b === undefined ? null : facingFrom(b.x - a.x, b.y - a.y)
+    }
+    const stopNow = (fitted: ZoomStop): ZoomStop =>
+      shot !== null && shot.kind === 'close' ? pushedStop(shot, performance.now()) : fitted
+    const first = where()
+    if (first !== null) scene.setZoom(stopNow(first.stop))
+    // Resolved on the ticker: the shot is cut to where they are standing NOW, and a cast the
+    // character layer has not drawn yet is waited for rather than dropped.
+    let stopped = first !== null
+    const until = performance.now() + CUT_MIN_MS
+    scene.setFollow(() => {
+      // Past one shot's own minimum the wait is over. The shot stands DOWN rather than answering
+      // null for the rest of the claim, which left the camera stranded wherever the last one ended.
+      if (!stopped && performance.now() > until) {
+        scene.setFollow(null)
+        return null
+      }
+      const at = where()
+      if (at === null) return null
+      // A close re-asks every frame: its stop is a clock, not the framing box.
+      if (!stopped || (shot !== null && shot.kind === 'close')) {
+        stopped = true
+        scene.setZoom(stopNow(at.stop))
+      }
+      if (shot === null) return { x: at.sx, y: at.sy }
+      const d = driftAt(shot, facing(), performance.now())
+      return { x: at.sx + Math.round(d.dx), y: at.sy + Math.round(d.dy) }
+    })
+    return () => {
+      scene.setFollow(null)
+    }
+  }
+  const followed = claim.followed
+  if (followed === null) {
+    // Standing down means the camera STOPS. Only the very first frame is framed for the
+    // viewer: after that a hand on the lens got the town thrown home under its own drag.
+    if (!claim.awake || !opening || taken.current) return undefined
+    scene.centerHome()
+    scene.setZoom(OVERVIEW_ZOOM)
+    return undefined
+  }
+  // The stop is a function of the window, so a resize has to re-ask it: dragged across 1280
+  // the wrong stop stood until the claim next changed.
+  const stop = (): void => {
+    scene.setZoom(directorZoom(window.innerWidth))
+  }
+  stop()
+  window.addEventListener('resize', stop)
+  scene.setFollow(() => {
+    const anchor = scene.anchorOf?.(followed)
+    if (anchor !== undefined && anchor !== null) return anchor
+    const a = store.getState()?.agents[followed]
+    if (a === undefined) return null
+    const { sx, sy } = tileToScreen(a.x, a.y)
+    return { x: sx, y: sy }
+  })
+  return () => {
+    window.removeEventListener('resize', stop)
+    scene.setFollow(null)
+  }
+}
+
+/** The shot on screen and what it is of. One value, so the caption can never describe a cast
+ *  the floor turned away. */
+type Shown = {
+  shot: Shot
+  by: CameraClaim['by']
+  structureId: string | null
+  of: {
+    castKey: string
+    followed: string | null
+    sceneId: string | null
+    isCut: boolean
+    why: string | null
+  }
+}
+
+/** What the world is asking the camera for, or null for a claim that asks for no shot at all. */
+function specOf(
+  by: CameraClaim['by'],
+  kind: Exclude<ShotKind, 'overview'>,
+  room: string | null,
+  of: Shown['of'],
+): ShotSpec | null {
+  if (by === 'hold') return null
+  if (room !== null) return { kind, target: { at: 'room', structureId: room }, why: of.why ?? '' }
+  if (of.castKey !== '')
+    return { kind, target: { at: 'cast', ids: of.castKey.split(' ') }, why: of.why ?? '' }
+  if (of.followed !== null) return { kind, target: { at: 'body', id: of.followed }, why: '' }
+  return { kind: 'overview', target: { at: 'town' }, why: '' }
+}
+
+/** The shot ON SCREEN, kept across renders, which is not always the shot the world is asking
+ *  for: one inside its own floor is not replaced, so a round turn and a stand-down wait as long
+ *  as a cut does. */
+function shotHold(): (
+  want: { spec: ShotSpec | null; byHand: boolean } & Omit<Shown, 'shot'>,
+) => Shown | null {
+  let on: Shown | null = null
+  return (want) => {
+    const shot = nextShot(on?.shot ?? null, want.spec, performance.now(), want.byHand)
+    if (shot === null) on = null
+    else if (shot !== on?.shot)
+      on = { shot, by: want.by, structureId: want.structureId, of: want.of }
+    // The same people with a newer sentence keep the shot. A cast the floor turned away must not
+    // have its words printed over the picture that is still up.
+    else if (
+      on.of.castKey === want.of.castKey &&
+      on.of.followed === want.of.followed &&
+      (on.of.why !== want.of.why || on.of.sceneId !== want.of.sceneId)
+    )
+      on = { ...on, of: want.of }
+    return on
+  }
 }
 
 /** `autoCut` is the live town being televised; `pinned` is a viewer who asked to follow one
@@ -90,31 +308,22 @@ export function DirectorMode({
   // The cut the camera is actually on. The gateway may change its mind faster than a viewer can
   // read a face, so the eight-second floor is kept here, over frames, not over polls.
   const [held, setHeld] = useState<StakeScore | null>(null)
-  const lastCutRef = useRef(0)
+  const [floor] = useState(() => cutFloor<StakeScore>(setHeld, keyOf))
+  const [round] = useState(() => quietRound())
+  const [hold] = useState(() => shotHold())
+  useEffect(() => floor.clear, [floor])
   // Whether the town has ever been framed for this viewer, so the overview is an opening shot
   // and never the thing the camera does on its way out of a claim.
   const framedRef = useRef(false)
+  // A hand on the camera, ever. `autoCut` goes false only when a viewer drives it.
+  const takenRef = useRef(false)
+  useEffect(() => {
+    if (!autoCut) takenRef.current = true
+  }, [autoCut])
 
   useEffect(() => {
-    const next = autoCut ? (frame?.cut ?? null) : null
-    if (next === null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the socket IS the external system this synchronises; the frame arrives as a store snapshot and the wall clock decides when it may land.
-      setHeld(null)
-      return
-    }
-    // The same people, a fresher sentence: not a cut, so it lands whatever the clock says.
-    if (keyOf(next) === keyOf(held)) {
-      setHeld(next)
-      return
-    }
-    // No bypass for the first one: arming the director must not yank the camera the instant a
-    // frame lands, and toggling it off and on again must not do it every time.
-    const now = performance.now()
-    if (now - lastCutRef.current >= CUT_MIN_MS) {
-      lastCutRef.current = now
-      setHeld(next)
-    }
-  }, [frame, autoCut, held])
+    floor.offer(autoCut ? (frame?.cut ?? null) : null, performance.now())
+  }, [frame, autoCut, floor])
 
   // One object per cut rather than one per render: the ladder reads a frame, and every render
   // that built a fresh literal would re-run the camera effect under it.
@@ -129,79 +338,59 @@ export function DirectorMode({
     shotFrame,
     asleep,
     // A hand on the camera stands the round down with the director, for the same twenty seconds.
-    autoCut ? quietSubject(outdoorLiving(state, indoors), store.getTick()) : null,
+    autoCut ? round(outdoorLiving(state, indoors), store.getTick()) : null,
+    (id) => state?.agents[id]?.insideId ?? null,
   )
   const claimBy = claim.by
-  const castKey = claim.by === 'cut' || claim.by === 'moment' ? claim.cast.join(' ') : ''
-  const followed = claim.by === 'pinned' || claim.by === 'round' ? claim.agentId : null
-  const sceneId = claim.by === 'cut' ? (held?.sceneId ?? null) : null
-  // Who the camera is ON, which is not the same question as who it frames TOGETHER: a round
-  // turn is a shot too, and the caption over it has to follow the face it moved to.
+  const wantRoom = claim.by === 'interior' ? claim.structureId : null
+  const want = shotOf(claim, held)
+  const wantCast = want.castKey
+  const wantFollowed = want.followed
+  const wantKind = shotKindFor({
+    // The browser is never told which scenes it has already shown, so it never claims a shot is
+    // opening one. `peak` is the gateway's own number, which it does send.
+    opening: false,
+    peak: claimBy === 'cut' && (held?.score ?? 0) >= PEAK_SCORE,
+    indoors: wantRoom !== null,
+    walking: wantFollowed !== null && state?.agents[wantFollowed]?.activity?.path !== undefined,
+    cast: wantCast === '' ? (wantFollowed === null ? 0 : 1) : wantCast.split(' ').length,
+  })
+
+  const on = hold({
+    spec: specOf(claimBy, wantKind, wantRoom, want),
+    // A hand on the lens outranks the floor: a viewer who pinned somebody, opened a moment or
+    // took the camera waits for nothing.
+    byHand: !autoCut || pinned !== null || moment.length > 0,
+    by: claimBy,
+    structureId: wantRoom,
+    of: want,
+  })
+
+  const shot = on?.shot ?? null
+  const driveBy = on?.by ?? 'hold'
+  const structureId = on?.structureId ?? null
+  const castKey = on?.of.castKey ?? ''
+  const followed = on?.of.followed ?? null
+  const sceneId = on?.of.sceneId ?? null
+  const isCut = on?.of.isCut ?? false
+  const why = on?.of.why ?? null
   const shotKey = castKey !== '' ? castKey : (followed ?? '')
 
   // Centre BEFORE the stop changes: the zoom eases about whatever the middle of the screen holds.
   useEffect(() => {
     if (scene === null) return
-    // A shot the exterior view cannot show takes nobody, and it HOLDS where it is: a camera that
-    // cut away would be showing three closed doors while the room talks behind them.
-    if (claimBy === 'hold') return
-    if (castKey !== '') {
-      const cast = castKey.split(' ')
-      const stageBox = { w: scene.app.screen.width, h: scene.app.screen.height }
-      const where = (): ReturnType<typeof sceneShot> =>
-        sceneShot(
-          cast
-            .map((id) => scene.pointOf('agent', id))
-            .filter((p): p is { sx: number; sy: number } => p !== null),
-          stageBox,
-        )
-      const opening = where()
-      if (opening === null) return
-      scene.setZoom(opening.stop)
-      // The room, every frame: the shot is cut to where they are standing NOW, not to where
-      // they were when the gateway scored it.
-      scene.setFollow(() => {
-        const shot = where()
-        return shot === null ? null : { x: shot.sx, y: shot.sy }
-      })
-      return () => {
-        scene.setFollow(null)
-      }
-    }
-    if (followed === null) {
-      scene.setFollow(null)
-      // Standing down means the camera STOPS. Only the very first frame is framed for the
-      // viewer: after that a hand on the lens got the town thrown home under its own drag.
-      if (!awake || framedRef.current) return
-      framedRef.current = true
-      scene.centerHome()
-      scene.setZoom(OVERVIEW_ZOOM)
-      return
-    }
-    // The stop is a function of the window, so a resize has to re-ask it: dragged across 1280
-    // the wrong stop stood until the claim next changed.
-    const stop = (): void => {
-      scene.setZoom(directorZoom(window.innerWidth))
-    }
-    stop()
-    window.addEventListener('resize', stop)
-    scene.setFollow(() => {
-      const anchor = scene.anchorOf?.(followed)
-      if (anchor !== undefined && anchor !== null) return anchor
-      const a = store.getState()?.agents[followed]
-      if (a === undefined) return null
-      const { sx, sy } = tileToScreen(a.x, a.y)
-      return { x: sx, y: sy }
-    })
-    return () => {
-      window.removeEventListener('resize', stop)
-      scene.setFollow(null)
-    }
-  }, [scene, store, claimBy, castKey, followed, awake])
+    return driveShot(
+      scene,
+      store,
+      { by: driveBy, castKey, followed, structureId, awake },
+      framedRef,
+      takenRef,
+      shot,
+    )
+  }, [scene, store, driveBy, castKey, followed, structureId, awake, shot])
 
   // Split from the key rather than passed as the claim's own array: a fresh array every render
   // would re-run this on every tick of the town.
-  const isCut = claimBy === 'cut' || claimBy === 'moment'
   useEffect(() => {
     onShot?.(shotKey === '' ? NO_CAST : shotKey.split(' '), sceneId, isCut)
   }, [shotKey, sceneId, isCut, onShot])
@@ -220,9 +409,6 @@ export function DirectorMode({
     onCue?.(name === null ? null : `${pinned === null ? 'DIRECTOR' : 'FOLLOWING'} · ${name}`)
   }, [name, pinned, onCue])
 
-  // The sentence belongs to the shot the camera is HOLDING, never to a frame it has not taken:
-  // a caption that named the newer cut would describe people who are not in the picture.
-  const why = claimBy === 'cut' ? (held?.why ?? null) : null
   useEffect(() => {
     onWhy?.(why)
   }, [why, onWhy])

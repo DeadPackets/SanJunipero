@@ -28,6 +28,21 @@ import { createToponymLayer, type ToponymLayer } from './toponyms.js'
 /** Nobody is in a room the town is not holding open. */
 const NOBODY: readonly string[] = []
 
+/** The camera surface a key drives, named on its own so a keypress can be taken over a real rig:
+ *  where the camera ended up is the one thing a test of this can read. */
+export type KeyCamera = Pick<Scene, 'panBy' | 'takeZoom' | 'getZoomStop' | 'centerHome'>
+
+/** What one key does to the camera, and whether it was a camera key at all. The step is off the
+ *  stop the camera is GOING to: a press mid-transit stepped off the animated scale and stood still. */
+export function driveKey(s: KeyCamera, key: string): boolean {
+  const action = cameraActionFor(key)
+  if (action === null) return false
+  if (action.kind === 'pan') s.panBy(action.dx, action.dy)
+  else if (action.kind === 'zoom') s.takeZoom(stepZoom(s.getZoomStop(), action.dir))
+  else s.centerHome()
+  return true
+}
+
 // The ONLY React/Pixi contact point — React renders nothing inside the canvas (spec §15).
 export function StageMount({
   store,
@@ -64,12 +79,7 @@ export function StageMount({
   const onKeyDown = (e: React.KeyboardEvent): void => {
     const s = sceneRef.current
     if (s === null) return
-    const action = cameraActionFor(e.key)
-    if (action === null) return
-    e.preventDefault()
-    if (action.kind === 'pan') s.panBy(action.dx, action.dy)
-    else if (action.kind === 'zoom') s.setZoom(stepZoom(s.getZoom(), action.dir))
-    else s.centerHome()
+    if (driveKey(s, e.key)) e.preventDefault()
   }
 
   useEffect(() => {
