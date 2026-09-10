@@ -11,13 +11,7 @@ export function Signpost({
   ref?: React.Ref<HTMLElement>
 }) {
   return (
-    <nav
-      id="signpost"
-      className="signpost"
-      aria-label="Town sections"
-      data-open={open === null ? 'no' : 'yes'}
-      ref={ref}
-    >
+    <nav id="signpost" className="signpost" aria-label="Town sections" ref={ref}>
       {ARMS.map((arm) => (
         <button
           key={arm}

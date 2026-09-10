@@ -39,19 +39,14 @@ export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
   },
   { what: 'the caption', from: 'sheet', selector: "[data-broadcast='on'] .lower-third-words" },
   { what: 'the chronicle ticker', from: 'sheet', selector: "[data-broadcast='on'] .ticker-line" },
-  { what: 'the quiet stamp', from: 'sheet', selector: "[data-broadcast='on'] .stage-stamp" },
+  { what: 'the town clock', from: 'sheet', selector: "[data-broadcast='on'] .sky-clock" },
+  { what: 'the dateline', from: 'sheet', selector: "[data-broadcast='on'] .sky-line" },
   { what: 'the director’s cue', from: 'sheet', selector: "[data-broadcast='on'] .stage-cue" },
   { what: 'the scene card', from: 'sheet', selector: "[data-broadcast='on'] .scene-card-where" },
   {
     what: 'the scene card’s stamp',
     from: 'sheet',
     selector: "[data-broadcast='on'] .scene-card-title",
-  },
-  { what: 'the sleep card', from: 'sheet', selector: "[data-broadcast='on'] .sleep-card-line" },
-  {
-    what: 'the sleep card’s note',
-    from: 'sheet',
-    selector: "[data-broadcast='on'] .sleep-card-note",
   },
 ]
 

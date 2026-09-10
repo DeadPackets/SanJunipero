@@ -14,27 +14,28 @@ const chebyshev = (x1: number, y1: number, x2: number, y2: number): number =>
   Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))
 
 // A wall stops sound: speech carries iff both share an interior, both are outdoors within
-// earshot, or the one outdoors is standing in the other's doorway.
-export function hears(
+// the given reach, or the one outdoors is standing in the other's doorway.
+function carries(
   state: WorldState,
   baseConfig: SimConfig,
   spoken: unknown,
   hearerId: string,
+  reach: 'earshotRadius' | 'conversationRadius',
 ): boolean {
   const config = effectiveConfig(baseConfig, state.laws)
+  const radius = config.movement[reach]
   const p = spoken as { x?: unknown; y?: unknown; insideId?: unknown } | null
   const hearer = state.agents[hearerId]
   if (!hearer || typeof p?.x !== 'number' || typeof p.y !== 'number') return false
 
   // Occlusion off drops the wall, not the distance: plain earshot.
-  if (!config.occlusion.enabled)
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
+  if (!config.occlusion.enabled) return dist(hearer.x, hearer.y, p.x, p.y) <= radius
 
   const speakerInside = typeof p.insideId === 'string' ? p.insideId : null
   const hearerInside = hearer.insideId ?? null
   if (speakerInside !== null && hearerInside !== null) return speakerInside === hearerInside
   if (speakerInside === null && hearerInside === null) {
-    return dist(hearer.x, hearer.y, p.x, p.y) <= config.movement.earshotRadius
+    return dist(hearer.x, hearer.y, p.x, p.y) <= radius
   }
 
   const structure = state.structures[speakerInside ?? hearerInside!]
@@ -43,6 +44,28 @@ export function hears(
   if (!door) return false
   const outdoors = speakerInside !== null ? { x: hearer.x, y: hearer.y } : { x: p.x, y: p.y }
   return chebyshev(outdoors.x, outdoors.y, door.x, door.y) <= 1
+}
+
+/** Did this ear catch the line at all, over the far radius: a voice across the square, which
+ *  nobody is waiting on an answer to. */
+export function hears(
+  state: WorldState,
+  baseConfig: SimConfig,
+  spoken: unknown,
+  hearerId: string,
+): boolean {
+  return carries(state, baseConfig, spoken, hearerId, 'earshotRadius')
+}
+
+/** Was the line said TO this ear, near enough to be answered. Same walls, shorter air: it is
+ *  how far a voice reaches to open a talk, and it says nothing about who should walk over. */
+export function spokenTo(
+  state: WorldState,
+  baseConfig: SimConfig,
+  spoken: unknown,
+  hearerId: string,
+): boolean {
+  return carries(state, baseConfig, spoken, hearerId, 'conversationRadius')
 }
 
 const RE_META = /[.*+?^${}()|[\]\\]/g

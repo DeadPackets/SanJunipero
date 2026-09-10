@@ -42,6 +42,22 @@ describe('★ the store keeps the gateway’s last answer, and only its last ans
     store.applyServer(beat)
     expect(store.getDirector()).toEqual(beat)
   })
+
+  // The gateway mutes a socket that has left the live edge, so the last live frame stood and
+  // aimed the camera at where those people are NOW, under a sentence about a minute the viewer
+  // is not watching. A cut is about the live minute or it is about nothing.
+  it('★ forgets the live cut the moment the viewer leaves the live edge', () => {
+    for (const back of [
+      { t: 'scrubbed', reqId: 1, tick: 1, state: {} },
+      { t: 'replaying', reqId: 1, tick: 1, seq: 1, state: {} },
+    ] as const) {
+      const store = createWorldStore()
+      store.applyServer(frame())
+      expect(store.getDirector()).not.toBeNull()
+      store.applyServer(back)
+      expect(store.getDirector(), back.t).toBeNull()
+    }
+  })
 })
 
 // ── ★ THE LADDER ──────────────────────────────────────────────────────────────────────────
@@ -119,7 +135,7 @@ describe('★ the camera’s ladder of claims', () => {
     ).toEqual({ by: 'round', agentId: 'omar' })
   })
 
-  it('★ a sleeping town is a picture of a sleeping town — the card, and no cut under it', () => {
+  it('★ a sleeping town is a picture of a sleeping town: the bar says so, and no cut under it', () => {
     expect(cameraClaim(null, NO_MOMENT, NOBODY_INSIDE, cut(['nadia']), true, 'omar')).toEqual({
       by: 'town',
     })
@@ -219,6 +235,19 @@ describe('★ DirectorMode reads the gateway’s frame, and asks nobody anything
   it('★ the first viewport is the town at zoom 1, centred before the stop moves', () => {
     expect(SRC).toContain('export const OVERVIEW_ZOOM = 1 as const')
     expect(SRC).toMatch(/scene\.centerHome\(\)\s*\n\s*scene\.setZoom\(OVERVIEW_ZOOM\)/)
+  })
+
+  // Learned the hard way: a hand on the camera nulls the held cut, the claim falls to 'town',
+  // and the branch above ran again, so the first frame of a viewer's own drag was preceded by a
+  // jump home at 1x. The opening shot is taken once and never again.
+  it('★ standing a claim down moves the camera nowhere at all', () => {
+    expect(SRC).toContain('if (!awake || framedRef.current) return')
+    expect(SRC).toMatch(/framedRef\.current = true\s*\n\s*scene\.centerHome\(\)/)
+  })
+
+  it('★ re-asks the stop when the window crosses the wide breakpoint', () => {
+    expect(SRC).toContain("window.addEventListener('resize', stop)")
+    expect(SRC).toContain("window.removeEventListener('resize', stop)")
   })
 
   it('★ a hand on the camera stands the gateway AND the round down, for the same 20s', () => {

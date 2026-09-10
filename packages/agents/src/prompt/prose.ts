@@ -206,7 +206,14 @@ export type PerceptionPacket = {
   // The shelves this mind may use, wherever its feet are. Absent on a packet from before the
   // town had anywhere to put things, which reads as it always did.
   stores?: PerceptionStore[]
-  heard: { speakerId: string; name: string; text: string; distance: number }[]
+  heard: {
+    speakerId: string
+    name: string
+    text: string
+    distance: number
+    // Near enough that the line was said to this ear. Absent is a voice caught across the way.
+    addressed?: true
+  }[]
   seen: PerceptionSeen[]
   feltEvents: string[]
 }
@@ -1220,7 +1227,7 @@ export function heardProse(
 ): string {
   return packet.heard
     .filter((h) => !told.has(heardKey(h)))
-    .map((h) => heardLine(h.name, h.text))
+    .map((h) => heardLine(h.name, h.text, h.addressed === true))
     .join('\n')
 }
 

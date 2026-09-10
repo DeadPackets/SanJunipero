@@ -5,6 +5,7 @@ import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './n
 import { parseRoute, routeToPath, titleFor, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
+import { whenDressed } from './render/textures.js'
 import type { Scene } from './render/scene.js'
 import {
   DirectorCue,
@@ -14,10 +15,8 @@ import {
   Ticker,
   SpeechLive,
   SubjectRing,
-  QuietStamp,
   SceneCard,
   SkyArc,
-  SleepCard,
   toggleFullscreen,
   useSafeInsets,
   useStageKeys,
@@ -58,6 +57,15 @@ import type { Thing } from './paper/pages/types.js'
 type Sheet = { page: PageKey; tab: string }
 
 const NO_CAST: readonly string[] = []
+
+/** The card's line once the town is answering but its art is still landing. "Looking for the
+ *  town" is a lie by then, and an empty field is what dismissing the card early reveals. */
+const DRESSING_NOTE = 'The town is coming into focus…'
+
+function waitingNote(link: LinkStatus): string {
+  if (link === 'reconnecting') return FIRST_FRAME_COPY.lost
+  return link === 'online' ? DRESSING_NOTE : FIRST_FRAME_COPY.looking
+}
 
 /** How many minds are alive to be watched — what the first two lines count. */
 const livingCount = (agents: Record<string, { alive: boolean }> | undefined): number =>
@@ -171,9 +179,21 @@ export function App() {
   // The worries ride the aims feed, a beat behind the town; the effect below runs again when
   // they land, and the first lines gain their second sentence if they are still up.
   const aims = useFeed(aimsFeed).data
+  // The card leaves when the town is DRESSED, never when the scene object exists: art in hand
+  // is the only thing that makes the reveal a town rather than an empty field.
+  const [dressed, setDressed] = useState(false)
+  useEffect(() => {
+    let live = true
+    void whenDressed().then(() => {
+      if (live) setDressed(true)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
-    if (scene !== null && link === 'online') {
+    if (scene !== null && link === 'online' && dressed) {
       dismissFirstFrame()
       // ...and the two lines take the card's place, over the town they are about.
       showFirstLines(livingCount(store.getState()?.agents))
@@ -185,9 +205,8 @@ export function App() {
             tickToMoment(store.getTick()).day,
           ),
         )
-    } else
-      firstFrameNote(link === 'reconnecting' ? FIRST_FRAME_COPY.lost : FIRST_FRAME_COPY.looking)
-  }, [scene, link, store, aims])
+    } else firstFrameNote(waitingNote(link))
+  }, [scene, link, store, aims, dressed])
 
   // The first cut is the first thing worth watching, so the lines get out of its way. A quiet
   // round turn is not one: it happens the instant the town arrives, before anybody has read them.
@@ -420,8 +439,7 @@ export function App() {
           <span aria-hidden="true">← </span>Back to town
         </button>
       )}
-      {/* The stamp already names the minute and reads REPLAY; this is the one way back out of it.
-          A stream frame has no hands, and its stamp says the same thing on its own. */}
+      {/* The one way back out of a replay: a stream frame has no hands. */}
       {!mode.live && !route.broadcast && play === null && (
         <button type="button" className="stage-live" onClick={onLive}>
           Return to now<span aria-hidden="true"> →</span>
@@ -438,11 +456,9 @@ export function App() {
       />
       <Nameplate subject={focus ?? subject} scene={scene} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
-      <SkyArc store={store} />
-      <QuietStamp store={store} link={link} />
+      <SkyArc store={store} link={link} />
       <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
       <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />
-      <SleepCard store={store} />
       <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode

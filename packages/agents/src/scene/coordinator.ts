@@ -226,9 +226,9 @@ export class SceneCoordinator {
 
   /** A word the world took. Said inside the mouth's own talk — an ordinary turn that resolved
    *  after the scene opened around it — it is a line of that talk. Inside another open scene's
-   *  earshot it is a line of THAT scene and the mouth joins it; otherwise, if anyone who could
-   *  answer heard it, it opens one between the speaker and the mind they spoke to, and everybody
-   *  else stands and listens. */
+   *  earshot it is a line of THAT scene, and the mouth joins the talk only if it stands near
+   *  enough to be answered. Failing both, a word anyone near enough heard opens one between the
+   *  speaker and the mind they spoke to, and everybody else stands and listens. */
   noteSpoken(agentId: string, text: string, tick: number): Scene | null {
     const said = sanitizeSpokenText(text)
     const mine = this.sceneFor(agentId)
@@ -244,10 +244,14 @@ export class SceneCoordinator {
       .earshot(agentId)
       .filter((id) => this.#mindFor(id) !== null && this.#canOpen(id))
     if (heard.length + 1 < TALKERS_NEEDED) return null
+    // Only a body the word was said TO can be expected to answer it. The rest of the square
+    // heard a voice carry, which is not a talk being opened with them.
+    const near = new Set(this.#bridge.nearEnoughToAnswer(agentId))
+    const partners = heard.filter((id) => near.has(id))
     // A name opens a talk whatever the day has held; a remark to the air does not once the
     // speaker, or everyone near enough to answer, has talked their fill today.
-    const named = addressedIn(said, heard, (id) => this.#nameOf(id))
-    const fresh = heard.filter((id) => !this.#talkedOut(id, tick))
+    const named = addressedIn(said, partners, (id) => this.#nameOf(id))
+    const fresh = partners.filter((id) => !this.#talkedOut(id, tick))
     const answering =
       named ?? (this.#talkedOut(agentId, tick) ? null : this.#bridge.nearestOf(agentId, fresh))
     if (answering === null) return null
@@ -289,7 +293,8 @@ export class SceneCoordinator {
 
   /** One invariant: a say inside an open scene's earshot is a line of that scene. So no second
    *  scene ever opens over the top of one, and two can share a square only out of each other's
-   *  hearing. Ties by id, because a mouth heard by two scenes has to pick the same one twice. */
+   *  hearing. Ties by id, because a mouth heard by two scenes has to pick the same one twice.
+   *  A voice from across the square lands in the talk and stands in its audience, not in it. */
   #joinNearby(agentId: string, said: string, tick: number): Scene | null {
     if (this.#mindFor(agentId) === null || !this.#canTalk(agentId)) return null
     const within = new Set(this.#bridge.earshot(agentId))
@@ -297,7 +302,11 @@ export class SceneCoordinator {
       .filter((s) => s.participants.some((id) => within.has(id)))
       .sort((a, b) => a.id.localeCompare(b.id))[0]
     if (scene === undefined) return null
-    this.#admit(scene, agentId, tick)
+    const near = new Set(this.#bridge.nearEnoughToAnswer(agentId))
+    if (scene.participants.some((id) => near.has(id))) this.#admit(scene, agentId, tick)
+    else if (!scene.audience.includes(agentId)) {
+      scene.audience = [...scene.audience, agentId].sort()
+    }
     this.#recordLine(scene, agentId, said, '', 'none', null, tick)
     return scene
   }
@@ -625,8 +634,12 @@ export class SceneCoordinator {
 
   #floorAfter(scene: Scene, speakerId: string, text: string, to: string | null): string | null {
     const mind = this.#mindFor(speakerId)
+    // A listener can be named into the talk, but only one standing near enough to answer the
+    // line. The rest of the square heard it and is owed nothing.
+    const near = new Set(this.#bridge.nearEnoughToAnswer(speakerId))
+    const answerable: Scene = { ...scene, audience: scene.audience.filter((id) => near.has(id)) }
     return nextFloor(
-      scene,
+      answerable,
       speakerId,
       text,
       to,

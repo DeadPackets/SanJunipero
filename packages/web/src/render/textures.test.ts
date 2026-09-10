@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { AssetRecord } from '@sj/shared'
 
 // The book calls into Pixi's loader; nothing else in this file does. A tiny stand-in keeps the
@@ -32,13 +32,17 @@ const land = async (url: string): Promise<void> => {
 
 import { Assets } from 'pixi.js'
 import {
+  LOAD_PRIORITY,
   TextureBook,
   artOptional,
   buildingArt,
   characterArt,
+  dressDelay,
   facingCellKind,
+  openBoot,
   resolveAssetId,
   textureUrlFor,
+  whenDressed,
 } from './textures.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -99,8 +103,11 @@ describe('textureUrlFor', () => {
   it('serves the resolved asset png', () => {
     expect(textureUrlFor([rec({ id: 'asset_9' })], 'building', 'house')).toBe('/assets/asset_9.png')
   })
-  it('falls back to the class placeholder', () => {
-    expect(textureUrlFor([], 'building', 'house')).toBe('/assets/placeholder/building.png')
+  // Rewritten: it used to hand back the forge's checkerboard. A viewer reads that as broken,
+  // so the answer is now "no art exists" and the caller draws its own palette-true stand-in.
+  it('says NO ART rather than naming a checkerboard', () => {
+    expect(textureUrlFor([], 'building', 'house')).toBeNull()
+    expect(textureUrlFor([], 'item', 'plank')).toBeNull()
   })
 })
 
@@ -206,6 +213,75 @@ describe('buildingArt (v4-hires-building manifest)', () => {
   })
 })
 
+// ── ★ DRESSED IS ART IN HAND ──────────────────────────────────────────────────────────────
+// The defect this states: the title card left the screen the moment the Pixi scene object
+// existed, which is before one texture had landed. The reveal was an empty field that filled
+// in afterwards. These run FIRST in the file: the counters they read start at zero.
+
+describe('★ the town is dressed when its art lands, never when its scene is built', () => {
+  const GROUND = '/assets/asset_grass.png'
+  const HOUSE = '/assets/asset_house.png'
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('★ holds while the first view is still in flight, and gives up after the timeout', async () => {
+    openBoot([
+      rec({ id: 'asset_grass', class: 'terrain', kind: 'grass' }),
+      rec({ id: 'asset_house', class: 'building', kind: 'house' }),
+    ])
+    const book = new TextureBook()
+    void book.get(GROUND, LOAD_PRIORITY.ground).catch(artOptional)
+    let released = false
+    void whenDressed(5).then(() => {
+      released = true
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(released, 'art was asked for and has not landed').toBe(false)
+    // ...and one dead asset must never keep the card up for the life of the page
+    await vi.advanceTimersByTimeAsync(10)
+    expect(released).toBe(true)
+  })
+
+  // ★ The race this states: `scene.ts` subscribes before the stage mounts, so the ground baker
+  // can be the only caller in flight when the first texture lands.
+  it('★ the ground landing alone is not a dressed town, with the town still unasked for', async () => {
+    let dressed = false
+    void whenDressed(60_000).then(() => {
+      dressed = true
+    })
+    await land(GROUND)
+    expect(dressed, 'the codex holds building art and nobody has asked for any').toBe(false)
+  })
+
+  it('★ and it IS dressed once every class the first frame needs has answered', async () => {
+    let dressed = false
+    void whenDressed(60_000).then(() => {
+      dressed = true
+    })
+    const book = new TextureBook()
+    void book.get(HOUSE).catch(artOptional)
+    await Promise.resolve()
+    expect(dressed).toBe(false)
+    await land(HOUSE)
+    expect(dressed).toBe(true)
+  })
+})
+
+describe('the dressing runs outward from the middle of the shot', () => {
+  it('waits longer the further a thing stands from the camera, and never past one sweep', () => {
+    expect(dressDelay(0, 500)).toBe(0)
+    expect(dressDelay(250, 500)).toBeGreaterThan(0)
+    expect(dressDelay(250, 500)).toBeLessThan(dressDelay(500, 500))
+    expect(dressDelay(5000, 500)).toBe(dressDelay(500, 500))
+    expect(dressDelay(100, 0), 'a scene with no rect staggers nothing').toBe(0)
+  })
+})
+
 describe('★ TextureBook.peek — the room and its furniture arrive in the same frame', () => {
   it('is null before the bytes land and the texture after', async () => {
     const book = new TextureBook()
@@ -235,26 +311,17 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     expect(viaThen).toBe(viaPeek)
   })
 
-  it('★ a swap off the shared placeholder leaves it alone — the siblings are still on it', async () => {
-    // The crash this states: every artless kind shares `/assets/placeholder/item.png`, so the
-    // one entity whose art lands would destroy the texture all its siblings are still drawing.
-    // `Assets.unload` runs `texture.destroy(true)`, which nulls `texture.source`, and the
-    // batcher reads `source.alphaMode` unguarded — the whole stage goes down on the next frame.
-    // Even the soft `unload` costs every sibling a re-upload, once per kind that finds its art.
-    const shared = '/assets/placeholder/item.png'
-    const book = new TextureBook()
-    void book.get(shared)
-    await land(shared)
-    const old = loads.get(shared)!.texture as { source: { unload: Mock } }
-
-    const p = book.swap(shared, '/assets/new.png')
-    await land('/assets/new.png')
-    await p
-
-    expect(old.source.unload).not.toHaveBeenCalled()
-    expect(Assets.unload).not.toHaveBeenCalled()
-    expect(book.peek(shared)).toBe(old) // the siblings still hold a live texture
-    expect(book.peek('/assets/new.png')).not.toBeNull()
+  // Rewritten: `swap` carried a guard for the shared placeholder url. What was learned is that
+  // the shared url itself was the defect, so it went and the guard went with it.
+  it('★ every url a swap can be handed is resolved for one entity alone', () => {
+    // The crash this states: every artless kind of a class shared one url, so the one entity
+    // whose art landed freed the texture all its siblings were still on.
+    for (const klass of ['building', 'item', 'crop'] as const)
+      expect(textureUrlFor([], klass, 'anything')).toBeNull()
+    expect(buildingArt([], 'house', 2, 2).url).toBeNull()
+    expect(characterArt([], 'omar').url, 'a body is one agent, and so is its sheet').toBe(
+      '/assets/character/omar.png',
+    )
   })
 
   it('★ a swap off art of its own frees that art, and stops handing it back', async () => {
@@ -312,5 +379,32 @@ describe('★ TextureBook.peek — the room and its furniture arrive in the same
     const add = src.slice(src.indexOf('function addPiece('), src.indexOf('function bodyFor('))
     expect(add).toMatch(/const inHand = book\.peek\(url\)/)
     expect(add.indexOf('book.peek(url)')).toBeLessThan(add.indexOf('book.get(url)'))
+  })
+})
+
+describe('★ the loader serves the shot first', () => {
+  it('★ gives a freed connection to what the camera can see, not to what asked first', async () => {
+    const book = new TextureBook()
+    const far = Array.from({ length: 8 }, (_, i) => `/assets/far${String(i)}.png`)
+    for (const u of far) void book.get(u, LOAD_PRIORITY.far).catch(artOptional)
+    const near = '/assets/near.png'
+    void book.get(near, LOAD_PRIORITY.near).catch(artOptional)
+    expect(loads.has(near), 'six connections are already open, so nothing was asked').toBe(false)
+
+    await land(far[0]!)
+    expect(loads.has(near), 'the freed slot goes to the shot').toBe(true)
+    expect(loads.has(far[6]!), 'and not to the one that queued first').toBe(false)
+
+    for (const u of far.slice(1, 6)) await land(u)
+    for (const u of [near, far[6]!, far[7]!]) await land(u)
+  })
+
+  it('★ takes every downloaded source off Pixi garbage collection', async () => {
+    const book = new TextureBook()
+    const url = '/assets/gc.png'
+    void book.get(url)
+    await land(url)
+    const held = book.peek(url) as unknown as { source: { autoGarbageCollect: boolean } }
+    expect(held.source.autoGarbageCollect, 'an unloaded source is a null one').toBe(false)
   })
 })

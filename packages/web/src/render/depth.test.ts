@@ -225,8 +225,10 @@ describe('the counted deterministic fallback', () => {
       depthOrder(boxes)
     }
     const { frames, nodes } = depthFallbacks()
-    expect(frames).toBe(304) // 1.52 % of 20 000 — pinned so a rule change is visible
-    expect(nodes).toBe(1203)
+    // Was 304 while a body's screen box was the whole 96 px sheet cell. The box is the drawn
+    // figure now, so far fewer pairs overlap at all and far fewer pinwheels can form.
+    expect(frames).toBe(175) // 0.88 % of 20 000 — pinned so a rule change is visible
+    expect(nodes).toBe(733)
     expect(frames / 20000).toBeLessThan(0.02)
   })
 

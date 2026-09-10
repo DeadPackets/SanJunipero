@@ -104,7 +104,9 @@ describe('the walk-around, on the thirteen buildings of the real town', () => {
     const { decided, disagreements } = sweep((_b, i, tile) =>
       landedInFront(town.structures[i]!, tile),
     )
-    expect(decided).toBe(512)
+    // A body's screen box is the DRAWN figure, so the tiles it can cover a building on
+    // move with the art rather than with a sheet cell.
+    expect(decided).toBe(471)
     // One tie per frontage face: the tiles where the landed rule drew a body at a door behind
     // the building it stood in front of.
     expect(
@@ -132,7 +134,7 @@ describe('the walk-around, on the thirteen buildings of the real town', () => {
     const { decided, disagreements } = sweep((box, _i, tile) =>
       before(depthOrder([box, bodyDepthBox('body', tile.x, tile.y)]), box.id, 'body'),
     )
-    expect(decided).toBe(512)
+    expect(decided).toBe(471)
     expect(
       disagreements.map((d) => `${d.structure} at ${d.tile}: oracle ${d.oracle}, got ${d.got}`),
     ).toEqual([])

@@ -135,23 +135,22 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
       'the speaker’s name — 6.00px',
       'the caption — 8.00px',
       'the chronicle ticker — 6.00px',
-      'the quiet stamp — 6.00px',
+      'the town clock — 6.00px',
+      'the dateline — 6.00px',
       'the director’s cue — 6.00px',
       'the scene card — 7.00px',
       'the scene card’s stamp — 6.00px',
-      'the sleep card — 10.00px',
-      'the sleep card’s note — 6.00px',
     ])
     expect(captionMinPx()).toBeCloseTo(5.4, 3)
   })
 
   it('★ measures every caption the frame draws, not only the one it added', () => {
     const promised = [
-      'the quiet stamp',
+      'the town clock',
+      'the dateline',
       'the director’s cue',
       'the chronicle ticker',
       'the scene card',
-      'the sleep card',
     ]
     for (const what of promised) {
       expect(BROADCAST_CAPTIONS.map((c) => c.what)).toContain(what)

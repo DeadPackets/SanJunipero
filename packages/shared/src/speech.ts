@@ -21,8 +21,11 @@ export function sanitizeSpokenText(text: string): string {
   return `${flat.slice(0, SPEECH_MAX_CHARS - 1).trimEnd()}…`
 }
 
-/** One utterance, as a listener reads it. The only untrusted string in a prompt; sanitized here
- *  as well as at the verb, because a world resumed from an older log carries raw text. */
-export function heardLine(name: string, text: string): string {
-  return `You hear ${name} say: "${sanitizeSpokenText(text)}" (from nearby)`
+/** One utterance, as a listener reads it: said to this body, or caught across the way. The only
+ *  untrusted string in a prompt, sanitized here as well as at the verb, because a world resumed
+ *  from an older log carries raw text. */
+export function heardLine(name: string, text: string, addressed = false): string {
+  const said = sanitizeSpokenText(text)
+  if (addressed) return `${name} says to you: "${said}"`
+  return `You hear ${name} say: "${said}" (from nearby)`
 }

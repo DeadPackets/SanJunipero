@@ -68,7 +68,7 @@ export function cameraClaim(
     const played = sceneCast(moment, indoors)
     return played.length === 0 ? { by: 'hold' } : { by: 'moment', cast: played }
   }
-  // The sleep card says the town is asleep; cutting to a body under it would call it a liar.
+  // The bar says the town is asleep, and cutting to a body under that would call it a liar.
   if (asleep) return { by: 'town' }
   const cut = director?.cut ?? null
   if (cut !== null) {

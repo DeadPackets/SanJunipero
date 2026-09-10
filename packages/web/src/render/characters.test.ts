@@ -133,7 +133,7 @@ vi.mock('pixi.js', () => {
 })
 
 import { Container as MockContainer, Sprite as MockSprite, Texture as MockTexture } from 'pixi.js'
-import { CELL, CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
+import { CELL, CHAR_TARGET_PX, IDLE_SQUASH, SHEET_ROWS } from './charAnim.js'
 import { characterCell, createCharacterLayer } from './characters.js'
 import { ZOOM_STOPS, type ZoomStop } from './camera.js'
 import { CROWD_PITCH_PX, CROWD_SETTLE_MS } from './crowd.js'
@@ -319,20 +319,25 @@ describe('createCharacterLayer entry registration (F1 regression net)', () => {
   })
 
   // The multiplier is re-applied by this layer, so tick order stops being load-bearing.
+  // ★ WHAT WAS LEARNED: this axis carries TWO multipliers now. A standing body breathes as a
+  // squash rather than a hop off its own shadow, so the pin is the composition of the effect
+  // with that breath, inside the breath's own band.
   it('★ composes an effect multiplier with the scale it owns, and re-applies it every tick', () => {
     layer.tick(1000)
     const sprite = layer.getSprite('nadia')!
+    const composed = (want: number, note?: string): void => {
+      expect(sprite.scale.y, note).toBeGreaterThanOrEqual(want * (1 - IDLE_SQUASH))
+      expect(sprite.scale.y, note).toBeLessThanOrEqual(want * (1 + IDLE_SQUASH))
+    }
     layer.setScaleMulY('nadia', 0.92)
-    expect(sprite.scale.y).toBeCloseTo(sprite.scale.x * 0.92)
+    composed(sprite.scale.x * 0.92)
 
     sprite.scale.set(2) // the layer's own write when a new atlas cell lands mid-effect
     layer.tick(1016)
-    expect(sprite.scale.y, 'the effect rides the NEW base, not the one it started on').toBeCloseTo(
-      2 * 0.92,
-    )
+    composed(2 * 0.92, 'the effect rides the NEW base, not the one it started on')
 
     layer.setScaleMulY('nadia', 1)
-    expect(sprite.scale.y).toBeCloseTo(2)
+    composed(2)
   })
 
   it('ignores a multiplier for a body it does not have', () => {
@@ -636,6 +641,31 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
         worst = Math.max(worst, i - drawnTile(scene, 'nadia').x)
       }
       expect(worst).toBeLessThanOrEqual(3)
+    })()
+  })
+
+  // ★ The idle breath was a floored two-state hop on the sprite's POSITION while the shadow
+  // stayed at the feet, so a standing body jumped off its own shadow 1.11 times a second and
+  // the camera scaled that by up to 4. It is a squash now, and this is the pin.
+  it('★ a standing body breathes without leaving its own shadow', () => {
+    return (async () => {
+      const agents: MutableAgents = { nadia: makeBodyAgent('nadia', 0, 0) }
+      const { scene, layer, at } = await rig(agents)
+      const l = scene.layers as unknown as Record<
+        string,
+        { children: { position: { y: number } }[] }
+      >
+      const heights = new Set<number>()
+      for (let ms = 0; ms <= 6000; ms += 50) {
+        at(ms)
+        const s = layer.getSprite('nadia') as unknown as {
+          position: { y: number }
+          scale: { y: number }
+        }
+        expect(s.position.y - l.shadow!.children[0]!.position.y, `${ms}ms`).toBe(0)
+        heights.add(s.scale.y)
+      }
+      expect(heights.size, 'and it is still alive: the breath is on the scale').toBeGreaterThan(1)
     })()
   })
 
@@ -1108,6 +1138,9 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     expect(rings(scene).map((r) => r.alpha)).toEqual([1, 0])
   })
 
+  // ★ WHAT WAS LEARNED: drawing a standing `ne` or `nw` as `se` or `sw` was refused. The screen
+  // may not state a facing the world does not hold, and it stopped these two looking at each
+  // other. Faceless back cells are a reason to commission art, never to draw another world.
   it('★ turns the two of them toward each other while the scene runs', async () => {
     const { layer, setScene, say } = await rig()
     setScene(openScene(['amara', 'salma']))
@@ -1117,6 +1150,85 @@ describe('★ the floor ring and the facing, through the real layer', () => {
     say('salma', 2, 2000)
     expect(facingOf(layer, 'amara')).toBe('se')
     expect(facingOf(layer, 'salma')).toBe('nw')
+  })
+
+  // ★ A body kept the direction of its last walk leg for the whole act, so it worked facing
+  // wherever it happened to arrive from rather than facing the work.
+  it('★ faces the work, not wherever it last walked from', async () => {
+    const agents: MutableAgents = { omar: makeBodyAgent('omar', 4, 4) }
+    const scene = makeScene()
+    const { store } = makeStore(agents)
+    ;(store as unknown as { getConfig: () => unknown }).getConfig = () => null
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    layer.tick(0)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const doing = (verb: string, params: Record<string, unknown>): void => {
+      ;(agents.omar as unknown as { activity: unknown }).activity = {
+        verb,
+        ticksRemaining: 30,
+        params,
+      }
+    }
+
+    // the tile he is tilling is one step east: the screen puts it down and to the right
+    doing('till', { x: 5, y: 4 })
+    layer.tick(100)
+    expect(facingOf(layer, 'omar')).toBe('se')
+
+    // and one step north, which the world calls a back, so a back is what is drawn
+    doing('till', { x: 4, y: 3 })
+    layer.tick(200)
+    expect(facingOf(layer, 'omar')).toBe('ne')
+
+    // the person he is giving to outranks any tile the act also names
+    agents.salma = makeBodyAgent('salma', 0, 4)
+    doing('give', { targetId: 'salma', itemId: 'it_1', x: 5, y: 4 })
+    layer.tick(300)
+    expect(facingOf(layer, 'omar')).toBe('nw')
+  })
+
+  it('turns with a short cross-fade, so a facing change is not an atlas swap', async () => {
+    const agents: MutableAgents = {
+      omar: makeBodyAgent('omar', 4, 4),
+      salma: makeBodyAgent('salma', 0, 4),
+    }
+    const scene = makeScene()
+    const { store } = makeStore(agents)
+    ;(store as unknown as { getConfig: () => unknown }).getConfig = () => null
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    layer.tick(0)
+    await Promise.resolve()
+    await Promise.resolve()
+    const doing = (verb: string, params: Record<string, unknown>): void => {
+      ;(agents.omar as unknown as { activity: unknown }).activity = {
+        verb,
+        ticksRemaining: 30,
+        params,
+      }
+    }
+    const ghost = (): { visible: boolean; alpha: number; texture: { frame?: { x: number } } } =>
+      (
+        layer.getSprite('omar') as unknown as {
+          children: { visible: boolean; alpha: number; texture: { frame?: { x: number } } }[]
+        }
+      ).children[0]!
+
+    doing('till', { x: 5, y: 4 })
+    layer.tick(100)
+    expect(ghost().visible, 'the first cell a body is drawn on is not a turn').toBe(false)
+
+    doing('give', { targetId: 'salma', itemId: 'it_1' })
+    layer.tick(200)
+    expect(facingOf(layer, 'omar')).toBe('nw')
+    expect(ghost().visible).toBe(true)
+    expect(FACINGS[ghost().texture.frame!.x / CELL], 'the facing being left').toBe('se')
+
+    layer.tick(245)
+    expect(ghost().alpha).toBeCloseTo(0.5, 2)
+    layer.tick(290)
+    expect(ghost().visible).toBe(false)
   })
 
   it('★ takes the ring back when the scene closes', async () => {

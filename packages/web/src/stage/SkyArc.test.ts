@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { MINUTES_PER_DAY, dayPhaseFromTick } from '@sj/shared'
+import { DAYS_PER_SEASON, MINUTES_PER_DAY, dayPhaseFromTick } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import { tickBadgeState, type LinkState } from '../ui/broadcastReady.js'
 import { createWorldStore, type WorldStore } from '../state/worldStore.js'
 import { WEATHER_GLYPH } from '../ui/townStats.js'
 import {
@@ -15,16 +16,16 @@ import {
   GOLDEN_ELEVATION,
   SHADOW_MAX_STRETCH,
   SHADOW_REST,
-  dayWord,
   moonAltitude,
   shadowCast,
   skyKind,
   skyToken,
   skyWord,
 } from '../ui/skyModel.js'
-import { SkyArc } from './SkyArc.js'
+import { SkyArc, sleepField, stampWord, townStamp } from './SkyArc.js'
 
 const CSS = readFileSync(new URL('../ui/chrome.css', import.meta.url), 'utf8')
+const SRC = readFileSync(new URL('./SkyArc.tsx', import.meta.url), 'utf8')
 const at = (h: number, min = 0): number => h * 60 + min
 
 describe('★ 5A — one traveller, one curve, and the position is the clock', () => {
@@ -90,8 +91,8 @@ describe('the curve the token is placed on', () => {
 
 describe('the words beside the road', () => {
   it('carries the day and the season, in capitals the pixel face can set', () => {
-    expect(dayWord(at(15, 57))).toBe('DAY 0 · SPRING')
-    expect(dayWord(12 * MINUTES_PER_DAY)).toBe('DAY 12 · SUMMER')
+    expect(townStamp(at(15, 57), 'LIVE').date).toBe('DAY 0 · SPRING')
+    expect(townStamp(12 * MINUTES_PER_DAY, 'LIVE').date).toBe('DAY 12 · SUMMER')
   })
 
   it('names the weather and the temperature it actually is', () => {
@@ -121,12 +122,13 @@ describe('★ the bar the viewer actually gets', () => {
       ({ tick, weather: { kind: 'storm', temperatureC: 4 } }) as unknown as WorldState,
   })
   const bar = (tick: number): string =>
-    renderToStaticMarkup(createElement(SkyArc, { store: stormyStore(tick) }))
+    renderToStaticMarkup(createElement(SkyArc, { store: stormyStore(tick), link: 'online' }))
 
-  it('prints the day, the season, the weather and the temperature', () => {
+  it('prints the day, the season, the weather, the temperature and the clock', () => {
     const html = bar(at(15, 57))
     expect(html).toContain('DAY 0 · SPRING')
     expect(html).toContain('STORM 4°')
+    expect(html).toContain('15:57 · LIVE')
   })
 
   it('puts the token where the hour puts it, and moves it when the hour does', () => {
@@ -151,7 +153,7 @@ describe('the bar is quiet chrome, and does not fight the town', () => {
   // arriving from the other end.
   it('takes the signpost’s inset at the top and stays a bounded, centred group', () => {
     const body = /\.sky-bar \{([^}]*)\}/.exec(CSS)?.[1] ?? ''
-    expect(body).toMatch(/top: max\(var\(--mark-inset\), env\(safe-area-inset-/)
+    expect(body).toMatch(/top: calc\(max\(var\(--mark-inset\), env\(safe-area-inset-/)
     expect(body).toContain('left: 50%')
     expect(body).toContain('translate: -50% 0')
     expect(body).toMatch(/width: min\(var\(--sky-w\)/)
@@ -205,11 +207,17 @@ describe('the bar is quiet chrome, and does not fight the town', () => {
     expect(bar).toMatch(/width: calc\(100% - 2 \* max\(var\(--mark-inset\)/)
   })
 
-  it('leaves the stamp its corner by sitting above it, and stands down in the stream frame', () => {
-    expect(/\.stage-stamp \{([^}]*)\}/.exec(CSS)?.[1]).toMatch(
-      /top: calc\(max\(var\(--mark-inset\)/,
+  // The bar used to hide on the stream and hand its corner to a second mark. There is no second
+  // mark now, so the bar itself takes that corner and drops the road and the weather with it.
+  it('★ takes the corner itself in the stream frame, road and weather dropped', () => {
+    const flat = CSS.replace(/\s+/g, ' ')
+    expect(flat).not.toContain("[data-broadcast='on'] .sky-bar { display: none; }")
+    expect(flat).toContain(
+      "[data-broadcast='on'] .sky-arc, [data-broadcast='on'] .sky-weather { display: none; }",
     )
-    expect(CSS.replace(/\s+/g, ' ')).toContain("[data-broadcast='on'] .sky-bar { display: none; }")
+    expect(/\[data-broadcast='on'\] \.sky-bar \{([^}]*)\}/.exec(CSS)?.[1]).toMatch(
+      /right: max\(var\(--mark-inset\)/,
+    )
   })
 })
 
@@ -286,5 +294,153 @@ describe('★ golden hour: a low sun throws a long shadow', () => {
   it("the golden band is a fraction of the sun's own height, not an hour of its own", () => {
     expect(GOLDEN_ELEVATION).toBeGreaterThan(0)
     expect(GOLDEN_ELEVATION).toBeLessThan(1)
+  })
+})
+
+// ── ★ ONE CLOCK, IN ONE BOX ───────────────────────────────────────────────────────────────
+//
+// The day and the season used to be printed twice, 42px apart, by two components with two
+// formatters that could disagree about the minute. The bar owns all of it now.
+
+describe('★ the day, the season, the time and where the picture came from', () => {
+  const DAY_12 = 12 * MINUTES_PER_DAY + 9 * 60 + 40
+
+  it('★ splits ONE read of the clock into the dateline and the clock beside the road', () => {
+    expect(townStamp(DAY_12, 'LIVE')).toEqual({ date: 'DAY 12 · SUMMER', clock: '09:40 · LIVE' })
+  })
+
+  it('pads the clock, so the corner never jitters between 9:40 and 10:40', () => {
+    expect(townStamp(0, 'LIVE').clock).toBe('00:00 · LIVE')
+    expect(townStamp(23 * 60 + 5, 'LIVE').clock).toContain('23:05')
+  })
+
+  it('turns the season over with the year', () => {
+    expect(townStamp(DAYS_PER_SEASON * MINUTES_PER_DAY, 'LIVE').date).toContain('SUMMER')
+    expect(townStamp((DAYS_PER_SEASON - 1) * MINUTES_PER_DAY, 'LIVE').date).toContain('SPRING')
+  })
+
+  // ★ THE DAY HAS A SHAPE. The gateway marks the day I / II / III, and the bar is where a viewer
+  // reads it, because the mark applies between cuts too and the cue slot does not stand between
+  // them. It rides the dateline, never the clock: an act is not a minute.
+  it('★ reads DAY n · SEASON · ACT II, and says nothing before the day has an act', () => {
+    expect(townStamp(DAY_12, 'LIVE', 'II').date).toBe('DAY 12 · SUMMER · ACT II')
+    expect(townStamp(DAY_12, 'REPLAY', 'III')).toEqual({
+      date: 'DAY 12 · SUMMER · ACT III',
+      clock: '09:40 · REPLAY',
+    })
+    expect(townStamp(DAY_12, 'LIVE', null)).toEqual(townStamp(DAY_12, 'LIVE'))
+  })
+
+  it('★ reads the act off the gateway’s own frame, not off the clock', () => {
+    expect(SRC).toContain('store.getDirector()?.act ?? null')
+    expect(SRC).toContain('townStamp(tick, stampWord(live, awake, link, paused), act)')
+  })
+})
+
+describe('a clock nobody can know is stale says so instead', () => {
+  it('is LIVE only when the town is awake and at its edge', () => {
+    expect(stampWord(true, true, 'online')).toBe('LIVE')
+  })
+
+  it('is REPLAY while a past moment is being watched', () => {
+    expect(stampWord(false, true, 'online')).toBe('REPLAY')
+  })
+
+  it('is OFFLINE with the socket down or the town not yet woken', () => {
+    expect(stampWord(true, true, 'reconnecting')).toBe('OFFLINE')
+    expect(stampWord(true, true, 'connecting')).toBe('OFFLINE')
+    expect(stampWord(true, false, 'online')).toBe('OFFLINE')
+    expect(stampWord(false, false, 'online')).toBe('OFFLINE')
+  })
+
+  it('is PAUSED only over LIVE: a stopped clock behind a scrub is the lesser fact', () => {
+    expect(stampWord(true, true, 'online', true)).toBe('PAUSED')
+    expect(stampWord(false, true, 'online', true)).toBe('REPLAY')
+  })
+
+  it('is R8’s own badge state, said in three words rather than four', () => {
+    expect(stampWord(true, true, 'online')).toBe(
+      { live: 'LIVE', past: 'REPLAY', stale: 'OFFLINE', waking: 'OFFLINE' }[
+        tickBadgeState('online', true, true)
+      ],
+    )
+  })
+
+  // The word the viewer reads is the one the PROP carries, not the one a unit test hands the
+  // pure function: the bar said LIVE over frozen figures for as long as `link` went unpassed.
+  it('★ is handed the socket’s status by the app', () => {
+    const app = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8')
+    expect(app).toContain('onStatus: setLink')
+    expect(app).toMatch(/<SkyArc[^>]*link=\{link\}/)
+  })
+
+  it('★ the corner renders the word the socket is actually on', () => {
+    const awakeStore = (): WorldStore => ({
+      ...createWorldStore(),
+      getState: () =>
+        ({ tick: 0, weather: { kind: 'sunny', temperatureC: 12 } }) as unknown as WorldState,
+    })
+    const corner = (link: LinkState): string =>
+      renderToStaticMarkup(createElement(SkyArc, { store: awakeStore(), link }))
+    expect(corner('online')).toContain('LIVE')
+    expect(corner('reconnecting')).toContain('OFFLINE')
+    expect(corner('connecting')).toContain('OFFLINE')
+  })
+})
+
+// ── ★ THE ONE HONEST EMPTY FRAME ──────────────────────────────────────────────────────────
+//
+// This was a full-screen slab in the middle of the picture with no dismiss, standing for up to
+// thirty real minutes, promising a wake hour baked in at build time. What it was FOR is real: an
+// empty dark frame at 02:00 reads as a broken stream. That job needs a mark, not a modal, so it
+// is one word in the bar and no hour, because no hour is a thing this world holds.
+
+describe('★ what the town says when nobody in it is doing anything', () => {
+  const body = (alive: boolean, asleep: boolean) => ({ alive, asleep })
+
+  it('★ stands only when every living body is asleep', () => {
+    expect(sleepField({ a: body(true, true), b: body(true, true) })).toBe('ASLEEP')
+  })
+
+  it('★ is gone the moment anybody is up: one mind at 03:00 is a town worth watching', () => {
+    expect(sleepField({ a: body(true, true), b: body(true, false) })).toBeNull()
+  })
+
+  it('★ never stands over a town with nobody in it', () => {
+    expect(sleepField({})).toBeNull()
+    expect(sleepField({ a: body(false, false) })).toBeNull()
+  })
+
+  // ★ THE HOUR WAS A BUILD-TIME CONSTANT AND COULD BE A LIE, and re-deriving it from the tick
+  // was the same lie: WAKE_HOUR only picks which hours the world calls night, it wakes nobody.
+  it('★ takes no clock, so it has no hour to promise', () => {
+    expect(sleepField).toHaveLength(1)
+    expect(SRC).not.toContain('WAKE_HOUR')
+  })
+
+  // Sleep is a chosen act, not a schedule: a town that all lies down at 14:00 has no hour the
+  // world can promise, and saying one was the whole of the old card's lie.
+  it('★ is one word and never a number', () => {
+    expect(sleepField({ a: body(true, true) })).toBe('ASLEEP')
+    expect(sleepField({ a: body(true, true), b: body(true, true) })).not.toMatch(/\d/)
+  })
+
+  it('★ reaches the viewer as a field in the bar, never as a slab over the town', () => {
+    const asleepStore = (): WorldStore => ({
+      ...createWorldStore(),
+      getTick: () => at(2),
+      getState: () =>
+        ({
+          tick: at(2),
+          agents: { a: body(true, true) },
+          weather: { kind: 'sunny', temperatureC: 12 },
+        }) as unknown as WorldState,
+    })
+    const html = renderToStaticMarkup(
+      createElement(SkyArc, { store: asleepStore(), link: 'online' }),
+    )
+    expect(html).toContain('class="sky-state"')
+    expect(html).toContain('>ASLEEP<')
+    expect(CSS).not.toContain('.sleep-card')
   })
 })

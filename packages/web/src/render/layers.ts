@@ -1,6 +1,6 @@
 import { Container } from 'pixi.js'
 import { cullByBox, type ViewRect } from './cull.js'
-import { depthOrder, type DepthBox } from './depth.js'
+import { OVERLAP_RANK, depthOrder, type DepthBox } from './depth.js'
 
 export const LAYERS = [
   'ground', // the baked terrain field
@@ -42,9 +42,9 @@ export function createLayers(world: Container): { layers: LayerSet; graded: Cont
  *  an additive light may live: under the night multiply the grade darkens it. */
 export const SCREEN_LAYERS = [
   'flash', // lightning — under the night quad, so a strike at 2 a.m. is a night strike (D8)
+  'weather', // rain, snow: screen-space particles, under the quad so the night reaches them
   'night', // the deep-blue multiply quad
   'lights', // pools, blooms, window glow, fire, the sky gradient — additive, world transform
-  'weather', // rain, snow: screen-space particles
 ] as const
 type ScreenLayerName = (typeof SCREEN_LAYERS)[number]
 export type ScreenLayerSet = Readonly<Record<ScreenLayerName, Container>>
@@ -64,7 +64,13 @@ export function createScreenLayers(stage: Container): ScreenLayerSet {
 // ── the depth sort's one writer ──────────────────────────────────────────────────────────
 
 /** A drawable inside `entities`, and the ground it stands on. */
-export type DepthEntry = { box: DepthBox; node: Container }
+export type DepthEntry = {
+  box: DepthBox
+  node: Container
+  /** the slot over a body's crown while it is wearing a mark: that rides in a layer which does
+   *  not sort, so a roof has to give way to it as well */
+  overhead?: Container
+}
 
 /** What one frame cost, and what it did not. Read by the FPS overlay and asserted by tests —
  *  a cull nobody can count is a claim, not a measurement. */
@@ -90,6 +96,8 @@ export function createDepthGate(): (entries: readonly DepthEntry[], view: ViewRe
     put(view.y)
     put(view.w)
     put(view.h)
+    // A relief in flight, or one the dwell is holding back, still owes the frame a write.
+    if (reliefPending > 0) moved = true
     for (const e of entries) {
       const b = e.box
       put(e.node)
@@ -111,7 +119,11 @@ export function createDepthGate(): (entries: readonly DepthEntry[], view: ViewRe
 
 /** The only place a depth is written and a drawable is hidden. The cull runs BEFORE the sort
  *  because `depthOrder` is O(n²) and degrades to seed order above `DEPTH_BUDGET`. */
-export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect): DepthCounts {
+export function applyDepthOrder(
+  entries: readonly DepthEntry[],
+  view: ViewRect,
+  now = performance.now(),
+): DepthCounts {
   const { drawn, hidden } = cullByBox(entries, view)
   for (const e of hidden) e.node.visible = false
   boxes.length = 0
@@ -123,7 +135,73 @@ export function applyDepthOrder(entries: readonly DepthEntry[], view: ViewRect):
     e.node.visible = true
     e.node.zIndex = index.get(e.box.id) ?? 0
   }
+  applyRelief(drawn, now)
   return { drawn: drawn.length, culled: hidden.length }
+}
+
+// ── occlusion relief ─────────────────────────────────────────────────────────────────────
+
+// The sort is right to bury a body under a roof and the eye still calls it a bug: art is fitted
+// (w + h) · 32 px over the feet line while one tile of ground recession is 8 px.
+const RELIEF_ALPHA = 0.4
+const RELIEF_ENTER_MS = 180
+const RELIEF_EXIT_MS = 260
+/** The enter ramp and a 600 ms hold, rounded up to one change a second: a body walking a wall
+ *  edge crosses into cover and out again every few frames, and the roof would strobe. */
+const RELIEF_DWELL_MS = 1000
+/** The glyph slot over a crown, `SLOT_ABOVE_HEAD_PX + SLOT_PX` in overhead.ts. It is claimed
+ *  only by a body wearing a mark, because an empty slot hides nobody. */
+const RELIEF_HEADROOM_PX = 28
+
+type Relief = { on: boolean; at: number; k: number }
+const relief = new WeakMap<Container, Relief>()
+const bodies: DepthEntry[] = []
+const structures: DepthEntry[] = []
+/** How many structures are mid-ramp or waiting out the dwell. The depth gate reads it. */
+let reliefPending = 0
+
+/** Is the body, plus whatever headroom it has claimed, under this structure's art? */
+function coversColumn(s: DepthBox, b: DepthBox, headroom: number): boolean {
+  return s.sx0 < b.sx1 && b.sx0 < s.sx1 && s.sy0 < b.sy1 && b.sy0 - headroom < s.sy1
+}
+
+/** A structure painted over a body goes part translucent, so the picture never loses the person
+ *  it is about. Read off the order the sort just wrote: whoever paints later is the one hiding. */
+function applyRelief(drawn: readonly DepthEntry[], now: number): void {
+  bodies.length = 0
+  structures.length = 0
+  for (const e of drawn) {
+    if (e.box.rank === OVERLAP_RANK.body) bodies.push(e)
+    else if (e.box.rank === OVERLAP_RANK.structure) structures.push(e)
+  }
+  reliefPending = 0
+  for (const e of structures) {
+    const z = index.get(e.box.id) ?? 0
+    let want = false
+    for (const b of bodies) {
+      if ((index.get(b.box.id) ?? 0) > z) continue
+      const headroom = b.overhead?.visible === true ? RELIEF_HEADROOM_PX : 0
+      if (!coversColumn(e.box, b.box, headroom)) continue
+      want = true
+      break
+    }
+    let s = relief.get(e.node)
+    if (s === undefined) {
+      s = { on: false, at: now - RELIEF_DWELL_MS, k: 0 }
+      relief.set(e.node, s)
+    }
+    if (s.on !== want && now - s.at >= RELIEF_DWELL_MS) {
+      s.on = want
+      s.at = now
+    }
+    const p = Math.min(1, (now - s.at) / (s.on ? RELIEF_ENTER_MS : RELIEF_EXIT_MS))
+    const k = s.on ? p : 1 - p
+    if (k !== s.k) {
+      e.node.alpha = 1 - k * (1 - RELIEF_ALPHA)
+      s.k = k
+    }
+    if (p < 1 || s.on !== want) reliefPending++
+  }
 }
 
 // ── P16's mechanical guard ───────────────────────────────────────────────────────────────

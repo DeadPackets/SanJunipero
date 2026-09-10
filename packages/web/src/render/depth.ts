@@ -1,4 +1,5 @@
-import { CELL, CHAR_TARGET_PX, FEET_Y } from './charAnim.js'
+import { CHAR_TARGET_PX } from './charAnim.js'
+import { SHOULDER_W } from './hitShapes.js'
 import { feetOf } from './iso.js'
 import { BUILDING_PX_PER_TILE } from './textures.js'
 
@@ -152,11 +153,9 @@ export function depthOrder(boxes: readonly DepthBox[], edge: EdgeRule = geometri
 
 // ── the two box shapes the world actually contains ───────────────────────────────────────
 
-const BODY_SCALE = CHAR_TARGET_PX / 64
-/** The drawn figure's own extent, derived from the sheet geometry rather than guessed. */
-export const BODY_SPRITE_W = CELL * BODY_SCALE
-const BODY_ABOVE_FEET_PX = FEET_Y * BODY_SCALE
-const BODY_BELOW_FEET_PX = (CELL - FEET_Y) * BODY_SCALE
+/** The DRAWN figure, not the 96 px sheet lattice: both slicing paths in `characters.ts` scale a
+ *  sheet so the body stands `CHAR_TARGET_PX` feet to crown, and the shoulders are its widest. */
+export const BODY_SPRITE_W = SHOULDER_W
 
 /** A body stands on ONE tile, at its interpolated position — no rounding anywhere (F-3c). */
 export function bodyDepthBox(id: string, px: number, py: number): DepthBox {
@@ -169,9 +168,9 @@ export function bodyDepthBox(id: string, px: number, py: number): DepthBox {
     x1: px + 0.5,
     y1: py + 0.5,
     sx0: sx - BODY_SPRITE_W / 2,
-    sy0: sy - BODY_ABOVE_FEET_PX,
+    sy0: sy - CHAR_TARGET_PX,
     sx1: sx + BODY_SPRITE_W / 2,
-    sy1: sy + BODY_BELOW_FEET_PX,
+    sy1: sy,
   }
 }
 

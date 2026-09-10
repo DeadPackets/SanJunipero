@@ -76,12 +76,21 @@ describe('deriveSheet', () => {
       expect(sheet.get(`passing-a-${f}`)).toBe(sheet.get(`passing-b-${f}`))
   })
 
-  it('maps sleep: se/sw = the cell, ne/nw = its flip', () => {
+  it('maps sleep: se/ne = the cell, sw/nw = its flip', () => {
     const authored = makeAuthored()
     expect(sheet.get('sleep-se')!.data).toEqual(authored.sleep.data)
-    expect(sheet.get('sleep-sw')).toBe(sheet.get('sleep-se'))
-    expect(sheet.get('sleep-ne')!.data).toEqual(mirrorX(authored.sleep).data)
-    expect(sheet.get('sleep-nw')).toBe(sheet.get('sleep-ne'))
+    expect(sheet.get('sleep-ne')).toBe(sheet.get('sleep-se'))
+    expect(sheet.get('sleep-sw')!.data).toEqual(mirrorX(authored.sleep).data)
+    expect(sheet.get('sleep-nw')).toBe(sheet.get('sleep-sw'))
+  })
+
+  // ★ WHAT SHIPPED WRONG: sleep-sw was the unmirrored se cell, so a body asleep facing sw lay
+  // head-up-right, the wrong way round. One authored sleeper still owes both halves this law.
+  it('★ every sw and nw cell is its se or ne partner flipped, sleep included', () => {
+    for (const p of POSES_V2) {
+      expect(sheet.get(`${p}-sw`)!.data).toEqual(mirrorX(sheet.get(`${p}-se`)!).data)
+      expect(sheet.get(`${p}-nw`)!.data).toEqual(mirrorX(sheet.get(`${p}-ne`)!).data)
+    }
   })
 
   it('double flip is identity', () => {

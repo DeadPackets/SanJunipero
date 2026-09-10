@@ -70,7 +70,7 @@ async function runCharacter(m: CastLook): Promise<void> {
   assetId = `cast:${m.id}`
   const spentBefore = ledger.totalFor(assetId)
   const report: string[] = []
-  let refused: string | null = null
+  const refusal: { reason: string | null } = { reason: null }
   console.log(`\n== ${m.id} ==`)
 
   const sheet = await commissionCharacter(
@@ -83,7 +83,7 @@ async function runCharacter(m: CastLook): Promise<void> {
         console.log(`  ${line}`)
       },
       onRefused: (reason) => {
-        refused = reason
+        refusal.reason = reason
       },
       // The raws cache is the script's, not the pipeline's: a re-run of a character re-reads the
       // candidates it already paid for instead of buying them again.
@@ -108,7 +108,7 @@ async function runCharacter(m: CastLook): Promise<void> {
     m,
   )
   writeFileSync(`${DIR}/report.txt`, report.join('\n'))
-  if (sheet === null) throw new Error(refused ?? `${m.id}: refused with no reason given`)
+  if (sheet === null) throw new Error(refusal.reason ?? `${m.id}: refused with no reason given`)
 
   for (const [name, img] of sheet.cells)
     writeFileSync(`${DIR}/cells/${name}.png`, await encodePng(img))

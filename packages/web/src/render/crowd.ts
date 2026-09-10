@@ -40,7 +40,8 @@ export function screenToWorldOffset(sx: number, sy: number): CrowdOffset {
   return { dx: (a + b) / 2, dy: (b - a) / 2 }
 }
 
-/** Slot offsets keyed by id. Only SETTLED bodies take a slot, so a group does not shuffle aside for somebody walking through it; a body absent from the map is drawn where the record puts it. */
+/** Slot offsets keyed by id. Only SETTLED bodies take a slot, so a group does not shuffle aside for somebody walking through it; a body absent from the map is drawn where the record puts it.
+ *  The group is read off THIS frame alone, so a viewer that watched a body walk in and one that joined on the last frame lay the same crowd out. */
 export function crowdOffsets(
   bodies: readonly { id: string; x: number; y: number; settled: boolean }[],
 ): Map<string, CrowdOffset> {

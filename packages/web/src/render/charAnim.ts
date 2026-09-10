@@ -17,10 +17,12 @@ export const FEET_Y = 88
 const WALK_FPS = 8
 export const WALK_LOOP = ['contact-a', 'passing-a', 'contact-b', 'passing-b'] as const // v2, 8fps
 export const BOB_PX = 1 // passing frames render 1px lower — render-time only, never baked
-/** ★ A STANDING BODY BREATHES. `idle` was one frame at `bobY: 0`, so anybody not walking was a
- *  statue. Two steps a whole pixel apart on a 450 ms hold is the pixel-art practice, and the
- *  phase is the body's own gait, so a group standing together does not breathe in unison. */
-export const IDLE_BREATH_MS = 450
+/** ★ A STANDING BODY BREATHES, and on the spot: the shadow is its own sprite at the feet, so a
+ *  breath on the POSITION leaves it behind. Phased off the gait, so a group is not in unison. */
+export const IDLE_BREATH_MS = 4500
+/** How far the squash carries at the top of the breath. 1.5% of a 52 px figure is under a pixel
+ *  of head, which is all a body at rest should move. */
+export const IDLE_SQUASH = 0.015
 export const CHAR_TARGET_PX = 52 // ≈1.6 tiles of 32px; art height 64 in cell → scale 52/64
 export const WALK_FRAME_MS_V4 = 180 // v4 ruling: F1-F2-F1-F3 cadence at 180ms/frame
 
@@ -76,7 +78,13 @@ export function gaitOf(agentId: string): Gait {
 }
 
 export type SheetRow = (typeof SHEET_ROWS)[number]
-export type CharPose = { row: SheetRow; facing: Facing; bobY: number }
+export type CharPose = {
+  row: SheetRow
+  facing: Facing
+  bobY: number
+  /** the vertical multiplier of the breath, about the feet: 1 on every row but a standing idle */
+  breathY: number
+}
 
 /** What a body draws when the cell it wants is missing, in the order it tries: never another facing's art, which would be a body walking one way drawn facing the other. */
 export function cellRowLadder(row: SheetRow): readonly SheetRow[] {
@@ -95,7 +103,7 @@ export function cellRowLadder(row: SheetRow): readonly SheetRow[] {
 export type PoseOpts = {
   /** this body's own offset into the walk loop, from `gaitOf` — 0 is the shared clock */
   phase?: number
-  /** the 1 px passing-frame hop. Off under `prefers-reduced-motion` — see charAnim.test.ts */
+  /** the passing-frame hop and the idle breath. Off under `prefers-reduced-motion`. */
   bob?: boolean
 }
 
@@ -104,18 +112,23 @@ export function charPose(
   frameMs = 1000 / WALK_FPS,
   opts: PoseOpts = {},
 ): CharPose {
-  if (a.asleep || a.collapsed) return { row: 'sleep', facing: a.facing, bobY: 0 }
+  if (a.asleep || a.collapsed) return { row: 'sleep', facing: a.facing, bobY: 0, breathY: 1 }
   if (a.walking) {
     const n = WALK_LOOP.length
     const cycles = a.nowMs / (frameMs * n) + (opts.phase ?? 0)
     const i = Math.floor(cycles * n)
     const row = WALK_LOOP[((i % n) + n) % n]!
     const bobbing = opts.bob !== false && (row === 'passing-a' || row === 'passing-b')
-    return { row, facing: a.facing, bobY: bobbing ? BOB_PX : 0 }
+    return { row, facing: a.facing, bobY: bobbing ? BOB_PX : 0, breathY: 1 }
   }
-  if (opts.bob === false) return { row: 'idle', facing: a.facing, bobY: 0 }
-  const step = Math.floor(a.nowMs / IDLE_BREATH_MS + (opts.phase ?? 0) * 2)
-  return { row: 'idle', facing: a.facing, bobY: (((step % 2) + 2) % 2) * BOB_PX }
+  if (opts.bob === false) return { row: 'idle', facing: a.facing, bobY: 0, breathY: 1 }
+  const cycle = a.nowMs / IDLE_BREATH_MS + (opts.phase ?? 0)
+  return {
+    row: 'idle',
+    facing: a.facing,
+    bobY: 0,
+    breathY: 1 + IDLE_SQUASH * Math.sin(2 * Math.PI * cycle),
+  }
 }
 
 // ── THE STRIDE FOLLOWS THE GROUND ─────────────────────────────────────────────────────────

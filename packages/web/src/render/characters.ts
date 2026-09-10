@@ -1,7 +1,7 @@
 import { Graphics, Polygon, Rectangle, Sprite, Texture } from 'pixi.js'
 import type { SimEvent } from '@sj/shared'
 import { tilesPerTickFor } from '@sj/engine/verbs'
-import type { AgentBody } from '@sj/engine/state'
+import type { AgentBody, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { bodyDepthBox } from './depth.js'
 import { facingFrom, feetOf, type Facing } from './iso.js'
@@ -63,6 +63,10 @@ import {
 const SHADOW_ALPHA = 0.25
 const EMOTE_PX = 16
 
+/** How long the old facing lies over the new one on a turn. Long enough to read as a turn,
+ *  short enough that nobody sees two bodies. */
+const TURN_FADE_MS = 90
+
 /** The floor of a scene, drawn on the ground the speaker is standing on: 2:1 like the tile, and
  *  a shade wider than the 20×8 contact shadow so it reads as a ring and not as an outline. */
 const FLOOR_RING_RX = 12
@@ -114,6 +118,13 @@ type CharEntry = {
   crowdSinceMs: number
   /** the vertical multiplier an effect is holding over this body's own scale */
   mulY: number
+  /** the breath's own multiplier, composed with `mulY` rather than fighting it */
+  breath: number
+  /** the facing the sprite is drawn on, so a turn cross-fades off the one being left */
+  drawn: Facing | null
+  /** the outgoing facing, fading out over the new one for TURN_FADE_MS */
+  ghost: Sprite
+  ghostSinceMs: number
 }
 
 export type CharacterLayer = {
@@ -217,6 +228,19 @@ export function characterCell(
       row: r,
     }
   }
+  return null
+}
+
+/** Where the act this body is doing is happening: the person it names, else the structure,
+ *  else the tile. A body works facing its work, not facing wherever it last walked from. */
+function activityTarget(state: WorldState, a: AgentBody): { x: number; y: number } | null {
+  const p = a.activity?.params
+  if (p === undefined) return null
+  const who = typeof p.targetId === 'string' ? state.agents[p.targetId] : undefined
+  if (who !== undefined) return { x: who.x, y: who.y }
+  const s = typeof p.structureId === 'string' ? state.structures[p.structureId] : undefined
+  if (s !== undefined) return { x: s.x + (s.w - 1) / 2, y: s.y + (s.h - 1) / 2 }
+  if (typeof p.x === 'number' && typeof p.y === 'number') return { x: p.x, y: p.y }
   return null
 }
 
@@ -347,6 +371,12 @@ export function createCharacterLayer(
     sprite.on('pointertap', () => {
       onSelect(agentId)
     })
+    // The turn's own art: the outgoing cell, riding the body's transform as a child so the
+    // depth sort keeps owning where it is drawn.
+    const ghost = new Sprite()
+    ghost.eventMode = 'none'
+    ghost.visible = false
+    sprite.addChild(ghost)
     const shadow = new Sprite(shadowTexture)
     shadow.anchor.set(0.5, 0.5)
     shadow.alpha = SHADOW_ALPHA
@@ -395,18 +425,31 @@ export function createCharacterLayer(
       gait: gaitOf(agentId),
       legMs: clock.periodMs / MOVEMENT_FALLBACK.base,
       path: [{ x, y, atMs: now }],
-      depth: { box: bodyDepthBox(agentId, x, y), node: sprite },
+      depth: { box: bodyDepthBox(agentId, x, y), node: sprite, overhead: overhead.node },
       crowd: NO_OFFSET,
       crowdFrom: NO_OFFSET,
       crowdTo: NO_OFFSET,
       crowdSinceMs: now,
       mulY: 1,
+      breath: 1,
+      drawn: null,
+      ghost,
+      ghostSinceMs: now,
     }
     e = e2
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
     loadSheet(agentId, null)
     return e
+  }
+
+  /** The old cell lies over the new one and fades, so a turn is a turn and not an atlas swap. */
+  const startTurn = (e: CharEntry, nowMs: number): void => {
+    e.ghost.texture = e.sprite.texture
+    e.ghost.anchor.set(e.sprite.anchor.x, e.sprite.anchor.y)
+    e.ghost.alpha = 1
+    e.ghost.visible = true
+    e.ghostSinceMs = nowMs
   }
 
   const offEvents = store.onEvents((evts: SimEvent[]) => {
@@ -464,6 +507,7 @@ export function createCharacterLayer(
       }
     }
     const nowTick = store.getTick()
+    const wantsMotion = scene.wantsMotion()
     // An open scene turns its cast toward each other and puts the ring under whoever has it.
     const open = store.getScene()
     const cast = open?.open === true ? open.participants : null
@@ -506,6 +550,11 @@ export function createCharacterLayer(
         const partner = talk.partnerOf(a.id, pos.x, pos.y, nowMs)
         const at = partner === null ? undefined : state.agents[partner]
         if (at !== undefined) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
+      } else {
+        // Face what you are doing. Without this a body keeps the direction of the last walk
+        // leg for the whole act, which is the back of its head half the time.
+        const at = activityTarget(state, a)
+        if (at !== null) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
       }
       const sheet = sheets.get(a.id)
       const pose = charPose(
@@ -519,9 +568,14 @@ export function createCharacterLayer(
         strideFrameMs(e.legMs, e.gait.stride),
         { phase: e.gait.phase, bob: scene.wantsMotion() },
       )
+      e.breath = pose.breathY
       if (sheet !== undefined && sheet.texture !== null) {
         const cell = characterCell(sheet.texture, sheet.art, pose.row, pose.facing)
         if (cell !== null) {
+          if (pose.facing !== e.drawn) {
+            if (e.drawn !== null && wantsMotion) startTurn(e, nowMs)
+            e.drawn = pose.facing
+          }
           e.sprite.texture = cell.texture
           e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
           e.sprite.scale.set(cell.scale) // smooth downscale to world footprint
@@ -535,7 +589,6 @@ export function createCharacterLayer(
 
     // ── pass two: the rank, then everything that hangs off a body's position ────────────────
     const ranks = crowdOffsets(standing)
-    const wantsMotion = scene.wantsMotion()
     // once a frame for every body: the sun's height is a function of the minute, not of who
     const sun = shadowCast(nowTick)
     for (const { a, e, pos, bobY } of drawing) {
@@ -583,7 +636,12 @@ export function createCharacterLayer(
       e.ringA = e.ringFrom + (hasFloor - e.ringFrom) * fade
       e.ring.alpha = e.ringA
       e.ring.visible = e.ringA > 0
-      e.sprite.scale.y = e.sprite.scale.x * e.mulY
+      e.sprite.scale.y = e.sprite.scale.x * e.mulY * e.breath
+      if (e.ghost.visible) {
+        const p = (nowMs - e.ghostSinceMs) / TURN_FADE_MS
+        e.ghost.alpha = Math.max(0, 1 - p)
+        e.ghost.visible = p < 1
+      }
       const row = emotesHidden ? null : overheadRow(a, nowTick)
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
@@ -605,6 +663,7 @@ export function createCharacterLayer(
     }
     for (const [agentId, e] of entries) {
       if (!live.has(agentId)) {
+        e.ghost.destroy()
         e.sprite.destroy()
         e.shadow.destroy()
         e.ring.destroy()
@@ -627,11 +686,12 @@ export function createCharacterLayer(
       e.mulY = k
       // written now as well as in `tick`: the character layer ticks BEFORE the effects do, so
       // waiting for the next frame would show the squash one frame late.
-      e.sprite.scale.y = e.sprite.scale.x * k
+      e.sprite.scale.y = e.sprite.scale.x * k * e.breath
     },
     destroy: () => {
       offEvents()
       for (const e of entries.values()) {
+        e.ghost.destroy()
         e.sprite.destroy()
         e.shadow.destroy()
         e.ring.destroy()

@@ -103,10 +103,9 @@
      2560. One inset, and it clears the notch on the phones that have one. */
   --mark-inset: clamp(16px, 3vmin, 40px);
 
-  /* The sun arc owns the top edge. Its width and its height are named here because the quiet
-     stamp has to sit UNDER it and cannot measure a sibling — so the arc is DRAWN at `--sky-h`
-     rather than at a second number, or the two drift and the stamp lands on the road. */
-  --sky-w: 600px;
+  /* The sun arc owns the top edge, and everything the frame says about when is inside it. The
+     clock ran to 680px before the road had any room left to mean anything. */
+  --sky-w: 680px;
   --sky-h: 34px;
 
   /* The transport strip's own height, named because the cue and the title card both step over
@@ -158,7 +157,6 @@ body {
 .stage-mount:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle `f`) ── */
-/* Top-LEFT: the quiet stamp owns the top-right corner. */
 .fps-overlay {
   position: absolute; top: var(--s-5); left: var(--s-6); z-index: 30;
   display: grid; gap: var(--s-1); justify-items: start;
@@ -1191,7 +1189,7 @@ body {
    the only thing on this bar that ever moves. */
 .sky-bar {
   position: absolute; z-index: 21;
-  top: max(var(--mark-inset), env(safe-area-inset-top));
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
   /* ONE GROUP, centred and bounded. Spread across a 1440px window the arc stretches to a
      556px-wide 26px-tall smear and its position stops meaning anything — the same failure the
      900px rule below names, arriving from the other end. */
@@ -1211,8 +1209,21 @@ body {
   text-shadow: var(--halo-deep);
 }
 .sky-glyph { display: block; flex: none; image-rendering: pixelated; }
-/* The weather chip is the right flank; its words end at the bar's edge, not against the road. */
-.sky-bar > .sky-chip:last-child { justify-content: flex-end; }
+/* The clock is the right flank; its words end at the bar's edge, not against the road. */
+.sky-clock { justify-content: flex-end; }
+/* The dateline runs under the road, across the whole group: one box says the day, the season,
+   the act the day has reached and what the town itself is doing. */
+.sky-line {
+  grid-column: 1 / -1; justify-self: center; margin: 0;
+  display: flex; align-items: center; gap: var(--s-5);
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.14em; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: var(--cream);
+  text-shadow: var(--halo-deep);
+}
+/* The one thing the town says about itself when nobody in it is doing anything. Honey, so it
+   reads as news rather than as another number in the dateline. */
+.sky-state { color: var(--honey); }
 .sky-arc { position: relative; height: var(--sky-h); }
 .sky-arc-line { display: block; width: 100%; height: 100%; }
 /* The road brings its own ground with it, the way every mark over the town does. Whole pixels:
@@ -1241,27 +1252,10 @@ body {
     grid-template-columns: auto auto; justify-content: space-between; gap: var(--s-5);
   }
   .sky-arc { display: none; }
-  /* With the road gone the bar is one row of chips, and the stamp's clearance follows it down. */
-  /* --sky-h stays the arc's drawn height; with the road gone the stamp clears one chip row. */
-  .stage-stamp { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7)); }
+  /* With the road gone the two chips close up and the dateline takes the row under them. A
+     phone at night has no 358px to spend on one unbreakable line. */
+  .sky-line { flex-wrap: wrap; justify-content: center; white-space: normal; }
 }
-/* The stream frame has its own clock in the stamp, and the bar would sit under the overlay. */
-[data-broadcast='on'] .sky-bar { display: none; }
-
-.stage-stamp {
-  position: absolute; z-index: 21;
-  /* Under the sky bar, not over it: the bar owns the top edge and this is the wire's own news.
-     A clear step, so the two never sit on one line at any width. */
-  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4));
-  right: max(var(--mark-inset), env(safe-area-inset-right));
-  pointer-events: none;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
-  letter-spacing: 0.14em; font-variant-numeric: tabular-nums;
-  color: var(--cream);
-  text-shadow: var(--halo-deep);
-  opacity: 0;
-}
-.stage-stamp.shown { opacity: 1; }
 
 /* A WIDTH, not only a cap: an offset with no `right` leaves shrink-to-fit half the stage. */
 .stage-cue {
@@ -1336,7 +1330,8 @@ body {
   position: absolute; z-index: 21;
   /* the second row of the top-left corner, level with `.stage-live` across the picture */
   top: calc(
-    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--sky-h) +
+      var(--s-4) + var(--s-7)
   );
   left: max(var(--mark-inset), env(safe-area-inset-left));
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3);
@@ -1344,8 +1339,9 @@ body {
   pointer-events: none;
 }
 @media (max-width: 900px) {
-  /* the arc is gone below 900px, and the card clears one chip row like the stamp does */
-  .scene-card { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+  .scene-card {
+    top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--s-7) * 2);
+  }
 }
 .scene-card-title {
   padding: var(--s-2) var(--s-3);
@@ -1358,32 +1354,6 @@ body {
   font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
   letter-spacing: 0.02em; text-wrap: pretty;
   color: var(--cream);
-  text-shadow: var(--halo-deep);
-}
-
-/* ── the sleep card: the one honest empty frame ─────────────────────────────────────────────
-   A town where every living body is asleep has nothing to cut to. Saying so, and saying when it
-   ends, is the difference between a quiet hour and a broken stream. */
-.sleep-card {
-  position: absolute; z-index: 22; inset: 0;
-  display: grid; place-content: center; justify-items: center;
-  gap: var(--s-5);
-  padding: var(--mark-inset);
-  text-align: center;
-  pointer-events: none;
-}
-.sleep-card-line {
-  margin: 0;
-  padding: var(--s-4) var(--s-6);
-  font-family: var(--font-px); font-size: var(--f-4); line-height: 1.2;
-  letter-spacing: 0.04em;
-  color: var(--cream); background: var(--deep);
-  box-shadow: var(--frame);
-}
-.sleep-card-note {
-  margin: 0; max-width: 34ch;
-  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
-  color: var(--cream-quiet); text-wrap: pretty;
   text-shadow: var(--halo-deep);
 }
 
@@ -1473,32 +1443,32 @@ body {
 }
 .first-lines.gone { opacity: 0; }
 /* The lines are the town's first page, not the paper's: a deep link that opens a sheet, or a
-   sheet opened while they stand, takes them down. While they stand, the sleep card, which sits
-   on the same centre, waits its turn. */
+   sheet opened while they stand, takes them down. */
 body:has(.app[data-paper='on']) .first-lines { display: none; }
-body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden; }
 
 .stage-exit, .stage-live {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
-  top: max(var(--mark-inset), env(safe-area-inset-top));
+  top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band));
   min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
   font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--cream); background: var(--ink);
   border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
 }
-/* Under the stamp, in the same corner: the word REPLAY and the way out of it are one thing.
-   One stamp line plus a gap below its own top, so the two never sit on each other. */
+/* Under the bar that reads REPLAY, in the top-right: the word and the way out of it are one
+   thing, and the offset keeps this button off the bar's own row. */
 .stage-live {
   left: auto;
   right: max(var(--mark-inset), env(safe-area-inset-right));
   top: calc(
-    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sky-h) + var(--s-4) + var(--s-7)
+    max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--sky-h) +
+      var(--s-4) + var(--s-7)
   );
 }
 @media (max-width: 900px) {
-  /* The stamp clears one chip row below 900px, and this follows it down. */
-  .stage-live { top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--s-7) * 2); }
+  .stage-live {
+    top: calc(max(var(--mark-inset), env(safe-area-inset-top)) + var(--sign-band) + var(--s-7) * 2);
+  }
 }
 @media (prefers-reduced-motion: no-preference) {
   .stage-exit, .stage-live { transition-property: background-color, translate, box-shadow; }
@@ -1515,9 +1485,6 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Slow out, fast in: a mark that answers a mouse-move may not lag it by 300ms. */
-  .stage-stamp { transition: opacity var(--t-slow) var(--ease-enter); }
-  .stage-stamp.shown { transition-duration: var(--t-fast); }
   /* A moment arrives and goes on the sheet's own reveal — it is news, not an answer to a hand. */
   .stage-cue {
     transition: opacity var(--t-fast) var(--ease-enter);
@@ -1527,7 +1494,7 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
   .sound-cue { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
   /* A cut's card and the night's card arrive the same way the cue does — a fade, nothing else:
      a mark that slid in would be moving the picture the camera just settled. */
-  .scene-card, .sleep-card { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
+  .scene-card { animation: cue-in var(--t-fast) var(--ease-enter) backwards; }
   .first-lines { transition: opacity var(--t-slow) var(--ease-enter); }
   @keyframes cue-in {
     from { opacity: 0; }
@@ -1540,9 +1507,13 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
   .stage-ring-arms button:active { scale: 1; }
 }
 
+/* `clip`, never `hidden`: `hidden` is still a scroll container, and a `.focus()` or a
+   `scrollIntoView` inside the sheet walked up to it and carried the whole town with it. */
 .app {
-  position: relative; display: block; height: 100%; overflow: hidden;
+  position: relative; display: block; height: 100%; overflow: clip;
   background: var(--night); user-select: none;
+  /* How much of the top edge the signpost's arms take, so the marks that share it start below. */
+  --sign-band: 0px;
 }
 .town-lost {
   display: grid; place-content: center; height: 100%; margin: 0; padding: var(--s-8);
@@ -1604,37 +1575,21 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 @media (max-height: 620px) {
   .signpost-post { display: none; }
 }
-/* No corner left with the sheet up: at 768px the space beside it is 146px against a 192px arm.
-   The arms move to the top edge, two by two, and into one row on a short window. */
+/* No corner left with the sheet up at 768px, and an arm that re-anchored on the click that
+   pressed it took the control out from under the hand. One home per size, up or down. */
 @media (max-width: 1000px), (max-height: 620px) {
-  .signpost[data-open='yes'] {
+  .signpost {
     top: max(var(--mark-inset), env(safe-area-inset-top)); bottom: auto;
     left: max(var(--mark-inset), env(safe-area-inset-left)); right: auto;
     grid-template-columns: repeat(2, auto); padding-bottom: 0;
   }
-  .signpost[data-open='yes'] .signpost-post { display: none; }
-  /* Three marks in one band, with `DAY 2` reading through a plank. The sheet's own dateline
-     carries the day, the season and the clock while it is up. */
-  .app[data-paper='on'] :is(.sky-bar, .stage-stamp, .scene-card, .lower-third, .sleep-card) {
-    display: none;
-  }
+  .signpost-post { display: none; }
+  .app { --sign-band: 88px; }
 }
+/* A short window puts the four arms in one row, so the band is one plank deep. */
 @media (min-width: 641px) and (max-height: 620px) {
-  .signpost[data-open='yes'] { grid-auto-flow: column; grid-template-columns: none; }
-}
-/* A phone has no corner to spare: at 390px the cue ran under the arms. Closed, the arms go two
-   by two without the pole, and the cue and the lower third stand above the 88px row they make. */
-@media (max-width: 699px) {
-  .signpost[data-open='no'] { grid-template-columns: repeat(2, auto); padding-bottom: 0; }
-  .signpost[data-open='no'] .signpost-post { display: none; }
-  .stage-cue {
-    bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + var(--s-4));
-  }
-  .lower-third {
-    bottom: calc(
-      max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + var(--s-4) + var(--s-8)
-    );
-  }
+  .signpost { grid-auto-flow: column; grid-template-columns: none; }
+  .app { --sign-band: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .signpost-arm:hover { translate: 0 0; }
@@ -1820,6 +1775,26 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
   }
   .paper-tab { flex: none; scroll-snap-align: start; }
   .paper-marginalia { grid-row: 1; grid-column: 2; }
+}
+/* A phone gives the strip 294px of track for 410px of tabs. The scroll drives the two stops, so
+   the soft edge is only on the end with pages past it and a strip that fits is never masked. */
+@property --tab-fade-in { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --tab-fade-out { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes tab-edge {
+  from { --tab-fade-in: 0px; --tab-fade-out: 24px; }
+  to { --tab-fade-in: 24px; --tab-fade-out: 0px; }
+}
+@supports (animation-timeline: scroll(self inline)) {
+  @media (max-width: 1919.98px) {
+    .paper-tabs {
+      mask-image:
+        linear-gradient(to right, transparent, #000 var(--tab-fade-in)),
+        linear-gradient(to left, transparent, #000 var(--tab-fade-out));
+      mask-composite: intersect;
+      animation: tab-edge linear both;
+      animation-timeline: scroll(self inline);
+    }
+  }
 }
 /* Both AFTER the base rule: a media block that precedes it loses on source order at equal
    specificity, which is why the short window's smaller masthead never once took. */
@@ -2067,8 +2042,7 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .player-head, .skeleton-row, .paper,
   .bond-detail, .fps-overlay, .stage-plate, .stage-scene-stamp, .signpost-arm, .help-button,
-  .thoughts-button, .sound-button, .scene-card-title, .sleep-card-line, .lower-third,
-  .lower-third-bust {
+  .thoughts-button, .sound-button, .scene-card-title, .lower-third, .lower-third-bust {
     border: 2px solid CanvasText;
   }
   .paper, .bond-detail, .fps-overlay { border-image: none; }
@@ -2092,8 +2066,8 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 }
 
 /* ── the corner cluster: two 44px targets, each with the glyph everyone already knows ─────── */
-/* Bottom-LEFT, not the top-right the pattern usually takes: the sun arc owns the top edge and
-   the quiet stamp sits under it, so this is the one corner nothing else stands in at any width. */
+/* Bottom-LEFT, not the top-right the pattern usually takes: the sun arc owns the top edge, so
+   this is the one corner nothing else stands in at any width. */
 .help-button, .thoughts-button, .sound-button {
   position: absolute; z-index: 25;
   left: max(var(--mark-inset), env(safe-area-inset-left));
@@ -2237,13 +2211,20 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
   --bcast-safe: 88px;
 }
 
-[data-broadcast='on'] .stage-stamp {
-  font-size: var(--f-bcast);
+/* On the stream the bar is the only clock, so the road and the weather go and the words take
+   the top-right corner to themselves. */
+[data-broadcast='on'] .sky-bar {
+  left: auto; translate: none; width: auto;
+  right: max(var(--mark-inset), env(safe-area-inset-right));
   top: max(var(--mark-inset), env(safe-area-inset-top));
+  display: block; text-align: right;
 }
+[data-broadcast='on'] .sky-arc, [data-broadcast='on'] .sky-weather { display: none; }
+[data-broadcast='on'] .sky-clock { font-size: var(--f-bcast); justify-content: flex-end; }
+[data-broadcast='on'] .sky-line { font-size: var(--f-bcast); justify-content: flex-end; }
 [data-broadcast='on'] .stage-cue { font-size: var(--f-bcast); bottom: var(--bcast-safe); }
 
-/* The sky bar is gone on the stream, so the card takes the corner itself. */
+/* The bar takes the right corner on the stream, so the card has the left one to itself. */
 [data-broadcast='on'] .scene-card {
   top: max(var(--mark-inset), env(safe-area-inset-top));
   gap: 12px;
@@ -2251,9 +2232,6 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 }
 [data-broadcast='on'] .scene-card-title { font-size: 24px; padding: 8px 12px; }
 [data-broadcast='on'] .scene-card-where { font-size: 28px; }
-[data-broadcast='on'] .sleep-card { gap: 24px; }
-[data-broadcast='on'] .sleep-card-line { font-size: 40px; padding: 20px 32px; }
-[data-broadcast='on'] .sleep-card-note { font-size: 24px; }
 
 [data-broadcast='on'] .lower-third {
   position: absolute; left: 4%; right: auto; margin: 0; width: auto; z-index: 26;
@@ -2334,7 +2312,7 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 /* The card stands in the cue's own slot, over the transport — and the two can never collide:
    the card goes down on the first thing that happens, which is the only thing that brings the
    cue up. The corners are all taken (help and thoughts bottom-left, the signpost bottom-right,
-   the stamp and the arc along the top), and a caption belongs on the centre line anyway.
+   the sky bar along the top), and a caption belongs on the centre line anyway.
    Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
    Ranged left, not centred: the plate carries a paragraph more often than a title. */
 .replay-card {
@@ -2400,7 +2378,7 @@ body:has(.first-lines:not([hidden]):not(.gone)) .sleep-card { visibility: hidden
 }
 /* A replay already names itself — its own dateline card, its own cue and the transport bar.
    The live director's three marks would be three more slabs in the same two corners. */
-[data-replay='on'] :is(.lower-third, .scene-card, .sleep-card) { display: none; }
+[data-replay='on'] :is(.lower-third, .scene-card) { display: none; }
 
 /* The grade carries no transition: the curtain is fully black at the midpoint of the dip, so
    the grade arrives behind it and there is nothing to ease. */

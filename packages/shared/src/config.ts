@@ -35,6 +35,9 @@ const MovementSchema = z
     crawlTickMultiplier: z.number().positive().default(8),
     sightRadius: z.number().default(12),
     earshotRadius: z.number().default(8),
+    // How near a voice has to be for the line to be said TO you and answerable. At the 8-tile
+    // overhearing radius a pair held fourteen lines from 6.1 tiles apart, at two front doors.
+    conversationRadius: z.number().default(2),
   })
   .strict()
 

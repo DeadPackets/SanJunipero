@@ -53,6 +53,14 @@ describe('SimConfigSchema', () => {
     expect(() => SimConfigSchema.parse({ health: { injuryDamage: { fatal: 99 } } })).toThrow()
   })
 
+  it('hearing is two dials, and the one a talk opens on is the shorter', () => {
+    const c = SimConfigSchema.parse({})
+    expect(c.movement.earshotRadius).toBe(8)
+    expect(c.movement.conversationRadius).toBe(2)
+    expect(c.movement.conversationRadius).toBeLessThan(c.movement.earshotRadius)
+    expect(() => SimConfigSchema.parse({ movement: { bogus: 1 } })).toThrow()
+  })
+
   it('an override survives and the rest still defaults', () => {
     const c = SimConfigSchema.parse({ needs: { hungerDecayPerTick: 1 } })
     expect(c.needs.hungerDecayPerTick).toBe(1)

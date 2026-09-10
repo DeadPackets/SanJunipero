@@ -28,7 +28,7 @@ const {
   createScreenLayers,
   literalZIndexOffenders,
 } = await import('./layers.js')
-const { structureDepthBox } = await import('./depth.js')
+const { bodyDepthBox, structureDepthBox } = await import('./depth.js')
 const { bigTown } = await import('./bigTown.js')
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -99,11 +99,20 @@ describe('createLayers', () => {
 })
 
 describe('createScreenLayers — the stack over the world', () => {
-  it('paints the flash under the night quad and the lights over it, then the weather', () => {
-    expect(SCREEN_LAYERS).toEqual(['flash', 'night', 'lights', 'weather'])
+  it('paints the flash and the weather under the night quad, and the lights over it', () => {
+    expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'night', 'lights'])
     const stage = new MockContainer()
     const set = createScreenLayers(stage)
     expect(SCREEN_LAYERS.map((n) => set[n])).toEqual(stage.children)
+  })
+
+  // ★ The night IS a multiply quad, so it only ever darkens what is already painted. Rain and
+  // snow sat over it and were the brightest thing on screen at 2 a.m.
+  it('★ keeps the weather under the multiply, where the night can reach it', () => {
+    const at = (n: string): number => (SCREEN_LAYERS as readonly string[]).indexOf(n)
+    expect(at('weather')).toBeLessThan(at('night'))
+    expect(at('flash')).toBeLessThan(at('night'))
+    expect(at('lights')).toBeGreaterThan(at('night'))
   })
 
   it('is event-inert throughout: a full-screen quad that took a click would end panning', () => {
@@ -115,8 +124,8 @@ describe('createScreenLayers — the stack over the world', () => {
 
 // ── the cull lives inside the one depth writer ────────────────────────────────────────────
 
-type FakeNode = { zIndex: number; visible: boolean }
-const nodeFor = (): FakeNode => ({ zIndex: -1, visible: true })
+type FakeNode = { zIndex: number; visible: boolean; alpha: number }
+const nodeFor = (): FakeNode => ({ zIndex: -1, visible: true, alpha: 1 })
 
 describe('applyDepthOrder culls to the viewport', () => {
   const VIEW = { x: 0, y: 0, w: 800, h: 600 }
@@ -210,6 +219,138 @@ describe('★ the depth gate keeps the sort off a still frame', () => {
     const a = entry('a', 4, 4)
     gate([a] as never, VIEW)
     expect(gate([{ box: a.box, node: nodeFor() }] as never, VIEW)).toBe(true)
+  })
+})
+
+// ── occlusion relief ──────────────────────────────────────────────────────────────────────
+// ★ A house is drawn (w + h) · 32 px over its feet line while one tile of ground recession is
+// 8 px, so a roof paints across about eight tiles and the sort is RIGHT to bury what is behind
+// it. The picture may not lose a body over that, so the roof gives way instead of the order.
+
+describe('★ a roof that hides a body goes translucent, and holds', () => {
+  const VIEW = { x: -1e6, y: -1e6, w: 2e6, h: 2e6 }
+  const HOUSE = { x: 20, y: 20, w: 2, h: 2 }
+  const scene = (
+    bx: number,
+    by: number,
+  ): {
+    house: { box: ReturnType<typeof structureDepthBox>; node: FakeNode }
+    body: { box: ReturnType<typeof bodyDepthBox>; node: FakeNode }
+    at: (now: number) => void
+  } => {
+    const house = { box: structureDepthBox('house', HOUSE), node: nodeFor() }
+    const body = { box: bodyDepthBox('body', bx, by), node: nodeFor() }
+    return {
+      house,
+      body,
+      at: (now) => {
+        applyDepthOrder([house, body] as never, VIEW, now)
+      },
+    }
+  }
+
+  it('fades the roof to 0.4 over 180 ms once it is painting over somebody', () => {
+    const s = scene(20, 18) // two tiles north of the house, and swallowed by its art
+    s.at(0)
+    expect(s.house.node.zIndex).toBeGreaterThan(s.body.node.zIndex)
+    expect(s.house.node.alpha).toBe(1)
+    s.at(90)
+    expect(s.house.node.alpha).toBeCloseTo(0.7, 5)
+    s.at(180)
+    expect(s.house.node.alpha).toBeCloseTo(0.4, 5)
+    s.at(400)
+    expect(s.house.node.alpha).toBeCloseTo(0.4, 5)
+  })
+
+  it('never writes the alpha of a roof that is hiding nobody, so an art fade is left alone', () => {
+    const s = scene(40, 40)
+    for (const t of [0, 180, 1000, 5000]) s.at(t)
+    expect(s.house.node.alpha).toBe(1)
+  })
+
+  // ★ The slot is only a reason to give way when somebody is standing in it: a body wearing no
+  // mark owns nothing above its crown, and a roof that fades for an empty 28 px band hides nobody.
+  describe('★ the glyph slot over a crown', () => {
+    const overSlot = (
+      overhead: { visible: boolean } | undefined,
+    ): { roof: { node: FakeNode }; alphaAt: (now: number) => number } => {
+      const body = { box: bodyDepthBox('body', 20, 18), node: nodeFor(), overhead }
+      const roof = {
+        box: {
+          ...structureDepthBox('house', HOUSE),
+          sy0: body.box.sy0 - 120,
+          sy1: body.box.sy0 - 20, // art bottom above the crown, inside the slot
+        },
+        node: nodeFor(),
+      }
+      return {
+        roof,
+        alphaAt: (now) => {
+          applyDepthOrder([body, roof] as never, VIEW, now)
+          return roof.node.alpha
+        },
+      }
+    }
+
+    it('★ is claimed by a body wearing a mark, and the roof over it gives way', () => {
+      const s = overSlot({ visible: true })
+      s.alphaAt(0)
+      expect(s.alphaAt(180)).toBeCloseTo(0.4, 5)
+    })
+
+    it('★ and is nobody at all when the slot is empty, so the roof stays whole', () => {
+      const s = overSlot({ visible: false })
+      for (const t of [0, 180, 1000]) expect(s.alphaAt(t)).toBe(1)
+      const none = overSlot(undefined) // a body layer that publishes no slot claims none
+      for (const t of [0, 180, 1000]) expect(none.alphaAt(t)).toBe(1)
+    })
+  })
+
+  it('holds the relief a whole second before it may let go', () => {
+    const s = scene(20, 18)
+    s.at(0)
+    s.at(180)
+    expect(s.house.node.alpha).toBeCloseTo(0.4, 5)
+    s.body.box = bodyDepthBox('body', 40, 40) // and off they go
+    for (const t of [300, 700, 999]) {
+      s.at(t)
+      expect(s.house.node.alpha, `${t} ms`).toBeCloseTo(0.4, 5)
+    }
+    s.at(1000) // the exit may start here, and takes 260 ms
+    expect(s.house.node.alpha).toBeCloseTo(0.4, 5)
+    s.at(1130)
+    expect(s.house.node.alpha).toBeCloseTo(0.7, 5)
+    s.at(1260)
+    expect(s.house.node.alpha).toBe(1)
+  })
+
+  it('★ cannot strobe: a body pacing a wall edge changes the roof at most once a second', () => {
+    const s = scene(20, 18)
+    let prev = s.house.node.alpha
+    let dir = 0
+    let ramps = 0
+    for (let t = 0; t <= 4000; t += 20) {
+      s.body.box = bodyDepthBox('body', 20, Math.floor(t / 100) % 2 === 0 ? 18 : 40)
+      s.at(t)
+      const d = Math.sign(s.house.node.alpha - prev)
+      if (d !== 0 && d !== dir) ramps++
+      if (d !== 0) dir = d
+      prev = s.house.node.alpha
+    }
+    // Without the dwell the body crosses cover 40 times over these four seconds.
+    expect(ramps).toBeGreaterThan(0)
+    expect(ramps).toBeLessThanOrEqual(5)
+  })
+
+  it('keeps the depth gate open until the fade has finished, then lets the frame rest', () => {
+    const gate = createDepthGate()
+    const s = scene(20, 18)
+    s.at(0)
+    expect(gate([s.house, s.body] as never, VIEW)).toBe(true)
+    s.at(90)
+    expect(gate([s.house, s.body] as never, VIEW)).toBe(true) // nothing moved, the fade did
+    s.at(180)
+    expect(gate([s.house, s.body] as never, VIEW)).toBe(false)
   })
 })
 

@@ -1,5 +1,5 @@
 // 2 authored facings + 1 sleep cell derive the full 24-cell sheet: SW = flip(SE), NW = flip(NE),
-// passing-a = passing-b, sleep-ne/nw = its flip. Facing-correct by construction.
+// passing-a = passing-b, sleep-sw/nw = its flip. Facing-correct by construction.
 import type { RawImage } from './post/raw.js'
 import {
   FACINGS,
@@ -63,9 +63,11 @@ export function deriveSheet(authored: AuthoredSet): Map<string, RawImage> {
     for (const [p, img] of Object.entries(cells)) out.set(`${p}-${derived}`, mirrorX(img))
   }
   const sleepFlip = mirrorX(authored.sleep)
+  // One authored sleeper serves all four facings, so the mirror law picks which: a lying head
+  // leans to the same screen side the body faces, west mirrored like every other west cell.
   out.set('sleep-se', authored.sleep)
-  out.set('sleep-sw', authored.sleep)
-  out.set('sleep-ne', sleepFlip)
+  out.set('sleep-ne', authored.sleep)
+  out.set('sleep-sw', sleepFlip)
   out.set('sleep-nw', sleepFlip)
   return out
 }

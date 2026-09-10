@@ -266,8 +266,18 @@ export function createAmbient(
   let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
   const BIRD_FLIGHT_MS = 10_000
 
+  // The director clock stops under the grave tone, so a bounce in flight stops with it and the
+  // body it is on holds at 1.18x until the tone lifts. The flip lands them all at rest instead.
+  const settleBounces = (): void => {
+    for (const b of bounces) setEntityScaleMul(scene, b.kind, b.id, 1)
+    for (const b of bodyBounces) layers.chars?.setScaleMulY(b.id, 1)
+    bounces.length = 0
+    bodyBounces.length = 0
+  }
+
   const applyTone = (v: boolean): void => {
     grave = v
+    settleBounces()
     layers.weather.setSuppressed(v)
     layers.bubbles.setSuppressed(v)
     layers.chars?.setEmotesHidden(v)

@@ -42,6 +42,28 @@ describe('★ a body turns to whoever it is answering', () => {
     expect(talk.partnerOf('amara', 10, 10, 2100)).toBe('omar')
   })
 
+  // ★ In a plaza the newest voice is usually somebody else's exchange, and a body turned to it
+  // mid-sentence. The line it answered outranks the last line anybody said.
+  it('★ answers the voice its own last line came back to, not the loudest neighbour', () => {
+    const talk = createConversation()
+    talk.heard({ agentId: 'amara', x: 10, y: 10, atMs: 0 })
+    talk.heard({ agentId: 'yusuf', x: 11, y: 10, atMs: 1000 }) // yusuf answers amara
+    talk.heard({ agentId: 'omar', x: 12, y: 12, atMs: 1500 }) // and omar is talking to nadia
+    expect(talk.partnerOf('yusuf', 11, 10, 1600)).toBe('amara')
+    // amara opened the exchange, so she has no line to answer and turns to the last voice heard
+    expect(talk.partnerOf('amara', 10, 10, 1600)).toBe('omar')
+  })
+
+  // ★ WHAT WAS LEARNED: once the line a body answered has aged out, the exchange is over and it
+  // turns to nobody. Falling through to the newest voice hands it a stranger's conversation.
+  it('★ turns to nobody once the line it answered has aged out', () => {
+    const talk = createConversation()
+    talk.heard({ agentId: 'amara', x: 10, y: 10, atMs: 0 })
+    talk.heard({ agentId: 'yusuf', x: 11, y: 10, atMs: REPLY_WINDOW_MS - 500 })
+    talk.heard({ agentId: 'omar', x: 12, y: 12, atMs: REPLY_WINDOW_MS }) // near enough to hear
+    expect(talk.partnerOf('yusuf', 11, 10, REPLY_WINDOW_MS + 100)).toBe(null)
+  })
+
   it('never answers itself, however many times it speaks', () => {
     const talk = createConversation()
     for (const atMs of [0, 500, 1000]) talk.heard({ agentId: 'amara', x: 10, y: 10, atMs })

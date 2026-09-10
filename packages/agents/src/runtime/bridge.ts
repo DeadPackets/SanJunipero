@@ -11,6 +11,7 @@ import {
   daysUntilNewGround,
   groundForBuilding,
   hears,
+  spokenTo,
   townSquareOf,
   unfinishedWork,
   type StandingWalls,
@@ -274,6 +275,16 @@ export class EngineBridge {
   /** Who would hear this body speak from where it stands, itself excluded. The scene's own
    *  membership test, so the ear that opens a scene and the ear that leaves one read one rule. */
   earshot(agentId: string): string[] {
+    return this.#reached(agentId, hears)
+  }
+
+  /** Who stands near enough that a word from this body is said TO them, and so near enough to
+   *  be answering it. Everyone else in `earshot` caught it and is waiting on nothing. */
+  nearEnoughToAnswer(agentId: string): string[] {
+    return this.#reached(agentId, spokenTo)
+  }
+
+  #reached(agentId: string, carries: typeof hears): string[] {
     const state = this.#loop.state
     const speaker = state.agents[agentId]
     if (speaker?.alive !== true) return []
@@ -285,7 +296,7 @@ export class EngineBridge {
     return Object.keys(state.agents)
       .sort()
       .filter((id) => id !== agentId && state.agents[id]!.alive)
-      .filter((id) => hears(state, this.#simConfig, spoken, id))
+      .filter((id) => carries(state, this.#simConfig, spoken, id))
   }
 
   /** The closest of these bodies to this one, by the block distance the rest of the world

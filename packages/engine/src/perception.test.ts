@@ -518,6 +518,24 @@ describe('composePerception: earshot occlusion', () => {
     ).toEqual(['across the field'])
   })
 
+  it('the packet says which lines were said to this ear and which were only overheard', () => {
+    const near = DEFAULT_CONFIG.movement.conversationRadius
+    const earshot = DEFAULT_CONFIG.movement.earshotRadius
+    const s = makeWorld([
+      { id: 'a', x: 0, y: 0 },
+      { id: 'close', x: near, y: 0 },
+      { id: 'across', x: earshot, y: 0 },
+    ])
+    const p = composePerception(s, DEFAULT_CONFIG, 'a', [
+      spoke('close', 'pass me the axe', near, 0),
+      spoke('across', 'the roof is done', earshot, 0),
+    ])
+    expect(p.heard.map((h) => [h.speakerId, h.addressed])).toEqual([
+      ['close', true],
+      ['across', undefined],
+    ])
+  })
+
   it('hears() is the pure rule the packet is built from', () => {
     let s = withHouse(
       makeWorld([
@@ -1472,7 +1490,8 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
          "speakerId": "b",
          "name": "b",
          "text": "the bread is yours",
-         "distance": 2
+         "distance": 2,
+         "addressed": true
         }
        ],
        "seen": [
@@ -1588,7 +1607,8 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
            "speakerId": "b",
            "name": "b",
            "text": "shut the door",
-           "distance": 0
+           "distance": 0,
+           "addressed": true
           }
          ],
          "seen": []

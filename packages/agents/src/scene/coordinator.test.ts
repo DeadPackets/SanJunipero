@@ -289,6 +289,50 @@ describe('a scene opens on a word somebody heard', () => {
     expect(scene?.audience).toEqual([OMAR])
   })
 
+  // The owner's ruling: a pair held fourteen lines about a stove from 6.1 tiles apart, standing
+  // at two different front doors. A voice that carries is not a talk being opened.
+  it('opens nothing on a word from across the square, even one with a name in it', () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 10 },
+      ],
+    })
+    expect(h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)).toBeNull()
+    expect(h.coordinator.open(), 'seven tiles is a shout, not a conversation').toHaveLength(0)
+  })
+
+  it('opens with the body beside it and leaves the shouted name listening', () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 10 },
+        { id: SALMA, name: 'Salma', x: 4 },
+      ],
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    expect(scene.participants, 'Salma is one pace off and Omar seven').toEqual([NADIA, SALMA])
+    expect(scene.audience).toEqual([OMAR])
+    expect(scene.floor, 'the talk waits on nobody it has to shout at').not.toBe(OMAR)
+  })
+
+  it('takes a voice from across the square as a line of the talk, and not as a talker', () => {
+    const h = harness({
+      who: [
+        { id: NADIA, name: 'Nadia', x: 3 },
+        { id: OMAR, name: 'Omar', x: 4 },
+        { id: YUSUF, name: 'Yusuf', x: 10 },
+      ],
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    const same = h.coordinator.noteSpoken(YUSUF, 'The well is dry again.', NOON + 1)
+    expect(same?.id, 'no second scene opened over the top of it').toBe(scene.id)
+    expect(scene.participants, 'he is six tiles from either of them').not.toContain(YUSUF)
+    expect(scene.audience).toContain(YUSUF)
+    expect(scene.thread.at(-1)?.text).toBe('The well is dry again.')
+    expect(h.coordinator.sceneFor(YUSUF), 'so he goes on taking his own turns').toBeNull()
+  })
+
   it('a line that says how the speaker feels hands the word back to that mind alone', async () => {
     const h = harness({
       script: (id) => (_ask, nth) =>

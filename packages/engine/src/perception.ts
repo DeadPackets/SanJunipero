@@ -15,7 +15,7 @@ import {
 } from '@sj/shared'
 import { FORAGEABLE_PROSE } from './data/forageables.js'
 import { MYSTERY_BY_KIND } from './data/mysteries.js'
-import { hears } from './earshot.js'
+import { hears, spokenTo } from './earshot.js'
 import { doorTile, insideOf, isYourRoof, roomIsFull } from './interiors.js'
 import { effectiveConfig } from './laws.js'
 import { isPassable, pathCtx } from './path.js'
@@ -204,7 +204,15 @@ export type PerceivedFauna = { id: string; kind: string; x: number; y: number }
 // What the patch looks like, not what is left in it: abundance or bareness, never a count.
 export type PerceivedForageable = { id: string; kind: string; x: number; y: number; prose: string }
 
-export type HeardSpeech = { speakerId: string; name: string; text: string; distance: number }
+export type HeardSpeech = {
+  speakerId: string
+  name: string
+  text: string
+  distance: number
+  // Near enough that the line was said to this ear and can be answered. Absent is a voice
+  // overheard across the square, which nobody is waiting on.
+  addressed?: true
+}
 
 // Things this agent watched happen out in the world — a taking that was not theirs,
 // or one of the world's unexplained happenings close enough to see.
@@ -762,6 +770,7 @@ function perceiveHeard(lens: Lens, recentEvents: SimEvent[]): HeardSpeech[] {
       name: state.agents[speakerId]?.name ?? speakerId,
       text: p.text,
       distance,
+      ...(spokenTo(state, config, ev.payload, self.id) ? { addressed: true as const } : {}),
     })
   }
   return heard

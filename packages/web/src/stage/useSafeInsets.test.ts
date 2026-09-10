@@ -22,7 +22,7 @@ describe('★ the chrome bands a bubble keeps out of', () => {
   })
 
   it('names the marks the sheet draws at the two edges', () => {
-    expect(TOP_BAND).toEqual(['.sky-bar', '.stage-stamp'])
+    expect(TOP_BAND).toEqual(['.sky-bar'])
     expect(BOTTOM_BAND).toEqual(['.stage-cue', '.lower-third'])
   })
 })

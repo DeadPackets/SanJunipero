@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { PLATE_DROP_PX } from '../stage/Nameplate.js'
-import { rulesFor } from './finish.test.js'
+import { rulesFor, selectorsMatching } from './finish.test.js'
 
 // A union merge that drops one side's block is invisible to tsc and to every other test in the
 // suite: the remaining CSS still parses, and the surface it styled just stops being styled.
@@ -96,23 +96,45 @@ describe('★ the signpost and the paper hold their own shape', () => {
   })
 
   // Every mark that hangs off an edge takes the same inset and the same notch guard.
-  it('gives the stamp and the cue the signpost’s own inset', () => {
-    for (const sel of ['.stage-stamp', '.stage-cue']) {
+  it('gives the bar and the cue the signpost’s own inset', () => {
+    for (const sel of ['.sky-bar', '.stage-cue']) {
       expect(rulesFor(BARE, sel), sel).toMatch(/max\(var\(--mark-inset\), env\(safe-area-inset-/)
     }
   })
 
   // Below 1400px a centred sheet sliced the arms mid-word; below 640 it buried them entirely.
-  it('★ keeps the signpost reachable with the sheet open, at every width', () => {
+  // The arms answered that by re-anchoring on the click that pressed them, which took the control
+  // out from under the hand: the position may not depend on `data-open` at any size any more.
+  it('★ keeps the signpost reachable with the sheet open, without moving it to do so', () => {
     expect(BARE).toMatch(
       /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*left:/,
     )
     expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.signpost\[data-open='yes'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*grid-template-columns: repeat\(2, auto\)/,
     )
     expect(BARE).toMatch(
       /@media \(min-width: 641px\) and \(max-height: 620px\) \{[^}]*grid-auto-flow: column/,
     )
+    expect(
+      selectorsMatching(BARE, /^\.signpost\[data-open/),
+      'an arm still moves on the click that pressed it',
+    ).toEqual([])
+  })
+
+  // The arms hold the top edge below 1001px, so every mark that shared that band starts under
+  // them. Hiding five of them on the same click was the other half of the jump.
+  it('★ steps the top marks below the arms rather than hiding them when the sheet opens', () => {
+    expect(rulesFor(BARE, '.app')).toMatch(/--sign-band:\s*0px/)
+    expect(BARE).toMatch(
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.app \{[^}]*--sign-band: 88px/,
+    )
+    expect(BARE).toMatch(
+      /@media \(min-width: 641px\) and \(max-height: 620px\) \{[\s\S]*?\.app \{[^}]*--sign-band: 44px/,
+    )
+    for (const sel of ['.sky-bar', '.scene-card', '.stage-live']) {
+      expect(rulesFor(BARE, sel), sel).toContain('var(--sign-band)')
+    }
+    expect(selectorsMatching(BARE, /data-paper='on'\] :is\(\.sky-bar/)).toEqual([])
   })
 
   // Height is what a landscape phone runs out of.
@@ -121,11 +143,13 @@ describe('★ the signpost and the paper hold their own shape', () => {
       /@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: calc\(100dvh - 64px\)/,
     )
     expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.signpost-post \{ display: none/)
-    // 390px wide: the closed arms go two by two and the cue stands above the row they make.
+    // 390px wide: the arms go two by two. They stand on the top edge in both states now, so the
+    // 88px the cue and the lower third used to leave them at the bottom is the picture's again.
     expect(BARE).toMatch(
-      /@media \(max-width: 699px\) \{[\s\S]*?\.signpost\[data-open='no'\] \{[^}]*grid-template-columns: repeat\(2, auto\)/,
+      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*top: max\(var\(--mark-inset\)/,
     )
-    expect(BARE).toMatch(/@media \(max-width: 699px\) \{[\s\S]*?\.stage-cue \{[^}]*\+ 88px/)
+    expect(rulesFor(BARE, '.stage-cue')).not.toContain('88px')
+    expect(rulesFor(BARE, '.lower-third')).not.toContain('88px')
   })
 
   it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {
@@ -203,13 +227,15 @@ describe('★ the signpost and the paper hold their own shape', () => {
     expect(PLATE_DROP_PX, `the plate must start below ${armBottom}px`).toBeGreaterThan(armBottom)
   })
 
-  it('★ keeps the fps meter out of the corner the quiet stamp owns', () => {
+  // The stamp that used to own the right-hand corner is folded into the bar, which takes the
+  // top CENTRE. The meter still has the left corner to itself, and nothing else claims it.
+  it('★ keeps the fps meter out of the corner the town clock owns', () => {
     // both selectors carry a second rule for their frame recipe; the placement one positions
     const placed = (sel: string): string =>
       [...CSS.matchAll(new RegExp(`\\${sel} \\{([^}]*)\\}`, 'g'))]
         .map((m) => m[1]!)
         .find((body) => body.includes('position:'))!
-    expect(placed('.stage-stamp')).toMatch(/right:/)
+    expect(placed('.sky-bar')).toContain('left: 50%')
     expect(placed('.fps-overlay')).toMatch(/left:/)
     expect(placed('.fps-overlay')).not.toMatch(/right:/)
   })
@@ -256,6 +282,13 @@ describe('★ the sheet answers the device, not only the window width', () => {
     }
   })
 
+  // `overflow: hidden` is still a scroll container. A `.focus()` or a `scrollIntoView` inside the
+  // sheet walked up to `.app` and carried the canvas, the arms and every stage mark with it.
+  it('★ clips the town rather than making it something the browser can scroll', () => {
+    expect(rulesFor(BARE, '.app')).toMatch(/overflow:\s*clip/)
+    expect(rulesFor(BARE, '.app')).not.toMatch(/overflow:\s*hidden/)
+  })
+
   it('gives the canvas the pointer and stops the page rubber-banding behind the sheet', () => {
     expect(rulesFor(BARE, '.stage-mount')).toMatch(/touch-action:\s*none/)
     expect(rulesFor(BARE, '.app')).toMatch(/user-select:\s*none/)
@@ -296,6 +329,15 @@ describe('★ the sheet answers the device, not only the window width', () => {
     expect(BARE).toMatch(
       /@media \(max-width: 1919\.98px\) \{[\s\S]*?\.paper-tabs \{[^}]*overflow-x: auto/,
     )
+  })
+
+  // 294px of track for 410px of tabs, and Moments and Days sat off the edge with nothing saying
+  // they were there. The scroll drives the stops, so the end with no pages past it is not faded.
+  it('★ says the tab strip runs past its own edge', () => {
+    expect(BARE).toMatch(/@supports \(animation-timeline: scroll\(self inline\)\)/)
+    expect(BARE).toMatch(/animation-timeline: scroll\(self inline\)/)
+    expect(BARE).toMatch(/@keyframes tab-edge \{[\s\S]*?--tab-fade-out: 24px/)
+    expect(BARE).toMatch(/mask-composite: intersect/)
   })
 })
 

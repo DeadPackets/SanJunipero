@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { flingFrom, trackDrag, type DragTrack } from '../render/fling.js'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -65,23 +65,41 @@ export function Paper({
   const open = page !== null
   const tabsRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
+  const sheetBoxRef = useRef<HTMLDivElement>(null)
   const dimRef = useRef<HTMLDivElement>(null)
   // The page is held for the 300 ms it takes to slide out, so the sheet is never blank in flight.
   const [shown, setShown] = useState<PageKey | null>(page)
   if (page !== null && page !== shown) setShown(page)
 
   const key = shown ?? 'folk'
+  const tabs = PAGE_TABS[key] as readonly string[]
+  const current = hasTab(key, tab) ? tab : tabs[0]!
   const [notice, setNotice] = useState<PaperNotice | null>(null)
 
-  // [open, key]: switching arms unmounts the focused tab, and focus would fall to <body>.
+  // The opener is whatever was pressed to raise the sheet, and it gets the focus back on the way
+  // down. Its own effect, so a tab change does not bounce focus through it and announce twice.
   useEffect(() => {
     if (!open) return
     const opener = document.activeElement as HTMLElement | null
-    tabsRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     return () => {
       opener?.focus()
     }
-  }, [open, key])
+  }, [open])
+
+  // Switching arms unmounts the focused tab and focus would fall to <body>. Seating it on the tab
+  // being shown, not the first one, is also what tells a reader a tab change landed somewhere.
+  useEffect(() => {
+    if (!open) return
+    tabsRef.current
+      ?.querySelector<HTMLButtonElement>(`#paper-tab-${current}`)
+      ?.focus({ preventScroll: true })
+  }, [open, key, current])
+
+  // A layout effect, not a passive one: Found runs its own scroll-to-row in a child passive
+  // effect, which is later, so this returns the box to the top without undoing that.
+  useLayoutEffect(() => {
+    if (sheetBoxRef.current !== null) sheetBoxRef.current.scrollTop = 0
+  }, [open, key, current])
 
   const release = (): void => {
     if (sheetRef.current !== null) sheetRef.current.style.cssText = ''
@@ -109,8 +127,6 @@ export function Paper({
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const date = dateline(tick)
 
-  const tabs = PAGE_TABS[key] as readonly string[]
-  const current = hasTab(key, tab) ? tab : tabs[0]!
   const title =
     key === 'person' || key === 'building' ? (subject?.name ?? PAGE_TITLE[key]) : PAGE_TITLE[key]
 
@@ -247,6 +263,7 @@ export function Paper({
           role="tabpanel"
           aria-labelledby={`paper-tab-${current}`}
           tabIndex={-1}
+          ref={sheetBoxRef}
         >
           {open ? (
             // Keyed by the page, not the tab: a tab switch must not drop the page's feeds and

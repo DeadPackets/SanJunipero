@@ -2032,7 +2032,7 @@ describe('arbiter seam (T19)', () => {
     // The heard block rides its own message, so this is the "happening now" reading of the line
     // and not the day log's record of the moment it landed in.
     const hears = (p: CapturedMessage[]): boolean =>
-      p.some((m) => m.text.startsWith('You hear Omar say: "Rain soon."'))
+      p.some((m) => m.text.startsWith('Omar says to you: "Rain soon."'))
     await stepUntil(loop, () => prompts.some(hears), 60)
     const first = prompts.findIndex(hears)
     expect(first, 'the mind was told at all').toBeGreaterThanOrEqual(0)

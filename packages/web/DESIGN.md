@@ -84,13 +84,11 @@ overlay sixty times a second.
 | `ThoughtsButton` | one 44px pixel wisp, shown or hidden; a switch, so `aria-pressed`, and off empties the silhouette the way `.legend-chip.off` strikes a chip — never a darker ground, which is what a pressed arm means | bottom-left, stacked over the help button |
 | `Nameplate` | `.stage-plate`, the picked figure's name on a wooden plate | 60px under the anchor, clear of the ring's lowest arm |
 | `SubjectRing` | four verbs at 12/3/6/9 o'clock: Follow · Story · Bonds · Home | round the picked figure |
-| `QuietStamp` | `DAY n · SEASON · HH:MM · LIVE\|REPLAY\|OFFLINE` and, once the day has one, `· ACT I\|II\|III` | top-right, `--mark-inset`; opens the session, then on input, gone 3s later |
 | `DirectorCue` | `DIRECTOR · NAME`, letter-spaced — or, for six seconds after one, **what just happened**: the moment's own sentence beside a 16px pixel glyph, in sentence case; or, while the gateway's own cut owns the shot, **why the camera is here** in the same sentence case | bottom-centre, `--mark-inset`, never reaching the arms |
 | `SceneCard` | a struck stamp for what the town calls the scene, and `At the fire pit · Nadia & Yusuf` under it; written at the cut and gone 6s later | top-left, level with `.stage-live` across the picture |
 | `LowerThird` | the speaker's 28px bust (96 on the stream), their name on an ink slab, and their line typing in at 28 characters a second over a hidden ghost that holds the width | bottom-centre, directly over the cue; only while its speaker is in the shot |
-| `SleepCard` | `The town sleeps until 06:00.` on a slab, and one quieter line under it | dead centre; only when EVERY living body is asleep |
 | `SpeechLive` | a visually-hidden `aria-live` line of every utterance | anywhere, once |
-| `SkyArc` | the sun's road: `DAY n · SEASON` · the arc · `STORM 4°` | the top edge, `--mark-inset`, permanent |
+| `SkyArc` | the sun's road and everything the frame says about when: `STORM 4°` · the arc · `HH:MM · LIVE\|REPLAY\|OFFLINE\|PAUSED`, with `DAY n · SEASON` and the day's act on a line under it, plus `ASLEEP · 12m 00s` while every living body is asleep | the top edge, `--mark-inset`, permanent |
 
 **The three story marks all read one answer.** The gateway scores the town and pushes one
 `{ t: 'director' }` frame — a cut, a quiet beat and the day's act — and `ui/DirectorMode.tsx` is
@@ -109,9 +107,19 @@ day, the season, the weather kind and the temperature, in `WEATHER_GLYPH`'s 8×8
 than an emoji. It eases its position on the world's tick and runs no loop at all. Below 900px the
 arc flattens and the position stops meaning anything, so the road goes and the two chips close
 up. The arc is DRAWN at `--sky-h` rather than at a second number — the token said 30px while the
-bar drew 34, and the quiet stamp that positions off it sat 4px inside the road. The stamp now
-steps `--sky-h` plus `--s-4` clear. Both flanking chips reserve `--sky-chip-w`, so the arc is
-centred on the viewport and stays there when the weather word changes length.
+bar drew 34 and the road came out 4px off. The two flanks are equal fractions of the group, so
+the arc is centred whatever the weather word or the clock runs to.
+
+**And it is the only mark that says when.** The day and the season used to be printed twice, by
+this bar and by a second box under it, from two formatters that could disagree about the minute.
+`townStamp` is one read of the clock split into the two slots the bar has, and the bar is always
+up: the old stamp shipped at `opacity: 0` and woke for three seconds on a pointer move, so a
+viewer who put the town on a tab and watched never saw the time at all. The field on the same
+line is what the town says when nobody in it is doing anything, which today is one state: every
+living body asleep, counted down in real seconds to the light the world itself keeps. It says
+`ASLEEP` with no number when the world cannot say. Sleep is a chosen act, so a town that all
+lies down at 14:00 has no hour anything can promise, and promising one was the whole of the
+full-screen card this replaced.
 
 **The hover is a footprint plate.** `render/plate.ts` draws it, `ui/interaction.ts` decides its
 words and `ui/plateModel.ts` shapes its rows. There is ONE for the whole stage — the tooltip

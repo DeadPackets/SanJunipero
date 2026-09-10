@@ -78,10 +78,12 @@ describe('the signpost', () => {
     expect(post('building').match(/aria-expanded="true"/g)).toBeNull()
   })
 
-  // The sheet buries the corner it stands in below 1400px, so the arms move to the top edge.
-  it('says whether the sheet is up, so the arms can stand clear of it', () => {
-    expect(post(null)).toContain('data-open="no"')
-    expect(post('folk')).toContain('data-open="yes"')
+  // The nav laid itself out from this, and the arms then left the corner they were pressed in.
+  // It has one home per width now, so the post says nothing about whether the sheet is up.
+  it('★ hangs in the same place whether the sheet is up or down', () => {
+    expect(post(null)).not.toContain('data-open')
+    expect(post('folk')).not.toContain('data-open')
+    expect(post('folk')).toBe(post(null).replace('aria-expanded="false"', 'aria-expanded="true"'))
   })
 
   // ★ 6E supersedes the fifth arm: the way into the key map is the corner button, so the post
@@ -356,8 +358,16 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   })
 
   // Switching arms while the sheet is up unmounted the focused tab and dropped focus to <body>.
-  it('★ re-seats focus when the arm changes, not only when the sheet opens', () => {
-    expect(code).toMatch(/\}, \[open, key\]\)/)
+  // The tab now counts too: on `[open, key]` alone a tab change moved no focus, so a reader was
+  // told nothing when the panel under it was replaced.
+  it('★ re-seats focus when the arm or the tab changes, not only when the sheet opens', () => {
+    expect(code).toMatch(/\}, \[open, key, current\]\)/)
+  })
+
+  // The opener capture is its own effect: on the focus effect's deps its cleanup fired on every
+  // tab change and put focus back on the old tab before the new one took it.
+  it('★ hands the opener back only when the sheet goes down', () => {
+    expect(code).toMatch(/const opener = document\.activeElement[\s\S]*?\}, \[open\]\)/)
   })
 
   // A keyboard instruction inside an accessible name is re-announced on every tab focus.
@@ -368,12 +378,29 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     expect(html).not.toMatch(/aria-label="[^"]*arrow keys/)
   })
 
-  it('moves focus to the first tab on the way up, and back to the opener on the way down', () => {
+  // The first button is not always the selected one: a person page opens on Story and a deep link
+  // opens on whatever tab it names, and focus landed on the wrong tab in both.
+  it('moves focus to the tab being shown on the way up, and back to the opener on the way down', () => {
     expect(code).toMatch(/const opener = document\.activeElement/)
-    expect(code).toMatch(
-      /tabsRef\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\)/,
-    )
+    expect(code).toMatch(/querySelector<HTMLButtonElement>\(`#paper-tab-\$\{current\}`\)/)
     expect(code).toMatch(/opener\?\.focus\(\)/)
+  })
+
+  // `.focus()` reveals its target by scrolling every ancestor that can scroll, and the sheet's
+  // tab strip is one of them while the sheet is still 102% down its own slide.
+  it('★ seats that focus without scrolling anything to reach it', () => {
+    expect(code).toMatch(/\.focus\(\{ preventScroll: true \}\)/)
+  })
+
+  // The sheet's scroll box is one div that React keeps mounted across every arm and tab, so its
+  // scrollTop was carried into the next page and dropped the reader mid-way down it.
+  it('★ returns the sheet to the top when the page or the tab under it changes', () => {
+    expect(code).toMatch(/sheetBoxRef\.current\.scrollTop = 0/)
+    // A layout effect: Found's own scroll-to-row is a child passive effect, which runs later.
+    expect(code).toMatch(
+      /useLayoutEffect\(\(\) => \{[\s\S]*?scrollTop = 0[\s\S]*?\}, \[open, key, current\]\)/,
+    )
+    expect(src('./pages/Found.tsx')).toContain('scrollIntoView')
   })
 })
 

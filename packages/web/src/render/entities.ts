@@ -11,10 +11,13 @@ import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hit
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
+  LOAD_PRIORITY,
   TextureBook,
   artOptional,
   buildingArt,
+  dressDelay,
   fadeArtIn,
+  openBoot,
   textureUrlFor,
   type BuildingArt,
 } from './textures.js'
@@ -92,7 +95,10 @@ type Entry = {
   sprite: Sprite
   url: string
   pips: Graphics | null
+  /** the palette-true stand-in a drawable shows while it has no art of its own */
   form: Graphics | null
+  /** whether real art has ever been written to this sprite, NOT whether art exists */
+  dressed: boolean
   /** the contact shadow under a dropped thing; a body's own is the character layer's */
   shadow: Graphics | null
   /** the kind and ground plan the hit prism is cut from */
@@ -128,13 +134,69 @@ type SyncState = {
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
-function setTexture(book: TextureBook, entry: Entry, url: string): void {
-  entry.url = url
-  void book.get(url).then((t) => {
+/** Where a drawable stands relative to the shot: what it is worth to the loader, and how long
+ *  its art waits before it fades up. */
+type Load = { priority: number; delayMs: number }
+
+/** A thing on the ground with no art of its own draws a palette-true chip at the size the art
+ *  would be. The forge's checkerboard reads as broken. This reads as not painted yet. */
+const CHIP_PX = 16
+
+function drawItemChip(g: Graphics, kind: string): void {
+  const { faces, ink } = builtFormSpec(kind, 1, 1)
+  const half = CHIP_PX / 2
+  g.clear()
+  g.rect(-half, -CHIP_PX, CHIP_PX, CHIP_PX * 0.68)
+  g.fill(faces[2].color)
+  g.rect(-half, -CHIP_PX * 0.32, CHIP_PX, CHIP_PX * 0.32)
+  g.fill(faces[0].color)
+  g.rect(-half, -CHIP_PX, CHIP_PX, CHIP_PX)
+  g.stroke({ width: 1, color: ink, alignment: 0.5 })
+}
+
+/** The stand-in every drawable wears while its art is in flight or missing. A child of the
+ *  sprite, so it inherits depth, position and tint, and it goes the moment real art arrives. */
+function standIn(entry: Entry, draw: (g: Graphics) => void): void {
+  if (entry.form === null) {
+    entry.form = new Graphics()
+    entry.form.eventMode = 'none' // the volume is a picture; the sprite owns the pointer
+    entry.sprite.addChild(entry.form)
+  }
+  draw(entry.form)
+}
+
+function clearStandIn(entry: Entry): void {
+  if (entry.form === null) return
+  entry.form.destroy()
+  entry.form = null
+}
+
+function landItem(entry: Entry, t: Texture): void {
+  entry.sprite.texture = t
+  entry.dressed = true
+  clearStandIn(entry)
+  // A shadow is what marks the entries drawn to a common longest side: the dropped things.
+  if (entry.shadow !== null) fitItem(entry, t)
+}
+
+function setTexture(book: TextureBook, entry: Entry, url: string | null, load: Load): void {
+  entry.url = url ?? NO_ART
+  const inHand = url === null ? null : book.peek(url)
+  if (inHand !== null) {
+    landItem(entry, inHand)
+    return
+  }
+  // The same tier whether the art is missing or merely in flight: a chip the palette owns, at
+  // the size the art will be, and the contact that stops it reading as a floating sticker.
+  standIn(entry, (g) => {
+    drawItemChip(g, entry.kind)
+  })
+  if (entry.shadow !== null) drawItemShadow(entry.shadow, CHIP_PX)
+  if (url === null) return
+  void book.get(url, load.priority).then((t) => {
     if (entry.url !== url || entry.sprite.destroyed) return
-    entry.sprite.texture = t
-    // A shadow is what marks the entries drawn to a common longest side: the dropped things.
-    if (entry.shadow !== null) fitItem(entry, t)
+    landItem(entry, t)
+    fadeArtIn(entry.sprite, load.delayMs)
   }, artOptional)
 }
 
@@ -147,41 +209,48 @@ function applyBuildingArt(
   swapFrom: string | null,
   footprint: { w: number; h: number },
   kind: string,
+  load: Load,
 ): void {
-  // No art in any root: draw the built form. It is a child of the sprite, so it inherits depth,
-  // position and tint, and disappears the moment real art arrives.
+  const volume = (g: Graphics): void => {
+    drawBuiltForm(g, builtFormSpec(kind, footprint.w, footprint.h))
+  }
+  // No art in any root: the built form IS the building, not a stand-in for one.
   if (art.url === null) {
     entry.url = NO_ART
     entry.sprite.texture = Texture.EMPTY
     entry.sprite.anchor.set(0.5, 1.0)
     writeScale(entry, 1)
     cutHitPrism(entry)
-    if (entry.form === null) {
-      entry.form = new Graphics()
-      entry.form.eventMode = 'none' // the volume is a picture; the sprite owns the pointer
-      entry.sprite.addChild(entry.form)
-    }
-    drawBuiltForm(entry.form, builtFormSpec(kind, footprint.w, footprint.h))
+    standIn(entry, volume)
     return
-  }
-  if (entry.form !== null) {
-    entry.form.destroy()
-    entry.form = null
   }
   entry.url = art.url
   // The manifest's scale is known NOW, so the prism is cut now: a building is clickable at its
   // real shape from the frame it appears, not a texture round trip later.
   cutHitPrism(entry, entry.hitZoom, art.scale ?? 1)
-  const swapping = swapFrom !== null && swapFrom !== art.url
-  const p = swapping ? book.swap(swapFrom, art.url) : book.get(art.url)
-  void p.then((t) => {
-    if (entry.url !== art.url || entry.sprite.destroyed) return // superseded or torn down mid-load
+  const land = (t: Texture, fade: boolean): void => {
     entry.sprite.texture = t
-    if (swapping) fadeArtIn(entry.sprite) // finish line 8: art arrives, it does not pop in
+    entry.dressed = true
+    clearStandIn(entry)
     if (art.anchor !== null) entry.sprite.anchor.set(art.anchor.x, art.anchor.y)
     else entry.sprite.anchor.set(0.5, 1.0)
     writeScale(entry, art.scale ?? 1)
     cutHitPrism(entry) // the prism is scaled with the sprite, so a new scale re-cuts it
+    if (fade) fadeArtIn(entry.sprite, load.delayMs)
+  }
+  const inHand = book.peek(art.url)
+  if (inHand !== null) {
+    land(inHand, false) // already in the book: nothing arrives, so nothing fades
+    return
+  }
+  // A building whose art has not landed draws its own volume rather than a hole. This is the
+  // one tier for the whole product: a stand-in, never an empty sprite and never a checkerboard.
+  if (!entry.dressed) standIn(entry, volume)
+  const swapping = swapFrom !== null && swapFrom !== art.url
+  const p = swapping ? book.swap(swapFrom, art.url) : book.get(art.url, load.priority)
+  void p.then((t) => {
+    if (entry.url !== art.url || entry.sprite.destroyed) return // superseded or torn down mid-load
+    land(t, true) // finish line 8: art arrives, it does not pop in, first load included
   }, artOptional)
 }
 
@@ -308,11 +377,28 @@ export function syncEntities(
     })
   }
   const records = store.assetRecords()
+  // What art exists, before a sprite asks for a byte of it.
+  openBoot(records)
   const live = new Set<string>()
+
+  // The loader never saw the camera, so an off-screen crop raced the house in the middle of the
+  // shot. It is the same rect the scene hands the tooltip layer and the ground baker.
+  const view = scene.viewRect()
+  const midX = view.x + view.w / 2
+  const midY = view.y + view.h / 2
+  const span = Math.hypot(view.w, view.h) / 2
+  const loadAt = (sx: number, sy: number): Load => ({
+    priority:
+      sx >= view.x && sx <= view.x + view.w && sy >= view.y && sy <= view.y + view.h
+        ? LOAD_PRIORITY.near
+        : LOAD_PRIORITY.far,
+    delayMs: dressDelay(Math.hypot(sx - midX, sy - midY), span),
+  })
 
   for (const s of Object.values(state.structures)) {
     const key = `structure:${s.id}`
     live.add(key)
+    const ground = feetOf(s.x, s.y, s.w, s.h)
     let entry = sync.entries.get(key)
     if (entry === undefined) {
       const sprite = new Sprite()
@@ -333,6 +419,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        dressed: false,
         shadow: null,
         kind: s.kind,
         footprint: { w: s.w, h: s.h },
@@ -352,9 +439,9 @@ export function syncEntities(
         null,
         s,
         s.kind,
+        loadAt(ground.sx, ground.sy),
       )
     }
-    const ground = feetOf(s.x, s.y, s.w, s.h)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = structureDepthBox(key, s)
     if (s.stage === 'construction') {
@@ -388,6 +475,7 @@ export function syncEntities(
     if (it.loc.t !== 'tile') continue
     const key = `item:${it.id}`
     live.add(key)
+    const ground = feetOf(it.loc.x, it.loc.y)
     let entry = sync.entries.get(key)
     if (entry === undefined) {
       const sprite = new Sprite()
@@ -406,6 +494,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        dressed: false,
         shadow,
         kind: it.kind,
         footprint: { w: 1, h: 1 },
@@ -416,9 +505,8 @@ export function syncEntities(
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
-      setTexture(book, entry, textureUrlFor(records, 'item', it.kind))
+      setTexture(book, entry, textureUrlFor(records, 'item', it.kind), loadAt(ground.sx, ground.sy))
     }
-    const ground = feetOf(it.loc.x, it.loc.y)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.shadow?.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, it.loc.x, it.loc.y, ITEM_PX)
@@ -427,6 +515,7 @@ export function syncEntities(
   for (const c of Object.values(state.crops)) {
     const key = `crop:${c.id}`
     live.add(key)
+    const ground = feetOf(c.x, c.y)
     let entry = sync.entries.get(key)
     if (entry === undefined) {
       const sprite = new Sprite()
@@ -441,6 +530,7 @@ export function syncEntities(
         url: '',
         pips: null,
         form: null,
+        dressed: false,
         shadow: null,
         kind: c.kind,
         footprint: { w: 1, h: 1 },
@@ -451,9 +541,8 @@ export function syncEntities(
       }
       sync.entries.set(key, entry)
       scene.layers.entities.addChild(sprite)
-      setTexture(book, entry, textureUrlFor(records, 'crop', c.kind))
+      setTexture(book, entry, textureUrlFor(records, 'crop', c.kind), loadAt(ground.sx, ground.sy))
     }
-    const ground = feetOf(c.x, c.y)
     entry.sprite.position.set(ground.sx, ground.sy)
     entry.depth.box = tileDepthBox(key, c.x, c.y)
     writeScale(entry, CROP_SCALE_BASE + CROP_SCALE_PER_STAGE * c.stage)
@@ -480,20 +569,22 @@ export function syncEntities(
         if (s === undefined) continue
         const art = buildingArt(records, s.kind, s.w, s.h, s.facing)
         if ((art.url ?? NO_ART) !== entry.url) {
-          applyBuildingArt(book, entry, art, entry.url === NO_ART ? null : entry.url, s, s.kind)
+          const at = loadAt(entry.sprite.position.x, entry.sprite.position.y)
+          applyBuildingArt(book, entry, art, entry.url === NO_ART ? null : entry.url, s, s.kind, at)
         }
         continue
       }
       const kind = key.startsWith('item:') ? state.items[id]?.kind : state.crops[id]?.kind
       if (kind === undefined) continue
       const url = textureUrlFor(records, key.startsWith('item:') ? 'item' : 'crop', kind)
-      if (url !== entry.url) {
+      if (url !== null && url !== entry.url) {
         const oldUrl = entry.url
+        const at = loadAt(entry.sprite.position.x, entry.sprite.position.y)
         entry.url = url
         void book.swap(oldUrl, url).then((t) => {
           if (entry.url !== url || entry.sprite.destroyed) return
-          entry.sprite.texture = t
-          if (entry.shadow !== null) fitItem(entry, t)
+          landItem(entry, t)
+          fadeArtIn(entry.sprite, at.delayMs)
         }, artOptional)
       }
     }

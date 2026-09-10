@@ -183,6 +183,9 @@ export function createWorldStore(): WorldStore {
         case 'scrubbed':
           state = msg.state as WorldState
           mode = { live: false, replaying: false, tick: msg.tick }
+          // The live cut is about the live minute. Left standing it aimed the camera and the
+          // caption at people doing something that has not happened in the minute on screen.
+          director = null
           break
         case 'replaying':
           // The log head goes BACK to where this state was taken: the recorded deltas that follow
@@ -190,6 +193,7 @@ export function createWorldStore(): WorldStore {
           logSeq = msg.seq
           state = msg.state as WorldState
           mode = { live: false, replaying: true, tick: msg.tick }
+          director = null
           break
         case 'mood':
           moods.set(msg.agentId, msg.mood)

@@ -186,6 +186,21 @@ describe('nearestPerson', () => {
   })
 })
 
+describe('a word carries further than a talk does', () => {
+  it('parts the shoulder next to a mouth from the rest of the square', () => {
+    const { bridge, step } = ownedWorld()
+    bridge.announce('agent_moved', { id: 'cass', x: 11, y: 3 })
+    step()
+    expect(bridge.earshot(AGENT), 'a voice crosses the square').toEqual(['bex', 'cass'])
+    expect(bridge.nearEnoughToAnswer(AGENT), 'Cass is eight tiles off').toEqual(['bex'])
+  })
+
+  it('is silent for a body that is not there to speak', () => {
+    const { bridge } = ownedWorld()
+    expect(bridge.nearEnoughToAnswer('nobody')).toEqual([])
+  })
+})
+
 describe('the default perception window outlasts the gap between turns (D-28-6)', () => {
   it('covers the longest an awake mind can go without a turn, with margin', () => {
     expect(DEFAULT_RECENT_WINDOW_TICKS).toBeGreaterThan(DEFAULT_MIND_CONFIG.boredomTicks)

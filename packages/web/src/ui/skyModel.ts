@@ -1,4 +1,4 @@
-import { DAWN_HOUR, MINUTES_PER_DAY, simTimeFromTick, tickToMoment } from '@sj/shared'
+import { DAWN_HOUR, MINUTES_PER_DAY } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 
 // ★ WHERE IN THE DAY YOU ARE, read off an arc before it is read off a clock. One traveller, one
@@ -90,11 +90,6 @@ export function arcPercent(along: number): { left: number; top: number } {
 }
 
 // ── the words beside it ──────────────────────────────────────────────────────────────────
-
-/** `DAY 12 · SPRING`. Capitals because the mark is set in the face with no lowercase. */
-export function dayWord(tick: number): string {
-  return `DAY ${tickToMoment(tick).day} · ${simTimeFromTick(tick).season.toUpperCase()}`
-}
 
 /** The sky in two words: what it is doing and how cold it is. A town whose snapshot has not
  *  landed says nothing about the weather rather than inventing a temperature. */

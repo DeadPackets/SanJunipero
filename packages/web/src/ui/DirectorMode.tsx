@@ -91,6 +91,9 @@ export function DirectorMode({
   // read a face, so the eight-second floor is kept here, over frames, not over polls.
   const [held, setHeld] = useState<StakeScore | null>(null)
   const lastCutRef = useRef(0)
+  // Whether the town has ever been framed for this viewer, so the overview is an opening shot
+  // and never the thing the camera does on its way out of a claim.
+  const framedRef = useRef(false)
 
   useEffect(() => {
     const next = autoCut ? (frame?.cut ?? null) : null
@@ -167,13 +170,21 @@ export function DirectorMode({
     }
     if (followed === null) {
       scene.setFollow(null)
-      if (awake) {
-        scene.centerHome()
-        scene.setZoom(OVERVIEW_ZOOM)
-      }
+      // Standing down means the camera STOPS. Only the very first frame is framed for the
+      // viewer: after that a hand on the lens got the town thrown home under its own drag.
+      if (!awake || framedRef.current) return
+      framedRef.current = true
+      scene.centerHome()
+      scene.setZoom(OVERVIEW_ZOOM)
       return
     }
-    scene.setZoom(directorZoom(window.innerWidth))
+    // The stop is a function of the window, so a resize has to re-ask it: dragged across 1280
+    // the wrong stop stood until the claim next changed.
+    const stop = (): void => {
+      scene.setZoom(directorZoom(window.innerWidth))
+    }
+    stop()
+    window.addEventListener('resize', stop)
     scene.setFollow(() => {
       const anchor = scene.anchorOf?.(followed)
       if (anchor !== undefined && anchor !== null) return anchor
@@ -183,6 +194,7 @@ export function DirectorMode({
       return { x: sx, y: sy }
     })
     return () => {
+      window.removeEventListener('resize', stop)
       scene.setFollow(null)
     }
   }, [scene, store, claimBy, castKey, followed, awake])

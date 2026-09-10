@@ -97,8 +97,8 @@ export function faceInScene(
 
 export type Conversation = {
   heard(v: Voice): void
-  /** Who this speaker is answering: the last OTHER voice heard within earshot of where they are
-   *  standing now, or null when they are talking to the air. */
+  /** Who this speaker is answering: the voice its own last line came back to, else the last
+   *  voice heard. Null once that line has aged out, and null when it is talking to the air. */
   partnerOf(agentId: string, x: number, y: number, nowMs: number): string | null
   /** The voice log itself, so the floor rules above can be asked of it without a second one. */
   voices(): readonly Voice[]
@@ -112,14 +112,26 @@ export function createConversation(): Conversation {
       if (voices.length > KEEP_VOICES) voices.shift()
     },
     partnerOf(agentId, x, y, nowMs) {
-      for (let i = voices.length - 1; i >= 0; i--) {
-        const v = voices[i]!
-        if (nowMs - v.atMs > REPLY_WINDOW_MS) return null
-        if (v.agentId === agentId) continue
-        if (Math.hypot(v.x - x, v.y - y) > EARSHOT_TILES) continue
-        return v.agentId
+      const back = (from: number): string | null => {
+        for (let i = from; i >= 0; i--) {
+          const v = voices[i]!
+          if (nowMs - v.atMs > REPLY_WINDOW_MS) return null
+          if (v.agentId === agentId) continue
+          if (Math.hypot(v.x - x, v.y - y) > EARSHOT_TILES) continue
+          return v.agentId
+        }
+        return null
       }
-      return null
+      // The line THIS body answered outranks the newest line in the square: in a plaza the last
+      // voice heard is usually somebody else's exchange.
+      let mine = -1
+      for (let i = voices.length - 1; i >= 0 && nowMs - voices[i]!.atMs <= REPLY_WINDOW_MS; i--) {
+        if (voices[i]!.agentId === agentId) {
+          mine = i
+          break
+        }
+      }
+      return mine > 0 ? back(mine - 1) : back(voices.length - 1)
     },
     voices: () => voices,
   }

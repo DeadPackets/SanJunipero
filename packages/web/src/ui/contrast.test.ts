@@ -306,8 +306,12 @@ describe('C9 · the signpost arm, whose ground is a drawn plank and not a token'
 })
 
 describe('C6, C11, C12 · the sheet stops thinning colours it cannot measure', () => {
-  it('states the stamp at full strength', () => {
-    expect(ruleBody(CSS, '.stage-stamp.shown')).toMatch(/opacity:\s*1/)
+  // The clock used to ship at opacity 0 and wake for three seconds on a pointer move, so a
+  // viewer who put the town on a tab and watched never saw the time, the season or LIVE at all.
+  it('★ states the clock at full strength, and never thins it behind a hand', () => {
+    expect(ruleBody(CSS, '.sky-chip')).toContain('color: var(--cream)')
+    expect(ruleBody(CSS, '.sky-line')).toContain('color: var(--cream)')
+    expect(CSS).not.toMatch(/\.sky-(bar|chip|line) \{[^}]*opacity:/)
   })
 
   it('names the feed zebra as a computed composite rather than an alpha', () => {

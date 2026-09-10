@@ -185,7 +185,7 @@ describe('7 · waiting looks like the thing that is coming', () => {
 // ── 8 · nothing pops in ───────────────────────────────────────────────────────────────────
 describe('8 · art arriving is a cross-fade, never a hard swap', () => {
   it('fades a building sprite in when the codex hands over its art', () => {
-    expect(src('../render/entities.ts')).toContain('fadeArtIn(entry.sprite)')
+    expect(src('../render/entities.ts')).toMatch(/fadeArtIn\(entry\.sprite\b/)
   })
 
   it('takes the reveal motion from the one table, not a number of its own', () => {

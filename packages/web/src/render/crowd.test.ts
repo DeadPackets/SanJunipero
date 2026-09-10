@@ -124,6 +124,19 @@ describe('who takes a slot', () => {
     for (const id of a.keys()) expect(b.get(id)).toEqual(a.get(id))
     // amara sorts first, so amara takes the left of the rank
     expect(a.get('amara')!.dx).toBeLessThan(a.get('yusuf')!.dx)
+
+    // ★ and a browser that watched a body walk in lays it out like one that joined on the last
+    // frame: the rank is read off THIS frame, so nothing a viewer saw earlier can change it.
+    const frame = (
+      who: string,
+      x: number,
+    ): { id: string; x: number; y: number; settled: true }[] => [
+      { id: who, x, y: 40, settled: true },
+      { id: `${who}-2`, x: 41, y: 40, settled: true },
+    ]
+    let watched = crowdOffsets(frame('walker', 40))
+    for (const x of [40.3, 40.6]) watched = crowdOffsets(frame('walker', x))
+    expect([...watched.values()]).toEqual([...crowdOffsets(frame('joiner', 40.6)).values()])
   })
 
   it('★ a WALKER is not ranked, and does not shove the group it passes through', () => {
@@ -143,6 +156,18 @@ describe('who takes a slot', () => {
       { id: 'b', x: 39.6, y: 40, settled: true },
     ])
     expect(out.size).toBe(2)
+  })
+
+  // ★ WHAT WAS LEARNED: a viewer-held hysteresis was tried here and refused. The memory a
+  // browser that watched the walk has and one that just joined does not is two different crowds.
+  it('★ a body on a tile edge is grouped by where it stands, not by what this viewer saw', () => {
+    const at = (x: number): number =>
+      crowdOffsets([
+        { id: 'a', x, y: 40, settled: true },
+        { id: 'b', x: 40, y: 40, settled: true },
+      ]).size
+    // up to the edge, over it, and back, one frame at a time
+    expect([40, 40.4, 40.6, 40.4].map(at)).toEqual([2, 2, 0, 2])
   })
 
   it('two bodies on tiles that merely touch are two crowds of one, i.e. none', () => {

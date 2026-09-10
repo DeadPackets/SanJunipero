@@ -7,13 +7,20 @@ import {
   BELL_MS,
   CUE_CHIP_MS,
   CUE_WORD,
+  DEFAULT_LEVEL,
+  DUCK_DB,
+  NIGHT_LEVEL,
   SOUND_MASTER,
   SOUND_SOURCES,
   type SoundScene,
   type SoundSource,
   cueChip,
+  masterFor,
+  mixLevels,
+  rememberLevel,
   rememberSound,
   soundCues,
+  soundLevel,
   soundSetting,
   standingChips,
   trackStarts,
@@ -200,7 +207,9 @@ describe('★ a cue chip appears with every sound that starts', () => {
 })
 
 describe('★ nothing the mix can do reaches a clipping sum', () => {
-  it('★ the loudest world stays under one, master included', () => {
+  // ★ REWRITTEN. The old pin dropped the bell before it summed, so the one loudest event in the
+  // town was the one thing the headroom claim never counted. It sums the whole mix now.
+  it('★ the loudest world, bell included, stays under one with the master on it', () => {
     const loudest = scene({
       weatherKind: 'storm',
       minuteOfDay: NIGHT,
@@ -209,8 +218,7 @@ describe('★ nothing the mix can do reaches a clipping sum', () => {
       voicesInView: 99,
       bellAgeMs: 0,
     })
-    const held = soundCues(loudest).filter((c) => c.source !== 'bell')
-    const sum = held.reduce((a, c) => a + c.gain, 0)
+    const sum = mixLevels(soundCues(loudest)).reduce((a, l) => a + l.gain, 0)
     expect(sum).toBeLessThanOrEqual(1)
     expect(sum * SOUND_MASTER).toBeLessThan(0.7)
     expect(SOUND_MASTER).toBeLessThanOrEqual(0.6)
@@ -231,6 +239,85 @@ describe('★ nothing the mix can do reaches a clipping sum', () => {
       scene({ weatherKind: 'storm', firesInView: 1, voicesInView: 1, bellAgeMs: 0 }),
     )
     expect(b.filter((s) => s !== 'bell')).toEqual(a)
+  })
+})
+
+describe('★ the mix, and not a pile of gains', () => {
+  const level = (cues: ReturnType<typeof soundCues>, source: SoundSource): number =>
+    mixLevels(cues).find((l) => l.source === source)?.gain ?? 0
+
+  // ★ 0.2 OF CRICKET WAS NOT 0.2 OF WIND. A tone in the ear's own octave was budgeted beside a
+  // lowpassed noise as though a number meant one loudness at any pitch. It does now.
+  it('★ weights every voice against the ear before it reaches the bus', () => {
+    const night = soundCues(scene({ minuteOfDay: NIGHT, firefliesInView: 20 }))
+    expect(level(night, 'crickets')).toBeLessThan(0.04)
+    expect(level(night, 'crickets')).toBeLessThan(level(night, 'wind') / 2)
+  })
+
+  it('★ the weather gives way to whatever the frame is about', () => {
+    const quiet = soundCues(scene({ weatherKind: 'rain' }))
+    const talking = soundCues(scene({ weatherKind: 'rain', voicesInView: 3 }))
+    const drop = level(talking, 'rain') / level(quiet, 'rain')
+    expect(20 * Math.log10(drop)).toBeCloseTo(-DUCK_DB, 5)
+    // the murmur itself keeps its gain, which is the whole point of ducking the rest
+    expect(level(talking, 'murmur')).toBe(level(soundCues(scene({ voicesInView: 3 })), 'murmur'))
+  })
+
+  it('★ a placed voice carries its own side of the frame', () => {
+    const left = mixLevels(soundCues(scene({ firesInView: 1, firePan: -0.8 })))
+    expect(left.find((l) => l.source === 'fire')!.pan).toBe(-0.8)
+    // the weather is everywhere, so it is nowhere in particular
+    expect(left.find((l) => l.source === 'wind')!.pan).toBe(0)
+  })
+
+  it('★ a fire crossing the frame moves the gain rather than stepping it', () => {
+    const near = soundCues(scene({ firesInView: 1 }))[1]!.gain
+    const far = soundCues(scene({ firesInView: 0.12 }))[1]!.gain
+    expect(far).toBeLessThan(near)
+    expect(far).toBeGreaterThan(0)
+  })
+
+  // ★ THE SECOND BELL WAS SILENT. Two strikes printed the same cue list, so the synth saw no
+  // change and never rang. The strike is a number now, and two of them differ.
+  it('★ a second law inside the first bell tail is a new strike', () => {
+    const first = soundCues(scene({ bellAgeMs: 0, bellStrike: 1 }))
+    const second = soundCues(scene({ bellAgeMs: 0, bellStrike: 2 }))
+    const of = (c: ReturnType<typeof soundCues>): number =>
+      c.find((x) => x.source === 'bell')!.strike
+    expect(of(first)).not.toBe(of(second))
+  })
+
+  it('the wind answers the gust the canopies lean to', () => {
+    const gain = (gust: number): number => soundCues(scene({ gust }))[0]!.gain
+    expect(gain(1)).toBeGreaterThan(gain(0))
+    expect(gain(0)).toBeGreaterThan(0)
+  })
+})
+
+describe('★ how loud, not only whether', () => {
+  it('★ a viewer who has never been asked gets the middle of the range', () => {
+    expect(soundLevel(store())).toBe(DEFAULT_LEVEL)
+    expect(soundLevel(null)).toBe(DEFAULT_LEVEL)
+  })
+
+  it('★ round-trips a number and refuses one it cannot use', () => {
+    const s = store()
+    rememberLevel(s, 0.25)
+    expect(soundLevel(s)).toBe(0.25)
+    for (const bad of ['', 'loud', '-1', '2', 'NaN']) {
+      s.held.set('sj.sound.level', bad)
+      expect(soundLevel(s), bad).toBe(DEFAULT_LEVEL)
+    }
+  })
+
+  // ★ THE TAB LEFT OPEN OVERNIGHT is the case the sound is worst at, so the slider stops
+  // meaning what it says once it is dark.
+  it('★ holds the master down after dark whatever the slider says', () => {
+    expect(masterFor(1, 720)).toBe(SOUND_MASTER)
+    expect(masterFor(1, 0)).toBe(SOUND_MASTER * NIGHT_LEVEL)
+    expect(masterFor(1, 1380)).toBe(SOUND_MASTER * NIGHT_LEVEL)
+    expect(masterFor(0.2, 0)).toBe(SOUND_MASTER * 0.2)
+    expect(masterFor(0, 720)).toBe(0)
   })
 })
 
@@ -261,6 +348,38 @@ describe('★ synthesized, on a gesture, and never a file', () => {
     expect(code).toMatch(/setMuted/)
     const build = code.indexOf('new AudioContext(')
     expect(build).toBeGreaterThan(code.indexOf('const wake ='))
+  })
+
+  // ★ THE STAGE NOBODY BUILT. Every voice used to be a gain straight onto one bus: no limiter,
+  // no place, nothing to stop a storm and a bell landing on the same sample.
+  it('★ puts a limiter and a place between the voices and the destination', () => {
+    expect(code).toMatch(/createDynamicsCompressor/)
+    expect(code).toMatch(/createStereoPanner/)
+    expect(code).toMatch(/\.connect\(master\)\.connect\(ctx\.destination\)/)
+  })
+
+  // ★ THE MASTER OVER A STALE MIX is how a whole night's bed once landed at once at dawn: the
+  // gains were written only when the printed cue list moved, and a still night never moves it.
+  it('★ writes the cue list before it raises the master', () => {
+    const body = code.slice(code.indexOf('const settle ='))
+    expect(body.indexOf('write(mixLevels(held))')).toBeGreaterThan(-1)
+    expect(body.indexOf('write(mixLevels(held))')).toBeLessThan(body.indexOf('writeMaster()'))
+  })
+
+  it('★ stops the clock for a tab nobody is looking at, and for a viewer who muted', () => {
+    expect(code).toMatch(/suspend\(\)/)
+    expect(code).toMatch(/setHidden/)
+    const settle = code.slice(code.indexOf('const settle ='), code.indexOf('setMuted(next)'))
+    expect(settle).toMatch(/suspend\(\)/)
+    expect(code.slice(code.indexOf('setMuted(next)'))).toMatch(/settle\(\)/)
+  })
+
+  // ★ A 50% SQUARE AT 2.4 Hz IS A MACHINE, NOT AN INSECT, and the rate was picked off a rule
+  // about flashing light. Chirps are scheduled on the audio clock now.
+  it('★ chirps the cricket rather than gating a tone', () => {
+    expect(code).not.toMatch(/'square'/)
+    expect(code).toMatch(/linearRampToValueAtTime/)
+    expect(code).toMatch(/CRICKET_HZ = 3\d{3}/)
   })
 })
 

@@ -9,6 +9,7 @@ import {
   EMOTE_KINDS,
   GAIT_STRIDE_SPREAD,
   IDLE_BREATH_MS,
+  IDLE_SQUASH,
   HIT_AREA_H,
   HIT_AREA_W,
   STRIDE_TILES,
@@ -55,11 +56,13 @@ describe('charPose', () => {
       row: 'sleep',
       facing: 'se',
       bobY: 0,
+      breathY: 1,
     })
     expect(charPose({ ...base, collapsed: true, walking: true })).toEqual({
       row: 'sleep',
       facing: 'se',
       bobY: 0,
+      breathY: 1,
     })
   })
 
@@ -70,7 +73,7 @@ describe('charPose', () => {
   })
 
   it('idles at rest', () => {
-    expect(charPose(base)).toEqual({ row: 'idle', facing: 'se', bobY: 0 })
+    expect(charPose(base)).toEqual({ row: 'idle', facing: 'se', bobY: 0, breathY: 1 })
   })
 })
 
@@ -80,20 +83,39 @@ describe('★ a standing body breathes', () => {
   const stand = (nowMs: number, phase?: number) =>
     charPose({ ...base, nowMs }, WALK_FRAME_MS_V4, phase === undefined ? {} : { phase })
 
-  it('★ is two steps a whole pixel apart, each held IDLE_BREATH_MS', () => {
-    expect(IDLE_BREATH_MS).toBe(450)
-    const held = [0, 1, 449, 450, 899, 900].map((t) => stand(t).bobY)
-    expect(held).toEqual([0, 0, 0, BOB_PX, BOB_PX, 0])
-    for (const t of [0, 137, 449, 450, 900, 4321]) expect([0, BOB_PX]).toContain(stand(t).bobY)
+  // ★ WHAT WAS LEARNED: the old breath was `Math.floor(...) % 2 * BOB_PX` on the sprite's
+  // POSITION, held 450 ms a step. The camera scales world pixels by up to 4 and the shadow is
+  // pinned at the feet, so every standing body jumped 4 screen px off its own shadow 1.11 times
+  // a second. The breath is a squash about the feet now, and this pin is the shape of it.
+  it('★ is an eased squash the feet never leave, not a step off the ground', () => {
+    expect(IDLE_BREATH_MS).toBe(4500)
+    for (const t of [0, 137, 449, 450, 900, 4321, 9000]) expect(stand(t).bobY).toBe(0)
+
+    const at = (ms: number): number => stand(ms).breathY
+    // no instantaneous step: a 60fps frame moves the body a small part of the whole swing
+    for (let ms = 0; ms < IDLE_BREATH_MS * 2; ms += 16) {
+      expect(Math.abs(at(ms + 16) - at(ms))).toBeLessThan(IDLE_SQUASH / 10)
+    }
+    // and it eases between the extremes rather than snapping between two values
+    const quarter = IDLE_BREATH_MS / 4
+    for (let ms = 0; ms < quarter; ms += 25) expect(at(ms + 25)).toBeGreaterThan(at(ms))
+    for (let ms = quarter; ms < quarter * 3; ms += 25) expect(at(ms + 25)).toBeLessThan(at(ms))
+    expect(at(quarter)).toBeCloseTo(1 + IDLE_SQUASH, 6)
+    expect(at(quarter * 3)).toBeCloseTo(1 - IDLE_SQUASH, 6)
   })
 
   it('★ two standing bodies do not breathe in unison', () => {
     const FOUNDERS = ['omar', 'amara', 'yusuf', 'nadia', 'salma']
     const trace = (id: string): string =>
-      Array.from({ length: 40 }, (_, i) => stand(i * 50, gaitOf(id).phase).bobY).join('')
+      Array.from({ length: 40 }, (_, i) => stand(i * 50, gaitOf(id).phase).breathY.toFixed(4)).join(
+        '',
+      )
     const traces = FOUNDERS.map(trace)
-    expect(new Set(traces).size, 'five founders, five breaths').toBeGreaterThan(1)
-    for (const t of traces) expect(new Set(t).size, 'every one of them moves').toBe(2)
+    expect(new Set(traces).size, 'five founders, five breaths').toBe(FOUNDERS.length)
+    for (const id of FOUNDERS) {
+      const ys = Array.from({ length: 40 }, (_, i) => stand(i * 100, gaitOf(id).phase).breathY)
+      expect(new Set(ys).size, 'every one of them moves').toBeGreaterThan(1)
+    }
   })
 
   it('★ leaves a walking body exactly as it was: the hop belongs to the passing frames', () => {
@@ -107,14 +129,20 @@ describe('★ a standing body breathes', () => {
 
   it('holds still under reduced motion, and for a body that is not standing', () => {
     for (const t of [0, 450, 900, 1350]) {
-      expect(charPose({ ...base, nowMs: t }, WALK_FRAME_MS_V4, { bob: false }).bobY).toBe(0)
-      expect(charPose({ ...base, asleep: true, nowMs: t }).bobY).toBe(0)
-      expect(charPose({ ...base, collapsed: true, nowMs: t }).bobY).toBe(0)
+      const still = charPose({ ...base, nowMs: t }, WALK_FRAME_MS_V4, { bob: false })
+      expect(still.bobY).toBe(0)
+      expect(still.breathY).toBe(1)
+      expect(charPose({ ...base, asleep: true, nowMs: t }).breathY).toBe(1)
+      expect(charPose({ ...base, collapsed: true, nowMs: t }).breathY).toBe(1)
     }
   })
 
-  it('names a step whichever way the clock ran', () => {
-    for (const t of [-1, -450, -12345.6]) expect([0, BOB_PX]).toContain(stand(t, 0.7).bobY)
+  it('breathes whichever way the clock ran', () => {
+    for (const t of [-1, -450, -12345.6]) {
+      const y = stand(t, 0.7).breathY
+      expect(y).toBeGreaterThanOrEqual(1 - IDLE_SQUASH)
+      expect(y).toBeLessThanOrEqual(1 + IDLE_SQUASH)
+    }
   })
 })
 

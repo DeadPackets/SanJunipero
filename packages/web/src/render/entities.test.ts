@@ -63,6 +63,9 @@ vi.mock('pixi.js', () => {
     rect(): this {
       return this
     }
+    ellipse(): this {
+      return this
+    }
   }
   const Texture = { EMPTY: {} }
   class Polygon {
@@ -79,7 +82,9 @@ vi.mock('pixi.js', () => {
       public height = 0,
     ) {}
   }
-  return { Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture }
+  // the layer registers the boot manifest with the loader before it draws anything
+  const Assets = { add: () => {}, load: () => new Promise(() => {}) }
+  return { Assets, Container, Graphics, Point, Polygon, Rectangle, Sprite, Texture }
 })
 import type { Structure, WorldState } from '@sj/engine/state'
 import {
@@ -109,7 +114,7 @@ import {
   syncEntities,
 } from './entities.js'
 import type { Scene } from './scene.js'
-import type { TextureBook } from './textures.js'
+import { LOAD_PRIORITY, type TextureBook } from './textures.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverPlate } from '../ui/interaction.js'
 import { polygonBounds, resolveHit } from './hitShapes.js'
@@ -498,6 +503,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => zoom.at,
       getZoomStop: () => zoom.stop,
+      viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
       onCamera: (cb: Cam) => {
         cameras.push(cb)
         return () => {}
@@ -516,6 +522,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
       assetRecords: () => records,
     } as unknown as WorldStore
     const book = {
+      peek: () => null,
       get: () => new Promise<never>(() => {}),
       swap: () => new Promise<never>(() => {}),
     } as unknown as TextureBook
@@ -704,6 +711,7 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => 1,
       getZoomStop: () => 1,
+      viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
       onCamera: () => () => {},
       addDepthSource: () => () => {},
     } as unknown as Scene
@@ -715,6 +723,7 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
       assetRecords: () => records,
     } as unknown as WorldStore
     const book = {
+      peek: () => null,
       get: () => Promise.resolve({} as never),
       swap: () => Promise.resolve({} as never),
     } as unknown as TextureBook
@@ -754,5 +763,104 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
     const h = drive()
     h.sync()
     expect(setEntityScaleMul(h.scene, 'structure', 'nobody', 1.2)).toBe(false)
+  })
+})
+
+// ── ★ THE LOADING TIER ───────────────────────────────────────────────────────────────────
+// The defect this states: readiness used to mean the Pixi object was CONSTRUCTED. A building
+// whose art was in flight drew nothing at all, and a thing with no art drew the forge's
+// checkerboard, which a viewer reads as broken rather than as unpainted.
+
+describe('★ a drawable in flight shows a stand-in, never a hole and never a checkerboard', () => {
+  const HOUSE_ART = {
+    id: 'asset_house',
+    seq: 1,
+    class: 'building',
+    desc: 'a house',
+    kind: 'house',
+    meta: JSON.stringify({
+      version: 'v4-hires-building',
+      kind: 'house',
+      footprint: { w: 2, h: 2 },
+      cell: { w: 512, h: 512, feetX: 256, feetY: 511 },
+    }),
+    footprint: { w: 2, h: 2 },
+    widthPx: 512,
+    heightPx: 512,
+    status: 'ready',
+    score: null,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '',
+  } as unknown as AssetRecord
+
+  const stage = (structures: Structure[], records: AssetRecord[] = []) => {
+    const asked: { url: string; priority: number }[] = []
+    const inFlight = new Map<string, (t: unknown) => void>()
+    const scene = {
+      layers: {
+        entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+        shadow: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+      },
+      tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
+      getZoom: () => 1,
+      getZoomStop: () => 1,
+      viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
+      onCamera: () => () => {},
+      addDepthSource: () => () => {},
+    } as unknown as Scene
+    const items = { i1: { id: 'i1', kind: 'plank', loc: { t: 'tile', x: 0, y: 2 } } }
+    const store = {
+      getState: () =>
+        ({
+          structures: Object.fromEntries(structures.map((s) => [s.id, s])),
+          items,
+          crops: {},
+        }) as unknown as WorldState,
+      getConfig: () => DEFAULT_CONFIG,
+      assetsSeq: () => records.length,
+      assetRecords: () => records,
+    } as unknown as WorldStore
+    const book = {
+      peek: () => null,
+      get: (url: string, priority: number) => {
+        asked.push({ url, priority })
+        return new Promise((resolve) => inFlight.set(url, resolve))
+      },
+      swap: () => new Promise<never>(() => {}),
+    } as unknown as TextureBook
+    syncEntities(scene, book, store, () => {})
+    return { scene, asked, inFlight }
+  }
+
+  const kids = (s: { children: unknown[] }): unknown[] => s.children
+
+  it('★ draws the built form while the art is in flight, and drops it when the art lands', async () => {
+    const house = box(0, 0, 2, 2, 'house')
+    const h = stage([house], [HOUSE_ART])
+    const sprite = entitySpriteOf(h.scene, 'structure', house.id)!
+    expect(h.asked.map((a) => a.url)).toContain('/assets/asset_house.png')
+    expect(kids(sprite as unknown as { children: unknown[] })).toHaveLength(1)
+
+    h.inFlight.get('/assets/asset_house.png')!({ width: 512, height: 512 })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(kids(sprite as unknown as { children: unknown[] })[0]).toMatchObject({ destroyed: true })
+    expect(sprite.texture).toEqual({ width: 512, height: 512 })
+  })
+
+  it('★ asks for nothing at all for a kind the codex has no art for, and draws a chip', () => {
+    const h = stage([box(0, 0, 2, 2, 'house')])
+    expect(h.asked, 'no art exists, so no byte is fetched to find that out').toEqual([])
+    const chip = entitySpriteOf(h.scene, 'item', 'i1')!
+    expect(kids(chip as unknown as { children: unknown[] })).toHaveLength(1)
+  })
+
+  it('★ ranks what the camera can see over what it cannot', () => {
+    const near = box(0, 0, 2, 2, 'house')
+    const far = box(60, 60, 2, 2, 'house')
+    const h = stage([near, far], [HOUSE_ART])
+    // one url, two entities: the ranks are what differ, and the near one is asked for first
+    expect(h.asked.map((a) => a.priority)).toEqual([LOAD_PRIORITY.near, LOAD_PRIORITY.far])
   })
 })

@@ -44,13 +44,18 @@ vi.mock('pixi.js', () => {
   }
   return { Container, Graphics, Point, Sprite, Texture: { EMPTY: {} } }
 })
+import { Container as MockContainer } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
+import type { SimEvent } from '@sj/shared'
 import type { TileId } from '@sj/engine/state'
+import type { WorldStore } from '../state/worldStore.js'
+import type { Scene } from './scene.js'
 import {
   HEARTH_KINDS,
   SMOKE_COLOR,
   SMOKE_MAX_ALPHA,
   TREES_MAX,
+  createAmbient,
   sampleDecorations,
 } from './ambient.js'
 import { bigTown } from './bigTown.js'
@@ -129,5 +134,64 @@ describe('the frame loop does not walk the world', () => {
     expect(tick, 'the frame loop must not walk the world again').not.toContain(
       'Object.values(state.structures)',
     )
+  })
+})
+
+// ★ The director clock stops under the grave tone and the bounce loop keeps reading it, so a
+// body caught mid-bounce held at 1.18x for the whole sim-hour a death stills the town for.
+describe('★ a bounce cannot be frozen mid-flight', () => {
+  const rig = (): {
+    tick: (dtMs: number) => void
+    emit: (evts: SimEvent[]) => void
+    lastFor: (id: string) => number | undefined
+  } => {
+    const handlers = new Set<(evts: SimEvent[]) => void>()
+    const scene = {
+      app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
+      layers: { groundDecal: new MockContainer(), overhead: new MockContainer() },
+      wantsMotion: () => true,
+      reachableBox: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ terrain: [[1, 1]], agents: {} }),
+      getTick: () => 0,
+      onEvents: (fn: (evts: SimEvent[]) => void) => {
+        handlers.add(fn)
+        return () => handlers.delete(fn)
+      },
+    } as unknown as WorldStore
+    const calls: { id: string; k: number }[] = []
+    const dir = createAmbient(scene, store, {
+      weather: { setSuppressed: () => {} },
+      bubbles: { setSuppressed: () => {} },
+      chars: {
+        setEmotesHidden: () => {},
+        setScaleMulY: (id: string, k: number) => calls.push({ id, k }),
+      },
+    } as unknown as Parameters<typeof createAmbient>[2])
+    return {
+      tick: dir.tick,
+      emit: (evts) => {
+        for (const fn of handlers) fn(evts)
+      },
+      lastFor: (id) => calls.filter((c) => c.id === id).at(-1)?.k,
+    }
+  }
+
+  it('★ lands every body back at rest when the tone flips', () => {
+    const { tick, emit, lastFor } = rig()
+    tick(16)
+    emit([
+      { type: 'partnership_formed', tick: 1, payload: { aId: 'amara', bId: 'yusuf' } } as SimEvent,
+    ])
+    tick(130)
+    expect(lastFor('amara')).toBeGreaterThan(1)
+
+    emit([{ type: 'agent_died', tick: 1, payload: { id: 'nadia' } } as SimEvent])
+    tick(16)
+    expect(lastFor('amara'), 'the death settles the bounce it froze').toBe(1)
+    expect(lastFor('yusuf')).toBe(1)
+    tick(16)
+    expect(lastFor('amara'), 'and nothing holds it at a scale after that').toBe(1)
   })
 })
