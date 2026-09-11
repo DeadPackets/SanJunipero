@@ -15,20 +15,21 @@ import {
   worldTextOffenders,
 } from './legibility.js'
 import { TILE_COLORS } from './ground.js'
+import { luma } from './groundField.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
 import { clockTint } from './tints.js'
 
-describe('the two light bands the town is actually read in', () => {
+describe('the two light bands the PICTURE is actually read in', () => {
   it('takes them from the clock, never from a second copy of the numbers', () => {
     expect(LIGHT_BANDS.day).toBe(clockTint(720))
     expect(LIGHT_BANDS.night).toBe(clockTint(0))
     expect(LIGHT_BANDS.day).toBe(0xffffff)
   })
 
-  it('multiplies a colour the way the night quad does', () => {
+  it('multiplies a colour the way the grade does', () => {
     expect(tintedBy(0xffffff, LIGHT_BANDS.day)).toBe(0xffffff)
     expect(tintedBy(0x000000, LIGHT_BANDS.night)).toBe(0x000000)
-    // the night quad is a MULTIPLY blend, so white takes the tint exactly
+    // the grade's night is a diagonal MULTIPLY, so white takes the tint exactly
     expect(tintedBy(0xffffff, LIGHT_BANDS.night)).toBe(LIGHT_BANDS.night)
   })
 
@@ -37,9 +38,9 @@ describe('the two light bands the town is actually read in', () => {
   })
 })
 
-// The night tint is a MULTIPLY over the whole stage, world text included, so a ratio quoted for
-// the material is not the ratio a viewer gets after dark. The ceiling under it is 6.37:1 — black
-// on white — so every pair below has to be chosen inside that.
+// ★ The night left the stage for the grade, and `worldText` sits over `graded`, so a word is
+// read on its own paper at every hour. What still takes the tint is anything drawn INSIDE the
+// picture, which is why the ground sweep below is unchanged and got harder.
 describe('every word the world says clears AA in BOTH bands, not just in daylight', () => {
   it('names the pairs it is checking, so a new world surface cannot skip the law', () => {
     expect(WORLD_TEXT_PAIRS.length).toBeGreaterThanOrEqual(3)
@@ -54,13 +55,16 @@ describe('every word the world says clears AA in BOTH bands, not just in dayligh
     const r = bandRatios(LANDMARK_INK, LANDMARK_PLATE)
     expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
     expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
-    // ...and the ground it used to be painted on cannot be relied on to carry it. Under the
-    // raised night floor the pale paving (#e8d5bc) clears at 4.60:1 and every other tile does
-    // not, so a name that read its own ground would pass on the plaza and fail on the grass.
+    // ...and the ground it used to be painted on cannot be relied on to carry it. The ink is
+    // over the grade and the tile is under it, so this is the ONE pair the two bands straddle.
+    const onGround = (g: number): number => {
+      const [ink, tile] = [luma(LANDMARK_INK), luma(tintedBy(g, LIGHT_BANDS.night))]
+      const [hi, lo] = ink > tile ? [ink, tile] : [tile, ink]
+      return (hi + 0.05) / (lo + 0.05)
+    }
     const grounds = Object.values(TILE_COLORS)
-    const clear = grounds.filter((g) => bandRatios(LANDMARK_INK, g).night >= AA_RATIO)
-    expect(clear.length).toBeLessThanOrEqual(1)
-    expect(bandRatios(LANDMARK_INK, TILE_COLORS[0]).night).toBeLessThan(AA_RATIO)
+    expect(grounds.filter((g) => onGround(g) >= AA_RATIO)).toEqual([])
+    expect(onGround(TILE_COLORS[0])).toBeLessThan(AA_RATIO)
   })
 
   it('keeps speech and thought on different PAPER, both of which hold the ink after dark', () => {

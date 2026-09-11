@@ -43,13 +43,25 @@ vi.mock('pixi.js', () => {
   }
   class Sprite extends Container {}
   class Graphics extends Container {
+    ellipses: number[][] = []
+    fills: unknown[] = []
     rect(): this {
       return this
     }
     circle(): this {
       return this
     }
-    fill(): this {
+    ellipse(x: number, y: number, rx: number, ry: number): this {
+      this.ellipses.push([x, y, rx, ry])
+      return this
+    }
+    clear(): this {
+      this.ellipses = []
+      this.fills = []
+      return this
+    }
+    fill(style: unknown): this {
+      this.fills.push(style)
       return this
     }
   }
@@ -58,10 +70,14 @@ vi.mock('pixi.js', () => {
 // the town's structures live in a module-level map a mocked Pixi never fills, so the one call
 // the bounce loop makes on them is recorded here instead
 const entityCalls: { kind: string; id: string; k: number }[] = []
+const sunCalls: { scaleX: number; dx: number }[] = []
 vi.mock('./entities.js', () => ({
   setEntityScaleMul: (_s: unknown, kind: string, id: string, k: number) => {
     entityCalls.push({ kind, id, k })
     return true
+  },
+  setSunCast: (_s: unknown, cast: { scaleX: number; dx: number }) => {
+    sunCalls.push(cast)
   },
 }))
 import { Container as MockContainer } from 'pixi.js'
@@ -79,6 +95,7 @@ import {
   sampleDecorations,
 } from './ambient.js'
 import { bigTown } from './bigTown.js'
+import { GROUND_SHADOW_INK } from './groundShadow.js'
 import { advanceWind } from './wind.js'
 
 describe('HEARTH_KINDS', () => {
@@ -131,9 +148,10 @@ const wooded = (motion = true) => {
     wantsMotion: () => motion,
     reachableBox: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
   } as unknown as Scene
+  const clock = { tick: 0 }
   const store = {
     getState: () => state,
-    getTick: () => 0,
+    getTick: () => clock.tick,
     onEvents: () => () => {},
   } as unknown as WorldStore
   const dir = createAmbient(scene, store, {
@@ -144,6 +162,12 @@ const wooded = (motion = true) => {
   return {
     dir,
     read,
+    clock,
+    shade: (): { ellipses: number[][]; fills: unknown[] } =>
+      groundDecal.children[0]!.children[0] as unknown as {
+        ellipses: number[][]
+        fills: unknown[]
+      },
     // the frame StageMount runs: the one wind clock moves, then the director draws
     frame: (dtMs: number): void => {
       advanceWind(dtMs)
@@ -399,5 +423,63 @@ describe('★ the picture says how much a moment mattered', () => {
     expect(Math.min(...plank), 'a plank has no weight to land with').toBe(1)
     expect(Math.max(...house)).toBeGreaterThan(Math.max(...plank))
     expect(house.length, 'and it is on screen longer').toBeGreaterThan(plank.length)
+  })
+})
+
+// ── ★ THE WOOD STANDS ON SOMETHING, AND ON THE SAME SUN THE TOWN DOES ────────────────────
+
+describe('★ the canopies mark the ground, on one sun shared with the buildings', () => {
+  it('lays one mark under every tree, under the trunks that cast them', () => {
+    const r = wooded()
+    r.frame(16)
+    const trees = r.nodes().filter((n) => n.children.length === 0).length
+    expect(r.shade().ellipses.length, 'a mark a tree').toBeGreaterThan(0)
+    expect(r.shade().ellipses.length).toBeLessThan(trees)
+    expect(r.shade().fills, 'ink, once, for the whole wood').toHaveLength(1)
+    expect(r.shade().fills[0]).toMatchObject({ color: GROUND_SHADOW_INK })
+  })
+
+  it('★ moves them with the hour, and stretches them the way a body is stretched', () => {
+    const r = wooded()
+    r.frame(16)
+    const noon = r.shade().ellipses[0]!
+    r.clock.tick = 20 * 60 + 30
+    r.frame(16)
+    const dusk = r.shade().ellipses[0]!
+    expect(dusk[0], 'laid away from a low sun').not.toBeCloseTo(noon[0]!, 3)
+    expect(dusk[2]).toBeGreaterThan(noon[2]!)
+    r.clock.tick = 6 * 60
+    r.frame(16)
+    const dawn = r.shade().ellipses[0]!
+    expect(
+      (dawn[0]! - noon[0]!) * (dusk[0]! - noon[0]!),
+      'the two ends of the day lie opposite ways',
+    ).toBeLessThan(0)
+  })
+
+  it('★ asks the sky ONCE a tick, and hands that one answer to the buildings too', () => {
+    const r = wooded()
+    r.frame(16) // noon: the mark sits on the trunk, so this reads the trunk's own x
+    const trunkX = r.shade().ellipses[0]![0]!
+    sunCalls.length = 0
+    r.clock.tick = 20 * 60 + 30
+    for (let i = 0; i < 20; i++) r.frame(16)
+    expect(sunCalls, 'twenty frames, one hour, one answer').toHaveLength(1)
+    const dx = r.shade().ellipses[0]![0]! - trunkX
+    expect(sunCalls[0]!.dx * dx, 'the trees lie the way the sun told the town to').toBeGreaterThan(
+      0,
+    )
+    r.clock.tick = 6 * 60
+    r.frame(16)
+    expect(sunCalls, 'and it asks again when the hour moves').toHaveLength(2)
+  })
+
+  it('the hour keeps moving under reduced motion, because it is not an animation', () => {
+    const r = wooded(false)
+    r.frame(16)
+    const noon = r.shade().ellipses[0]!
+    r.clock.tick = 20 * 60 + 30
+    r.frame(16)
+    expect(r.shade().ellipses[0]![0]).not.toBeCloseTo(noon[0]!, 3)
   })
 })

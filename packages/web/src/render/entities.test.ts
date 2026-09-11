@@ -48,13 +48,19 @@ vi.mock('pixi.js', () => {
     texture: unknown = null
   }
   class Graphics extends Container {
+    polys: number[][] = []
+    fills: unknown[] = []
     clear(): this {
+      this.polys = []
+      this.fills = []
       return this
     }
-    poly(): this {
+    poly(points: number[]): this {
+      this.polys.push(points)
       return this
     }
-    fill(): this {
+    fill(style: unknown): this {
+      this.fills.push(style)
       return this
     }
     stroke(): this {
@@ -101,6 +107,8 @@ import {
   BUILDING_PX_PER_TILE,
   BUILD_TICKS_FULL,
   PIP_COUNT,
+  setSunCast,
+  structureMarks,
   doorTileOf,
   enterableKind,
   entersOnClick,
@@ -117,8 +125,10 @@ import type { Scene } from './scene.js'
 import { LOAD_PRIORITY, type TextureBook } from './textures.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverPlate } from '../ui/interaction.js'
-import { polygonBounds, resolveHit } from './hitShapes.js'
+import { artPrismPolygon, polygonBounds, resolveHit } from './hitShapes.js'
 import { builtFormSpec } from './builtForm.js'
+import { CAST_ALPHA, GROUND_SHADOW_INK } from './groundShadow.js'
+import { shadowCast, SHADOW_REST } from '../ui/skyModel.js'
 import { inFrontOf, structureDepthBox } from './depth.js'
 import { rendersOnMap } from './characters.js'
 
@@ -499,6 +509,7 @@ describe('★ the layer puts the prism on the sprite, and keeps it there', () =>
     const scene = {
       layers: {
         entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+        shadow: new (MockContainer as never as typeof Object)() as { addChild: () => void },
       },
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => zoom.at,
@@ -707,6 +718,7 @@ describe('★ an effect multiplies the scale the layer owns, and never replaces 
     const scene = {
       layers: {
         entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+        shadow: new (MockContainer as never as typeof Object)() as { addChild: () => void },
       },
       tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
       getZoom: () => 1,
@@ -862,5 +874,191 @@ describe('★ a drawable in flight shows a stand-in, never a hole and never a ch
     const h = stage([near, far], [HOUSE_ART])
     // one url, two entities: the ranks are what differ, and the near one is asked for first
     expect(h.asked.map((a) => a.priority)).toEqual([LOAD_PRIORITY.near, LOAD_PRIORITY.far])
+  })
+})
+
+// ── ★ THE TOWN CASTS, AND IT CASTS WHERE THE BODIES DO ───────────────────────────────────
+//
+// Phase 5 deleted a built-form "shadow" whose polygon was byte-identical to the plinth and was
+// painted over by it one loop later. It had never drawn a pixel, and nobody noticed for four
+// review phases, so every assertion here reads the polygon the layer actually laid down.
+
+describe('★ a structure lays a ring and a cast on the ground', () => {
+  type Mark = { position: { x: number; y: number }; polys: number[][]; fills: unknown[] }
+  const GOLDEN = 20 * 60 + 30 // low sun, the hour a body's own shadow is longest
+  const HOUSE_ART = {
+    id: 'asset_house',
+    seq: 1,
+    class: 'building',
+    desc: 'a house',
+    kind: 'house',
+    meta: JSON.stringify({
+      version: 'v4-hires-building',
+      kind: 'house',
+      footprint: { w: 2, h: 2 },
+      cell: { w: 512, h: 512, feetX: 256, feetY: 511 },
+    }),
+    footprint: { w: 2, h: 2 },
+    widthPx: 512,
+    heightPx: 512,
+    status: 'ready',
+    score: null,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '',
+  } as unknown as AssetRecord
+
+  const town = (structures: Structure[], records: AssetRecord[] = [], texture: unknown = null) => {
+    const shadow = new (MockContainer as never as typeof Object)() as {
+      addChild: () => void
+      children: Mark[]
+    }
+    const scene = {
+      layers: {
+        entities: new (MockContainer as never as typeof Object)() as { addChild: () => void },
+        shadow,
+      },
+      tags: { show: () => {}, hide: () => {}, hideAll: () => {} },
+      getZoom: () => 1,
+      getZoomStop: () => 1,
+      viewRect: () => ({ x: -400, y: -300, w: 800, h: 600 }),
+      onCamera: () => () => {},
+      addDepthSource: () => () => {},
+    } as unknown as Scene
+    const store = {
+      getState: () =>
+        ({
+          structures: Object.fromEntries(structures.map((s) => [s.id, s])),
+          items: {},
+          crops: {},
+        }) as unknown as WorldState,
+      getConfig: () => DEFAULT_CONFIG,
+      assetsSeq: () => records.length,
+      assetRecords: () => records,
+    } as unknown as WorldStore
+    const book = {
+      peek: () => texture,
+      get: () => new Promise<never>(() => {}),
+      swap: () => new Promise<never>(() => {}),
+    } as unknown as TextureBook
+    syncEntities(scene, book, store, () => {})
+    return {
+      scene,
+      marks: (): Mark[] => shadow.children,
+      at: (minute: number): Mark => {
+        setSunCast(scene, shadowCast(minute))
+        return shadow.children[0]!
+      },
+    }
+  }
+
+  const house = box(20, 20, 2, 2, 'house')
+  const midX = (poly: number[]): number => {
+    const xs = poly.filter((_, i) => i % 2 === 0)
+    return (Math.max(...xs) + Math.min(...xs)) / 2
+  }
+
+  it('puts one mark in the SHADOW layer, on the feet point the sprite stands on', () => {
+    const t = town([house])
+    expect(t.marks()).toHaveLength(1)
+    const sprite = entitySpriteOf(t.scene, 'structure', house.id)!
+    expect(t.marks()[0]!.position).toEqual({
+      x: sprite.position.x,
+      y: sprite.position.y,
+    })
+  })
+
+  it('★ the cast is NOT the plinth polygon, and it moves when the tick moves', () => {
+    const t = town([house])
+    const plinth = builtFormSpec('house', 2, 2).plinth.poly
+    const golden = t.at(GOLDEN)
+    expect(golden.polys, 'the ring and the cast').toHaveLength(2)
+    // the dead ink this test exists for: a "shadow" equal to the plinth, drawn and then covered
+    expect(golden.polys[1]).not.toEqual(plinth)
+    expect(midX(golden.polys[1]!)).not.toBeCloseTo(midX(plinth), 3)
+    const centres = new Set<number>()
+    for (let m = 0; m < 24 * 60; m += 10) centres.add(midX(t.at(m).polys.at(-1)!))
+    expect(centres.size, 'a shadow that never moves is a sticker').toBeGreaterThan(10)
+  })
+
+  it('★ lies the same way as a body under the same sun, at every hour of the day', () => {
+    const t = town([house])
+    const plinth = midX(builtFormSpec('house', 2, 2).plinth.poly)
+    let lit = 0
+    for (let m = 0; m < 24 * 60; m += 10) {
+      const body = shadowCast(m).dx
+      const structure = midX(t.at(m).polys.at(-1)!) - plinth
+      if (Math.abs(body) < 1e-6) {
+        expect(structure, `minute ${String(m)} is not a casting hour`).toBeCloseTo(0, 6)
+        continue
+      }
+      lit++
+      expect(Math.sign(structure), `minute ${String(m)}`).toBe(Math.sign(body))
+    }
+    expect(lit, 'not vacuous: the sun really was low for part of the day').toBeGreaterThan(20)
+  })
+
+  it('★ the mark SURVIVES real art landing, which is when a viewer looks longest', () => {
+    const t = town([house], [HOUSE_ART], { width: 512, height: 512 })
+    const sprite = entitySpriteOf(t.scene, 'structure', house.id)!
+    expect(sprite.texture, 'the art really did land').toEqual({ width: 512, height: 512 })
+    expect(
+      (sprite as unknown as { children: unknown[] }).children,
+      'art in hand, so there is no stand-in Graphics to hang a mark off at all',
+    ).toEqual([])
+    const mark = t.at(GOLDEN)
+    expect(mark, 'the ground mark is not a child of the stand-in').toBeDefined()
+    expect(mark.polys).toHaveLength(2)
+    for (const f of mark.fills as { color: number; alpha: number }[]) {
+      expect(f.color).toBe(GROUND_SHADOW_INK)
+      expect(f.alpha).toBeGreaterThan(0)
+    }
+  })
+
+  it('★ follows the PIXELS: art is twice its plan across, so its shadow is too', () => {
+    const plan = structureMarks('house', 2, 2, false, SHADOW_REST)[0]!.poly
+    const art = structureMarks('house', 2, 2, true, SHADOW_REST)[0]!.poly
+    const span = (poly: number[]): number => {
+      const xs = poly.filter((_, i) => i % 2 === 0)
+      return Math.max(...xs) - Math.min(...xs)
+    }
+    expect(span(art)).toBeCloseTo(span(plan) * 2, 9)
+    // pinned to the prism the click already uses, so the two cannot drift apart
+    const prism = polygonBounds(artPrismPolygon(2, 2, 1))
+    expect(span(art) / (1 + 0.22)).toBeCloseTo(prism.w, 9)
+    const ys = art.filter((_, i) => i % 2 === 1)
+    expect(Math.max(...ys), 'the south vertex is the feet point').toBeGreaterThan(0)
+  })
+
+  it('a high sun draws the ring alone: the cast under the volume is ink nobody sees', () => {
+    const t = town([house])
+    expect(t.at(12 * 60).polys).toHaveLength(1)
+    expect(t.at(2 * 60).polys, 'and the night casts nothing at all').toHaveLength(1)
+    expect(t.at(GOLDEN).polys).toHaveLength(2)
+  })
+
+  it('the cast is ink, never a colour, and it is fainter than the body it comes from', () => {
+    const t = town([house])
+    const fills = t.at(GOLDEN).fills as { color: number; alpha: number }[]
+    for (const f of fills) expect(f.color).toBe(GROUND_SHADOW_INK)
+    expect(fills[1]!.alpha).toBeLessThanOrEqual(CAST_ALPHA)
+    expect(fills[1]!.alpha).toBeGreaterThan(fills[0]!.alpha)
+  })
+
+  it('tears the mark down with the building it belongs to', () => {
+    const t = town([house])
+    const mark = t.marks()[0] as unknown as { destroyed: boolean }
+    expect(mark.destroyed).toBe(false)
+    syncEntities(
+      t.scene,
+      { peek: () => null } as unknown as TextureBook,
+      {
+        getState: () => ({ structures: {}, items: {}, crops: {} }) as unknown as WorldState,
+        getConfig: () => DEFAULT_CONFIG,
+        assetsSeq: () => 0,
+        assetRecords: () => [],
+      } as unknown as WorldStore,
+    )
+    expect(mark.destroyed).toBe(true)
   })
 })

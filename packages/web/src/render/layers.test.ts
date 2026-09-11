@@ -111,20 +111,21 @@ describe('createLayers', () => {
 })
 
 describe('createScreenLayers — the stack over the world', () => {
-  it('paints the flash and the weather under the night quad, and the lights over it', () => {
-    expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'night', 'lights', 'bloom'])
+  it('paints the flash and the weather under the lights', () => {
+    expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'lights', 'bloom'])
     const stage = new MockContainer()
     const set = createScreenLayers(stage)
     expect(SCREEN_LAYERS.map((n) => set[n])).toEqual(stage.children)
   })
 
-  // ★ The night IS a multiply quad, so it only ever darkens what is already painted. Rain and
-  // snow sat over it and were the brightest thing on screen at 2 a.m.
-  it('★ keeps the weather under the multiply, where the night can reach it', () => {
+  // ★ The night was a multiply quad HERE, between the weather and the lights, and it darkened
+  // the words on the way past. It is a diagonal on `scene.graded` now, so no stack order can
+  // put it over speech again and these two layers take it as a tint (atmosphere.ts).
+  it('★ holds no night quad, and nothing sits between the weather and the lights', () => {
+    expect((SCREEN_LAYERS as readonly string[]).includes('night')).toBe(false)
     const at = (n: string): number => (SCREEN_LAYERS as readonly string[]).indexOf(n)
-    expect(at('weather')).toBeLessThan(at('night'))
-    expect(at('flash')).toBeLessThan(at('night'))
-    expect(at('lights')).toBeGreaterThan(at('night'))
+    expect(at('weather')).toBe(at('flash') + 1)
+    expect(at('lights')).toBe(at('weather') + 1)
   })
 
   // ★ The bloom reads the lights and draws over them. In the same layer it would capture the

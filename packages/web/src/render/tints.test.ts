@@ -10,7 +10,13 @@ import {
   sunTint,
 } from './tints.js'
 import { SUN_DOWN_MIN, SUN_UP_MIN } from '../ui/skyModel.js'
-import { AA_RATIO, WORLD_TEXT_PAIRS, readableRatio } from './legibility.js'
+import {
+  AA_RATIO,
+  WORLD_TEXT_PAIRS,
+  bandRatios,
+  readableRatio,
+  worldTextOffenders,
+} from './legibility.js'
 
 describe('clock tint LUT', () => {
   it('pins the calibrated stops', () => {
@@ -19,22 +25,22 @@ describe('clock tint LUT', () => {
     expect(CLOCK_STOPS.map((s) => s.minute)).toEqual([0, 300, 390, 480, 1050, 1140, 1230, 1440])
   })
 
-  // ★ THE NIGHT FLOOR (task 18). 0.45/0.52 read as a hole in the picture: a roof under it
-  // measured 0.536 of its own luma. The floor is lifted to a watchable blue and the hue held.
-  it('★ the night floor is [0.5, 0.58, 0.95], and 04:00 packs to 0x8094F2', () => {
-    expect(NIGHT_FLOOR).toEqual([0.5, 0.58, 0.95])
-    expect(clockTint(240)).toBe(0x8094f2)
+  // ★ THE NIGHT FLOOR. It sat at 0.590 because the night was a multiply over the words and
+  // AA_RATIO priced it; the night is in the grade now, under them, so the picture sets it.
+  it('★ the night floor is [0.254, 0.295, 0.483], and 04:00 packs to 0x414B7B', () => {
+    expect(NIGHT_FLOOR).toEqual([0.254, 0.295, 0.483])
+    expect(clockTint(240)).toBe(0x414b7b)
   })
 
-  it('★ lifts the night without turning it: the same blue cast, brighter', () => {
+  it('★ drops the night without turning it: the same blue cast, darker', () => {
     const [r, g, b] = NIGHT_FLOOR
-    expect(b).toBe(0.95)
     expect(r).toBeLessThan(g)
     expect(g).toBeLessThan(b)
-    // 0.536 → 0.590 of the material's own luma, measured off the floor rather than chosen
+    // 0.590 → 0.300 of the material's own luma, and the hue held: b/r is 1.90 either side
     const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    expect(lum).toBeGreaterThan(0.58)
-    expect(lum).toBeLessThan(0.62)
+    expect(lum).toBeGreaterThan(0.29)
+    expect(lum).toBeLessThan(0.31)
+    expect(b / r).toBeCloseTo(0.95 / 0.5, 2)
   })
 
   it('06:45 lands mid-lerp between dawn and full day (channel math, not a magic hex)', () => {
@@ -86,7 +92,7 @@ describe('weather grading', () => {
   })
 
   it('lays the diagonal on the pixi 4×5 matrix', () => {
-    const m = gradingMatrix('storm')!
+    const m = gradingMatrix('storm', 0xffffff)!
     expect(m).toBeInstanceOf(Float32Array)
     expect(m[0]).toBeCloseTo(0.72, 6)
     expect(m[6]).toBeCloseTo(0.84, 6)
@@ -95,11 +101,38 @@ describe('weather grading', () => {
   })
 
   it('cloudy is no longer identical to sunny', () => {
-    expect(gradingMatrix('cloudy')).not.toBeNull()
+    expect(gradingMatrix('cloudy', 0xffffff)).not.toBeNull()
   })
 
-  it('sunny is identity (no filter)', () => {
-    expect(gradingMatrix('sunny')).toBeNull()
+  it('sunny at noon is identity (no filter)', () => {
+    expect(gradingMatrix('sunny', clockTint(720))).toBeNull()
+  })
+})
+
+// ── ★ THE NIGHT IS THE OTHER HALF OF THE SAME DIAGONAL ───────────────────────────────────
+
+describe('★ the hour of the day rides the grade, not a quad over the stage', () => {
+  it('★ puts the deep-night tint on the matrix a clear midnight would otherwise not attach', () => {
+    const m = gradingMatrix('sunny', clockTint(0))!
+    expect(m).not.toBeNull()
+    expect(m[0]).toBeCloseTo(((clockTint(0) >> 16) & 0xff) / 255, 6)
+    expect(m[6]).toBeCloseTo(((clockTint(0) >> 8) & 0xff) / 255, 6)
+    expect(m[12]).toBeCloseTo((clockTint(0) & 0xff) / 255, 6)
+  })
+
+  it('★ multiplies the deck by the hour, so a storm at midnight is darker than either alone', () => {
+    const midnight = gradingMatrix('sunny', clockTint(0))!
+    const storm = gradingMatrix('storm', 0xffffff)!
+    const both = gradingMatrix('storm', clockTint(0))!
+    for (const i of [0, 6, 12]) {
+      expect(both[i]!, `channel ${i}`).toBeCloseTo(midnight[i]! * storm[i]!, 5)
+      expect(both[i]!, `channel ${i}`).toBeLessThanOrEqual(midnight[i]!)
+    }
+  })
+
+  it('★ still hands back null at the one hour and weather that need no filter at all', () => {
+    for (let m = 480; m <= 1050; m += 30) expect(gradingMatrix('sunny', clockTint(m))).toBeNull()
+    expect(gradingMatrix('nothing the town has a word for', 0xffffff)).toBeNull()
   })
 })
 
@@ -134,40 +167,28 @@ describe('★ SUN_STOPS — the colour of the light that arrives', () => {
   })
 })
 
-// ── ★ WHAT ACTUALLY PRICES THE NIGHT FLOOR ───────────────────────────────────────────────
+// ── ★ WHAT USED TO PRICE THE NIGHT FLOOR, AND WHAT DOES NOW ──────────────────────────────
 //
-// The floor was asked to drop to 0.300 of luma so the lamps would have a dark to be bright
-// against. It cannot, and the reason is not the picture. `screen.night` is a full-screen
-// MULTIPLY on `app.stage` ABOVE `world`, so it darkens `worldText`, `bubbles` and `overlay` —
-// the three layers `GRADED_LAYERS` deliberately keeps OUT of the weather grade. Speech is
-// protected from the weather and not from the night, and `AA_RATIO` then sets the floor.
+// `screen.night` was a full-screen MULTIPLY on `app.stage` ABOVE `world`, so it darkened
+// `worldText`, `bubbles` and `overlay` — the three layers `GRADED_LAYERS` deliberately keeps
+// OUT of the weather grade. Speech was protected from the weather and not from the night, and
+// AA_RATIO set the floor at 0.590. The night is a diagonal on `scene.graded` now, under the
+// words, and the deepest legal floor went from 0.896 of 0.590 to anywhere the picture likes.
 
-describe('★ the night floor is priced by the text law, not by the picture', () => {
-  const scaled = (k: number): number => {
-    const [r, g, b] = NIGHT_FLOOR
-    const ch = (v: number): number => Math.round(v * k * 255)
-    return (ch(r) << 16) | (ch(g) << 8) | ch(b)
-  }
+describe('★ the night floor is priced by the picture, and no longer by the text law', () => {
   const worstPair = (tint: number): number =>
     Math.min(...WORLD_TEXT_PAIRS.map((p) => readableRatio(p.ink, p.paper, tint)))
 
-  it('★ 0.300 of luma puts EVERY pair under AA, black on white included', () => {
-    const k = 0.3 / (0.2126 * NIGHT_FLOOR[0] + 0.7152 * NIGHT_FLOOR[1] + 0.0722 * NIGHT_FLOOR[2])
-    const tint = scaled(k)
-    expect(worstPair(tint)).toBeLessThan(AA_RATIO)
-    // the ceiling for ANY two colours at that tint, which is what makes it unreachable
-    expect(readableRatio(0x000000, 0xffffff, tint)).toBeLessThan(AA_RATIO)
+  it('★ every word the world says clears AA at the 0.300 floor, because the night misses it', () => {
+    expect(worldTextOffenders(WORLD_TEXT_PAIRS)).toEqual([])
+    for (const p of WORLD_TEXT_PAIRS)
+      expect(bandRatios(p.ink, p.paper).night).toBe(bandRatios(p.ink, p.paper).day)
   })
 
-  it('★ today clears AA with room, and the deepest legal floor has almost none', () => {
-    expect(worstPair(clockTint(0))).toBeGreaterThan(AA_RATIO)
-    let deepest = 1
-    while (deepest > 0.3 && worstPair(scaled(deepest - 0.002)) >= AA_RATIO) deepest -= 0.002
-    // 0.896 of today's floor, where the thought bubble sits at 4.51:1 — 0.2% of margin, which
-    // an antialiased glyph edge spends on its own. The floor moves when the night stops
-    // multiplying the words, and not before.
-    expect(deepest).toBeGreaterThan(0.85)
-    expect(deepest).toBeLessThan(0.95)
-    expect(worstPair(scaled(deepest))).toBeLessThan(4.6)
+  it('★ and it is the same floor that put EVERY pair under AA while it multiplied them', () => {
+    const tint = clockTint(0)
+    expect(worstPair(tint)).toBeLessThan(AA_RATIO)
+    // the ceiling for ANY two colours under that tint, which is what made it unreachable
+    expect(readableRatio(0x000000, 0xffffff, tint)).toBeLessThan(AA_RATIO)
   })
 })

@@ -3,7 +3,7 @@ import { isRoofedKind, type SimConfig } from '@sj/shared'
 import type { Structure, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
 import { hoverPlate, type HoverKind } from '../ui/interaction.js'
-import { builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
+import { BUILT_FORM_UNIT_PX, builtFormSpec, drawBuiltForm, footprintDiamond } from './builtForm.js'
 import { structureDepthBox, tileDepthBox } from './depth.js'
 import { depthKey, feetOf } from './iso.js'
 import type { DepthEntry } from './layers.js'
@@ -22,6 +22,8 @@ import {
   type BuildingArt,
 } from './textures.js'
 import { contactShadow } from './interiors.js'
+import { contactAo, GROUND_SHADOW_INK, sunCast, type GroundMark } from './groundShadow.js'
+import { SHADOW_REST, type ShadowCast } from '../ui/skyModel.js'
 
 export { BUILDING_PX_PER_TILE } from './textures.js'
 
@@ -91,6 +93,28 @@ export function structureHitPoints(
   return inflateToMin(local, HIT_MIN_PX, k * (zoom > 0 ? zoom : 1))
 }
 
+/** What a structure lays on the ground: the ring where it meets the tile, and the sun's cast
+ *  out of it. Cut from what is DRAWN — art is twice its plan across, the south vertex on the
+ *  feet point (`artPrismPolygon`) — because a shadow is drawn art and follows the pixels. */
+export function structureMarks(
+  kind: string,
+  w: number,
+  h: number,
+  hasArt: boolean,
+  sun: ShadowCast,
+): GroundMark[] {
+  const side = (w + h) * BUILT_FORM_UNIT_PX
+  const stands = hasArt
+    ? [0, -side / 2, side / 2, -side / 4, 0, 0, -side / 2, -side / 4]
+    : footprintDiamond(w, h)
+  const heightPx = hasArt ? side / 2 : builtFormSpec(kind, w, h).heightPx
+  const marks = [contactAo(stands)]
+  // No direction, no cast: at noon and all night the mark is the footprint itself, which the
+  // thing standing on it hides.
+  if (sun.dx !== 0) marks.push(sunCast(stands, heightPx, sun))
+  return marks
+}
+
 type Entry = {
   sprite: Sprite
   url: string
@@ -99,7 +123,7 @@ type Entry = {
   form: Graphics | null
   /** whether real art has ever been written to this sprite, NOT whether art exists */
   dressed: boolean
-  /** the contact shadow under a dropped thing; a body's own is the character layer's */
+  /** the ground this thing marks: a dropped thing's contact, a structure's ring and cast */
   shadow: Graphics | null
   /** the kind and ground plan the hit prism is cut from */
   kind: string
@@ -131,6 +155,8 @@ type SyncState = {
   onPick: ((pick: WorldPick) => void) | null
   /** the camera scale every structure prism was last cut for */
   hitZoom: number
+  /** the sun every structure's ground mark was last cut for */
+  cast: ShadowCast
 }
 const syncStates = new WeakMap<Scene, SyncState>()
 
@@ -266,6 +292,26 @@ function fitItem(entry: Entry, t: Texture): void {
   if (entry.shadow !== null) drawItemShadow(entry.shadow, t.width * k)
 }
 
+function paintMarks(sync: SyncState, entry: Entry): void {
+  const g = entry.shadow
+  if (g === null) return
+  const { w, h } = entry.footprint
+  g.clear()
+  for (const m of structureMarks(entry.kind, w, h, entry.url !== NO_ART, sync.cast)) {
+    g.poly(m.poly)
+    g.fill({ color: GROUND_SHADOW_INK, alpha: m.alpha })
+  }
+}
+
+/** The sun this frame, for everything that is not a body. `characters.ts` writes the same cast
+ *  onto the bodies off the same `shadowCast` and the same tick, so the two cannot disagree. */
+export function setSunCast(scene: Scene, cast: ShadowCast): void {
+  const sync = syncStates.get(scene)
+  if (sync === undefined) return
+  sync.cast = cast
+  for (const [key, entry] of sync.entries) if (key.startsWith('structure:')) paintMarks(sync, entry)
+}
+
 function drawItemShadow(g: Graphics, widthPx: number): void {
   const s = contactShadow(widthPx)
   g.clear()
@@ -332,6 +378,7 @@ export function syncEntities(
       onDoor: null,
       onPick: null,
       hitZoom: scene.getZoomStop(),
+      cast: SHADOW_REST,
     }
     syncStates.set(scene, sync)
     // The 24 px floor is a SCREEN size and the 0.25 overview stop makes it live, so every prism
@@ -414,13 +461,18 @@ export function syncEntities(
         }
         sync.onPick?.({ kind: 'structure', id: sid, screenX: e.client.x, screenY: e.client.y })
       })
+      // The ground a building marks is not the building: it outlives the stand-in, so a
+      // structure that gets art keeps its ring and its cast.
+      const marks = new Graphics()
+      marks.eventMode = 'none'
+      scene.layers.shadow.addChild(marks)
       entry = {
         sprite,
         url: '',
         pips: null,
         form: null,
         dressed: false,
-        shadow: null,
+        shadow: marks,
         kind: s.kind,
         footprint: { w: s.w, h: s.h },
         hitZoom: sync.hitZoom,
@@ -441,8 +493,10 @@ export function syncEntities(
         s.kind,
         loadAt(ground.sx, ground.sy),
       )
+      paintMarks(sync, entry)
     }
     entry.sprite.position.set(ground.sx, ground.sy)
+    entry.shadow?.position.set(ground.sx, ground.sy)
     entry.depth.box = structureDepthBox(key, s)
     if (s.stage === 'construction') {
       entry.sprite.tint = CONSTRUCTION_TINT
@@ -468,6 +522,7 @@ export function syncEntities(
       entry.footprint = { w: s.w, h: s.h }
       entry.kind = s.kind
       cutHitPrism(entry, sync.hitZoom)
+      paintMarks(sync, entry)
     }
   }
 
@@ -571,6 +626,7 @@ export function syncEntities(
         if ((art.url ?? NO_ART) !== entry.url) {
           const at = loadAt(entry.sprite.position.x, entry.sprite.position.y)
           applyBuildingArt(book, entry, art, entry.url === NO_ART ? null : entry.url, s, s.kind, at)
+          paintMarks(sync, entry)
         }
         continue
       }

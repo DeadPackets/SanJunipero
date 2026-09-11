@@ -1,8 +1,8 @@
 // LUT reuses forge's calibrated atmosphere TINTS — the palette was locked under these.
 
-/** How dark the town is ever allowed to get. NOT a picture decision: the night is a full-screen
- *  multiply over the words as well, so `AA_RATIO` prices this floor (see tints.test.ts). */
-export const NIGHT_FLOOR: [number, number, number] = [0.5, 0.58, 0.95]
+/** How dark the town is ever allowed to get. A picture decision again: the night is a diagonal
+ *  in the grade on `scene.graded`, which sits under the words, so no text law prices it. */
+export const NIGHT_FLOOR: [number, number, number] = [0.254, 0.295, 0.483]
 
 export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] = [
   { minute: 0, tint: NIGHT_FLOOR }, // deep night
@@ -15,8 +15,7 @@ export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] =
   { minute: 1440, tint: NIGHT_FLOOR },
 ]
 
-/** Blue held at 1.00, red pulled: a blue cast instead of the grey-green one, at the same luma.
- *  The night contrast floor is met by grading the picture and not the words, never by this. */
+/** Blue held at 1.00, red pulled: a blue cast instead of the grey-green one, at the same luma. */
 export const WEATHER_DIAG: Readonly<Record<string, [number, number, number]>> = {
   cloudy: [0.94, 0.96, 1.0],
   rain: [0.84, 0.92, 1.0],
@@ -94,9 +93,13 @@ function diagMatrix([r, g, b]: [number, number, number]): Float32Array {
   return m
 }
 
-export function gradingMatrix(weatherKind: string): Float32Array | null {
-  const diag = WEATHER_DIAG[weatherKind]
-  return diag === undefined ? null : diagMatrix(diag) // null: identity, no filter attached
+/** ★ The cloud deck and the hour of the day as ONE diagonal on `scene.graded`. The night was a
+ *  multiply quad over the whole stage, words included, and `AA_RATIO` then priced `NIGHT_FLOOR`. */
+export function gradingMatrix(weatherKind: string, nightTint: number): Float32Array | null {
+  const diag = WEATHER_DIAG[weatherKind] ?? [1, 1, 1]
+  const ch = (i: 0 | 1 | 2): number => (diag[i] * ((nightTint >> (16 - i * 8)) & 0xff)) / 255
+  const m: [number, number, number] = [ch(0), ch(1), ch(2)]
+  return m[0] === 1 && m[1] === 1 && m[2] === 1 ? null : diagMatrix(m) // null: no filter attached
 }
 
 /** ★ How much of the sky's own light gets through this weather. The grade reaches the ground

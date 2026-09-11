@@ -18,8 +18,8 @@ export type LayerSet = Readonly<Record<LayerName, Container>>
 /** The one layer that sorts its children by depth. Everything else is arrival order. */
 export const SORTED_LAYER: LayerName = 'entities'
 
-/** The PICTURE, `ground` through `overhead`. Words and reading aids sit outside it, so speech
- *  is never graded under the 4.5:1 floor. */
+/** The PICTURE, `ground` through `overhead`. Words and reading aids sit outside it, so neither
+ *  the weather nor the night is ever multiplied into speech. */
 export const GRADED_LAYERS: readonly LayerName[] = LAYERS.slice(0, LAYERS.indexOf('worldText'))
 
 /** Only `entities` sorts; every other layer is event-inert, so a decoration can never take a
@@ -46,11 +46,10 @@ export function createLayers(world: Container): {
 }
 
 /** In paint order over `world`. `lights` mirrors the world's transform and is the ONLY place
- *  an additive light may live: under the night multiply the grade darkens it. */
+ *  an additive light may live: the grade would darken it. */
 export const SCREEN_LAYERS = [
-  'flash', // lightning — under the night quad, so a strike at 2 a.m. is a night strike (D8)
-  'weather', // rain, snow: screen-space particles, under the quad so the night reaches them
-  'night', // the deep-blue multiply quad
+  'flash', // lightning — atmosphere.ts tints it by the night, so a 2 a.m. strike is a night one
+  'weather', // rain, snow: screen-space particles, tinted by the night for the same reason
   'lights', // pools, blooms, window glow, fire, the sky gradient — additive, world transform
   'bloom', // the lights again, thresholded and blurred, screened back over the whole frame
 ] as const

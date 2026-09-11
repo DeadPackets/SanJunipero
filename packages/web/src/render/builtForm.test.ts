@@ -177,15 +177,12 @@ describe('drawBuiltForm', () => {
     stroke: (s) => log.push({ op: 'stroke', arg: s }),
   })
 
-  // The ring joined this list when the forms stopped floating: a volume is painted into its own
-  // dark, so the ground fill comes before the plinth and never after it.
-  it('clears first, fills ground → plinth → faces → accent, then rims the silhouette', () => {
+  it('clears first, fills plinth → faces → accent, then rims the silhouette', () => {
     const log: Op[] = []
     const form = builtFormSpec('well', 1, 1)
     drawBuiltForm(painter(log), form)
     expect(log[0]!.op).toBe('clear')
     expect(log.filter((o) => o.op === 'fill').map((o) => o.arg)).toEqual([
-      { color: GROUND_SHADOW_INK, alpha: form.ao.alpha },
       form.plinth.color,
       ...form.faces.map((f) => f.color),
       form.accent.color,
@@ -197,29 +194,32 @@ describe('drawBuiltForm', () => {
       expect((s.arg as { color: number }).color).toBe(BUILT_FORM_INK)
     }
   })
+
+  // ★ The ring used to be painted by `drawBuiltForm`, into the stand-in Graphics that
+  // `clearStandIn` destroys the moment art lands, so every building with a picture lost it.
+  it('★ paints no ground of its own: the mark outlives the stand-in, so the form cannot own it', () => {
+    const log: Op[] = []
+    const form = builtFormSpec('house', 2, 2)
+    drawBuiltForm(painter(log), form)
+    for (const o of log.filter((f) => f.op === 'fill'))
+      expect(o.arg, 'no ink on the ground here').not.toEqual(
+        expect.objectContaining({ color: GROUND_SHADOW_INK }),
+      )
+    const polys = log.filter((o) => o.op === 'poly').map((o) => o.arg)
+    for (const poly of polys) {
+      const xs = xsOf(poly as number[])
+      expect(Math.max(...xs)).toBeLessThanOrEqual(Math.max(...xsOf(form.plinth.poly)))
+    }
+    // and the spec that fed it carries no ring either
+    expect(Object.keys(form)).not.toContain('ao')
+  })
 })
 
 describe('a form meets the ground instead of floating over it', () => {
-  it('gives every kind a ring wider than its own plinth, at every footprint', () => {
-    for (const [w, h] of SHAPES) {
-      for (const kind of ALL_KINDS) {
-        const form = builtFormSpec(kind, w, h)
-        const plinth = xsOf(form.plinth.poly)
-        const ao = xsOf(form.ao.poly)
-        expect(Math.max(...ao), `${kind} ${String(w)}x${String(h)}`).toBeGreaterThan(
-          Math.max(...plinth),
-        )
-        expect(form.ao.alpha, kind).toBeGreaterThan(0)
-      }
-    }
-  })
-
-  it('★ bakes the ring: no tick can move it, because no tick can reach it', () => {
+  it('★ takes no tick: occlusion is where two surfaces meet, not where the sun is', () => {
     const noon = builtFormSpec('house', 2, 2)
-    for (let t = 0; t < MINUTES_PER_DAY; t += 10) {
-      // the argument does not exist to take: occlusion is where two surfaces meet, not an hour
-      expect(builtFormSpec('house', 2, 2).ao, `tick ${String(t)}`).toEqual(noon.ao)
-    }
+    for (let t = 0; t < MINUTES_PER_DAY; t += 10)
+      expect(builtFormSpec('house', 2, 2), `tick ${String(t)}`).toEqual(noon)
   })
 })
 

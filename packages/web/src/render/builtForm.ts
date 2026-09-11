@@ -1,4 +1,3 @@
-import { contactAo, GROUND_SHADOW_INK, type GroundMark } from './groundShadow.js'
 import { TILE_H, TILE_W } from './iso.js'
 
 // A kind with no art draws a deliberate volume from the master palette — plinth, low prism, one
@@ -88,8 +87,6 @@ type BuiltFace = { poly: number[]; color: number }
 export type BuiltForm = {
   kind: string
   heightPx: number
-  /** the ring where the volume meets the ground, under everything and true at every hour */
-  ao: GroundMark
   /** the ground the volume stands on, drawn first */
   plinth: BuiltFace
   /** south-west face, south-east face, top — in paint order */
@@ -139,7 +136,6 @@ export function builtFormSpec(kind: string, w: number, h: number): BuiltForm {
   return {
     kind,
     heightPx,
-    ao: contactAo(stands),
     plinth: { poly: stands, color: ramp.plinth },
     faces: [
       { poly: [...gW, ...gS, ...tS, ...tW], color: ramp.left },
@@ -167,10 +163,6 @@ export type FormPainter = {
 
 export function drawBuiltForm(g: FormPainter, form: BuiltForm): void {
   g.clear()
-  // The ground goes down before the volume does, so a form sits in its own dark rather than on
-  // top of it.
-  g.poly(form.ao.poly)
-  g.fill({ color: GROUND_SHADOW_INK, alpha: form.ao.alpha })
   for (const face of [form.plinth, ...form.faces, form.accent]) {
     g.poly(face.poly)
     g.fill(face.color)

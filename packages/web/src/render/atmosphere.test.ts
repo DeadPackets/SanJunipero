@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('pixi.js', () => {
@@ -72,6 +71,7 @@ import {
   sunAlpha,
 } from './atmosphere.js'
 import { SUN_DOWN_MIN, SUN_UP_MIN, moonAltitude, shadowCast, sunLight } from '../ui/skyModel.js'
+import { MOTION } from '../ui/motion.js'
 import { clockTint, sunTint, weatherTransmit } from './tints.js'
 
 describe('the sky gradient (U4)', () => {
@@ -95,9 +95,11 @@ type Node = {
 }
 const drive = (): {
   atm: ReturnType<typeof createAtmosphere>
-  night: Node
+  flash: Node
+  weather: Node
   lights: Node
   graded: Node
+  clock: (ms: number) => void
   state: (tick: number, weather: string) => WorldState
 } => {
   const node = (): Node => ({
@@ -110,21 +112,24 @@ const drive = (): {
     mask: null,
     filters: [],
   })
-  const night = node(),
+  const flash = node(),
+    weather = node(),
     lights = node(),
     graded = node()
   const add =
     (n: Node) =>
     (...cs: Node[]) =>
       n.children.push(...cs)
+  const ticker = { lastTime: 0 }
   const scene = {
     app: {
       renderer: { generateTexture: () => ({ source: {} }) },
       screen: { width: 800, height: 600 },
-      ticker: { lastTime: 0 },
+      ticker,
     },
     screen: {
-      night: { ...night, addChild: add(night) },
+      flash,
+      weather,
       lights: { ...lights, addChild: add(lights) },
     },
     graded,
@@ -133,19 +138,41 @@ const drive = (): {
     [0, 0],
     [0, 0],
   ]
-  const state = (tick: number, weather: string): WorldState =>
-    ({ tick, terrain, weather: { kind: weather } }) as unknown as WorldState
-  return { atm: createAtmosphere(scene), night, lights, graded, state }
+  const state = (tick: number, weather2: string): WorldState =>
+    ({ tick, terrain, weather: { kind: weather2 } }) as unknown as WorldState
+  return {
+    atm: createAtmosphere(scene),
+    flash,
+    weather,
+    lights,
+    graded,
+    clock: (ms) => (ticker.lastTime = ms),
+    state,
+  }
 }
 
 describe('where the atmosphere draws (D1, D5, D27)', () => {
-  it('puts the night quad in the `night` screen layer and the sky in `lights`, screened', () => {
-    const { night, lights } = drive()
-    expect(night.children).toHaveLength(1)
-    expect(night.children[0]!.blendMode).toBe('multiply')
+  it('draws the sky in `lights`, screened and masked to the ground', () => {
+    const { lights } = drive()
     expect(rampsOf(lights)[0]!.blendMode).toBe('screen')
     // masked to the ground's outline — no hard edge on the void
     expect(planeOf(lights).mask).not.toBeNull()
+  })
+
+  // ★ THE NIGHT IS IN THE GRADE, WHICH IS UNDER THE WORDS. It was a full-screen multiply quad
+  // on `app.stage`, over `worldText` and `bubbles`, and AA_RATIO priced NIGHT_FLOOR at 0.590.
+  it('★ puts the night on `scene.graded` and on no quad at all, at an hour with no weather', () => {
+    const { atm, flash, weather, lights, graded, state } = drive()
+    atm.update(state(0, 'sunny'))
+    expect(graded.filters).toHaveLength(1)
+    const night = clockTint(0)
+    const m = (graded.filters[0] as { matrix: number[] }).matrix
+    expect(m[0]).toBeCloseTo(((night >> 16) & 0xff) / 255, 6)
+    expect(m[6]).toBeCloseTo(((night >> 8) & 0xff) / 255, 6)
+    expect(m[12]).toBeCloseTo((night & 0xff) / 255, 6)
+    // nothing multiplies the stage: no layer the atmosphere owns holds a full-screen quad
+    for (const n of [flash, weather, lights])
+      expect(n.children.some((c) => c.blendMode === 'multiply')).toBe(false)
   })
 
   it('★ grades `scene.graded` and never the world: speech stays out of the weather', () => {
@@ -153,36 +180,52 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     atm.update(state(720, 'storm'))
     expect(graded.filters).toHaveLength(1)
     atm.update(state(720, 'sunny'))
-    expect(graded.filters).toHaveLength(0)
-    const src = readFileSync(new URL('./atmosphere.ts', import.meta.url), 'utf8')
-    expect(src).not.toContain('scene.world.filters')
-    expect(src).not.toContain('ticker.add') // the tint is computed once a frame, by `update`
+    expect(graded.filters).toHaveLength(0) // full day, clear sky: identity, so nothing attached
   })
 
-  // ★ `update` runs once a frame. The matrix is a pure function of the weather kind, and
-  // assigning it dirties the filter's uniform group — an 80-byte re-upload at 60 fps.
-  it('★ writes the grading matrix when the weather changes, not on every frame', async () => {
+  // ★ `update` runs once a frame. The matrix is a pure function of the weather kind and the
+  // hour, and assigning it dirties the filter's uniform group — an 80-byte re-upload at 60 fps.
+  it('★ writes the grading matrix when the weather or the hour changes, not on every frame', async () => {
     const { ColorMatrixFilter } = (await import('pixi.js')) as unknown as {
       ColorMatrixFilter: { writes: number }
     }
-    const { atm, state } = drive()
+    const { atm, clock, state } = drive()
     atm.update(state(720, 'rain'))
     const written = ColorMatrixFilter.writes
     for (let i = 1; i <= 30; i++) atm.update(state(720 + i, 'rain'))
-    expect(ColorMatrixFilter.writes, 'a frame of rain is not new weather').toBe(written)
+    expect(ColorMatrixFilter.writes, 'a frame of rain at noon is not new weather').toBe(written)
 
     atm.update(state(760, 'storm'))
     expect(ColorMatrixFilter.writes).toBe(written + 1)
+
+    // the night cross-fades, so dusk reaches the diagonal as the clock runs, not on the tick
+    clock(2000)
+    atm.update(state(1200, 'storm'))
+    clock(2000 + MOTION.ambient.ms)
+    atm.update(state(1200, 'storm'))
+    const dusk = ColorMatrixFilter.writes
+    expect(dusk, 'dusk moves the diagonal too').toBeGreaterThan(written + 1)
+    atm.update(state(1200, 'storm'))
+    expect(ColorMatrixFilter.writes, 'and a still frame at dusk writes nothing').toBe(dusk)
   })
 
-  it('tints the quad from the clock and the sky from the quad', () => {
-    const { atm, night, lights, state } = drive()
+  // ★ The quad used to darken these two on its way past. Proved on a real GL context: a plain
+  // child of a tinted layer reads back 0x414b7b, and an added one reads back the tint times it.
+  it('★ takes the night off the clock and hands it to the sky and the screen layers', () => {
+    const { atm, flash, weather, lights, state } = drive()
     atm.update(state(240, 'sunny'))
-    const quad = night.children[0]!
-    expect(quad.tint).toBe(clockTint(240))
-    const sky = rampsOf(lights)[0]!
-    expect(sky.tint).toBe(quad.tint)
-    expect(sky.alpha).toBeCloseTo(skyAlpha(0), 6)
+    const night = clockTint(240)
+    expect(rampsOf(lights)[0]!.tint).toBe(night)
+    expect(rampsOf(lights)[0]!.alpha).toBeCloseTo(skyAlpha(0), 6)
+    expect(flash.tint).toBe(night)
+    expect(weather.tint).toBe(night)
+  })
+
+  it('★ leaves the flash and the rain at their own colour in full daylight', () => {
+    const { atm, flash, weather, state } = drive()
+    atm.update(state(720, 'sunny'))
+    expect(flash.tint).toBe(0xffffff)
+    expect(weather.tint).toBe(0xffffff)
   })
 })
 

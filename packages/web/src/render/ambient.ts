@@ -2,18 +2,21 @@ import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
 import type { TileId, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { feetOf } from './iso.js'
+import { feetOf, TILE_W } from './iso.js'
 import { rectOnGround, type ScreenRect } from './ground.js'
 import type { Scene } from './scene.js'
 import type { WeatherLayer } from './weatherFx.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { CharacterLayer } from './characters.js'
-import { setEntityScaleMul } from './entities.js'
+import { setEntityScaleMul, setSunCast } from './entities.js'
 import { phaseOf } from './charAnim.js'
 import { crownOffsetPx, windNow } from './wind.js'
 import { isGrave, toneReducer } from './tone.js'
 import { CUE_TYPES, bodiesOf } from '../ui/stageCue.js'
 import { beatFor, beatScale, type BeatName } from './beats.js'
+import { CAST_ALPHA, GROUND_SHADOW_INK } from './groundShadow.js'
+import { contactShadow } from './interiors.js'
+import { shadowCast, type ShadowCast } from '../ui/skyModel.js'
 
 // the smoke itself is smoke.ts's; these two are the material it is drawn in
 export const SMOKE_MAX_ALPHA = 0.42
@@ -217,6 +220,20 @@ export function createAmbient(
   let sampledTerrain: TileId[][] | null = null
   const shimmers: { sprite: Sprite; phase: number }[] = []
   const trees: { crown: Sprite; trunk: Sprite; phase: number }[] = []
+  // First child of `under`, so the wood stands on its marks instead of over them.
+  const canopyShade = new Graphics()
+  canopyShade.eventMode = 'none'
+  under.addChild(canopyShade)
+
+  const blob = contactShadow(CANOPY_PX.w)
+  const drawCanopyShade = (sun: ShadowCast): void => {
+    canopyShade.clear()
+    if (trees.length === 0) return
+    const dx = (sun.dx * CANOPY_PX.h) / TILE_W
+    for (const tr of trees)
+      canopyShade.ellipse(tr.trunk.x + dx, tr.trunk.y, blob.rx * sun.scaleX, blob.ry * sun.scaleY)
+    canopyShade.fill({ color: GROUND_SHADOW_INK, alpha: CAST_ALPHA * sun.alpha })
+  }
 
   const sampleTerrain = (terrain: TileId[][]): void => {
     for (const s of shimmers) s.sprite.destroy()
@@ -284,6 +301,7 @@ export function createAmbient(
     layers.chars?.setEmotesHidden(v)
   }
 
+  let sunTick: number | null = null
   const tick = (dtMs: number): void => {
     const state = store.getState()
     if (state === null) return
@@ -294,6 +312,15 @@ export function createAmbient(
     if (state.terrain !== sampledTerrain) {
       sampledTerrain = state.terrain
       sampleTerrain(state.terrain)
+      sunTick = null
+    }
+    // The hour is not an animation: it keeps moving under a grave tone and under reduced motion.
+    const nowTick = store.getTick()
+    if (nowTick !== sunTick) {
+      sunTick = nowTick
+      const sun = shadowCast(nowTick)
+      setSunCast(scene, sun)
+      drawCanopyShade(sun)
     }
     if (state !== fxState) {
       fxState = state

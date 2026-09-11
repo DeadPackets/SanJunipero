@@ -56,12 +56,6 @@ function skyTexture(scene: Scene): Texture {
 /** Cross-fades the day tint: `clockTint` steps once a sim minute, which arrives every 2.5 real
  *  seconds and reads as a jump. */
 export function createAtmosphere(scene: Scene): Atmosphere {
-  // the deep-blue night IS this multiply quad over the whole screen
-  const quad = new Sprite(Texture.WHITE)
-  quad.blendMode = 'multiply'
-  quad.eventMode = 'none' // full-screen overlay must never swallow stage hit-tests
-  scene.screen.night.addChild(quad)
-
   // Screened so the roofs catch it while the bases keep the ground's colour. Masked to the
   // map's own diamond: an unmasked box lightens the void and leaves a hard edge on it.
   const plane = new Container()
@@ -118,6 +112,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
   let sunOn = true
   let filtered = false
   let gradedKind: string | null = null
+  let gradedNight = -1
   let transmit = 1
 
   let fromTint = -1,
@@ -126,13 +121,11 @@ export function createAtmosphere(scene: Scene): Atmosphere {
 
   return {
     update(state) {
-      quad.width = scene.app.screen.width
-      quad.height = scene.app.screen.height
       const nowMs = scene.app.ticker.lastTime
       const minute = state.tick % MINUTES_PER_DAY
       const next = clockTint(minute)
       if (next !== toTint) {
-        // leave from where the quad IS, so a tick arriving mid-cross continues rather than jumps
+        // leave from where the night IS, so a tick arriving mid-cross continues rather than jumps
         fromTint =
           fromTint < 0
             ? next
@@ -140,16 +133,21 @@ export function createAtmosphere(scene: Scene): Atmosphere {
         toTint = next
         crossStartedMs = nowMs
       }
-      quad.tint = crossTint(fromTint, toTint, progress('ambient', crossStartedMs, nowMs))
+      const night = crossTint(fromTint, toTint, progress('ambient', crossStartedMs, nowMs))
 
       if (state.terrain !== maskedTerrain) fitSky(state.terrain)
 
-      // The matrix is a pure function of the kind, and assigning it re-uploads the filter's
-      // uniforms — so it is written when the weather turns, not on every frame of it.
-      if (state.weather.kind !== gradedKind) {
+      // The matrix is a pure function of the kind and the hour, and assigning it re-uploads the
+      // filter's uniforms — so it is written when one of those moves, not on every frame.
+      if (state.weather.kind !== gradedKind || night !== gradedNight) {
         gradedKind = state.weather.kind
+        gradedNight = night
         transmit = weatherTransmit(gradedKind)
-        const m = gradingMatrix(gradedKind)
+        // Screen-space passes are drawn over `graded` and cannot be inside it: they take the
+        // same diagonal on the layer, which multiplies down to every drop and every strike.
+        scene.screen.flash.tint = night
+        scene.screen.weather.tint = night
+        const m = gradingMatrix(gradedKind, night)
         if (m !== null) {
           filter.matrix = Array.from(m) as ColorMatrixFilter['matrix']
           if (!filtered) {
@@ -164,7 +162,7 @@ export function createAtmosphere(scene: Scene): Atmosphere {
 
       // The grade multiplies the GROUND by the cloud deck and every light here sits outside it,
       // so the deck comes off the sky's own light by hand or a storm at midnight burns clear.
-      sky.tint = quad.tint
+      sky.tint = night
       sky.alpha = skyAlpha(skyLevel(minute)) * transmit
       moon.alpha = MOON_MAX_ALPHA * moonAltitude(minute) * transmit
       moon.visible = moon.alpha > 0
@@ -183,7 +181,6 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       if (!on) sun.visible = false
     },
     destroy() {
-      quad.destroy()
       skyMask.destroy()
       sun.destroy()
       moon.destroy()

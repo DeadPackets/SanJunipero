@@ -2,18 +2,17 @@ import { luma } from './groundField.js'
 import { clockTint } from './tints.js'
 import { SPEECH_FILL, SPEECH_INK, THOUGHT_FILL, THOUGHT_INK } from './textFaces.js'
 
-/** The night is a full-screen MULTIPLY quad over the whole stage, so a bubble measured against
- *  its own paper is not what a viewer sees — the ceiling under the deep-night tint is 6.37:1. */
 export const AA_RATIO = 4.5
 
-/** The two extremes of the day, read off the clock rather than copied from it. */
+/** The two extremes of the day FOR THE PICTURE. `graded` carries them, and a mark drawn on the
+ *  ground is under it. */
 export const LIGHT_BANDS = {
   day: clockTint(720), // 12:00 — identity, the material's own colour
-  night: clockTint(0), // 00:00 — the deep-blue multiply
+  night: clockTint(0), // 00:00 — the deep-blue diagonal in the grade
 } as const
 export type LightBand = keyof typeof LIGHT_BANDS
 
-/** What the multiply quad does to one colour. */
+/** What a multiply by `tint` does to one colour. */
 export function tintedBy(rgb: number, tint: number): number {
   const ch = (shift: number): number =>
     Math.round((((rgb >> shift) & 0xff) * ((tint >> shift) & 0xff)) / 255)
@@ -27,16 +26,16 @@ export function readableRatio(fg: number, bg: number, tint: number): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+/** ★ What a WORD is read at, hour by hour. The night is a diagonal in the grade now and
+ *  `worldText` sits over `graded`, so a bubble is read on its own paper at every hour. */
 export function bandRatios(fg: number, bg: number): Record<LightBand, number> {
-  return {
-    day: readableRatio(fg, bg, LIGHT_BANDS.day),
-    night: readableRatio(fg, bg, LIGHT_BANDS.night),
-  }
+  const r = readableRatio(fg, bg, LIGHT_BANDS.day)
+  return { day: r, night: r }
 }
 
 /** The landmark pair lives here, not in landmarks.ts: the choice is a legibility decision and
  *  this module is the one that has to prove it. */
-export const LANDMARK_INK = 0x241f2b // --deep:  15.02:1 day / 5.19:1 night
+export const LANDMARK_INK = 0x241f2b // --deep: 15.02:1 on the plate, at every hour
 export const LANDMARK_PLATE = 0xfff6e9 // --cream
 export const LANDMARK_EDGE = 0x241f2b // the stepped ledge every slab in the town wears
 
