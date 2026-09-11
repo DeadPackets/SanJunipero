@@ -23,6 +23,7 @@ import {
   type SceneKind,
   type ServerDirector,
   type SimEvent,
+  type StakeScore,
   type StakeTerm,
 } from '@sj/shared'
 
@@ -34,10 +35,24 @@ export type Director = {
   fold(events: readonly SimEvent[]): void
   /** The frame as it stands at this tick. Cheap enough to call on every pump. */
   frame(tick: number): ServerDirector
+  /** The top of the same survey `frame` cuts from, so a board row and the cut never disagree. */
+  board(tick: number, top: number): StakeScore[]
   /** On boot: what the town has already seen today, so a resumed run does not stamp ACT I on
    *  its fourth scene. */
   prime(db: Database.Database, tick: number): void
 }
+
+/** Every weighted payment the director makes, offered to a second fold so a thread can read the
+ *  same terms without a second copy of the event switch. */
+export type Pay = (
+  cast: readonly string[],
+  term: StakeTerm,
+  weight: number,
+  tick: number,
+  sceneId: string | null,
+) => void
+
+const NO_PAY: Pay = () => undefined
 
 /** The two heaviest reasons, in two fixed slots. A map per scene would be an allocation per
  *  event on the thread that ticks the town, for an answer that is never longer than two. */
@@ -81,6 +96,7 @@ const addTerm = (t: TopTwo, term: StakeTerm, weight: number): void => {
 
 type Entry = {
   sceneId: string | null
+  openedTick: number
   cast: string[]
   terms: TopTwo
   /** Rebuilt when the terms or the cast move, never per frame. */
@@ -139,11 +155,12 @@ const PRIMED_TERM_OF_TYPE: Readonly<Record<string, StakeTerm>> = {
   invitation_refused: 'invitation_refused_seen',
   tie_let_go: 'promise_broken',
 }
-const PRIMED_TYPES: readonly string[] = Object.keys(PRIMED_TERM_OF_TYPE)
+export const PRIMED_TYPES: readonly string[] = Object.keys(PRIMED_TERM_OF_TYPE)
 
 export function makeDirector(
   names: (id: string) => string,
   partnerOf: (id: string) => string | null,
+  pay: Pay = NO_PAY,
 ): Director {
   const scenes = new Map<string, SceneEntry>()
   const bodies = new Map<string, BodyEntry>()
@@ -157,6 +174,10 @@ export function makeDirector(
   /** Whoever holds the shot. Hysteresis and the quiet beat are both about this one key. */
   let current: string | null = null
   let quietUntil = -1
+  let beatNo = 0
+  /** Survey is a sort over both maps; two readers at one tick read one answer. */
+  let surveyAt = -1
+  let surveyRows: { key: string; score: number }[] = []
 
   const sceneKey = (id: string): string => `s:${id}`
   const bodyKey = (id: string): string => `b:${id}`
@@ -205,9 +226,17 @@ export function makeDirector(
     return e === undefined ? -1 : decayed(e, tick)
   }
 
+  /** Handing the shot over, which is what a new beat IS: the score under one shot moves every
+   *  minute, and the client cannot tell that from a cut without this counter. */
+  const hold = (key: string | null): void => {
+    if (key === current) return
+    current = key
+    beatNo += 1
+  }
+
   const peak = (tick: number, key: string): void => {
     quietUntil = tick + QUIET_BEAT_TICKS
-    current = key
+    hold(key)
   }
 
   const turnScene = (
@@ -215,11 +244,13 @@ export function makeDirector(
     kind: SceneKind,
     cast: readonly string[],
     stakes: number,
+    tick: number,
   ): void => {
     let e = scenes.get(id)
     if (e === undefined) {
       e = {
         sceneId: id,
+        openedTick: tick,
         cast: [...cast],
         terms: noTerms(),
         why: '',
@@ -242,6 +273,7 @@ export function makeDirector(
     e.base = stakes * SCENE_STAKES_X + (kind === 'council' ? COUNCIL_IN_SESSION : 0)
     e.firstToday += firstOf(kind)
     markTerm(e.terms, kind, e.base)
+    pay(e.cast, kind, e.base, tick, id)
     rewhy(e)
     sceneOpenedToday = true
   }
@@ -252,13 +284,22 @@ export function makeDirector(
     term: StakeTerm | null,
     weight: number,
     tick: number,
+    sceneId: string | null = null,
   ): void => {
     const cast = [...new Set(ids)].filter((id) => id.length > 0)
     if (cast.length === 0 || weight <= 0) return
     for (const id of cast) {
       let e = bodies.get(id)
       if (e === undefined) {
-        e = { sceneId: null, cast, terms: noTerms(), why: '', score: 0, atTick: tick }
+        e = {
+          sceneId: null,
+          openedTick: tick,
+          cast,
+          terms: noTerms(),
+          why: '',
+          score: 0,
+          atTick: tick,
+        }
         bodies.set(id, e)
       } else {
         e.score = decayed(e, tick)
@@ -269,12 +310,18 @@ export function makeDirector(
       if (term !== null) addTerm(e.terms, term, weight)
       rewhy(e)
     }
+    if (term !== null) pay(cast, term, weight, tick, sceneId)
     if (weight >= PEAK_SCORE) peak(tick, bodyKey(cast[0]!))
   }
 
   /** A weighted thing happening to people, plus whatever it is worth for being the day's first. */
-  const payEvent = (ids: readonly string[], term: StakeTerm, tick: number): void => {
-    payBody(ids, term, BODY_TERMS[term] ?? TIE_TERMS[term] ?? 0, tick)
+  const payEvent = (
+    ids: readonly string[],
+    term: StakeTerm,
+    tick: number,
+    sceneId: string | null = null,
+  ): void => {
+    payBody(ids, term, BODY_TERMS[term] ?? TIE_TERMS[term] ?? 0, tick, sceneId)
     payBody(ids, null, firstOf(term), tick)
   }
 
@@ -287,9 +334,9 @@ export function makeDirector(
       if (a === null || b === null || kind === null) continue
       const act = tieActOf(kind, d.settled === true)
       if (act === 'slight') {
-        payEvent([a, b], 'slight', tick)
-        if (partnerOf(a) === b) payEvent([a, b], 'partnership_strained', tick)
-      } else if (act === 'attraction') payEvent([a, b], 'attraction', tick)
+        payEvent([a, b], 'slight', tick, id)
+        if (partnerOf(a) === b) payEvent([a, b], 'partnership_strained', tick, id)
+      } else if (act === 'attraction') payEvent([a, b], 'attraction', tick, id)
     }
     const e = scenes.get(id)
     if (e === undefined) return
@@ -306,7 +353,7 @@ export function makeDirector(
         const id = str(p.id)
         if (id === null) return
         const cast = Array.isArray(p.participants) ? (p.participants as string[]) : []
-        turnScene(id, p.kind as SceneKind, cast, Number(p.stakes) || 0)
+        turnScene(id, p.kind as SceneKind, cast, Number(p.stakes) || 0, ev.tick)
         return
       }
       case 'scene_line': {
@@ -316,6 +363,7 @@ export function makeDirector(
         if (hits > 0) {
           e.lexicon += hits * LEXICON_HIT
           markTerm(e.terms, 'lexicon', e.lexicon)
+          pay(e.cast, 'lexicon', hits * LEXICON_HIT, ev.tick, e.sceneId)
           rewhy(e)
         }
         if (p.move === 'press') e.presses += 1
@@ -323,6 +371,7 @@ export function makeDirector(
           e.presses = 0
           e.gaveWay += GIVE_WAY
           markTerm(e.terms, 'give_way', e.gaveWay)
+          pay(e.cast, 'give_way', GIVE_WAY, ev.tick, e.sceneId)
           rewhy(e)
         }
         return
@@ -344,6 +393,7 @@ export function makeDirector(
         e.ratified += BODY_TERMS.law_ratified!
         e.firstToday += firstOf('law_ratified')
         markTerm(e.terms, 'law_ratified', e.ratified)
+        pay(e.cast, 'law_ratified', BODY_TERMS.law_ratified!, ev.tick, e.sceneId)
         rewhy(e)
         return
       }
@@ -392,16 +442,14 @@ export function makeDirector(
     }
   }
 
-  /** The highest-scoring thing on the board. Sweeps the two maps as it goes: a scene past its
-   *  summary and a body decayed to nothing are both gone. */
-  const survey = (tick: number): { key: string | null; score: number } => {
-    let key: string | null = null
-    let score = 0
+  /** Everything on the board, heaviest first. Sweeps the two maps as it goes: a scene past its
+   *  summary and a body decayed to nothing are both gone. Ties break on the key, ascending,
+   *  which is the answer the old single-winner loop settled on. */
+  const survey = (tick: number): { key: string; score: number }[] => {
+    if (tick === surveyAt) return surveyRows
+    const rows: { key: string; score: number }[] = []
     const offer = (k: string, s: number): void => {
-      if (s > score || (s === score && key !== null && k < key)) {
-        key = k
-        score = s
-      }
+      if (s > 0) rows.push({ key: k, score: s })
     }
     for (const [id, e] of scenes) {
       if (e.closedAt !== null && tick - e.closedAt >= SUMMARY_HOLD_TICKS) {
@@ -421,7 +469,22 @@ export function makeDirector(
       }
       offer(bodyKey(id), s)
     }
-    return { key, score }
+    rows.sort((a, b) => b.score - a.score || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+    surveyAt = tick
+    surveyRows = rows
+    return rows
+  }
+
+  const rowOf = (key: string, score: number): StakeScore | null => {
+    const e = entryAt(key)
+    if (e === undefined || e.cast.length === 0) return null
+    return {
+      sceneId: e.sceneId,
+      agentIds: e.cast,
+      score: Math.round(score),
+      why: e.why,
+      openedTick: e.openedTick,
+    }
   }
 
   const entryAt = (key: string | null): Entry | undefined =>
@@ -434,18 +497,19 @@ export function makeDirector(
   return {
     fold(events) {
       for (const ev of events) foldOne(ev)
+      surveyAt = -1
     },
     frame(tick) {
       atTick(tick)
-      const best = survey(tick)
+      const best = survey(tick)[0] ?? { key: null, score: 0 }
       if (best.score >= PEAK_SCORE) peakedToday = true
       const quiet = tick < quietUntil
       const held = current === null ? -1 : scoreOf(current, tick)
       // The incumbent keeps the shot unless it is gone, or a rival clears it by a quarter. In
       // the quiet beat after a peak nothing displaces it at all.
-      if (held < 0) current = best.key
+      if (held < 0) hold(best.key)
       else if (!quiet && best.key !== null && best.key !== current && best.score >= held * STICKY) {
-        current = best.key
+        hold(best.key)
       }
       const act = !sceneOpenedToday
         ? null
@@ -454,24 +518,30 @@ export function makeDirector(
           : peakedToday
             ? 'II'
             : 'I'
-      const on = entryAt(current)
-      if (on === undefined || on.cast.length === 0) {
-        current = null
+      const on = current === null ? null : rowOf(current, scoreOf(current, tick))
+      if (on === null) {
+        hold(null)
         return { t: 'director', tick, cut: null, quiet, act }
       }
-      return {
-        t: 'director',
-        tick,
-        cut: {
-          sceneId: on.sceneId,
-          agentIds: on.cast,
-          // Rounded: a decaying body would otherwise redraw the frame on every pump.
-          score: Math.round(scoreOf(current!, tick)),
-          why: on.why,
-        },
-        quiet,
-        act,
+      // Rounded: a decaying body would otherwise redraw the frame on every pump.
+      return { t: 'director', tick, cut: { ...on, beatId: `${beatNo}` }, quiet, act }
+    },
+    board(tick, top) {
+      atTick(tick)
+      const out: StakeScore[] = []
+      // One body entry per person carries the whole cast, so a slight between two people offers
+      // the board the same row twice. The heavier one stands.
+      const seen = new Set<string>()
+      for (const r of survey(tick)) {
+        if (out.length >= top) break
+        const row = rowOf(r.key, r.score)
+        if (row === null) continue
+        const same = `${row.sceneId ?? ''}|${row.agentIds.join(' ')}`
+        if (seen.has(same)) continue
+        seen.add(same)
+        out.push(row)
       }
+      return out
     },
     prime(db, tick) {
       atTick(tick)
@@ -482,22 +552,25 @@ export function makeDirector(
         .prepare(
           `SELECT seq, tick, type, payload FROM events
             WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_closed')
-              AND tick >= ? ORDER BY seq`,
+              AND tick >= ? AND tick <= ? ORDER BY seq`,
         )
-        .all(dayStart) as { seq: number; tick: number; type: string; payload: string }[]
+        .all(dayStart, tick) as { seq: number; tick: number; type: string; payload: string }[]
       for (const r of scenes) {
         foldOne({ seq: r.seq, tick: r.tick, type: r.type, payload: JSON.parse(r.payload) })
       }
       const seen = db
         .prepare(
           `SELECT DISTINCT type FROM events
-            WHERE type IN (${PRIMED_TYPES.map(() => '?').join(', ')}) AND tick >= ?`,
+            WHERE type IN (${PRIMED_TYPES.map(() => '?').join(', ')})
+              AND tick >= ? AND tick <= ?`,
         )
-        .all(...PRIMED_TYPES, dayStart) as { type: string }[]
+        .all(...PRIMED_TYPES, dayStart, tick) as { type: string }[]
       for (const row of seen) seenToday.add(PRIMED_TERM_OF_TYPE[row.type]!)
       const opened = db
-        .prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'scene_opened' AND tick >= ?")
-        .get(dayStart) as { n: number }
+        .prepare(
+          "SELECT COUNT(*) AS n FROM events WHERE type = 'scene_opened' AND tick >= ? AND tick <= ?",
+        )
+        .get(dayStart, tick) as { n: number }
       sceneOpenedToday = opened.n > 0
     },
   }

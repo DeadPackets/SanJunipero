@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ClientMsg, ServerMsg, momentToTick, tickToMoment, PROTOCOL_VERSION } from './protocol.js'
+import { BOARD_TOP_N, THREAD_TOP_N } from './threads.js'
 
 describe('protocol', () => {
   it('round-trips a tick message', () => {
@@ -131,5 +132,76 @@ describe('protocol', () => {
     expect(momentToTick(41, '14:30')).toBe(41 * 1440 + 14 * 60 + 30)
     expect(tickToMoment(41 * 1440 + 870)).toEqual({ day: 41, time: '14:30' })
     expect(momentToTick(41, '24:00')).toBeNaN() // invalid time → NaN, caller rejects
+  })
+  // ★ Additive, and PROTOCOL_VERSION stays at 8: a stale bundle drops a frame it cannot read
+  // (socket.ts) rather than dying, which is the whole reason a new frame may ship without a bump.
+  it('★ takes a cut with a beat mark, and the same cut without one', () => {
+    const cut = {
+      t: 'director',
+      tick: 850,
+      cut: { sceneId: 's1', agentIds: ['nadia'], score: 24, why: 'Nadia: a slight' },
+      quiet: false,
+      act: 'II',
+    }
+    expect(ServerMsg.parse(cut)).toEqual(cut)
+    const marked = { ...cut, cut: { ...cut.cut, beatId: 'b7', openedTick: 800 } }
+    expect(ServerMsg.parse(marked)).toEqual(marked)
+    expect(() => ServerMsg.parse({ ...cut, cut: { ...cut.cut, beatId: '' } })).toThrow()
+    expect(() => ServerMsg.parse({ ...cut, cut: { ...cut.cut, openedTick: -1 } })).toThrow()
+  })
+
+  it('carries the shot board, and refuses a row that is not a score', () => {
+    const row = {
+      sceneId: null,
+      agentIds: ['omar', 'rahel'],
+      score: 11,
+      why: 'Omar & Rahel: talking',
+    }
+    const board = { t: 'board', tick: 900, rows: [row, { ...row, score: 4 }] }
+    expect(ServerMsg.parse(board)).toEqual(board)
+    expect(ServerMsg.parse({ ...board, rows: [] })).toBeTruthy()
+    expect(() => ServerMsg.parse({ ...board, rows: [{ ...row, agentIds: [] }] })).toThrow()
+    expect(() => ServerMsg.parse({ ...board, rows: [{ ...row, score: -1 }] })).toThrow()
+    expect(() => ServerMsg.parse({ ...board, rows: [{ ...row, rank: 1 }] })).toThrow()
+    // The board is the top of the survey, not the survey.
+    const over = Array.from({ length: BOARD_TOP_N + 1 }, () => row)
+    expect(() => ServerMsg.parse({ ...board, rows: over })).toThrow()
+  })
+
+  it('carries the running threads, prose and all, and refuses a malformed one', () => {
+    const thread = {
+      id: 'th_kamal_leyla',
+      members: ['kamal', 'leyla'],
+      heat: 9.5,
+      peak: 14,
+      state: 'turned',
+      valence: -1,
+      arc: -1,
+      openedTick: 4000,
+      lastPaidTick: 5200,
+      terms: ['quarrel', 'slight'],
+      beat: 'She walked off before he finished.',
+      summary: 'They fell out over the fire pit.',
+    }
+    const frame = { t: 'threads', tick: 5300, threads: [thread] }
+    expect(ServerMsg.parse(frame)).toEqual(frame)
+    // The prose is what the town happened to write, so a thread with none is still a thread.
+    const { beat: _b, summary: _s, ...bare } = thread
+    expect(ServerMsg.parse({ ...frame, threads: [bare] })).toBeTruthy()
+    const bad =
+      (over: Record<string, unknown>): (() => unknown) =>
+      () =>
+        ServerMsg.parse({ ...frame, threads: [{ ...thread, ...over }] })
+    expect(bad({ state: 'brewing' })).toThrow()
+    expect(bad({ members: ['kamal'] })).toThrow() // an edge takes two
+    expect(bad({ arc: 2 })).toThrow()
+    expect(bad({ peak: 0 })).toThrow() // a bar cannot be normalised against nothing
+    expect(bad({ terms: [] })).toThrow()
+    expect(bad({ terms: ['quarrel', 'slight', 'talk'] })).toThrow()
+    expect(bad({ terms: ['sulking'] })).toThrow()
+    expect(bad({ heat: -1 })).toThrow()
+    expect(bad({ warmth: 3 })).toThrow()
+    const over = Array.from({ length: THREAD_TOP_N + 1 }, () => thread)
+    expect(() => ServerMsg.parse({ ...frame, threads: over })).toThrow()
   })
 })

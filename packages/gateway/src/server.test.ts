@@ -4,7 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, ServerMsg, stateHash, PROTOCOL_VERSION } from '@sj/shared'
+import {
+  ADULT_AGE_DAYS,
+  DEFAULT_CONFIG,
+  MINUTES_PER_DAY,
+  ServerMsg,
+  stateHash,
+  PROTOCOL_VERSION,
+} from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb } from '@sj/forge'
@@ -416,4 +423,287 @@ describe('★ the director frame', () => {
     await wait(80)
     expect(frames.filter((f) => f.includes('"t":"director"'))).toEqual([])
   }, 20000)
+})
+
+describe('★ a frame goes out when the screen changes and not when a number does', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwmark-'))
+  const open: (WebSocket | Gateway)[] = []
+  afterAll(async () => {
+    for (const o of open) {
+      if (o instanceof WebSocket) o.close()
+      else await o.close()
+    }
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('holds the board still while a decaying score moves no bar', async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('board-mark'),
+      snapshotEveryTicks: 200,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['yusuf', 'Yusuf'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 10) emit('partnership_formed', { aId: 'nadia', bId: 'yusuf' })
+      },
+    })
+    for (let i = 0; i < 5; i++) loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    // Twenty minutes of town time in which nothing happens. The marriage's score decays every
+    // one of them, and the one row on the board is still the whole of the board.
+    for (let i = 0; i < 25; i++) {
+      loop.step()
+      gw.pump()
+    }
+    await wait(120)
+    const boards = frames.filter((f) => f.includes('"t":"board"'))
+    expect(boards.length).toBeGreaterThan(0)
+    expect(boards.length).toBeLessThanOrEqual(2)
+  }, 30000)
+
+  it('★ pushes both again when the words change and no bar moves', async () => {
+    const dbPath = join(dir, 'words.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('board-words'),
+      snapshotEveryTicks: 200,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['yusuf', 'Yusuf'],
+            ['omar', 'Omar'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 3)
+          emit('scene_opened', {
+            id: 'scene_3_abcd1234',
+            kind: 'talk',
+            participants: ['nadia', 'yusuf'],
+            topic: 'Six planks.',
+            stakes: 5,
+          })
+        // The talk turns, with the same two people in it. The reason on the board and the words
+        // on the capsule both change and no bar moves: the leader is always the whole of its
+        // own denominator, so its share of itself is 100 before and after.
+        if (tick === 6)
+          emit('scene_turned', {
+            id: 'scene_3_abcd1234',
+            kind: 'quarrel',
+            participants: ['nadia', 'yusuf'],
+            stakes: 5,
+          })
+        // And then a third body walks into it, which is a cast the capsule names.
+        if (tick === 9)
+          emit('scene_turned', {
+            id: 'scene_3_abcd1234',
+            kind: 'quarrel',
+            participants: ['nadia', 'yusuf', 'omar'],
+            stakes: 5,
+          })
+      },
+    })
+    for (let i = 0; i < 4; i++) loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    for (let i = 0; i < 10; i++) {
+      loop.step()
+      gw.pump()
+    }
+    await wait(120)
+    const msgs = frames.map((f) => ServerMsg.parse(JSON.parse(f)))
+    // Read only the rows that still name the two, so the third body's own frame proves nothing.
+    const whys = msgs.flatMap((m) =>
+      m.t === 'board' ? m.rows.filter((r) => r.agentIds.length === 2).map((r) => r.why) : [],
+    )
+    expect(new Set(whys).size).toBeGreaterThan(1)
+    const words = msgs.flatMap((m) =>
+      m.t === 'threads'
+        ? m.threads.filter((t) => t.members.length === 2).map((t) => t.terms.join(' '))
+        : [],
+    )
+    expect(new Set(words).size).toBeGreaterThan(1)
+    const casts = msgs.flatMap((m) =>
+      m.t === 'threads' ? m.threads.map((t) => t.members.length) : [],
+    )
+    expect(new Set(casts).size).toBeGreaterThan(1)
+  }, 30000)
+})
+
+describe('★ the story ribbon survives a restart', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwthreads-'))
+  const open: (WebSocket | Gateway)[] = []
+  afterAll(async () => {
+    for (const o of open) {
+      if (o instanceof WebSocket) o.close()
+      else await o.close()
+    }
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('★ comes back knowing a story older than today, not calling it new', async () => {
+    const dbPath = join(dir, 'world.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('threads-restart'),
+      snapshotEveryTicks: 200,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['nadia', 'Nadia'],
+            ['yusuf', 'Yusuf'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 20)
+          emit('scene_opened', {
+            id: 'scene_20_abcd1234',
+            kind: 'quarrel',
+            participants: ['nadia', 'yusuf'],
+            topic: 'Six planks.',
+            stakes: 8,
+          })
+      },
+    })
+    // Past midnight, so the quarrel is on a day the director's own prime never reads.
+    for (let i = 0; i < MINUTES_PER_DAY + 60; i++) loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    gw.pump()
+    await wait(80)
+    const ribbon = frames
+      .map((f) => ServerMsg.parse(JSON.parse(f)))
+      .filter((m) => m.t === 'threads')
+    expect(ribbon.length).toBeGreaterThan(0)
+    const row = ribbon[0]!.threads[0]
+    expect(row?.members).toEqual(['nadia', 'yusuf'])
+    expect(row?.openedTick).toBe(20)
+    expect(row?.state).toBe('held')
+  }, 30000)
+
+  it('★ comes back knowing a marriage, which no scene row carries', async () => {
+    const dbPath = join(dir, 'wedding.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('threads-wedding'),
+      snapshotEveryTicks: 200,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['omar', 'Omar'],
+            ['salma', 'Salma'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        // A birth, a death, a marriage, a parting and a law are the heaviest payments in the
+        // table, and a window of scene rows alone loses every one of them on a restart.
+        if (tick === 30) emit('partnership_formed', { aId: 'omar', bId: 'salma' })
+      },
+    })
+    for (let i = 0; i < MINUTES_PER_DAY + 60; i++) loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    gw.pump()
+    await wait(80)
+    const ribbon = frames
+      .map((f) => ServerMsg.parse(JSON.parse(f)))
+      .filter((m) => m.t === 'threads')
+    expect(ribbon.length).toBeGreaterThan(0)
+    expect(ribbon[0]!.threads[0]?.members).toEqual(['omar', 'salma'])
+  }, 30000)
+
+  it('★ does not strain a marriage that had not happened when the scene closed', async () => {
+    const dbPath = join(dir, 'strain.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('threads-strain'),
+      snapshotEveryTicks: 200,
+      onTick: ({ tick, emit }) => {
+        if (tick === 1) {
+          for (const [id, name] of [
+            ['omar', 'Omar'],
+            ['salma', 'Salma'],
+          ])
+            emit('agent_spawned', { id, name, x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
+        }
+        if (tick === 100) {
+          emit('scene_opened', {
+            id: 'scene_100_abcd1234',
+            kind: 'quarrel',
+            participants: ['omar', 'salma'],
+            topic: 'Six planks.',
+            stakes: 3,
+          })
+          emit('scene_closed', {
+            id: 'scene_100_abcd1234',
+            summary: 'Omar walks off.',
+            deltas: [{ agentId: 'omar', personId: 'salma', kind: 'slight', text: 'he walked off' }],
+            closeReason: 'ended',
+          })
+        }
+        // They marry a hundred minutes AFTER that quarrel, so the live run never strained them.
+        if (tick === 200) emit('partnership_formed', { aId: 'omar', bId: 'salma' })
+      },
+    })
+    for (let i = 0; i < MINUTES_PER_DAY + 60; i++) loop.step()
+
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    await hello(sock)
+    collect(sock, frames)
+    gw.pump()
+    await wait(80)
+    const ribbon = frames
+      .map((f) => ServerMsg.parse(JSON.parse(f)))
+      .filter((m) => m.t === 'threads')
+    expect(ribbon.length).toBeGreaterThan(0)
+    const row = ribbon[0]!.threads.find((r) => r.members.includes('omar'))
+    expect(row?.members).toEqual(['omar', 'salma'])
+    expect(row?.terms).not.toContain('partnership_strained')
+  }, 30000)
 })

@@ -2,14 +2,19 @@ import { createServer } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
 import {
+  BOARD_TOP_N,
   ClientMsg,
   CLOSE_BAD_HELLO,
   DEFAULT_CONFIG,
   PROTOCOL_VERSION,
   TICK_REAL_MS,
+  MINUTES_PER_DAY,
+  THREAD_HALF_LIFE_TICKS,
   agentName,
   personAt,
   type AssetRecord,
+  type SimEvent,
+  type ServerBoard,
   type SimConfig,
 } from '@sj/shared'
 import type { TileId } from '@sj/engine'
@@ -18,7 +23,8 @@ import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import { latestMoods, type MoodRow, moodsSince, thoughtsSince } from './observer.js'
 import { makeSceneRelay } from './scenes.js'
-import { makeDirector } from './stakes.js'
+import { makeDirector, PRIMED_TYPES } from './stakes.js'
+import { makeThreads } from './threads.js'
 import { mountAssetRoutes } from './assetsHttp.js'
 import { mountDataApi } from './api.js'
 import { mountNarratorApi } from './narratorApi.js'
@@ -81,6 +87,20 @@ const SCRUB_BUDGET_MS_PER_S = 40
 
 /** Frames under this go out raw: a `thought` or an `asset` is smaller than the deflate header. */
 const DEFLATE_THRESHOLD_BYTES = 512
+
+/** What the story fold reads back off a resumed log over its own four sim-day window: the scene
+ *  rows that hold a scene together, plus every body event the director pays a term for. */
+const MEMORY_TYPES: readonly string[] = [
+  'scene_opened',
+  'scene_turned',
+  'scene_line',
+  'scene_closed',
+  ...PRIMED_TYPES,
+]
+
+/** A bar's own share of its denominator, in whole percent. What the screen shows is what the
+ *  broadcast mark is made of, so a number that moves no pixel is not a frame. */
+const share = (value: number, of: number): number => (of <= 0 ? 0 : Math.round((value / of) * 100))
 
 export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const config = opts.config ?? DEFAULT_CONFIG
@@ -394,6 +414,8 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         // The shot the town is already on. A replaying socket never gets one: a moment's own
         // cast owns that camera.
         if (directorJson !== null) sock.send(directorJson)
+        if (boardJson !== null) sock.send(boardJson)
+        if (threadsJson !== null) sock.send(threadsJson)
         return
       }
       if (msg.t === 'scrub') {
@@ -441,14 +463,74 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const sceneFrames = makeSceneRelay()
   // What the camera is on, folded off the same groups the deltas ride. Read-only on the world:
   // the names and the partnerships come out of the mirror's own state.
-  const director = makeDirector(
-    (id) => agentName(mirror.state().agents, id),
-    (id) => personAt(mirror.state().agents, id)?.partnerId ?? null,
-  )
-  director.prime(db, mirror.state().tick)
+  const threads = makeThreads()
+  const nameOf = (id: string): string => agentName(mirror.state().agents, id)
+  const partnerOf = (id: string): string | null =>
+    personAt(mirror.state().agents, id)?.partnerId ?? null
+  const director = makeDirector(nameOf, partnerOf, threads.pay)
+  // Stories remember four sim-days where the camera remembers ninety seconds, so a restart that
+  // primed only today would come back with an empty ribbon and call a ten-day grudge new. The
+  // days before today go through a throwaway director, which is how the fold reads them off the
+  // one event switch; `prime` below pays today. A birth, a death, a marriage, a parting and a
+  // law are the heaviest payments in the table, so the window carries them and not scenes alone.
+  const primedAt = mirror.state().tick
+  const memory: SimEvent[] = (
+    db
+      .prepare(
+        `SELECT seq, tick, type, payload FROM events
+          WHERE type IN (${MEMORY_TYPES.map(() => '?').join(', ')})
+            AND tick >= ? AND tick <= ? ORDER BY seq`,
+      )
+      .all(...MEMORY_TYPES, primedAt - THREAD_HALF_LIFE_TICKS, primedAt) as {
+      seq: number
+      tick: number
+      type: string
+      payload: string
+    }[]
+  ).map((r) => ({
+    seq: r.seq,
+    tick: r.tick,
+    type: r.type,
+    payload: JSON.parse(r.payload) as Record<string, unknown>,
+  }))
+  const today = Math.floor(primedAt / MINUTES_PER_DAY) * MINUTES_PER_DAY
+  // The mirror answers who is married TODAY, and a restart that replays four sim-days against it
+  // pays a strain between two people who were not together yet. Rolled back, it answers as of.
+  const partnerThen = new Map<string, string>()
+  for (const [id, body] of Object.entries(mirror.state().agents)) {
+    if (body.partnerId !== undefined) partnerThen.set(id, body.partnerId)
+  }
+  const retie = (ev: SimEvent, forward: boolean): void => {
+    const formed = ev.type === 'partnership_formed'
+    if (!formed && ev.type !== 'partnership_dissolved') return
+    const { aId, bId } = ev.payload as { aId?: unknown; bId?: unknown }
+    if (typeof aId !== 'string' || typeof bId !== 'string') return
+    if (formed === forward) {
+      partnerThen.set(aId, bId)
+      partnerThen.set(bId, aId)
+    } else {
+      partnerThen.delete(aId)
+      partnerThen.delete(bId)
+    }
+  }
+  for (let i = memory.length - 1; i >= 0; i--) retie(memory[i]!, false)
+  const past = makeDirector(nameOf, (id) => partnerThen.get(id) ?? null, threads.pay)
+  for (const ev of memory) {
+    if (ev.tick >= today) continue
+    retie(ev, true)
+    past.fold([ev])
+  }
+  director.prime(db, primedAt)
+  threads.fold(memory)
   let directorJson: string | null = null
   /** The cut, the beat and the act without the tick, which moves every minute on its own. */
   let directorMark = ''
+  let boardJson: string | null = null
+  let boardMark = ''
+  let threadsJson: string | null = null
+  /** What the capsule shows, quantised: the cast, the words and the prose as they are, and the
+   *  only unbounded number on it as a whole percent of its own peak. */
+  let threadsMark = ''
   let lastThoughtId = 0
   let lastMoodId = 0
   const moodJson = (m: MoodRow): string =>
@@ -504,14 +586,44 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
       for (const frame of sceneFrames(g.events)) hub.broadcast(JSON.stringify(frame))
+      // The ribbon is stepped tick by tick through the poll, before and after each tick's own
+      // payments. A gateway that fell behind then hands the ribbon over where a replay does.
+      threads.frame(g.tick - 1)
       director.fold(g.events)
+      threads.fold(g.events)
+      threads.frame(g.tick)
     }
-    const cut = director.frame(mirror.state().tick)
+    const at = mirror.state().tick
+    const cut = director.frame(at)
     const mark = JSON.stringify([cut.cut, cut.quiet, cut.act])
     if (mark !== directorMark) {
       directorMark = mark
       directorJson = JSON.stringify(cut)
       hub.broadcast(directorJson)
+    }
+    const board: ServerBoard = { t: 'board', tick: at, rows: director.board(at, BOARD_TOP_N) }
+    // A mark is what the screen shows, quantised. The browser normalises every bar against the
+    // leader in the same frame, so a decaying score that moves no bar is not a redraw.
+    const lead = board.rows[0]?.score ?? 0
+    const boardNow = board.rows
+      .map((r) => `${r.sceneId ?? ''}|${r.agentIds.join(' ')}|${r.why}|${share(r.score, lead)}`)
+      .join(' ')
+    if (boardNow !== boardMark) {
+      boardMark = boardNow
+      boardJson = JSON.stringify(board)
+      hub.broadcast(boardJson)
+    }
+    const story = threads.frame(at)
+    const storyNow = story.threads
+      .map(
+        (t) =>
+          `${t.id}:${t.state}:${t.valence}:${t.members.join('+')}:${t.terms.join('+')}:${t.beat ?? ''}:${t.summary ?? ''}:${t.proseTick ?? ''}:${share(t.heat, t.peak)}`,
+      )
+      .join(' ')
+    if (storyNow !== threadsMark) {
+      threadsMark = storyNow
+      threadsJson = JSON.stringify(story)
+      hub.broadcast(threadsJson)
     }
     if (!observerSeen) observerSeen = hasTable.get('observer_thoughts') !== undefined
     if (observerSeen) {

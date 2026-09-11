@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BOARD_TOP_N,
   MINUTES_PER_DAY,
   PEAK_SCORE,
   QUIET_BEAT_TICKS,
@@ -353,5 +354,56 @@ describe('a resumed town', () => {
     expect(frame.cut?.agentIds).toEqual(['nadia', 'yusuf'])
     expect(frame.cut?.why).toContain('falling out')
     db.close()
+  })
+})
+
+describe('the shot board', () => {
+  it('ranks the same survey the cut comes off, heaviest first', () => {
+    const d = director()
+    theQuarrel(d)
+    d.fold([
+      opened(1000, COUNCIL, 'council', ['omar', 'salma'], 8),
+      ev(1002, 'agent_born', { motherId: 'salma', fatherId: 'omar' }),
+    ])
+    const rows = d.board(1010, BOARD_TOP_N)
+    expect(rows.length).toBeGreaterThan(1)
+    expect(rows.map((r) => r.score)).toEqual([...rows.map((r) => r.score)].sort((a, b) => b - a))
+    const cut = d.frame(1010).cut
+    expect(rows[0]?.agentIds).toEqual(cut?.agentIds)
+    expect(rows[0]?.score).toBe(cut?.score)
+  })
+
+  it('caps the board and never puts an empty row on it', () => {
+    const d = director()
+    theQuarrel(d)
+    d.fold([opened(1000, COUNCIL, 'council', ['omar', 'salma'], 8)])
+    expect(d.board(1010, 1)).toHaveLength(1)
+    for (const row of d.board(1010, BOARD_TOP_N)) {
+      expect(row.agentIds.length).toBeGreaterThan(0)
+      expect(row.openedTick).toBeLessThanOrEqual(1010)
+    }
+  })
+
+  it('★ never carries the same row twice: one body entry per person names the whole cast', () => {
+    const d = director()
+    d.fold([
+      opened(1000, QUARREL, 'quarrel', ['nadia', 'yusuf'], 8),
+      closed(1001, QUARREL, [{ agentId: 'nadia', personId: 'yusuf', kind: 'slight' }]),
+    ])
+    const rows = d.board(1002, BOARD_TOP_N)
+    const keys = rows.map((r) => `${r.sceneId ?? ''}|${r.agentIds.join(' ')}`)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('★ gives a new beat id when the shot changes hands, and not when the score moves', () => {
+    const d = director()
+    theQuarrel(d)
+    const first = d.frame(1010).cut?.beatId
+    expect(first).toBeDefined()
+    // A decaying score under the same people is the same beat.
+    expect(d.frame(1012).cut?.beatId).toBe(first)
+    d.fold([ev(1013, 'agent_died', { agentId: 'omar' })])
+    expect(d.frame(1013).cut?.agentIds).toEqual(['omar'])
+    expect(d.frame(1013).cut?.beatId).not.toBe(first)
   })
 })

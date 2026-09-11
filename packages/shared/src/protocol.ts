@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { EventEnvelope } from './events.js'
 import { AssetRecordSchema } from './assetCodex.js'
+import { STAKE_TERMS } from './stakes.js'
+import { BOARD_TOP_N, THREAD_STATES, THREAD_TOP_N } from './threads.js'
 import { MINUTES_PER_DAY } from './time.js'
 
 export const PROTOCOL_VERSION = 8 // 8: the director's cut and act ride the socket; a v7 viewer polls a heat that no longer exists
@@ -159,6 +161,11 @@ export const StakeScoreSchema = z
     agentIds: z.array(z.string().min(1)).min(1),
     score: z.number().nonnegative(),
     why: z.string().min(1),
+    /** A new shot and not the same shot with a decayed score. Optional: the board's other four
+     *  rows were never cut to, so they have no beat. */
+    beatId: z.string().min(1).optional(),
+    /** When the thing this row scores began. */
+    openedTick: tick.optional(),
   })
   .strict()
 export type StakeScore = z.infer<typeof StakeScoreSchema>
@@ -176,6 +183,46 @@ export const ServerDirector = z
   })
   .strict()
 export type ServerDirector = z.infer<typeof ServerDirector>
+const sign = z.union([z.literal(-1), z.literal(0), z.literal(1)])
+// A running story, with everything a capsule and the sentence ladder need in the one frame. The
+// state words are all derived, off the payments, in the gateway.
+export const ThreadRowSchema = z
+  .object({
+    id: z.string().min(1),
+    /** The bodies in it, ranked by what each one paid. */
+    members: z.array(z.string().min(1)).min(2),
+    heat: z.number().nonnegative(),
+    /** Its own high-water mark, so a bar is normalised against something real. */
+    peak: z.number().positive(),
+    state: z.enum(THREAD_STATES),
+    /** The running sign, and the signed warmth arrow. Unsigned would make a marriage and a
+     *  betrayal the same shape. Absent when nothing has read the bond graph for this pair. */
+    valence: sign,
+    arc: sign.optional(),
+    openedTick: tick,
+    lastPaidTick: tick,
+    /** The two heaviest reasons, in the order they weigh. */
+    terms: z.array(z.enum(STAKE_TERMS)).min(1).max(2),
+    /** The story this one became, on the last row it ships. A story merged away says so once
+     *  instead of being replaced without a word. Absent on every other row. */
+    became: z.string().min(1).optional(),
+    /** The town's own prose off the last scene closed on this thread. Absent until one closes.
+     *  `proseTick` is when it was written: a line rides a story for sim-days after its scene. */
+    beat: z.string().min(1).optional(),
+    summary: z.string().min(1).optional(),
+    proseTick: tick.optional(),
+  })
+  .strict()
+export type ThreadRow = z.infer<typeof ThreadRowSchema>
+// The shot board: the top of the gateway's own survey, not just the row it cut to.
+export const ServerBoard = z
+  .object({ t: z.literal('board'), tick, rows: z.array(StakeScoreSchema).max(BOARD_TOP_N) })
+  .strict()
+export type ServerBoard = z.infer<typeof ServerBoard>
+export const ServerThreads = z
+  .object({ t: z.literal('threads'), tick, threads: z.array(ThreadRowSchema).max(THREAD_TOP_N) })
+  .strict()
+export type ServerThreads = z.infer<typeof ServerThreads>
 export const ServerMsg = z.discriminatedUnion('t', [
   ServerSnapshot,
   ServerPaused,
@@ -187,6 +234,8 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerAssets,
   ServerScene,
   ServerDirector,
+  ServerBoard,
+  ServerThreads,
 ])
 export type ServerMsg = z.infer<typeof ServerMsg>
 
