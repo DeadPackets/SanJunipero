@@ -1,16 +1,21 @@
-import { ColorMatrixFilter, Graphics, Sprite, Texture } from 'pixi.js'
+import { ColorMatrixFilter, Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import type { TileId, WorldState } from '@sj/engine/state'
-import { cameraBoundsOf } from './camera.js'
+import { boundsCentre, cameraBoundsOf } from './camera.js'
 import { tileToScreen } from './iso.js'
 import { bakeTexture } from './textures.js'
 import type { Scene } from './scene.js'
-import { clockTint, gradingMatrix, skyLevel } from './tints.js'
+import { clockTint, gradingMatrix, skyLevel, sunTint, weatherTransmit } from './tints.js'
 import { crossTint } from '../ui/sceneTransition.js'
-import { moonAltitude } from '../ui/skyModel.js'
+import { moonAltitude, sunLight, type SunLight } from '../ui/skyModel.js'
 import { progress } from '../ui/motion.js'
 
-export type Atmosphere = { update(state: WorldState): void; destroy(): void }
+export type Atmosphere = {
+  update(state: WorldState): void
+  /** the chain's last rung: the warm ramp goes and the sky, the moon and the ground stay */
+  setSun(on: boolean): void
+  destroy(): void
+}
 
 /** The ceiling, reached at dawn and dusk when sky and ground differ most. */
 export const SKY_MAX_ALPHA = 0.16
@@ -23,8 +28,18 @@ export const MOON_COLOR = 0xcdd8ff
  *  the ground it stands on where the night put it. */
 export const MOON_MAX_ALPHA = 0.14
 
+/** ★ THE SUN: warm light ADDED, never blue taken away. What it adds overhead, and what the
+ *  golden band adds on top. A sun louder than `SKY_MAX_ALPHA` reads as a lens flare. */
+export const SUN_ALPHA = 0.1
+export const SUN_GOLDEN_ALPHA = 0.12
+
 export function skyAlpha(sky: number): number {
   return SKY_MAX_ALPHA * (0.35 + 0.65 * (1 - Math.abs(0.5 - sky) * 2))
+}
+
+/** 0 every hour of the night, and 0 at the minute the sun touches the horizon at either end. */
+export function sunAlpha(sun: SunLight): number {
+  return SUN_ALPHA * sun.elevation + SUN_GOLDEN_ALPHA * sun.golden
 }
 
 /** A 1×64 vertical ramp, white at the top and clear at the bottom. The ONE texture in the
@@ -49,21 +64,29 @@ export function createAtmosphere(scene: Scene): Atmosphere {
 
   // Screened so the roofs catch it while the bases keep the ground's colour. Masked to the
   // map's own diamond: an unmasked box lightens the void and leaves a hard edge on it.
+  const plane = new Container()
+  plane.eventMode = 'none'
+  const skyMask = new Graphics()
+  // ★ ONE mask on the group, never one per ramp: measured 5 draw calls a frame for the three
+  // ramps against 11 when each of them carried the same mask itself.
+  plane.mask = skyMask
   const sky = new Sprite(skyTexture(scene))
   sky.blendMode = 'screen'
-  sky.eventMode = 'none'
   sky.autoGarbageCollect = false
-  const skyMask = new Graphics()
-  sky.mask = skyMask
   // The moon rides the same ramp over the same ground: one traveller, one curve, and the arc
   // over the town cannot disagree with the light on it.
   const moon = new Sprite(sky.texture)
   moon.blendMode = 'screen'
-  moon.eventMode = 'none'
   moon.autoGarbageCollect = false
   moon.tint = MOON_COLOR
-  moon.mask = skyMask
-  scene.screen.lights.addChild(skyMask, sky, moon)
+  // The same ramp again, turned to face wherever the sun is. One sprite and no render target:
+  // the additive path already exists and this rides it.
+  const sun = new Sprite(sky.texture)
+  sun.blendMode = 'screen'
+  sun.autoGarbageCollect = false
+  sun.anchor.set(0.5)
+  plane.addChild(sky, moon, sun)
+  scene.screen.lights.addChild(skyMask, plane)
   let maskedTerrain: TileId[][] | null = null
   const fitSky = (terrain: TileId[][]): void => {
     maskedTerrain = terrain
@@ -83,11 +106,19 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       s.width = b.maxX - b.minX
       s.height = b.maxY - b.minY
     }
+    // Square on the diagonal, so no angle of the sun uncovers a corner of the ground.
+    const c = boundsCentre(b)
+    sun.position.set(c.sx, c.sy)
+    const d = Math.hypot(b.maxX - b.minX, b.maxY - b.minY)
+    sun.width = d
+    sun.height = d
   }
 
   const filter = new ColorMatrixFilter()
+  let sunOn = true
   let filtered = false
   let gradedKind: string | null = null
+  let transmit = 1
 
   let fromTint = -1,
     toTint = -1,
@@ -112,14 +143,12 @@ export function createAtmosphere(scene: Scene): Atmosphere {
       quad.tint = crossTint(fromTint, toTint, progress('ambient', crossStartedMs, nowMs))
 
       if (state.terrain !== maskedTerrain) fitSky(state.terrain)
-      sky.tint = quad.tint
-      sky.alpha = skyAlpha(skyLevel(minute))
-      moon.alpha = MOON_MAX_ALPHA * moonAltitude(minute)
 
       // The matrix is a pure function of the kind, and assigning it re-uploads the filter's
       // uniforms — so it is written when the weather turns, not on every frame of it.
       if (state.weather.kind !== gradedKind) {
         gradedKind = state.weather.kind
+        transmit = weatherTransmit(gradedKind)
         const m = gradingMatrix(gradedKind)
         if (m !== null) {
           filter.matrix = Array.from(m) as ColorMatrixFilter['matrix']
@@ -132,12 +161,34 @@ export function createAtmosphere(scene: Scene): Atmosphere {
           filtered = false
         }
       }
+
+      // The grade multiplies the GROUND by the cloud deck and every light here sits outside it,
+      // so the deck comes off the sky's own light by hand or a storm at midnight burns clear.
+      sky.tint = quad.tint
+      sky.alpha = skyAlpha(skyLevel(minute)) * transmit
+      moon.alpha = MOON_MAX_ALPHA * moonAltitude(minute) * transmit
+      moon.visible = moon.alpha > 0
+
+      const sunAt = sunLight(minute)
+      sun.alpha = sunAlpha(sunAt) * transmit
+      sun.visible = sunOn && sun.alpha > 0
+      if (sun.visible) {
+        sun.tint = sunTint(minute)
+        // the ramp is bright along its own -y, so this turns that edge onto the sun
+        sun.rotation = Math.atan2(sunAt.x, sunAt.elevation)
+      }
+    },
+    setSun(on) {
+      sunOn = on
+      if (!on) sun.visible = false
     },
     destroy() {
       quad.destroy()
       skyMask.destroy()
+      sun.destroy()
       moon.destroy()
       sky.destroy(true)
+      plane.destroy()
     },
   }
 }

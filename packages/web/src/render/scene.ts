@@ -11,10 +11,14 @@ import {
   ZOOM_STOPS,
   type ZoomStop,
 } from './camera.js'
+import { createAttention } from './attention.js'
+import { createBloom } from './bloom.js'
 import { createCameraRig } from './cameraRig.js'
 import { createGroundBaker } from './groundBake.js'
+import { applyRungs, FRAME_TARGET_MS, type Rungs, weigh } from './postBudget.js'
 import { feetOf } from './iso.js'
 import { groundArtSignature } from './groundField.js'
+import type { Atmosphere } from './atmosphere.js'
 import type { BubbleLayer } from './bubbles.js'
 import type { InteriorScene } from './interiorScene.js'
 import {
@@ -148,6 +152,9 @@ export type Scene = {
    *  setting into a Pixi handle React never re-renders. Narrowed to the one method: the rest of
    *  the layer is the ambient director's. */
   bubbles?: Pick<BubbleLayer, 'setThoughts'>
+  /** the sky's own handle, wired by StageMount: the post chain's last rung sheds the sun term
+   *  and nothing else in the renderer can reach it */
+  atmosphere?: Pick<Atmosphere, 'setSun'>
   destroy(): void
 }
 
@@ -184,7 +191,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const world = new Container()
   // One table decides what is over what (layers.ts). Every layer but `entities` is event-inert,
   // so a label can never steal a click from the building it names.
-  const { layers, graded } = createLayers(world)
+  const { layers, graded, attention } = createLayers(world)
 
   // The ground is a grid of chunk sprites now, not one sprite the size of the map. `layers.ground`
   // is their only parent, so nothing else in the scene had to learn that the bake was cut up.
@@ -367,6 +374,9 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
       app.ticker.remove(bakeTick)
       app.ticker.remove(mirrorLights)
       app.ticker.remove(ringTick)
+      app.ticker.remove(postTick)
+      attend.destroy()
+      bloom.destroy()
       tension.destroy()
       scene.ring.destroy()
       tags.destroy()
@@ -381,5 +391,42 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     tension.tick(nowMs)
   }
   app.ticker.add(ringTick)
+
+  // THE POST CHAIN, and the budget that governs it. Both passes run before the frame is drawn:
+  // the bloom captures the lights it is about, and the band is written for this camera.
+  const bloom = createBloom(scene, store)
+  const attend = createAttention(scene, attention)
+  let frameMs = FRAME_TARGET_MS
+  let chain: Rungs = { rung: 0, calm: 0 }
+  let weighedMs = -Infinity
+  const postTick = (): void => {
+    // One late frame is a hiccup and a run of them is a machine that cannot afford the chain,
+    // so the rung is weighed against a smoothed frame and at most once a second.
+    frameMs += (app.ticker.deltaMS - frameMs) * 0.05
+    const nowMs = app.ticker.lastTime
+    if (nowMs - weighedMs >= 1000) {
+      weighedMs = nowMs
+      const was = chain.rung
+      chain = weigh(chain, frameMs)
+      if (chain.rung !== was)
+        applyRungs(chain.rung, {
+          attention: (v) => {
+            attend.setEnabled(v)
+          },
+          bloomRadius: (v) => {
+            bloom.setRadius(v)
+          },
+          bloom: (v) => {
+            bloom.setEnabled(v)
+          },
+          sun: (v) => {
+            scene.atmosphere?.setSun(v)
+          },
+        })
+    }
+    attend.tick()
+    bloom.tick()
+  }
+  app.ticker.add(postTick)
   return scene
 }

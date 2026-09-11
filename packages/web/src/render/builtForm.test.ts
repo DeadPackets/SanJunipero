@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { INTERIOR_KINDS } from '@sj/shared'
+import { INTERIOR_KINDS, MINUTES_PER_DAY } from '@sj/shared'
+import { GROUND_SHADOW_INK } from './groundShadow.js'
 import { TILE_H, TILE_W } from './iso.js'
 import {
   BUILT_FORM_ACCENTS,
@@ -176,12 +177,15 @@ describe('drawBuiltForm', () => {
     stroke: (s) => log.push({ op: 'stroke', arg: s }),
   })
 
-  it('clears first, fills plinth → faces → accent, then rims the silhouette', () => {
+  // The ring joined this list when the forms stopped floating: a volume is painted into its own
+  // dark, so the ground fill comes before the plinth and never after it.
+  it('clears first, fills ground → plinth → faces → accent, then rims the silhouette', () => {
     const log: Op[] = []
     const form = builtFormSpec('well', 1, 1)
     drawBuiltForm(painter(log), form)
     expect(log[0]!.op).toBe('clear')
     expect(log.filter((o) => o.op === 'fill').map((o) => o.arg)).toEqual([
+      { color: GROUND_SHADOW_INK, alpha: form.ao.alpha },
       form.plinth.color,
       ...form.faces.map((f) => f.color),
       form.accent.color,
@@ -191,6 +195,30 @@ describe('drawBuiltForm', () => {
     expect(log.filter((o) => o.op === 'stroke')).toHaveLength(3)
     for (const s of log.filter((o) => o.op === 'stroke')) {
       expect((s.arg as { color: number }).color).toBe(BUILT_FORM_INK)
+    }
+  })
+})
+
+describe('a form meets the ground instead of floating over it', () => {
+  it('gives every kind a ring wider than its own plinth, at every footprint', () => {
+    for (const [w, h] of SHAPES) {
+      for (const kind of ALL_KINDS) {
+        const form = builtFormSpec(kind, w, h)
+        const plinth = xsOf(form.plinth.poly)
+        const ao = xsOf(form.ao.poly)
+        expect(Math.max(...ao), `${kind} ${String(w)}x${String(h)}`).toBeGreaterThan(
+          Math.max(...plinth),
+        )
+        expect(form.ao.alpha, kind).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('★ bakes the ring: no tick can move it, because no tick can reach it', () => {
+    const noon = builtFormSpec('house', 2, 2)
+    for (let t = 0; t < MINUTES_PER_DAY; t += 10) {
+      // the argument does not exist to take: occlusion is where two surfaces meet, not an hour
+      expect(builtFormSpec('house', 2, 2).ao, `tick ${String(t)}`).toEqual(noon.ao)
     }
   })
 })

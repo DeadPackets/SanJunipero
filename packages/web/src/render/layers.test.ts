@@ -51,7 +51,7 @@ function sourcesUnder(dir: string): { path: string; source: string }[] {
 describe('createLayers', () => {
   it('adds exactly the eight layers, in the order they paint', () => {
     const world = new MockContainer()
-    const { layers: set, graded } = createLayers(world)
+    const { layers: set, graded, attention } = createLayers(world)
     expect(LAYERS).toEqual([
       'ground',
       'groundDecal',
@@ -64,8 +64,20 @@ describe('createLayers', () => {
     ])
     // the picture layers sit inside `graded`, the word layers beside it: one paint order
     const painted = [...graded.children, ...world.children.slice(1)]
-    expect(world.children[0]).toBe(graded)
+    expect(world.children[0]).toBe(attention)
+    expect(attention.children).toEqual([graded])
     expect(LAYERS.map((n) => set[n])).toEqual(painted)
+  })
+
+  // ★ Two filtered nodes, not one array: `atmosphere.ts` assigns `graded.filters` outright when
+  // the weather turns, so a second pass sharing that array would be wiped by the next storm.
+  // Pixi also hands the screen's own origin only to the OUTER filter, and the band needs it.
+  it('★ wraps the graded picture in a second node for the band, inside the world', () => {
+    const world = new MockContainer()
+    const { graded, attention } = createLayers(world)
+    expect(attention).not.toBe(graded)
+    expect(world.children.indexOf(attention)).toBe(0)
+    expect(attention.children.indexOf(graded)).toBe(0)
   })
 
   it('★ grades the picture and never the words (D5)', () => {
@@ -100,7 +112,7 @@ describe('createLayers', () => {
 
 describe('createScreenLayers — the stack over the world', () => {
   it('paints the flash and the weather under the night quad, and the lights over it', () => {
-    expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'night', 'lights'])
+    expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'night', 'lights', 'bloom'])
     const stage = new MockContainer()
     const set = createScreenLayers(stage)
     expect(SCREEN_LAYERS.map((n) => set[n])).toEqual(stage.children)
@@ -113,6 +125,14 @@ describe('createScreenLayers — the stack over the world', () => {
     expect(at('weather')).toBeLessThan(at('night'))
     expect(at('flash')).toBeLessThan(at('night'))
     expect(at('lights')).toBeGreaterThan(at('night'))
+  })
+
+  // ★ The bloom reads the lights and draws over them. In the same layer it would capture the
+  // glow it made last frame and run away inside three seconds.
+  it('★ paints the bloom over the lights it was made from, never among them', () => {
+    const at = (n: string): number => (SCREEN_LAYERS as readonly string[]).indexOf(n)
+    expect(at('bloom')).toBe(SCREEN_LAYERS.length - 1)
+    expect(at('bloom')).toBeGreaterThan(at('lights'))
   })
 
   it('is event-inert throughout: a full-screen quad that took a click would end panning', () => {

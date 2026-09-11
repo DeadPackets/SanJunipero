@@ -8,8 +8,10 @@ import {
   GOLDEN_ELEVATION,
   SHADOW_MAX_STRETCH,
   SHADOW_REST,
+  SUN_DOWN,
   moonAltitude,
   shadowCast,
+  sunLight,
   skyKind,
   skyToken,
   skyWord,
@@ -151,5 +153,50 @@ describe('★ golden hour: a low sun throws a long shadow', () => {
   it("the golden band is a fraction of the sun's own height, not an hour of its own", () => {
     expect(GOLDEN_ELEVATION).toBeGreaterThan(0)
     expect(GOLDEN_ELEVATION).toBeLessThan(1)
+  })
+})
+
+// ── ★ ONE SUN, READ BY THE SHADOWS AND BY THE LIGHT ──────────────────────────────────────
+
+describe('★ sunLight — where the sun is, for everything that has to agree about it', () => {
+  it('★ is nothing at all every hour the sun is down', () => {
+    for (const h of [21, 22, 0, 3]) expect(sunLight(at(h)), `${h}:00`).toEqual(SUN_DOWN)
+    expect(sunLight(at(4, 59))).toEqual(SUN_DOWN)
+  })
+
+  it('★ runs from one horizon to the other and is overhead in the middle', () => {
+    expect(sunLight(SUN_UP_MIN).x).toBeCloseTo(-1, 6)
+    expect(sunLight(SUN_UP_MIN).elevation).toBeCloseTo(0, 6)
+    const noon = (SUN_UP_MIN + SUN_DOWN_MIN) / 2
+    expect(sunLight(noon).x).toBeCloseTo(0, 6)
+    expect(sunLight(noon).elevation).toBeCloseTo(1, 6)
+    expect(sunLight(SUN_DOWN_MIN - 1).x).toBeGreaterThan(0.99)
+  })
+
+  it('★ opens the golden band under GOLDEN_ELEVATION and shuts it on the horizon', () => {
+    const noon = (SUN_UP_MIN + SUN_DOWN_MIN) / 2
+    expect(sunLight(noon).golden).toBe(0)
+    expect(sunLight(SUN_UP_MIN).golden).toBeCloseTo(0, 6)
+    let best = { m: -1, golden: 0 }
+    for (let m = SUN_UP_MIN; m < SUN_DOWN_MIN; m++) {
+      const s = sunLight(m)
+      if (s.golden > best.golden) best = { m, golden: s.golden }
+      if (s.golden > 0) expect(s.elevation, `minute ${m}`).toBeLessThan(GOLDEN_ELEVATION)
+    }
+    expect(best.golden).toBeGreaterThan(0.99)
+    expect(sunLight(best.m).elevation).toBeCloseTo(GOLDEN_ELEVATION / 2, 2)
+  })
+
+  it('★ is the SAME sun the shadows are cast by: a shadow points away from it', () => {
+    for (let m = 0; m < MINUTES_PER_DAY; m++) {
+      const { x, golden } = sunLight(m)
+      const cast = shadowCast(m)
+      if (golden <= 0) {
+        expect(cast, `minute ${m}`).toEqual(SHADOW_REST)
+        continue
+      }
+      expect(Math.sign(cast.dx), `minute ${m}`).toBe(-Math.sign(x))
+      expect(cast.scaleX, `minute ${m}`).toBeCloseTo(1 + (SHADOW_MAX_STRETCH - 1) * golden, 12)
+    }
   })
 })

@@ -23,10 +23,17 @@ export const SORTED_LAYER: LayerName = 'entities'
 export const GRADED_LAYERS: readonly LayerName[] = LAYERS.slice(0, LAYERS.indexOf('worldText'))
 
 /** Only `entities` sorts; every other layer is event-inert, so a decoration can never take a
- *  click from the world beneath it. The graded layers share the one node the filter goes on. */
-export function createLayers(world: Container): { layers: LayerSet; graded: Container } {
+ *  click from the world beneath it. The graded layers share the one node the filter goes on,
+ *  and `attention` wraps it: the outer filter is the only one pixi hands the screen origin to. */
+export function createLayers(world: Container): {
+  layers: LayerSet
+  graded: Container
+  attention: Container
+} {
+  const attention = new Container()
   const graded = new Container()
-  world.addChild(graded)
+  world.addChild(attention)
+  attention.addChild(graded)
   const out = {} as Record<LayerName, Container>
   for (const name of LAYERS) {
     const c = new Container()
@@ -35,7 +42,7 @@ export function createLayers(world: Container): { layers: LayerSet; graded: Cont
     ;(GRADED_LAYERS.includes(name) ? graded : world).addChild(c)
     out[name] = c
   }
-  return { layers: out, graded }
+  return { layers: out, graded, attention }
 }
 
 /** In paint order over `world`. `lights` mirrors the world's transform and is the ONLY place
@@ -45,6 +52,7 @@ export const SCREEN_LAYERS = [
   'weather', // rain, snow: screen-space particles, under the quad so the night reaches them
   'night', // the deep-blue multiply quad
   'lights', // pools, blooms, window glow, fire, the sky gradient — additive, world transform
+  'bloom', // the lights again, thresholded and blurred, screened back over the whole frame
 ] as const
 type ScreenLayerName = (typeof SCREEN_LAYERS)[number]
 export type ScreenLayerSet = Readonly<Record<ScreenLayerName, Container>>

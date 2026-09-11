@@ -13,6 +13,7 @@ import { phaseOf } from './charAnim.js'
 import { crownOffsetPx, windNow } from './wind.js'
 import { isGrave, toneReducer } from './tone.js'
 import { CUE_TYPES, bodiesOf } from '../ui/stageCue.js'
+import { beatFor, beatScale, type BeatName } from './beats.js'
 
 // the smoke itself is smoke.ts's; these two are the material it is drawn in
 export const SMOKE_MAX_ALPHA = 0.42
@@ -29,8 +30,6 @@ export const HEARTH_KINDS: ReadonlySet<string> = new Set([
 export const SHIMMER_MAX = 60
 const SHIMMER_HZ = 0.5
 export const TREES_MAX = 80
-const BOUNCE_MS = 260
-const BOUNCE_SCALE = 1.18
 const SQUASH_Y = 0.92
 const SQUASH_HZ = 0.3
 const SQUASH_VERBS = ['build', 'till', 'harvest', 'fish'] as const
@@ -177,24 +176,26 @@ export function createAmbient(
   const offEvents = store.onEvents((evts) => {
     tone = toneReducer(tone, evts, store.getTick())
     for (const ev of evts) {
-      if (ev.type === 'structure_completed' || ev.type === 'item_spawned') {
+      const beat = beatFor(ev.type)
+      if (beat !== null && (ev.type === 'structure_completed' || ev.type === 'item_spawned')) {
         const p = ev.payload as { id: string }
         bounces.push({
           kind: ev.type === 'structure_completed' ? 'structure' : 'item',
           id: p.id,
           at: t,
+          beat,
         })
       }
-      // ★ The same bounce a finished building takes, on whoever a moment happened to: the cue
-      // slot names it and the two bodies say it was them.
-      if (CUE_TYPES.includes(ev.type)) {
-        for (const id of bodiesOf(ev)) bodyBounces.push({ id, at: t })
+      // ★ The moment's OWN beat, on whoever it happened to: the cue slot names it, the two
+      // bodies say it was them, and the table says how hard it lands.
+      if (beat !== null && CUE_TYPES.includes(ev.type)) {
+        for (const id of bodiesOf(ev)) bodyBounces.push({ id, at: t, beat })
       }
     }
   })
 
-  const bounces: { kind: 'structure' | 'item'; id: string; at: number }[] = []
-  const bodyBounces: { id: string; at: number }[] = []
+  const bounces: { kind: 'structure' | 'item'; id: string; at: number; beat: BeatName }[] = []
+  const bodyBounces: { id: string; at: number; beat: BeatName }[] = []
   let fxState: WorldState | null = null
   const working: string[] = [] // the bodies a work verb is squashing, refreshed with the world
 
@@ -266,8 +267,8 @@ export function createAmbient(
   let nextBirdIn = (BIRD_MIN_S + Math.random() * (BIRD_MAX_S - BIRD_MIN_S)) * 1000
   const BIRD_FLIGHT_MS = 10_000
 
-  // The director clock stops under the grave tone, so a bounce in flight stops with it and the
-  // body it is on holds at 1.18x until the tone lifts. The flip lands them all at rest instead.
+  // The director clock stops under the grave tone, so a beat in flight stops with it and the
+  // body it is on holds off its rest scale until the tone lifts. The flip lands them all at rest.
   const settleBounces = (): void => {
     for (const b of bounces) setEntityScaleMul(scene, b.kind, b.id, 1)
     for (const b of bodyBounces) layers.chars?.setScaleMulY(b.id, 1)
@@ -306,14 +307,11 @@ export function createAmbient(
     const w = still ? 0 : windNow()
     for (const tr of trees) tr.crown.position.x = tr.trunk.x + crownOffsetPx(w, tr.phase)
 
-    // placement bounce: 1.0 → 1.18 → 1.0 over 260ms
     for (let i = bounces.length - 1; i >= 0; i--) {
       const b = bounces[i]!
-      const p = (t - b.at) / BOUNCE_MS
-      const done = still || p >= 1 || p < 0
-      const k = done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p)
-      const subject = setEntityScaleMul(scene, b.kind, b.id, k)
-      if (done || !subject) bounces.splice(i, 1)
+      const k = still ? null : beatScale(b.beat, t - b.at)
+      const subject = setEntityScaleMul(scene, b.kind, b.id, k ?? 1)
+      if (k === null || !subject) bounces.splice(i, 1)
     }
 
     if (!grave && !still && layers.chars !== undefined) {
@@ -324,10 +322,9 @@ export function createAmbient(
     // After the work squash, so a moment lands on a working body too: the news outranks the job.
     for (let i = bodyBounces.length - 1; i >= 0; i--) {
       const b = bodyBounces[i]!
-      const p = (t - b.at) / BOUNCE_MS
-      const done = still || p >= 1 || p < 0
-      layers.chars?.setScaleMulY(b.id, done ? 1 : 1 + (BOUNCE_SCALE - 1) * Math.sin(Math.PI * p))
-      if (done) bodyBounces.splice(i, 1)
+      const k = still ? null : beatScale(b.beat, t - b.at)
+      layers.chars?.setScaleMulY(b.id, k ?? 1)
+      if (k === null) bodyBounces.splice(i, 1)
     }
 
     if (!grave && !still) {

@@ -2,7 +2,8 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**'] },
+  // perf/ is a standalone benchmark harness run by hand, outside every package's tsconfig.
+  { ignores: ['**/dist/**', 'perf/**'] },
   tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
   {

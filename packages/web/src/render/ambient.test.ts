@@ -55,6 +55,15 @@ vi.mock('pixi.js', () => {
   }
   return { Container, Graphics, Point, Sprite, Texture: { EMPTY: {} } }
 })
+// the town's structures live in a module-level map a mocked Pixi never fills, so the one call
+// the bounce loop makes on them is recorded here instead
+const entityCalls: { kind: string; id: string; k: number }[] = []
+vi.mock('./entities.js', () => ({
+  setEntityScaleMul: (_s: unknown, kind: string, id: string, k: number) => {
+    entityCalls.push({ kind, id, k })
+    return true
+  },
+}))
 import { Container as MockContainer } from 'pixi.js'
 import { CITY_HEARTH_KIND, cityStructures } from '@sj/shared'
 import type { SimEvent } from '@sj/shared'
@@ -283,5 +292,112 @@ describe('★ a bounce cannot be frozen mid-flight', () => {
     expect(lastFor('yusuf')).toBe(1)
     tick(16)
     expect(lastFor('amara'), 'and nothing holds it at a scale after that').toBe(1)
+  })
+})
+
+// ★ A BIRTH, A DEATH AND A DROPPED PLANK WERE ONE 260 ms 1.18x POP. The picture could not say
+// that anything mattered, so the table gives each class of moment its own size and its own run.
+describe('★ the picture says how much a moment mattered', () => {
+  const rig = (): {
+    emit: (evts: SimEvent[]) => void
+    run: (ms: number) => void
+    peakFor: (id: string) => number
+    framesFor: (id: string) => number
+    entity: (id: string) => number[]
+  } => {
+    entityCalls.length = 0
+    const handlers = new Set<(evts: SimEvent[]) => void>()
+    const scene = {
+      app: { renderer: { generateTexture: () => ({ destroy: () => {} }) } },
+      layers: { groundDecal: new MockContainer(), overhead: new MockContainer() },
+      wantsMotion: () => true,
+      reachableBox: () => ({ minX: 0, minY: 0, maxX: 100, maxY: 100 }),
+    } as unknown as Scene
+    const store = {
+      getState: () => ({ terrain: [[1, 1]], agents: {} }),
+      getTick: () => 0,
+      onEvents: (fn: (evts: SimEvent[]) => void) => {
+        handlers.add(fn)
+        return () => handlers.delete(fn)
+      },
+    } as unknown as WorldStore
+    const calls: { id: string; k: number }[] = []
+    const dir = createAmbient(scene, store, {
+      weather: { setSuppressed: () => {} },
+      bubbles: { setSuppressed: () => {} },
+      chars: {
+        setEmotesHidden: () => {},
+        setScaleMulY: (id: string, k: number) => calls.push({ id, k }),
+      },
+    } as unknown as Parameters<typeof createAmbient>[2])
+    dir.tick(16)
+    return {
+      emit: (evts) => {
+        for (const fn of handlers) fn(evts)
+      },
+      run: (ms) => {
+        for (let i = 0; i < ms / 16; i++) dir.tick(16)
+      },
+      peakFor: (id) => Math.max(...calls.filter((c) => c.id === id).map((c) => c.k)),
+      framesFor: (id) => calls.filter((c) => c.id === id && c.k !== 1).length,
+      entity: (id) => entityCalls.filter((c) => c.id === id).map((c) => c.k),
+    }
+  }
+
+  const BIRTH = {
+    type: 'agent_born',
+    tick: 4,
+    payload: { id: 'ife', name: 'Ife', sex: 'f', motherId: 'amara', fatherId: 'yusuf', x: 3, y: 4 },
+  } as unknown as SimEvent
+  const PARTING = {
+    type: 'partnership_dissolved',
+    tick: 4,
+    payload: { aId: 'amara', bId: 'yusuf', byId: 'amara' },
+  } as unknown as SimEvent
+  const RULE_BROKEN = {
+    type: 'law_broken',
+    tick: 4,
+    payload: { id: 'law_1', byId: 'omar' },
+  } as unknown as SimEvent
+
+  it('★ draws a birth bigger and longer than a parting, and a parting than a broken rule', () => {
+    const r = rig()
+    r.emit([BIRTH, PARTING, RULE_BROKEN])
+    r.run(1200)
+    expect(r.peakFor('ife')).toBeGreaterThan(r.peakFor('yusuf'))
+    expect(r.peakFor('yusuf')).toBeGreaterThan(r.peakFor('omar'))
+    expect(r.framesFor('ife')).toBeGreaterThan(r.framesFor('yusuf'))
+    expect(r.framesFor('yusuf')).toBeGreaterThan(r.framesFor('omar'))
+    // the birth is the one a viewer across the room can see
+    expect(r.peakFor('ife') - r.peakFor('omar')).toBeGreaterThan(0.15)
+  })
+
+  it('★ never draws a beat on a death: the stillness the tone calls is the whole picture', () => {
+    const r = rig()
+    r.emit([{ type: 'agent_died', tick: 4, payload: { agentId: 'nadia' } } as unknown as SimEvent])
+    r.run(1200)
+    // `characters.ts` takes a body off the map the tick it stops being alive, so a knell here
+    // would be a beautiful curve nobody is ever shown.
+    expect(r.framesFor('nadia')).toBe(0)
+  })
+
+  it('★ lands a finished house under its own weight and barely moves a dropped plank', () => {
+    const r = rig()
+    r.emit([
+      { type: 'structure_completed', tick: 4, payload: { id: 'house_2' } } as unknown as SimEvent,
+      {
+        type: 'item_spawned',
+        tick: 4,
+        payload: { id: 'item_9', kind: 'wood', qty: 1, loc: { t: 'agent', id: 'omar' } },
+      } as unknown as SimEvent,
+    ])
+    r.run(1200)
+    const house = r.entity('house_2')
+    const plank = r.entity('item_9')
+    expect(house[0]).toBeGreaterThan(1)
+    expect(Math.min(...house), 'a raised roof settles onto its plot').toBeLessThan(1)
+    expect(Math.min(...plank), 'a plank has no weight to land with').toBe(1)
+    expect(Math.max(...house)).toBeGreaterThan(Math.max(...plank))
+    expect(house.length, 'and it is on screen longer').toBeGreaterThan(plank.length)
   })
 })

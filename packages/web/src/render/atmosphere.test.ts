@@ -22,8 +22,10 @@ vi.mock('pixi.js', () => {
     eventMode = ''
     blendMode = ''
     autoGarbageCollect = true
+    rotation = 0
     position = new Point()
     scale = new Point()
+    anchor = new Point()
     addChild(...cs: Container[]): void {
       this.children.push(...cs)
     }
@@ -63,11 +65,14 @@ import {
   MOON_COLOR,
   MOON_MAX_ALPHA,
   SKY_MAX_ALPHA,
+  SUN_ALPHA,
+  SUN_GOLDEN_ALPHA,
   createAtmosphere,
   skyAlpha,
+  sunAlpha,
 } from './atmosphere.js'
-import { moonAltitude } from '../ui/skyModel.js'
-import { clockTint } from './tints.js'
+import { SUN_DOWN_MIN, SUN_UP_MIN, moonAltitude, shadowCast, sunLight } from '../ui/skyModel.js'
+import { clockTint, sunTint, weatherTransmit } from './tints.js'
 
 describe('the sky gradient (U4)', () => {
   it('peaks at dawn and dusk and sits at a third of that at noon and midnight', () => {
@@ -82,6 +87,8 @@ type Node = {
   children: Node[]
   tint: number
   alpha: number
+  visible: boolean
+  rotation: number
   blendMode: string
   mask: unknown
   filters: unknown[]
@@ -97,6 +104,8 @@ const drive = (): {
     children: [],
     tint: 0,
     alpha: 1,
+    visible: true,
+    rotation: 0,
     blendMode: '',
     mask: null,
     filters: [],
@@ -134,9 +143,9 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     const { night, lights } = drive()
     expect(night.children).toHaveLength(1)
     expect(night.children[0]!.blendMode).toBe('multiply')
-    const sky = lights.children.find((c) => c.blendMode === 'screen')
-    expect(sky).toBeDefined()
-    expect(sky!.mask).not.toBeNull() // masked to the ground's outline — no hard edge on the void
+    expect(rampsOf(lights)[0]!.blendMode).toBe('screen')
+    // masked to the ground's outline — no hard edge on the void
+    expect(planeOf(lights).mask).not.toBeNull()
   })
 
   it('★ grades `scene.graded` and never the world: speech stays out of the weather', () => {
@@ -171,7 +180,7 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
     atm.update(state(240, 'sunny'))
     const quad = night.children[0]!
     expect(quad.tint).toBe(clockTint(240))
-    const sky = lights.children.find((c) => c.blendMode === 'screen')!
+    const sky = rampsOf(lights)[0]!
     expect(sky.tint).toBe(quad.tint)
     expect(sky.alpha).toBeCloseTo(skyAlpha(0), 6)
   })
@@ -179,16 +188,23 @@ describe('where the atmosphere draws (D1, D5, D27)', () => {
 
 // ── ★ THE MOON ON THE ARC LIGHTS THE ROOFS UNDER IT (task 18) ────────────────────────────
 
-describe('★ the moon', () => {
-  const moonOf = (lights: Node): Node =>
-    lights.children.filter((c) => c.blendMode === 'screen').at(-1)!
+// The three ramps now sit inside ONE masked group, in paint order: the sky, the moon, the sun.
+// They are named by that order rather than by `.at(-1)`, which used to mean the moon.
+const planeOf = (lights: Node): Node => lights.children.find((c) => c.children.length > 0)!
+const rampsOf = (lights: Node): Node[] =>
+  planeOf(lights).children.filter((c) => c.blendMode === 'screen')
+const moonOf = (lights: Node): Node => rampsOf(lights)[1]!
+const sunOf = (lights: Node): Node => rampsOf(lights)[2]!
 
+describe('★ the moon', () => {
   it('★ is a second screened ramp in `lights`, over the same masked ground', () => {
     const { lights } = drive()
-    const screened = lights.children.filter((c) => c.blendMode === 'screen')
-    expect(screened).toHaveLength(2)
-    expect(moonOf(lights).mask).not.toBeNull()
+    expect(rampsOf(lights)).toHaveLength(3)
     expect(moonOf(lights).tint).toBe(MOON_COLOR)
+    // ★ ONE mask for the group, not one per ramp: three masked siblings measured 11 draw calls
+    // a frame on the bench and the masked group measures 5.
+    expect(planeOf(lights).mask).not.toBeNull()
+    for (const r of rampsOf(lights)) expect(r.mask).toBeNull()
   })
 
   it('★ is dark all day and rides its own altitude at night', () => {
@@ -208,5 +224,108 @@ describe('★ the moon', () => {
       expect(moonOf(lights).alpha, `minute ${m}`).toBeLessThanOrEqual(MOON_MAX_ALPHA)
     }
     expect(MOON_MAX_ALPHA).toBeLessThanOrEqual(0.2)
+  })
+})
+
+// ── ★ THE SUN, ADDED INTO THE HIGHLIGHTS ─────────────────────────────────────────────────
+
+describe('★ the sun', () => {
+  it('★ is a third screened ramp on the same mask, warm from `SUN_STOPS`', () => {
+    const { atm, lights, state } = drive()
+    atm.update(state(780, 'sunny'))
+    const sun = sunOf(lights)
+    expect(sun.tint).toBe(sunTint(780))
+    expect((sun.tint >> 16) & 0xff).toBeGreaterThan(sun.tint & 0xff) // warm: red over blue
+  })
+
+  it('★ is not drawn at all between the sun going down and coming up again', () => {
+    const { atm, lights, state } = drive()
+    for (const m of [SUN_DOWN_MIN, 1350, 0, 120, SUN_UP_MIN - 1]) {
+      atm.update(state(m, 'sunny'))
+      expect(sunOf(lights).visible, `minute ${m}`).toBe(false)
+      expect(sunOf(lights).alpha, `minute ${m}`).toBe(0)
+    }
+  })
+
+  it('★ turns its bright edge onto the sun, and away from the shadow the same minute casts', () => {
+    const { atm, lights, state } = drive()
+    const noon = (SUN_UP_MIN + SUN_DOWN_MIN) / 2
+    atm.update(state(noon, 'sunny'))
+    expect(sunOf(lights).rotation).toBeCloseTo(0, 6) // overhead: the ramp stands up
+
+    for (const m of [SUN_UP_MIN + 60, noon - 120, noon + 120, SUN_DOWN_MIN - 60]) {
+      atm.update(state(m, 'sunny'))
+      const turn = sunOf(lights).rotation
+      expect(Math.sign(turn), `minute ${m}`).toBe(Math.sign(sunLight(m).x))
+      const cast = shadowCast(m)
+      if (cast.dx !== 0) expect(Math.sign(cast.dx), `minute ${m}`).toBe(-Math.sign(turn))
+    }
+  })
+
+  it('★ goes when the post chain sheds its last rung, and the sky and the moon stay', () => {
+    const { atm, lights, state } = drive()
+    atm.update(state(780, 'sunny'))
+    const lit = { sun: sunOf(lights).alpha, sky: rampsOf(lights)[0]!.alpha }
+    expect(lit.sun).toBeGreaterThan(0)
+
+    atm.setSun(false)
+    expect(sunOf(lights).visible).toBe(false)
+    atm.update(state(780, 'sunny'))
+    expect(sunOf(lights).visible).toBe(false)
+    expect(rampsOf(lights)[0]!.alpha).toBe(lit.sky)
+
+    atm.setSun(true)
+    atm.update(state(780, 'sunny'))
+    expect(sunOf(lights).visible).toBe(true)
+    expect(sunOf(lights).alpha).toBe(lit.sun)
+  })
+
+  it('★ never outshines the sky it hangs in, and the golden band is its loudest hour', () => {
+    const { atm, lights, state } = drive()
+    let loudest = 0
+    let loudestMin = -1
+    for (let m = 0; m < 1440; m++) {
+      atm.update(state(m, 'sunny'))
+      const a = sunOf(lights).alpha
+      expect(a, `minute ${m}`).toBeLessThanOrEqual(SKY_MAX_ALPHA)
+      if (a > loudest) {
+        loudest = a
+        loudestMin = m
+      }
+    }
+    expect(sunAlpha(sunLight(loudestMin)).toFixed(6)).toBe(loudest.toFixed(6))
+    expect(sunLight(loudestMin).golden).toBeGreaterThan(0.9) // the loudest minute is a golden one
+    expect(loudest).toBeGreaterThan(SUN_ALPHA) // and it is louder than the sun overhead
+    expect(SUN_GOLDEN_ALPHA).toBeGreaterThan(0)
+  })
+})
+
+// ── ★ THE WEATHER REACHES THE SKY'S OWN LIGHT ────────────────────────────────────────────
+
+describe('★ a cloud deck dims the sky, not only the ground', () => {
+  it('★ takes the same transmittance off the moon, the ramp and the sun that it takes off the ground', () => {
+    const { atm, lights, state } = drive()
+    const read = (): number[] => [
+      rampsOf(lights)[0]!.alpha,
+      moonOf(lights).alpha,
+      sunOf(lights).alpha,
+    ]
+    atm.update(state(300, 'sunny'))
+    const clear = read()
+    atm.update(state(300, 'storm'))
+    const under = read()
+    const t = weatherTransmit('storm')
+    expect(t).toBeLessThan(1)
+    for (let i = 0; i < clear.length; i++)
+      expect(under[i]!, `light ${i}`).toBeCloseTo(clear[i]! * t, 9)
+  })
+
+  it('★ is dimmest under the deck that takes most off the ground', () => {
+    expect(weatherTransmit('sunny')).toBe(1)
+    expect(weatherTransmit('nothing the town has a word for')).toBe(1)
+    expect(weatherTransmit('storm')).toBeLessThan(weatherTransmit('rain'))
+    expect(weatherTransmit('rain')).toBeLessThan(weatherTransmit('snow'))
+    expect(weatherTransmit('snow')).toBeLessThan(weatherTransmit('cloudy'))
+    expect(weatherTransmit('cloudy')).toBeLessThan(1)
   })
 })

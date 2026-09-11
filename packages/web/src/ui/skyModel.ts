@@ -47,22 +47,34 @@ const SHADOW_REACH_PX = 13
 /** A shadow drawn thin loses its edge: the longest one is this much of the noon blob's ink. */
 const SHADOW_MIN_ALPHA = 0.62
 
-export function shadowCast(tick: number): ShadowCast {
+/** ★ Where the sun IS: `x` is its screen direction, -1 at its rise and +1 at its set. The
+ *  shadows and the warm light over them both read this, so the two cannot point different ways. */
+export type SunLight = { x: number; elevation: number; golden: number }
+
+/** Every hour of the night: no sun, no direction, nothing added. */
+export const SUN_DOWN: SunLight = { x: 0, elevation: 0, golden: 0 }
+
+export function sunLight(tick: number): SunLight {
   const t = skyToken(tick)
-  if (t.kind !== 'sun') return SHADOW_REST
+  if (t.kind !== 'sun') return SUN_DOWN
   const elevation = Math.sin(Math.PI * t.along)
-  // A hump, not a ramp: the shadow draws out through the golden band and is back under the
-  // feet as the sun touches the horizon, so nothing snaps at the minute the light goes.
+  // A hump, not a ramp: the band opens as the sun drops through GOLDEN_ELEVATION and is shut
+  // again as it touches the horizon, so nothing snaps at the minute the light goes.
   const u = Math.max(0, (GOLDEN_ELEVATION - elevation) / GOLDEN_ELEVATION)
-  const low = Math.sin(Math.PI * u)
-  if (low <= 0) return SHADOW_REST
-  const stretch = 1 + (SHADOW_MAX_STRETCH - 1) * low
+  return { x: -Math.cos(Math.PI * t.along), elevation, golden: Math.sin(Math.PI * u) }
+}
+
+export function shadowCast(tick: number): ShadowCast {
+  const { x, golden } = sunLight(tick)
+  if (golden <= 0) return SHADOW_REST
+  const stretch = 1 + (SHADOW_MAX_STRETCH - 1) * golden
   return {
     scaleX: stretch,
     // the ground is 2:1 dimetric, so a shadow lying on it grows a third as fast in y as in x
     scaleY: 1 + (stretch - 1) / 3,
-    dx: Math.cos(Math.PI * t.along) * SHADOW_REACH_PX * low,
-    alpha: 1 - (1 - SHADOW_MIN_ALPHA) * low,
+    // away from the sun, which is what a shadow is
+    dx: -x * SHADOW_REACH_PX * golden,
+    alpha: 1 - (1 - SHADOW_MIN_ALPHA) * golden,
   }
 }
 

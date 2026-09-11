@@ -194,6 +194,7 @@ export function StageMount({
         acts = createActLayer(s, store)
         moments = createMomentEmotes(s, store, book)
         atmosphere = createAtmosphere(s)
+        s.atmosphere = atmosphere
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
         lightPools = createLightPools(s, store)

@@ -1,7 +1,7 @@
 // LUT reuses forge's calibrated atmosphere TINTS — the palette was locked under these.
 
-/** How dark the town is ever allowed to get. The forge's own night was 0.45/0.52 and a roof
- *  under it kept 0.536 of its luma, which is a hole in the picture rather than a night. */
+/** How dark the town is ever allowed to get. NOT a picture decision: the night is a full-screen
+ *  multiply over the words as well, so `AA_RATIO` prices this floor (see tints.test.ts). */
 export const NIGHT_FLOOR: [number, number, number] = [0.5, 0.58, 0.95]
 
 export const CLOCK_STOPS: { minute: number; tint: [number, number, number] }[] = [
@@ -23,14 +23,26 @@ export const WEATHER_DIAG: Readonly<Record<string, [number, number, number]>> = 
   storm: [0.72, 0.84, 1.0],
   snow: [0.9, 0.95, 1.0],
 }
-function clockStops(minuteOfDay: number): [number, number, number] {
-  const m = Math.min(Math.max(minuteOfDay, 0), 1440)
-  let lo = CLOCK_STOPS[0]!,
-    hi = CLOCK_STOPS.at(-1)!
-  for (let i = 0; i < CLOCK_STOPS.length - 1; i++) {
-    if (m >= CLOCK_STOPS[i]!.minute && m <= CLOCK_STOPS[i + 1]!.minute) {
-      lo = CLOCK_STOPS[i]!
-      hi = CLOCK_STOPS[i + 1]!
+/** ★ The colour of the light that ARRIVES: deep at the horizon, pale overhead. The minutes are
+ *  the sun's own arc, so a longer day keeps the same warmth at each end of it. */
+export const SUN_STOPS: { minute: number; tint: [number, number, number] }[] = [
+  { minute: 300, tint: [1.0, 0.55, 0.28] }, // 05:00 first light, deep orange
+  { minute: 420, tint: [1.0, 0.82, 0.58] }, // 07:00
+  { minute: 780, tint: [1.0, 0.97, 0.88] }, // 13:00 overhead, near white
+  { minute: 1140, tint: [1.0, 0.82, 0.58] }, // 19:00
+  { minute: 1260, tint: [1.0, 0.55, 0.28] }, // 21:00 last light
+]
+
+type Stop = { minute: number; tint: [number, number, number] }
+
+function stopsAt(stops: readonly Stop[], minuteOfDay: number): [number, number, number] {
+  const m = Math.min(Math.max(minuteOfDay, stops[0]!.minute), stops.at(-1)!.minute)
+  let lo = stops[0]!,
+    hi = stops.at(-1)!
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (m >= stops[i]!.minute && m <= stops[i + 1]!.minute) {
+      lo = stops[i]!
+      hi = stops[i + 1]!
       break
     }
   }
@@ -39,10 +51,20 @@ function clockStops(minuteOfDay: number): [number, number, number] {
   return [ch(0), ch(1), ch(2)]
 }
 
-export function clockTint(minuteOfDay: number): number {
-  const [r, g, b] = clockStops(minuteOfDay)
+const clockStops = (minuteOfDay: number): [number, number, number] =>
+  stopsAt(CLOCK_STOPS, minuteOfDay)
+
+const pack = ([r, g, b]: [number, number, number]): number => {
   const ch = (v: number): number => Math.round(v * 255)
   return (ch(r) << 16) | (ch(g) << 8) | ch(b)
+}
+
+export function clockTint(minuteOfDay: number): number {
+  return pack(clockStops(minuteOfDay))
+}
+
+export function sunTint(minuteOfDay: number): number {
+  return pack(stopsAt(SUN_STOPS, minuteOfDay))
 }
 
 const relLum = ([r, g, b]: [number, number, number]): number => 0.2126 * r + 0.7152 * g + 0.0722 * b
@@ -75,4 +97,11 @@ function diagMatrix([r, g, b]: [number, number, number]): Float32Array {
 export function gradingMatrix(weatherKind: string): Float32Array | null {
   const diag = WEATHER_DIAG[weatherKind]
   return diag === undefined ? null : diagMatrix(diag) // null: identity, no filter attached
+}
+
+/** ★ How much of the sky's own light gets through this weather. The grade reaches the ground
+ *  and not the lights, so without this a storm at midnight left the moon at clear-sky strength. */
+export function weatherTransmit(weatherKind: string): number {
+  const diag = WEATHER_DIAG[weatherKind]
+  return diag === undefined ? 1 : relLum(diag)
 }
