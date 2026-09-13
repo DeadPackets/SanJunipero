@@ -6,6 +6,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, doorTile, isPassable, type WorldState } from '@sj/engine'
 import { SHOWCASE_CONFIG, devGenesisState, devTerrain } from './devWorld.js'
 import { runFoundersWorld } from './testutil.js'
+import { STREAM_LAMPS } from './serve.js'
 import {
   LAMP_VERGE_REACH,
   foundersFor,
@@ -49,6 +50,24 @@ const litIn = (s: WorldState) =>
   lampsIn(s).filter((l) => l.stage === 'complete' && isFed(l, s.tick))
 
 describe('★ the lamplighter: the showcase town lights its own streets', () => {
+  it('extends default street lighting beyond the first eight posts', () => {
+    const state = runShowcase(STREAM_LAMPS, 4320)
+    expect(lampsIn(state).length).toBeGreaterThan(8)
+    expect(lampsIn(state).length).toBeLessThanOrEqual(STREAM_LAMPS)
+    for (const post of lampsIn(state)) {
+      expect([T_ROAD, T_PATH]).not.toContain(state.terrain[post.y]?.[post.x])
+      expect(
+        Object.values(state.structures).some(
+          (s) =>
+            s.id !== post.id &&
+            post.x >= s.x &&
+            post.x < s.x + s.w &&
+            post.y >= s.y &&
+            post.y < s.y + s.h,
+        ),
+      ).toBe(false)
+    }
+  })
   const lit = runShowcase(LAMPS, 1440)
 
   it('raises lamp posts through the real build verb, up to the count it was asked for', () => {

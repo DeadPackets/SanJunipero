@@ -12,7 +12,7 @@ import { asNumber, intEnv, parseWorldEnv } from './worldEnv.js'
 const STOP_GRACE_MS = 19_000
 
 export const STREAM_PORT = 8080
-export const STREAM_LAMPS = 8
+export const STREAM_LAMPS = 16
 /** Per-mind memory, beside the world db so one volume and one `SJ_FRESH=1` cover both. */
 export const STREAM_MINDS_DIR = 'data/minds'
 /** The chronicle. Inside the minds directory, so `SJ_FRESH=1` throws the town's story away with

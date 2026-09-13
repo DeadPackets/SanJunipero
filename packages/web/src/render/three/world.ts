@@ -220,7 +220,11 @@ export function createThreeWorld(
         const lit = climate.active.has(id)
         const windows = entry.group.userData.windows as MeshStandardMaterial[] | undefined
         for (const material of windows ?? [])
-          material.emissiveIntensity = lit ? 0.45 + (1 - climate.daylight) * 1.8 : 0
+          material.emissiveIntensity = lit
+            ? state.structures[id]?.kind === 'lamp_post'
+              ? 4
+              : 0.45 + (1 - climate.daylight) * 1.8
+            : 0
         if (state.structures[id]?.burning && !entry.group.userData.fire) {
           const fire = new Group()
           entry.group.updateWorldMatrix(true, true)
@@ -249,6 +253,26 @@ export function createThreeWorld(
         if (fire) {
           fire.visible = lit || state.structures[id]?.burning === true
           fire.scale.y = 0.95 + Math.sin(seconds * 8 + entry.group.id) * 0.09
+          fire.children.forEach((part, i) => {
+            if (part.name === 'ember') {
+              const rise = (seconds * 0.45 + i * 0.173) % 1
+              part.position.set(
+                Math.sin(i * 2.4) * 0.18 + rise * 0.12,
+                0.3 + rise * 1.5,
+                Math.cos(i * 2.4) * 0.18,
+              )
+              part.scale.setScalar(1 - rise)
+            } else if (part.name === 'smoke') {
+              const rise = (seconds * 0.15 + i / 6) % 1
+              part.position.set(rise * 0.35, 0.7 + rise * 2.1, rise * 0.14)
+              part.scale.setScalar(0.12 + rise * 0.3)
+              ;((part as Mesh).material as MeshStandardMaterial).opacity =
+                0.07 * Math.sin(rise * Math.PI)
+            } else if (typeof part.userData.flameHeight === 'number') {
+              part.scale.y = part.userData.flameHeight * (1 + Math.sin(seconds * 9 + i) * 0.2)
+              part.position.y = 0.4 + Math.sin(seconds * 7 + i) * 0.045
+            }
+          })
         }
       }
       terrain.tick(seconds, climate.wet, view.wantsMotion())

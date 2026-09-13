@@ -596,6 +596,23 @@ function loadedBook(): TextureBook {
   } as unknown as TextureBook
 }
 
+it('uses demo-sized exterior figures without shrinking the Pixi figures', async () => {
+  for (const spatial of [false, true]) {
+    const scene = makeScene()
+    scene.spatial = spatial
+    const { store } = makeStore({ nadia: makeBodyAgent('nadia', 3, 4) })
+    const state = store.getState()!
+    store.getState = () => ({ ...state, structures: {} })
+    const layer = createCharacterLayer(scene, loadedBook(), store, () => {})
+    layer.tick(1000)
+    await Promise.resolve()
+    await Promise.resolve()
+    layer.tick(1016)
+    expect(layer.getSprite('nadia')!.scale.x * 64).toBeCloseTo(spatial ? 40 : 52)
+    layer.destroy()
+  }
+})
+
 /** Which of the six sheet rows a body is drawn on, read off the slice rectangle. */
 function drawnRow(layer: ReturnType<typeof createCharacterLayer>, id: string): string | null {
   const s = layer.getSprite(id) as unknown as { texture: { frame?: { y: number } } } | null

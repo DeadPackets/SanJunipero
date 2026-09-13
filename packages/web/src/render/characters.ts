@@ -262,6 +262,7 @@ export function createCharacterLayer(
   store: WorldStore,
   onSelect: (agentId: string) => void,
 ): CharacterLayer {
+  const targetPx = scene.spatial ? 40 : CHAR_TARGET_PX
   const entries = new Map<string, CharEntry>()
   const sheets = new Map<string, Sheet>() // agentId → resolved art + loaded texture
   let lastAssetsSeq = store.assetsSeq()
@@ -390,10 +391,10 @@ export function createCharacterLayer(
     }
     const sprite = new Sprite()
     sprite.anchor.set(0.5, FEET_Y / CELL)
-    sprite.scale.set(CHAR_TARGET_PX / 64)
+    sprite.scale.set(targetPx / 64)
     sprite.eventMode = 'static'
     sprite.cursor = 'pointer'
-    const hit = new Polygon(bodyHitPolygon(64, CHAR_TARGET_PX / 64))
+    const hit = new Polygon(bodyHitPolygon(64, targetPx / 64))
     sprite.hitArea = hit
     sprite.on('pointertap', () => {
       onSelect(agentId)
@@ -466,7 +467,7 @@ export function createCharacterLayer(
       ghostSinceMs: now,
     }
     e = e2
-    setHitScale(e, CHAR_TARGET_PX / 64, 64)
+    setHitScale(e, targetPx / 64, 64)
     entries.set(agentId, e)
     const feet = feetOf(x, y)
     loadSheet(agentId, null, feet.sx, feet.sy)
@@ -621,9 +622,15 @@ export function createCharacterLayer(
           }
           e.sprite.texture = cell.texture
           e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
-          e.sprite.scale.set(cell.scale) // smooth downscale to world footprint
+          e.sprite.scale.set((cell.scale * targetPx) / CHAR_TARGET_PX) // smooth downscale to world footprint
           // the row the SHEET had: a sheet with no sleep row draws a standing body
-          setHitScale(e, cell.scale, cell.figureH, e.ranked, cell.row === 'sleep')
+          setHitScale(
+            e,
+            (cell.scale * targetPx) / CHAR_TARGET_PX,
+            cell.figureH,
+            e.ranked,
+            cell.row === 'sleep',
+          )
         }
       }
       standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })
@@ -690,7 +697,7 @@ export function createCharacterLayer(
         e.ghost.visible = p < 1
       }
       const row = emotesHidden ? null : overheadRow(a, nowTick)
-      e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
+      e.overhead.node.position.set(sx, sy - targetPx - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)
       const deciding =
@@ -710,7 +717,7 @@ export function createCharacterLayer(
       if (e.hovered) {
         // The head box is what the plate flips ABOVE into, so it measures what is drawn there:
         // the slot, at its own offset, and nothing that used to be.
-        const head = CHAR_TARGET_PX + SLOT_ABOVE_HEAD_PX + SLOT_PX
+        const head = targetPx + SLOT_ABOVE_HEAD_PX + SLOT_PX
         scene.tags.show(
           'hover',
           hoverPlate(state, 'agent', a.id, a.id === scene.pickedId),

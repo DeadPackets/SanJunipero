@@ -89,7 +89,7 @@ it at all, so the code's own default stands — an empty value is not the same a
 | `SJ_FOUNDERS` | `12` | How many people found the valley. Whole households, so 3, 4, 6, 7 or 12. Read once, at the founding. |
 | `SJ_INTERIORS` | on | `0` keeps people out of doors. |
 | `SJ_MAP` | `showcase` | `scripted` serves the frozen test fixture instead of the product town. |
-| `SJ_LAMPS` | `8` | Street lamps the lamplighter raises. `0` leaves the streets dark. |
+| `SJ_LAMPS` | `16` | Street lamps the lamplighter raises. `0` leaves the streets dark. |
 | `SJ_LIVE` | off | **`1` puts LLM minds behind the bodies and bills a real card, continuously.** |
 | `OPENROUTER_API_KEY` | — | Required by `SJ_LIVE=1`, ignored without it. |
 | `SJ_ARBITER` | on | `0` turns the god layer off inside a live run. |

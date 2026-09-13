@@ -66,16 +66,27 @@ describe('town structure geometry', () => {
     expect(position.z).toBeLessThan(s.y + s.h - 0.4)
   })
 
-  it('keeps solid walls at least .22 tiles inside the footprint', () => {
+  it('fills the occupied plot without putting walls beyond it', () => {
     const s = structure('house')
     const group = buildStructure(s, config)
     group.updateMatrixWorld(true)
     const walls = group.getObjectByName('wall-shell') as THREE.Group
     const bounds = new THREE.Box3().setFromObject(walls)
-    expect(bounds.min.x - s.x).toBeCloseTo(0.22)
-    expect(s.x + s.w - bounds.max.x).toBeCloseTo(0.22)
-    expect(bounds.min.z - s.y).toBeCloseTo(0.22)
-    expect(s.y + s.h - bounds.max.z).toBeCloseTo(0.22)
+    const size = bounds.getSize(new THREE.Vector3())
+    expect(size.x).toBeGreaterThanOrEqual(s.w * 0.93)
+    expect(size.z).toBeGreaterThanOrEqual(s.h * 0.93)
+    expectInside(group, s)
+  })
+
+  it('scales the fire ring to its occupied ground', () => {
+    for (const size of [1, 2]) {
+      const s = structure('fire_pit', { w: size, h: size })
+      const group = buildStructure(s, config)
+      const bounds = new THREE.Box3().setFromObject(group).getSize(new THREE.Vector3())
+      expect(bounds.x).toBeGreaterThan(size * 0.9)
+      expect(bounds.z).toBeGreaterThan(size * 0.9)
+      expectInside(group, s)
+    }
   })
 
   it('uses construction framing instead of a finished roof or lit windows', () => {

@@ -14,6 +14,34 @@ const C = {
 }
 type Point = [number, number, number]
 
+function woodMaps(): { color: THREE.DataTexture; height: THREE.DataTexture } {
+  const size = 128
+  const color = new Uint8Array(size * size * 4)
+  const height = new Uint8Array(size * size * 4)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const seam = y % 8 === 0
+      const grain = Math.sin(y * 9 + Math.sin(x * 0.045) * 1.5) * 3
+      const value = seam ? 174 : 207 + ((Math.floor(y / 8) * 17) % 18) + grain
+      const bump = seam ? 85 : 170 + grain
+      const offset = (y * size + x) * 4
+      color.set([value + 12, value + 7, value - 5, 255], offset)
+      height.set([bump, bump, bump, 255], offset)
+    }
+  }
+  const maps = {
+    color: new THREE.DataTexture(color, size, size),
+    height: new THREE.DataTexture(height, size, size),
+  }
+  maps.color.colorSpace = THREE.SRGBColorSpace
+  for (const texture of Object.values(maps)) {
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+    texture.magFilter = THREE.LinearFilter
+    texture.needsUpdate = true
+  }
+  return maps
+}
+
 function slateTexture(): THREE.DataTexture {
   const size = 64
   const pixels = new Uint8Array(size * size * 4)
@@ -52,11 +80,18 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   const d = turned ? s.w : s.h
   if (turned) body.rotation.y = Math.PI / 2
   root.add(body)
+  let wood: ReturnType<typeof woodMaps> | undefined
   const materials = new Map<number, THREE.MeshStandardMaterial>()
   const material = (color: number): THREE.MeshStandardMaterial => {
     let result = materials.get(color)
     if (!result) {
       result = new THREE.MeshStandardMaterial({ color, roughness: 0.86 })
+      if (color === C.cream) {
+        wood ??= woodMaps()
+        result.map = wood.color
+        result.bumpMap = wood.height
+        result.bumpScale = 0.035
+      }
       materials.set(color, result)
     }
     return result
@@ -140,7 +175,7 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
     pane.material = mat
     windows.push(mat)
   }
-  const inset = Math.min(0.22, Math.min(w, d) * 0.2)
+  const inset = Math.min(0.06, Math.min(w, d) * 0.06)
   const width = w - inset * 2
   const depth = d - inset * 2
   const left = -width / 2
@@ -185,39 +220,67 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   }
 
   if (s.kind === 'fire_pit') {
-    cylinder(body, 0, 0.035, 0, 0.36, 0.07, 0x5d5751, false)
-    for (let i = 0; i < 9; i++) {
-      const angle = (i / 9) * Math.PI * 2
-      const stone = box(
-        body,
-        Math.cos(angle) * 0.3,
-        0.13,
-        Math.sin(angle) * 0.3,
-        0.15,
-        0.17,
-        0.13,
-        C.stone,
-      )
-      stone.rotation.y = -angle
+    const radius = Math.min(w, d) * 0.48
+    cylinder(body, 0, 0.035, 0, radius, 0.07, 0x3c3129, false)
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2
+      const stone = mesh(body, new THREE.DodecahedronGeometry(1, 0), C.stone)
+      stone.position.set(Math.cos(angle) * radius * 0.76, 0.14, Math.sin(angle) * radius * 0.76)
+      stone.scale.set(radius * 0.24, 0.14, radius * 0.24)
+      stone.rotation.y = angle
     }
     for (const angle of [-0.6, 0.6]) {
-      const log = box(body, 0, 0.14, 0, 0.43, 0.08, 0.09, 0x665849)
+      const log = box(body, 0, 0.17, 0, radius * 1.25, 0.11, 0.12, 0x3c281b)
       log.rotation.y = angle
     }
     const fire = new THREE.Group()
     fire.name = 'flames'
     fire.visible = false
     body.add(fire)
-    for (let i = 0; i < 3; i++) {
-      const flame = mesh(fire, new THREE.ConeGeometry(0.09, 0.36 + i * 0.07, 5), 0xf6b85d, false)
-      flame.position.set((i - 1) * 0.085, 0.34 + i * 0.03, (i % 2) * 0.04)
-      const mat = (flame.material as THREE.MeshStandardMaterial).clone()
-      mat.emissive.setHex(0xff9f37)
-      mat.emissiveIntensity = 1.8
-      flame.material = mat
+    for (let i = 0; i < 8; i++) {
+      const flame = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 7, 5),
+        new THREE.MeshBasicMaterial({
+          color: i % 3 ? 0xff7720 : 0xffdf80,
+          transparent: true,
+          opacity: 0.83,
+          depthWrite: false,
+          toneMapped: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      )
+      const angle = i * 2.4
+      flame.position.set(Math.sin(angle) * radius * 0.32, 0.4, Math.cos(angle) * radius * 0.32)
+      flame.scale.set(0.07 + (i % 3) * 0.025, 0.25 + (i % 4) * 0.055, 0.08)
+      flame.userData.flameHeight = flame.scale.y
+      fire.add(flame)
+    }
+    for (let i = 0; i < 10; i++) {
+      const ember = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015, 4, 3),
+        new THREE.MeshBasicMaterial({ color: 0xffb949, toneMapped: false }),
+      )
+      ember.name = 'ember'
+      ember.position.y = 0.25
+      fire.add(ember)
+    }
+    for (let i = 0; i < 6; i++) {
+      const smoke = new THREE.Mesh(
+        new THREE.IcosahedronGeometry(1, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0x9a9b91,
+          transparent: true,
+          opacity: 0.06,
+          depthWrite: false,
+        }),
+      )
+      smoke.name = 'smoke'
+      smoke.position.y = 0.7
+      smoke.scale.setScalar(0.12)
+      fire.add(smoke)
     }
     root.userData.fire = fire
-    root.userData.lightHeight = 0.6
+    root.userData.lightHeight = 0.75
     return root
   }
 
@@ -344,8 +407,8 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   const cabin = s.kind === 'cabin'
   const storage = s.kind === 'storehouse' || s.kind === 'barn'
   const civic = s.kind === 'civic_hall' || s.kind === 'town_hall' || s.kind === 'church'
-  const height = farm ? 3.15 : civic ? 2.8 : cabin ? 1.7 : storage ? 2.05 : 2.15
-  const porchDepth = farm && d >= 1.5 ? 0.28 : 0
+  const height = farm ? 3.75 : civic ? 2.8 : cabin ? 1.7 : storage ? 2.05 : 2.15
+  const porchDepth = farm && d >= 1.5 ? 0.4 : 0
   const facade = front - porchDepth
   const shellDepth = depth - porchDepth
   const shell = new THREE.Group()
@@ -391,23 +454,24 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   const doorWidth = Math.min(storage ? 0.7 : 0.43, width * 0.65)
   const door = box(body, doorX, 0.82, facade + 0.025, doorWidth + 0.08, 1.27, 0.06, C.trim)
   door.name = 'door'
-  box(body, doorX, 0.8, facade + 0.064, doorWidth, 1.17, 0.028, C.wood, false)
-  box(body, doorX + doorWidth * 0.3, 0.78, facade + 0.086, 0.035, 0.04, 0.025, C.iron, false)
+  box(body, doorX, 0.8, facade + 0.038, doorWidth, 1.17, 0.02, C.wood, false)
+  box(body, doorX + doorWidth * 0.3, 0.78, facade + 0.054, 0.035, 0.04, 0.01, C.iron, false)
   const stepWidth = Math.min(0.72, width)
   box(
     body,
     Math.max(left + stepWidth / 2, Math.min(right - stepWidth / 2, doorX)),
     0.14,
-    facade + 0.09,
+    facade + 0.03,
     stepWidth,
     0.12,
-    0.15,
+    0.06,
     C.stone,
   )
 
   const window = (x: number, y: number, z: number, side: boolean): void => {
     const group = new THREE.Group()
     group.position.set(x, y, z)
+    group.scale.z = 0.55
     if (side) group.rotation.y = Math.PI / 2
     body.add(group)
     box(group, 0, 0, 0, 0.4, 0.57, 0.035, C.trim, false)
@@ -416,33 +480,36 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
     box(group, 0, 0, 0.04, 0.34, 0.025, 0.016, C.trim, false)
     box(group, 0, -0.31, 0.035, 0.44, 0.05, 0.11, C.trim, false)
   }
-  for (const fraction of [0.22, 0.76]) {
+  for (const fraction of farm ? [0.15, 0.38, 0.7, 0.88] : [0.22, 0.76]) {
     const x = left + width * fraction
-    if (Math.abs(x - doorX) > 0.45 && width > 1) window(x, 1.25, facade + 0.025, false)
-    if (farm) window(x, 2.5, facade + 0.025, false)
+    if (Math.abs(x - doorX) > 0.45 && width > 1) window(x, 1.25, facade + 0.005, false)
+    if (farm) window(x, 2.85, facade + 0.005, false)
   }
-  if (shellDepth > 0.75) window(right + 0.025, 1.25, (back + facade) / 2, true)
-  if (farm) box(body, 0, 1.92, facade + 0.035, width, 0.1, 0.075, C.trim, false)
+  if (shellDepth > 0.75)
+    for (const fraction of shellDepth > 1.3 ? [0.28, 0.73] : [0.5])
+      window(right + 0.005, 1.25, back + shellDepth * fraction, true)
+  if (farm) box(body, 0, 2.12, facade + 0.025, width, 0.1, 0.06, C.trim, false)
 
   const roof = new THREE.Group()
   roof.name = 'roof'
   body.add(roof)
   roofs.push(roof)
-  const x0 = -w / 2 + 0.07
-  const x1 = w / 2 - 0.07
-  const z0 = -d / 2 + 0.07
-  const z1 = facade + 0.12
+  const x0 = -w / 2 + 0.015
+  const x1 = w / 2 - 0.015
+  const z0 = -d / 2 + 0.015
+  const z1 = facade + 0.045
   const eave = height + 0.24
   const peak = eave + (cabin ? 0.57 : 0.76)
   const midZ = (z0 + z1) / 2
+  const hip = farm ? Math.min(0.65, width * 0.2) : 0
   box(roof, 0, eave - 0.03, midZ, x1 - x0, 0.09, z1 - z0, 0x5d5751)
   surface(
     roof,
     [
       [x0, eave, z0],
       [x1, eave, z0],
-      [x1, peak, midZ],
-      [x0, peak, midZ],
+      [x1 - hip, peak, midZ],
+      [x0 + hip, peak, midZ],
     ],
     C.slate,
     true,
@@ -450,8 +517,8 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   surface(
     roof,
     [
-      [x0, peak, midZ],
-      [x1, peak, midZ],
+      [x0 + hip, peak, midZ],
+      [x1 - hip, peak, midZ],
       [x1, eave, z1],
       [x0, eave, z1],
     ],
@@ -463,25 +530,30 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
     [
       [x0, eave, z1],
       [x0, eave, z0],
-      [x0, peak, midZ],
+      [x0 + hip, peak, midZ],
     ],
-    C.cream,
+    farm ? C.slate : C.cream,
+    farm,
   )
   surface(
     roof,
     [
       [x1, eave, z0],
       [x1, eave, z1],
-      [x1, peak, midZ],
+      [x1 - hip, peak, midZ],
     ],
-    C.cream,
+    farm ? C.slate : C.cream,
+    farm,
   )
-  box(roof, 0, peak + 0.015, midZ, x1 - x0, 0.055, 0.07, C.stone)
+  box(roof, 0, peak + 0.015, midZ, x1 - x0 - hip * 2, 0.055, 0.07, C.stone)
   if (!storage && width > 0.7) {
-    const chimneyX = left + width * 0.22
-    box(roof, chimneyX, peak + 0.08, midZ - 0.1, 0.21, 0.55, 0.23, cabin ? C.stone : 0x9c6b47)
-    box(roof, chimneyX, peak + 0.37, midZ - 0.1, 0.28, 0.075, 0.3, C.trim)
-    box(roof, chimneyX, peak + 0.412, midZ - 0.1, 0.14, 0.008, 0.16, C.iron, false)
+    for (const chimneyX of farm
+      ? [left + width * 0.22, right - width * 0.22]
+      : [left + width * 0.22]) {
+      box(roof, chimneyX, peak + 0.08, midZ - 0.1, 0.21, 0.55, 0.23, cabin ? C.stone : 0x9c6b47)
+      box(roof, chimneyX, peak + 0.37, midZ - 0.1, 0.28, 0.075, 0.3, C.trim)
+      box(roof, chimneyX, peak + 0.412, midZ - 0.1, 0.14, 0.008, 0.16, C.iron, false)
+    }
   }
   if (farm) {
     const porch = new THREE.Group()
