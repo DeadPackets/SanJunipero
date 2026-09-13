@@ -10,7 +10,6 @@ import {
   SWATCH_CLAUSE,
   planBatch,
   estimateBatchCost,
-  DEFAULT_CANDIDATES,
 } from './plan.js'
 
 describe('planBatch', () => {
@@ -80,13 +79,7 @@ describe('planBatch', () => {
       15 * 3 * EST_COST_PER_IMAGE + 15 * 2 * EST_COST_PER_VISION_CALL,
       10,
     )
-    expect(DEFAULT_CANDIDATES).toEqual({
-      tools: 1,
-      foods: 1,
-      materials: 1,
-      ritual: 1,
-      furniture: 1,
-    })
+    for (const b of LIBRARY_BATCHES) expect(planBatch(b)[0]?.candidates).toBe(1)
   })
 
   // Batch A measured 42 live calls: the pre-flight estimate must not lie by 2x again.

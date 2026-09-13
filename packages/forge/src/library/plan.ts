@@ -17,16 +17,6 @@ const BATCH_CATEGORY: Record<LibraryBatch, LibraryCategory> = {
   furniture: 'furniture',
 }
 
-// One candidate per attempt: picking between parallel candidates needs a pixel heuristic, and no
-// pixel heuristic tells a pail from a market stall — the judge does.
-export const DEFAULT_CANDIDATES: Record<LibraryBatch, number> = {
-  tools: 1,
-  foods: 1,
-  materials: 1,
-  ritual: 1,
-  furniture: 1,
-}
-
 const CATEGORY_HINT: Record<LibraryCategory, string> = {
   tool: 'A single small hand tool sprite, lying at a slight angle so its whole shape reads.',
   food: 'A single small food sprite, seen from a low three-quarter angle.',
@@ -76,7 +66,9 @@ export function planBatch(batch: string, opts: { candidates?: number } = {}): Pl
       `unknown batch ${JSON.stringify(batch)} — valid batches are ${LIBRARY_BATCHES.join(', ')}`,
     )
   const b = batch as LibraryBatch
-  const candidates = opts.candidates ?? DEFAULT_CANDIDATES[b]
+  // One candidate per attempt: picking between parallel candidates needs a pixel heuristic, and
+  // no pixel heuristic tells a pail from a market stall, the judge does.
+  const candidates = opts.candidates ?? 1
   return LIBRARY.filter((e) => e.category === BATCH_CATEGORY[b]).map((entry) => {
     const boilerplate = itemBoilerplate(entry)
     const commissionText = itemCommission(entry)

@@ -42,6 +42,7 @@ import {
   MAGENTA_RESIDUE_MAX,
   TORSO_DRIFT_MAX,
   WALK_CELLS,
+  figureHeight,
   magentaResidue,
   torsoDrift,
   walkRowGate,
@@ -291,11 +292,6 @@ function keyBg(img: RawImage): RawImage {
 // and the report's figure spread is what says whether the walk cycle still reads.
 const cutCell = (img: RawImage, anchor: 'feet' | 'centre' = 'feet'): RawImage =>
   spriteCell(img, { w: CHAR_CELL_PX, h: CHAR_CELL_PX, anchor }).cell
-
-const figureHeight = (img: RawImage): number => {
-  const b = opaqueBbox(img)
-  return b === null ? 0 : b.y1 - b.y0 + 1
-}
 
 const MAX_ART_H = FEET_Y_V2 + 1
 // Trimmed first, and that is what makes the fit below NORMALISE scale: a 256 canvas with the

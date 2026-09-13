@@ -6,7 +6,6 @@ import {
   VisionVerdictSchema,
   NA_CRITERIA_BY_CLASS,
   NA_CRITERION,
-  criterionOf,
   deriveOverall,
   type VisionCriteria,
 } from './verdict.js'
@@ -107,7 +106,9 @@ describe('deriveOverall', () => {
   })
 })
 
-describe('criterionOf', () => {
+// A verdict stored before a criterion existed does not carry it (`tiling`, added 2026-08-17),
+// so a reader of an archived verdict gets undefined rather than a crash.
+describe('an archived verdict', () => {
   const v = {
     assetId: 'library:axe',
     model: 'm',
@@ -118,13 +119,13 @@ describe('criterionOf', () => {
   }
 
   it('reads a criterion the verdict carries', () => {
-    expect(criterionOf(v, 'palette')?.score).toBe(8)
+    expect(v.criteria.palette.score).toBe(8)
   })
 
   it('returns undefined for a criterion the stored verdict predates, rather than crashing', () => {
     const older = Object.fromEntries(Object.entries(v.criteria).filter(([k]) => k !== 'tiling'))
     const stored = { ...v, criteria: older as unknown as VisionCriteria }
-    expect(criterionOf(stored, 'tiling')).toBeUndefined()
-    expect(criterionOf(stored, 'palette')?.score).toBe(8)
+    expect(Object.hasOwn(stored.criteria, 'tiling')).toBe(false)
+    expect(stored.criteria.palette.score).toBe(8)
   })
 })

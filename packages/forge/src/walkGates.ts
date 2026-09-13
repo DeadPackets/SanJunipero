@@ -27,7 +27,7 @@ const isSkin = (r: number, g: number, b: number): boolean =>
     ([sr, sg, sb]) => Math.abs(r - sr) + Math.abs(g - sg) + Math.abs(b - sb) <= SKIN_TOLERANCE,
   )
 
-function figureHeight(img: RawImage): number {
+export function figureHeight(img: RawImage): number {
   const b = opaqueBbox(img)
   return b === null ? 0 : b.y1 - b.y0 + 1
 }

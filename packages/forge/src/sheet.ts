@@ -281,9 +281,8 @@ export function sweepMagenta(img: RawImage): RawImage {
   return { width: img.width, height: img.height, data: out }
 }
 
-// Removes opaque 4-connected islands smaller than minIsland pixels.
-export function despeckle(img: RawImage, minIsland = 3): RawImage {
-  const out = new Uint8ClampedArray(img.data)
+// Every opaque 4-connected island, one at a time, so no caller ever holds them all at once.
+export function* opaqueIslands(img: RawImage): Generator<number[]> {
   const seen = new Uint8Array(img.width * img.height)
   for (let start = 0; start < seen.length; start++) {
     if (seen[start] || img.data[start * 4 + 3] === 0) continue
@@ -309,8 +308,15 @@ export function despeckle(img: RawImage, minIsland = 3): RawImage {
         }
       }
     }
-    if (island.length < minIsland) for (const p of island) out.fill(0, p * 4, p * 4 + 4)
+    yield island
   }
+}
+
+// Removes opaque 4-connected islands smaller than minIsland pixels.
+export function despeckle(img: RawImage, minIsland = 3): RawImage {
+  const out = new Uint8ClampedArray(img.data)
+  for (const island of opaqueIslands(img))
+    if (island.length < minIsland) for (const p of island) out.fill(0, p * 4, p * 4 + 4)
   return { width: img.width, height: img.height, data: out }
 }
 

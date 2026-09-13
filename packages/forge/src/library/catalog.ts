@@ -29,34 +29,19 @@ export const LIBRARY_COUNTS: Record<LibraryCategory, number> = {
 export { WORLD_SPRITE_PX, ICON_PX } from '../assetResolution.js'
 import { ICON_PX, WORLD_SPRITE_PX, nativeSizeFor } from '../assetResolution.js'
 
-const tool = (kind: string, desc: string): LibraryEntry => ({
-  kind,
-  category: 'tool',
-  desc,
-  spritePx: WORLD_SPRITE_PX,
-  iconPx: ICON_PX,
-})
-const food = (kind: string, desc: string): LibraryEntry => ({
-  kind,
-  category: 'food',
-  desc,
-  spritePx: WORLD_SPRITE_PX,
-  iconPx: ICON_PX,
-})
-const material = (kind: string, desc: string): LibraryEntry => ({
-  kind,
-  category: 'material',
-  desc,
-  spritePx: WORLD_SPRITE_PX,
-  iconPx: ICON_PX,
-})
-const ritual = (kind: string, desc: string): LibraryEntry => ({
-  kind,
-  category: 'ritual',
-  desc,
-  spritePx: WORLD_SPRITE_PX,
-  iconPx: ICON_PX,
-})
+const entry =
+  (category: LibraryCategory) =>
+  (kind: string, desc: string): LibraryEntry => ({
+    kind,
+    category,
+    desc,
+    spritePx: WORLD_SPRITE_PX,
+    iconPx: ICON_PX,
+  })
+const tool = entry('tool')
+const food = entry('food')
+const material = entry('material')
+const ritual = entry('ritual')
 /** Two 1×2 kinds have no 192 px art yet, so they keep the size their art actually is — nothing is
  *  ever declared bigger than the pixels behind it. Closing the gap is one deletion per kind. */
 export const SHORT_OF_FOOTPRINT: ReadonlySet<string> = new Set(['bench', 'loom'])

@@ -153,19 +153,6 @@ export function terrainAssetId(i: IdInput): string {
   return `terrain:season:${i.season}`
 }
 
-// No per-tile variants: they existed to break up a repeating tile stamp, and a continuous
-// world-space field has no tile stamp to break up.
-export const GROUND_VARIANTS: Record<TerrainTileKind, number> = {
-  grass: 1,
-  earth: 1,
-  water: 1,
-  forest: 1,
-  rock: 1,
-  sand: 1,
-  farmland: 1,
-  road: 1,
-}
-
 // `materialKind` lives in @sj/shared beside the tile kinds — the forge writes that codex
 // kind and the renderer reads it.
 export { MATERIAL_KIND_PREFIX, materialKind }
@@ -175,20 +162,16 @@ export const ROAD_MATERIAL_ID = 'terrain:road:0'
 // One place the whole program is decided, so a dry run and a live run cost the same to read.
 export function planTerrainProgram(): TerrainItem[] {
   const out: TerrainItem[] = []
+  // No per-tile variants: they existed to break up a repeating tile stamp, and a continuous
+  // world-space field has no tile stamp to break up.
   for (const kind of TERRAIN_TILE_KINDS) {
-    for (let variant = 0; variant < GROUND_VARIANTS[kind]; variant++) {
-      const commission =
-        kind === 'road'
-          ? ROAD_COMMISSION
-          : (TERRAIN_COMMISSIONS[`${kind}:${variant}`] ?? TERRAIN_COMMISSIONS[`${kind}:0`]!)
-      out.push({
-        sort: 'ground',
-        kind,
-        variant,
-        assetId: terrainAssetId({ sort: 'ground', kind, variant }),
-        commission,
-      })
-    }
+    out.push({
+      sort: 'ground',
+      kind,
+      variant: 0,
+      assetId: terrainAssetId({ sort: 'ground', kind, variant: 0 }),
+      commission: kind === 'road' ? ROAD_COMMISSION : TERRAIN_COMMISSIONS[`${kind}:0`]!,
+    })
   }
   out.push({
     sort: 'material',
@@ -260,30 +243,6 @@ export type SeamReport = {
   note: string
 }
 
-// mean colour of an edge strip: `axis` picks the column band or the row band
-function stripMean(
-  img: RawImage,
-  axis: 'x' | 'y',
-  from: number,
-  width: number,
-): [number, number, number] {
-  let r = 0,
-    g = 0,
-    b = 0,
-    n = 0
-  const outer = axis === 'x' ? img.height : img.width
-  for (let o = 0; o < outer; o++) {
-    for (let d = from; d < from + width; d++) {
-      const i = (axis === 'x' ? o * img.width + d : d * img.width + o) * 4
-      r += img.data[i]!
-      g += img.data[i + 1]!
-      b += img.data[i + 2]!
-      n++
-    }
-  }
-  return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
-}
-
 const toneDelta = (a: [number, number, number], b: [number, number, number]): number =>
   [0, 1, 2].reduce((s, k) => s + Math.abs(a[k]! - b[k]!), 0) / 3
 
@@ -292,12 +251,12 @@ const toneDelta = (a: [number, number, number], b: [number, number, number]): nu
 export function seamReport(m: RawImage): SeamReport {
   const strip = Math.max(1, Math.min(SEAM_STRIP_PX, Math.floor(Math.min(m.width, m.height) / 2)))
   const horizontalDelta = toneDelta(
-    stripMean(m, 'x', 0, strip),
-    stripMean(m, 'x', m.width - strip, strip),
+    materialMean(m, { x: 0, y: 0, w: strip, h: m.height }),
+    materialMean(m, { x: m.width - strip, y: 0, w: strip, h: m.height }),
   )
   const verticalDelta = toneDelta(
-    stripMean(m, 'y', 0, strip),
-    stripMean(m, 'y', m.height - strip, strip),
+    materialMean(m, { x: 0, y: 0, w: m.width, h: strip }),
+    materialMean(m, { x: 0, y: m.height - strip, w: m.width, h: strip }),
   )
   const worstAxis = horizontalDelta >= verticalDelta ? 'horizontal' : 'vertical'
   const pass = horizontalDelta <= SEAM_TOLERANCE && verticalDelta <= SEAM_TOLERANCE
@@ -438,17 +397,28 @@ export type Grade = {
   contrast?: number
 }
 
-export function materialMean(m: RawImage): [number, number, number] {
+// Every channel is a byte, so the sum is exact whatever order a window walks it in.
+export function materialMean(
+  m: RawImage,
+  rect: { x: number; y: number; w: number; h: number } = {
+    x: 0,
+    y: 0,
+    w: m.width,
+    h: m.height,
+  },
+): [number, number, number] {
   let r = 0,
     g = 0,
     b = 0,
     n = 0
-  for (let i = 0; i < m.data.length; i += 4) {
-    r += m.data[i]!
-    g += m.data[i + 1]!
-    b += m.data[i + 2]!
-    n++
-  }
+  for (let y = rect.y; y < rect.y + rect.h; y++)
+    for (let x = rect.x; x < rect.x + rect.w; x++) {
+      const i = (y * m.width + x) * 4
+      r += m.data[i]!
+      g += m.data[i + 1]!
+      b += m.data[i + 2]!
+      n++
+    }
   return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
 }
 
@@ -562,16 +532,9 @@ export function seasonTintFrom(
   seasonMat: RawImage,
   summerMat: RawImage,
 ): { r: number; g: number; b: number } {
-  const mean = (m: RawImage, k: number): number => {
-    let s = 0,
-      n = 0
-    for (let i = 0; i < m.data.length; i += 4) {
-      s += m.data[i + k]!
-      n++
-    }
-    return n === 0 ? 1 : Math.max(1, s / n)
-  }
+  const season = materialMean(seasonMat),
+    summer = materialMean(summerMat)
   const ratio = (k: number): number =>
-    Math.min(1.6, Math.max(0.6, mean(seasonMat, k) / mean(summerMat, k)))
+    Math.min(1.6, Math.max(0.6, Math.max(1, season[k]!) / Math.max(1, summer[k]!)))
   return { r: ratio(0), g: ratio(1), b: ratio(2) }
 }

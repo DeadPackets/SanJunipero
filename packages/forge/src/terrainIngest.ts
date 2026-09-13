@@ -26,9 +26,9 @@ import {
 import {
   CALM_ROAD_ID,
   CALM_ROAD_NAME,
-  GROUND_VARIANTS,
   ROAD_MATERIAL_ID,
   diamondFromMaterial,
+  materialMean,
   seasonTintFrom,
   stencilRoadTile,
   terrainAssetId,
@@ -72,23 +72,9 @@ export async function loadMaterialBook(
 // TONE renders as a harlequin checkerboard. Variants break REPETITION, they never add COLOUR.
 export const VARIANT_TONE_TOLERANCE = 4 // mean per-channel distance considered cohesive
 
-const meanRgb = (m: RawImage): [number, number, number] => {
-  let r = 0,
-    g = 0,
-    b = 0,
-    n = 0
-  for (let i = 0; i < m.data.length; i += 4) {
-    r += m.data[i]!
-    g += m.data[i + 1]!
-    b += m.data[i + 2]!
-    n++
-  }
-  return n === 0 ? [0, 0, 0] : [r / n, g / n, b / n]
-}
-
 export function variantSpread(variants: RawImage[]): number {
   if (variants.length < 2) return 0
-  const means = variants.map(meanRgb)
+  const means = variants.map((m) => materialMean(m))
   const kind = [0, 1, 2].map((k) => means.reduce((s2, m) => s2 + m[k]!, 0) / means.length)
   return Math.max(
     ...means.map((m) => [0, 1, 2].reduce((s2, k) => s2 + Math.abs(m[k]! - kind[k]!), 0) / 3),
@@ -97,7 +83,7 @@ export function variantSpread(variants: RawImage[]): number {
 
 export function cohereVariants(variants: RawImage[]): RawImage[] {
   if (variants.length < 2) return variants
-  const means = variants.map(meanRgb)
+  const means = variants.map((m) => materialMean(m))
   const kind = [0, 1, 2].map((k) => means.reduce((s2, m) => s2 + m[k]!, 0) / means.length)
   return variants.map((v, i) => {
     const shift = [0, 1, 2].map((k) => kind[k]! - means[i]![k]!)
@@ -222,18 +208,10 @@ export async function registerGeneratedTerrain(
   }
 
   for (const kind of TERRAIN_TILE_KINDS) {
-    const made = Array.from({ length: GROUND_VARIANTS[kind] }, (_, v) =>
-      materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: v })),
-    )
-    const present = made.filter((m): m is RawImage => m !== null)
-    const cohered = cohereVariants(present)
-    let seen = -1
-    const coheredFor = made.map((m) => (m === null ? null : cohered[++seen]!))
+    // One material per kind, so every variant the renderer asks for is cut from that one.
+    const m = materialFor(book, terrainAssetId({ sort: 'ground', kind, variant: 0 }))
 
     for (let variant = 0; variant < TERRAIN_VARIANTS; variant++) {
-      // a kind generated with fewer variants than the renderer asks for reuses its last one
-      const source = Math.min(variant, GROUND_VARIANTS[kind] - 1)
-      const m = coheredFor[source] ?? null
       if (m === null) painted++
       else generated++
       const img = m === null ? paintTerrainTile(kind, variant) : diamondFromMaterial(m)

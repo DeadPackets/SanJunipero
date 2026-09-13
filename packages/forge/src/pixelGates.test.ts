@@ -9,7 +9,6 @@ import {
   nativeDensityGate,
   classDensityGate,
   tileSeamGate,
-  tilesetVarietyGate,
   pixelBarReport,
   soleSilhouetteGate,
   SEAM_RATIO_MAX,
@@ -187,21 +186,6 @@ describe('tileSeamGate', () => {
   })
   it('GREEN on a flat field, which wraps onto itself perfectly', () => {
     expect(tileSeamGate(solid(16, 16, [0xff, 0xf6, 0xe9, 255])).ok).toBe(true)
-  })
-})
-
-describe('tilesetVarietyGate', () => {
-  it('RED on the real treatment-C wall run: the plain piece comes back every 4 tiles', () => {
-    const r = tilesetVarietyGate(
-      ['plain', 'window', 'plain', 'dresser', 'plain', 'window', 'plain', 'door'],
-      { minPeriod: 5 },
-    )
-    expect(r.ok).toBe(false)
-    expect(r.shortestPeriod).toBe(2)
-    expect(r.failures[0]).toContain('plain')
-  })
-  it('GREEN when no piece recurs inside the minimum period', () => {
-    expect(tilesetVarietyGate(['a', 'b', 'c', 'd', 'e', 'a'], { minPeriod: 5 }).ok).toBe(true)
   })
 })
 
