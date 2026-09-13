@@ -161,6 +161,36 @@ describe('the Firsts tab', () => {
     const html = view({ data: [named, first()], loaded: true, failed: false })
     expect(html).toContain('class="first-quote"')
     expect(html).toContain('we should call it Emberfall')
-    expect(html.match(/first-quote/g)).toHaveLength(1)
+    expect(html.match(/first-quote"/g)).toHaveLength(1)
+    // a naming quote carries no speaker, so it is not attributed to one
+    expect(html).not.toContain('first-quote-who')
+  })
+
+  // ★ The narrator caught this first in somebody's speech. The line that proved it is the
+  // town's own, so it is printed as said, under the name of the mind that said it.
+  it('★ prints the line a detected first was caught in, attributed, with its day', () => {
+    const caught = first({
+      kind: 'first_promise',
+      label: 'the first promise',
+      tier: 2.5,
+      agentIds: ['amara'],
+      detected: { quote: 'I will come back for the boat', day: 4 },
+    })
+    const html = renderToStaticMarkup(
+      createElement(FirstsView, {
+        read: { data: [caught, first()], loaded: true, failed: false },
+        viewTick: null,
+        edge: 9_000,
+        people: { amara: { name: 'Amara' } },
+        onPlay: () => {},
+      }),
+    )
+    expect(html).toContain('I will come back for the boat')
+    expect(html).toContain('class="first-quote-who"')
+    expect(html).toContain('Amara')
+    expect(html).toContain('day 4')
+    // the first with nothing caught keeps its line alone, with no slot of any kind under it
+    expect(html.match(/first-quote"/g)).toHaveLength(1)
+    expect(html.match(/first-quote-who/g)).toHaveLength(1)
   })
 })

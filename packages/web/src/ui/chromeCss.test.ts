@@ -30,6 +30,8 @@ const LANE_BLOCKS: readonly (readonly [lane: string, mark: string])[] = [
     'every name is a door',
     '/* ── every name is a door: the one link the paper opens a person with',
   ],
+  ['THE STANDING', "/* ── THE STANDING: the front page, and the board of the town's own records"],
+  ['the night watch', "/* ── the night watch and the day's own shape:"],
 ]
 
 describe('★ chrome.css survives the merge trains intact', () => {

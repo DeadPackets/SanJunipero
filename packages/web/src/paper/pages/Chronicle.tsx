@@ -9,9 +9,10 @@ import {
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
-import { editions, type Edition } from '../../ui/dispatches.js'
+import { editions, heatSpokes, type Edition, type HeatSpoke } from '../../ui/dispatches.js'
 import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
+import { PersonLink } from '../../ui/PersonLink.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
 import { bustStyle } from '../../ui/bustStyle.js'
@@ -19,10 +20,12 @@ import { lastVisitTick } from '../../ui/storage.js'
 import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
 import { useFeed, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import type { Subject } from '../../stage/index.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
 import { EditionView, Moments } from './Moments.js'
 import { Skeleton } from './Skeleton.js'
+import { Standing } from './Standing.js'
 import type { PageProps } from './types.js'
 
 const FEED_MAX = 120
@@ -137,6 +140,60 @@ function DaySoFar({ entries }: { entries: readonly ChronicleEntry[] }) {
   )
 }
 
+const SPOKE_R = 38
+const SPOKE_C = { x: 110, y: 58 }
+const SPOKE_LABEL_R = SPOKE_R + 14
+
+/** The five vertices of the shape, at the fraction of the day's own total each part holds. */
+function spokePoint(i: number, r: number): { x: number; y: number } {
+  const a = (i * 2 * Math.PI) / 5 - Math.PI / 2
+  return { x: SPOKE_C.x + r * Math.cos(a), y: SPOKE_C.y + r * Math.sin(a) }
+}
+
+const spokePath = (spokes: readonly HeatSpoke[], scale: (s: HeatSpoke) => number): string =>
+  spokes
+    .map((s, i) => {
+      const p = spokePoint(i, scale(s))
+      return `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
+    })
+    .join(' ') + ' Z'
+
+/** What the day's hottest scene was made of. Every arm is that part over the total the gateway
+ *  called the same scene, and the outer ring is that total, so the denominator is on screen. */
+function RecordHeat({ spokes, day }: { spokes: readonly HeatSpoke[]; day: number }) {
+  const words = spokes.map((s) => `${s.words} ${Math.round(s.share * 100)}%`).join(', ')
+  return (
+    <div className="record-heat">
+      <svg
+        width={220}
+        height={120}
+        viewBox="0 0 220 120"
+        role="img"
+        aria-label={`What day ${day} was made of: ${words}.`}
+      >
+        <path className="record-heat-ring" d={spokePath(spokes, () => SPOKE_R)} />
+        <path className="record-heat-fill" d={spokePath(spokes, (s) => s.share * SPOKE_R)} />
+        {spokes.map((s, i) => {
+          const p = spokePoint(i, SPOKE_LABEL_R)
+          const anchor = p.x > SPOKE_C.x + 1 ? 'start' : p.x < SPOKE_C.x - 1 ? 'end' : 'middle'
+          return (
+            <text
+              key={s.words}
+              className="record-heat-word"
+              x={p.x.toFixed(1)}
+              y={(p.y + 4).toFixed(1)}
+              textAnchor={anchor}
+              aria-hidden="true"
+            >
+              {s.words}
+            </text>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 /** ★ ONE LOG. Today, Chapters, Moments and Days were four names for the same record, and Today
  *  had no day bound at all: the newest 200 weighted rows, whatever day they fell on. The range
  *  control is what bounds it, and the day heads under it are the chapters. */
@@ -154,6 +211,7 @@ function Record(props: PageProps) {
     [paper.data],
   )
   const latest = days[0] ?? null
+  const spokes = latest === null || paper.data === null ? null : heatSpokes(paper.data, latest.day)
   const daysAway = gapTicks === null ? 0 : Math.floor(gapTicks / 1440)
   const viewTick = mode.live ? null : mode.tick
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
@@ -182,6 +240,8 @@ function Record(props: PageProps) {
         </p>
       )}
 
+      {spokes !== null && latest !== null && <RecordHeat spokes={spokes} day={latest.day} />}
+
       <div className="record-range" role="group" aria-label="How far back the record reaches">
         {RANGES.map((r) => (
           <button
@@ -197,6 +257,8 @@ function Record(props: PageProps) {
           </button>
         ))}
       </div>
+
+      <Standing {...props} />
 
       {/* THE FRONT PAGE: the day's own paper is the lead story and the live feed is the column
           beside it. Below the sheet's own 40rem the two stack, which is what a narrow broadsheet
@@ -287,6 +349,7 @@ function FirstPlateView({
   current,
   edge,
   onPlay,
+  onSubject,
 }: {
   plate: FirstPlate
   people: NameIndex | undefined
@@ -294,8 +357,12 @@ function FirstPlateView({
   current: boolean
   edge: number
   onPlay: (play: MomentPlay) => void
+  onSubject: (subject: Subject) => void
 }) {
   const named = plate.cast.map((id) => ({ id, name: agentName(people, id) }))
+  // A caught line is attributed only when one body could have said it. A naming quote carries
+  // no speaker, and a first with two in its cast would be a guess.
+  const said = plate.quoteDay === null || named.length !== 1 ? null : named[0]!
   return (
     <li
       className="first-plate"
@@ -313,12 +380,24 @@ function FirstPlateView({
           {named.map((who) => (
             <li key={who.id}>
               <Bust records={records} agentId={who.id} name={who.name} />
-              <span className="first-cast-name">{who.name}</span>
+              <span className="first-cast-name">
+                <PersonLink id={who.id} name={who.name} onSubject={onSubject} />
+              </span>
             </li>
           ))}
         </ul>
       )}
-      {plate.quote !== null && <p className="first-quote">“{plate.quote}”</p>}
+      {plate.quote !== null && (
+        <p className="first-quote">
+          “{plate.quote}”
+          {said !== null && (
+            <span className="first-quote-who">
+              <PersonLink id={said.id} name={said.name} onSubject={onSubject} />, day{' '}
+              {plate.quoteDay}
+            </span>
+          )}
+        </p>
+      )}
       <button
         type="button"
         className="first-watch"
@@ -366,6 +445,7 @@ export function FirstsView({
   people,
   records = NO_RECORDS,
   onPlay,
+  onSubject = () => undefined,
 }: {
   read: Read<MilestoneRead[]>
   viewTick: number | null
@@ -375,6 +455,7 @@ export function FirstsView({
   people?: NameIndex | undefined
   records?: AssetRecord[]
   onPlay: (play: MomentPlay) => void
+  onSubject?: (subject: Subject) => void
 }) {
   const groups = useMemo(() => firstsByTier(read.data ?? []), [read.data])
 
@@ -398,6 +479,7 @@ export function FirstsView({
                 current={viewTick === first.tick}
                 edge={edge}
                 onPlay={onPlay}
+                onSubject={onSubject}
               />
             ))}
           </ol>
@@ -407,7 +489,7 @@ export function FirstsView({
   )
 }
 
-function Firsts({ store, onPlay }: PageProps) {
+function Firsts({ store, onPlay, onSubject }: PageProps) {
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
@@ -422,6 +504,7 @@ function Firsts({ store, onPlay }: PageProps) {
       people={state?.agents}
       records={records}
       onPlay={onPlay}
+      onSubject={onSubject}
     />
   )
 }

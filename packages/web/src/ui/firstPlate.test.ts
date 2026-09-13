@@ -97,7 +97,33 @@ describe('★ a first is a plate, and the plate keeps no score', () => {
       tick: 300,
       cast: ['a1'],
       quote: null,
+      quoteDay: null,
       fresh: true,
+    })
+  })
+
+  // ★ Two quotes can reach one plate: the words the town named a thing out of, and the line the
+  // narrator caught the first itself in. Only the second one knows which day it was said on.
+  it('★ prefers the line the first was caught in, and carries the day with it', () => {
+    const row = {
+      kind: 'first_promise',
+      label: 'the first promise',
+      eventSeq: 2,
+      day: 4,
+      tick: 6000,
+      tier: 2.5,
+      domain: 'semantic',
+      agentIds: ['amara'],
+      nameProvenance: { name: 'x', sourceKind: 'speech' as const, eventSeq: 2, quote: 'a name' },
+      detected: { quote: 'I will come back for the boat', day: 4 },
+    }
+    expect(firstPlate(row, null)).toMatchObject({
+      quote: 'I will come back for the boat',
+      quoteDay: 4,
+    })
+    expect(firstPlate({ ...row, detected: null }, null)).toMatchObject({
+      quote: 'a name',
+      quoteDay: null,
     })
   })
 })

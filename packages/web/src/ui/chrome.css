@@ -3033,3 +3033,81 @@ body:has(.cold-open) .dossier-rail { opacity: 0; }
 /* The bonds row names the other person once as its own line, so the sentence under it stays
    the sentence the rest of the product prints. */
 .edge-who { margin: 0; font-family: var(--font-title); font-size: var(--f-4); }
+
+/* ── THE STANDING: the front page, and the board of the town's own records ───────────────────
+   The one figure the product sets large is the days since anyone died. --f-7 is the ladder's
+   top step and `chromeType.test.ts` closes the ladder at seven, so 28px is what 44px becomes. */
+.standing-line {
+  margin: 0; max-width: var(--measure);
+  font-family: var(--font-title); font-weight: 700; font-size: var(--f-6);
+  line-height: 1.2; color: var(--ink); text-wrap: pretty;
+}
+.standing-line::first-letter {
+  font-size: var(--f-7); float: left; line-height: 0.86;
+  padding: var(--s-1) var(--s-2) 0 0;
+}
+.standing-lead .first-cast { margin-top: var(--s-5); }
+
+.board { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-5); }
+.board-line {
+  margin: 0; max-width: var(--measure);
+  font-size: var(--f-3); line-height: 1.5; color: var(--ink); text-wrap: pretty;
+}
+.board-figure {
+  font-family: var(--font-data); font-size: var(--f-7); font-variant-numeric: tabular-nums;
+  line-height: 1; color: var(--ink);
+}
+
+/* ── the night watch and the day's own shape: what the town wrote while it slept, and what its
+      hottest scene was made of ────────────────────────────────────────────────────────────
+   The cards are lamplit slabs on the paper, so a night reads as a night without the sheet
+   changing colour under the reader. */
+.night-cards { display: grid; gap: var(--s-5); margin: 0 0 var(--s-6); padding: 0; list-style: none; }
+.night-cards:empty { display: none; }
+
+.night-card {
+  display: grid; gap: var(--s-3);
+  padding: var(--s-5);
+  color: var(--cream); background: var(--night);
+  border-top: 2px solid var(--honey);
+  box-shadow: var(--frame-tight);
+}
+.night-who { margin: 0; font-family: var(--font-title); font-size: var(--f-4); font-weight: 500; }
+.night-who .person-link { text-decoration-color: var(--cream-quiet); }
+.night-who .person-link:hover { text-decoration-color: var(--cream); }
+.night-who .person-link:focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+.night-said { margin: 0; font-size: var(--f-3); line-height: 1.5; text-wrap: pretty; }
+/* The dream is the same night in the other voice: quieter ink and the lamp's own rule beside it. */
+.night-dreamt {
+  margin: 0; padding-left: var(--s-4);
+  border-left: 2px solid var(--honey);
+  font-family: var(--font-title); font-size: var(--f-3); font-weight: 500; line-height: 1.5;
+  color: var(--cream-quiet);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .night-card {
+    animation: feed-in var(--t-slow) var(--ease-move) backwards;
+    animation-delay: calc(var(--stagger-i, 6) * var(--stagger));
+  }
+  .night-card:nth-child(1) { --stagger-i: 0; }
+  .night-card:nth-child(2) { --stagger-i: 1; }
+  .night-card:nth-child(3) { --stagger-i: 2; }
+  .night-card:nth-child(4) { --stagger-i: 3; }
+  .night-card:nth-child(5) { --stagger-i: 4; }
+  .night-card:nth-child(6) { --stagger-i: 5; }
+}
+
+/* The five parts of the day's hottest scene, each over the total the gateway called that same
+   scene. The outer ring IS that total, so the denominator is drawn and no arm is a bare score. */
+.record-heat { margin: 0 0 var(--s-5); }
+.record-heat svg { display: block; max-width: 100%; }
+.record-heat-ring { fill: none; stroke: var(--ink-quiet); stroke-width: 1.5; }
+.record-heat-fill { fill: var(--honey); stroke: var(--honey-deep); stroke-width: 2; }
+.record-heat-word {
+  font-family: var(--font-data); font-size: var(--f-1);
+  fill: var(--ink-quiet);
+}
+
+/* The line the narrator caught, attributed to the one mind that said it. */
+.first-quote-who { display: block; margin-top: var(--s-2); font-family: var(--font-body); }

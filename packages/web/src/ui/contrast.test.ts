@@ -119,7 +119,7 @@ const QUIET_SITES = [
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
 // surface where the town is actually speaking.
-const DARK_QUIET_SITES = ['.day-bar-when']
+const DARK_QUIET_SITES = ['.day-bar-when', '.night-dreamt']
 
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const

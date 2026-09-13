@@ -13,7 +13,16 @@ export type DispatchesFeed = {
     description: string
     memberIds: readonly string[]
   }[]
-  heat: readonly { day: number; total: number }[]
+  /** The five parts arrive together or not at all: an older gateway sends the total alone. */
+  heat: readonly {
+    day: number
+    total: number
+    conflict?: number
+    novelty?: number
+    firsts?: number
+    stakes?: number
+    dramaticIrony?: number
+  }[]
 }
 
 export const EMPTY_DISPATCHES: DispatchesFeed = {
@@ -71,6 +80,33 @@ export function temperOf(total: number): string {
   if (total >= LOUD_HEAT) return 'a loud day'
   if (total >= STIRRING_HEAT) return 'a day with something in it'
   return 'a quiet day'
+}
+
+/** What the day's hottest scene was made of, in the narrator's own five columns. The word is
+ *  what a reader sees, the key never is. */
+export const HEAT_SPOKES = [
+  ['conflict', 'conflict'],
+  ['novelty', 'novelty'],
+  ['firsts', 'firsts'],
+  ['stakes', 'stakes'],
+  ['dramaticIrony', 'irony'],
+] as const
+
+export type HeatSpoke = { words: string; share: number }
+
+/** Each part over the total the gateway called the same scene, so nothing here is a bare score.
+ *  Null where the day was never scored, scored at nothing, or read off a gateway that still
+ *  sends the total alone. */
+export function heatSpokes(feed: DispatchesFeed, day: number): HeatSpoke[] | null {
+  const row = feed.heat.find((h) => h.day === day)
+  if (row === undefined || row.total <= 0) return null
+  const out: HeatSpoke[] = []
+  for (const [key, words] of HEAT_SPOKES) {
+    const part = row[key]
+    if (typeof part !== 'number' || !Number.isFinite(part)) return null
+    out.push({ words, share: Math.min(1, Math.max(0, part / row.total)) })
+  }
+  return out
 }
 
 export function editions(feed: DispatchesFeed): Edition[] {

@@ -61,10 +61,14 @@ export type FirstPlate = {
   tick: number
   cast: readonly string[]
   quote: string | null
+  /** The day the line was said, where the narrator caught this first in somebody's speech. Null
+   *  for a quote the town only named the thing out of, which carries no speaker either. */
+  quoteDay: number | null
   fresh: boolean
 }
 
 export function firstPlate(first: MilestoneRead, lastSeenTick: number | null): FirstPlate {
+  const caught = first.detected ?? null
   return {
     kind: first.kind,
     label: first.label,
@@ -72,7 +76,8 @@ export function firstPlate(first: MilestoneRead, lastSeenTick: number | null): F
     material: plateMaterial(first.tier),
     tick: first.tick,
     cast: first.agentIds,
-    quote: first.nameProvenance?.quote ?? null,
+    quote: caught?.quote ?? first.nameProvenance?.quote ?? null,
+    quoteDay: caught === null ? null : caught.day,
     fresh: isNew(first, lastSeenTick),
   }
 }

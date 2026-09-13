@@ -5,6 +5,7 @@ import {
   biographyOf,
   dispatchesFrom,
   editions,
+  heatSpokes,
   temperOf,
 } from './dispatches.js'
 
@@ -68,6 +69,45 @@ describe('editions', () => {
     const out = editions({ ...FEED, heat: [], captions: [] })
     expect(out[0]?.temper).toBeNull()
     expect(out[0]?.caption).toBeNull()
+  })
+})
+
+describe('heatSpokes', () => {
+  const scored = {
+    ...EMPTY_DISPATCHES,
+    heat: [
+      { day: 4, total: 10, conflict: 5, novelty: 2, firsts: 1, stakes: 1, dramaticIrony: 1 },
+      { day: 5, total: 3 },
+    ],
+  }
+
+  it('gives every part as a share of the day’s own total, in a fixed order', () => {
+    expect(heatSpokes(scored, 4)).toEqual([
+      { words: 'conflict', share: 0.5 },
+      { words: 'novelty', share: 0.2 },
+      { words: 'firsts', share: 0.1 },
+      { words: 'stakes', share: 0.1 },
+      { words: 'irony', share: 0.1 },
+    ])
+  })
+
+  it('★ draws nothing off a gateway that still sends the total alone', () => {
+    expect(heatSpokes(scored, 5)).toBeNull()
+  })
+
+  it('draws nothing for a day nobody scored, or a day scored at nothing', () => {
+    expect(heatSpokes(scored, 9)).toBeNull()
+    expect(
+      heatSpokes(
+        {
+          ...EMPTY_DISPATCHES,
+          heat: [
+            { day: 0, total: 0, conflict: 0, novelty: 0, firsts: 0, stakes: 0, dramaticIrony: 0 },
+          ],
+        },
+        0,
+      ),
+    ).toBeNull()
   })
 })
 
