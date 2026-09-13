@@ -21,7 +21,15 @@ import type { TileId } from '@sj/engine'
 import { AssetCodex } from '@sj/forge'
 import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
-import { latestMoods, type MoodRow, moodsSince, thoughtsSince } from './observer.js'
+import {
+  latestMoods,
+  maxMindId,
+  type MindRow,
+  mindsSince,
+  type MoodRow,
+  moodsSince,
+  thoughtsSince,
+} from './observer.js'
 import { makeSceneRelay } from './scenes.js'
 import { makeDirector, PRIMED_TYPES } from './stakes.js'
 import { makeThreads } from './threads.js'
@@ -411,6 +419,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         }
         // The word each mind holds about itself, so a late roster does not guess from the body.
         if (observerSeen) for (const m of latestMoods(db)) sock.send(moodJson(m))
+        // Whoever is mid-turn right now. A turn runs ten to ninety seconds, so a viewer that
+        // arrives inside one would otherwise wait out the whole of it with nothing lit.
+        for (const [agentId, tick] of deciding) {
+          sock.send(JSON.stringify({ t: 'mind', agentId, tick, state: 'deciding' }))
+        }
         // The shot the town is already on. A replaying socket never gets one: a moment's own
         // cast owns that camera.
         if (directorJson !== null) sock.send(directorJson)
@@ -533,10 +546,21 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   let threadsMark = ''
   let lastThoughtId = 0
   let lastMoodId = 0
+  /** Its own flag, not the thought one: a world file written before this table existed still
+   *  serves every other frame. */
+  let mindsSeen = hasTable.get('observer_minds') !== undefined
+  /** Read at the boot, not at the first poll: rows a previous process wrote are history, and a
+   *  town that died mid-turn left a `deciding` with no `idle` behind it. */
+  let lastMindId = mindsSeen ? maxMindId(db) : 0
   const moodJson = (m: MoodRow): string =>
     JSON.stringify({ t: 'mood', agentId: m.agentId, tick: m.tick, mood: m.mood })
+  const mindJson = (m: MindRow): string =>
+    JSON.stringify({ t: 'mind', agentId: m.agentId, tick: m.tick, state: m.state })
   let lastAssetSeq = 0
   let observerSeen = false
+  /** Who is mid-turn, as this process has watched it happen. Held here rather than read back
+   *  from the table, so a row a dead town left mid-turn never lights a caret again. */
+  const deciding = new Map<string, number>()
   /** One recorded minute per replaying socket per beat, at the live cadence. No fold and no
    *  stringify of state: the log's own rows, in the frame shape the viewer already folds. */
   const driveReplays = (now: number): void => {
@@ -642,6 +666,17 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       for (const m of moodsSince(db, lastMoodId)) {
         lastMoodId = m.id
         hub.broadcast(moodJson(m))
+      }
+    }
+    if (!mindsSeen) mindsSeen = hasTable.get('observer_minds') !== undefined
+    if (mindsSeen) {
+      // In id order, so a turn that began and ended inside one poll sends both. Dropping the
+      // idle of such a pair is what would leave a caret lit on a body that has finished.
+      for (const m of mindsSince(db, lastMindId)) {
+        lastMindId = m.id
+        if (m.state === 'deciding') deciding.set(m.agentId, m.tick)
+        else deciding.delete(m.agentId)
+        hub.broadcast(mindJson(m))
       }
     }
     const cdx = getCodex()

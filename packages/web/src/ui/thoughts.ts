@@ -53,7 +53,11 @@ export function shouldBubble(
   thought: { agentId: string; importance: number },
   subjectId: string | null,
   sceneMembers: readonly string[],
+  timeMoving = true,
 ): boolean {
+  // A scrubbed viewer is standing in a past minute. A thought landing now belongs to the live
+  // one, and drawn over the past it is a sentence the minute on screen never held.
+  if (!timeMoving) return false
   return (
     thought.importance >= BUBBLE_IMPORTANCE ||
     thought.agentId === subjectId ||

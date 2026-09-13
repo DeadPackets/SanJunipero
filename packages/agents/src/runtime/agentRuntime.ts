@@ -430,6 +430,8 @@ export class AgentRuntime {
     | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
     | null
   readonly #onMood: ((m: { tick: number; agentId: string; mood: string }) => void) | null
+  readonly #onTurnStart: ((m: { tick: number; agentId: string }) => void) | null
+  readonly #onTurnEnd: ((m: { tick: number; agentId: string }) => void) | null
   #moodTold: string | null = null
   readonly #scenes: SceneCoordinator | null
   readonly #ties: RuntimeTies | null
@@ -532,6 +534,10 @@ export class AgentRuntime {
       | ((t: { tick: number; agentId: string; text: string; importance: number }) => void)
       | undefined
     onMood?: ((m: { tick: number; agentId: string; mood: string }) => void) | undefined
+    /** A provider call for this body is in flight, and again when it is not. It carries no
+     *  content: `onThought` can only ever say a mind HAS thought. */
+    onTurnStart?: ((m: { tick: number; agentId: string }) => void) | undefined
+    onTurnEnd?: ((m: { tick: number; agentId: string }) => void) | undefined
     adjudicator?: Adjudicator | undefined
     /** The world's one scene coordinator. Absent, a mind talks the way it always did. */
     scenes?: SceneCoordinator | undefined
@@ -559,6 +565,8 @@ export class AgentRuntime {
     this.#dreamLlm = deps.dreamLlm ?? null
     this.#onThought = deps.onThought ?? null
     this.#onMood = deps.onMood ?? null
+    this.#onTurnStart = deps.onTurnStart ?? null
+    this.#onTurnEnd = deps.onTurnEnd ?? null
     this.#adjudicator = deps.adjudicator ?? null
     this.#scenes = deps.scenes ?? null
     this.#ties = deps.ties ?? null
@@ -862,6 +870,7 @@ export class AgentRuntime {
   async #takeFloor(tick: number): Promise<void> {
     if (this.#turnInFlight || this.#scenes === null) return
     this.#turnInFlight = true
+    this.#onTurnStart?.({ tick, agentId: this.#agentId })
     try {
       await this.#scenes.takeFloor(this.#agentId, tick)
       this.#clock.lastTurnTick = tick
@@ -871,6 +880,7 @@ export class AgentRuntime {
       this.#doze(tick, err)
     } finally {
       this.#turnInFlight = false
+      this.#onTurnEnd?.({ tick: this.#bridge.currentTick(), agentId: this.#agentId })
     }
   }
 
@@ -1295,6 +1305,7 @@ export class AgentRuntime {
     if (this.#turnInFlight) return
     this.#turnInFlight = true
     const tick = this.#bridge.currentTick()
+    this.#onTurnStart?.({ tick, agentId: this.#agentId })
     try {
       await this.#runTurnBody(wake)
     } catch (err) {
@@ -1303,6 +1314,9 @@ export class AgentRuntime {
       this.#clock.dozeUntilTick = tick + this.#config.dozeTicks
     } finally {
       this.#turnInFlight = false
+      // In the finally, so a throw and a body that died while the provider was thinking both
+      // still send it. An idle that is never sent leaves the caret lit forever.
+      this.#onTurnEnd?.({ tick: this.#bridge.currentTick(), agentId: this.#agentId })
     }
   }
 

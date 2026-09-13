@@ -190,7 +190,7 @@ const ROLES: Readonly<Record<string, readonly string[]>> = {
   // struck metal: the tier the town's own work is cut at
   gilt: [".first-plate[data-material='gilded']"],
   // a mark our own hand made, on a page the town never prints
-  operator: ['.ops-word.stopped', '.sheet-note.operator'],
+  operator: ['.ops-word.stopped', '.sheet-note.operator', '.dossier-card[data-deciding]::before'],
 }
 
 /** Every selector in the sheet whose own declarations read `--name`. */

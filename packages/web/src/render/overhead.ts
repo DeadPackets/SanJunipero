@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import { hasCondition, statusOf, type AgentView, type Condition, type State } from '../ui/status.js'
 import type { EmoteKind } from './charAnim.js'
+import { CARET_LAP_MS } from '../ui/motion.js'
 import { SPEECH_FILL, SPEECH_INK } from './textFaces.js'
 
 // ★ ONE SLOT, ONE GLYPH, ONE PLACE. Three systems used to live over a person's head: a collapsed
@@ -73,12 +74,35 @@ const PLATE_INK = SPEECH_INK
 const PLATE_PAPER = SPEECH_FILL
 const PLATE_URGENT = 0xe8785a // --ember
 
+// ── the caret ────────────────────────────────────────────────────────────────────────────
+
+/** ★ A PROVIDER CALL IN FLIGHT, and only over somebody the shot is about. Twelve of these lit
+ *  at once read as twelve loading spinners, so the caller decides who wears one. */
+export const CARET_SQUARES = 3
+const CARET_PX = 2
+const CARET_GAP = 2
+const CARET_INK = 0x3e6786 // --sky
+const CARET_W = CARET_SQUARES * CARET_PX + (CARET_SQUARES - 1) * CARET_GAP
+const CARET_SLAB_W = CARET_W + 6
+const CARET_SLAB_H = CARET_PX + 6
+/** Clear of the plate's own box, so a body wearing a glyph wears both. */
+const CARET_Y = -SLOT_PX / 2 - CARET_SLAB_H / 2 - 2
+
+/** How many of the three are lit. A viewer who asked for stillness gets all three, steady. */
+export function caretLit(sinceMs: number, nowMs: number, wantsMotion: boolean): number {
+  if (!wantsMotion) return CARET_SQUARES
+  const lap = (((nowMs - sinceMs) % CARET_LAP_MS) + CARET_LAP_MS) % CARET_LAP_MS
+  return Math.floor((lap * CARET_SQUARES) / CARET_LAP_MS) + 1
+}
+
 export type Overhead = {
   node: Container
   /** the atlas cell the character layer hands in for this row's glyph */
   glyph: Sprite
   /** null puts the whole slot away; a row shows the plate and its one mark */
   setRow(row: OverheadRow | null): void
+  /** How many of the caret's squares are lit, 0 for no caret at all. */
+  setCaret(lit: number): void
   destroy(): void
 }
 
@@ -87,14 +111,17 @@ export function createOverhead(parent: Container): Overhead {
   node.visible = false
   node.eventMode = 'none' // a mark never takes a click from the body under it
   const plate = new Graphics()
+  const caret = new Graphics()
+  caret.visible = false
   const glyph = new Sprite()
   glyph.anchor.set(0.5, 0.5)
   glyph.width = GLYPH_PX
   glyph.height = GLYPH_PX
-  node.addChild(plate, glyph)
+  node.addChild(plate, glyph, caret)
   parent.addChild(node)
 
   let drawnUrgent: boolean | null = null
+  let drawnLit = 0
 
   return {
     node,
@@ -115,6 +142,26 @@ export function createOverhead(parent: Container): Overhead {
       plate.rect(-SLOT_PX / 2, -SLOT_PX / 2, SLOT_PX, SLOT_PX)
       plate.fill(row.urgent ? PLATE_URGENT : PLATE_PAPER)
       plate.stroke({ width: 2, color: PLATE_INK, alignment: 1 })
+    },
+    setCaret(lit) {
+      if (lit === drawnLit) return
+      drawnLit = lit
+      caret.visible = lit > 0
+      if (lit <= 0) return
+      // The mark brings its own ground, the same slab the plate does: --sky is 5.58:1 on the
+      // paper and 2.27:1 over the night the town is drawn on.
+      caret.clear()
+      caret.rect(-CARET_SLAB_W / 2, CARET_Y - CARET_SLAB_H / 2, CARET_SLAB_W, CARET_SLAB_H)
+      caret.fill(PLATE_PAPER)
+      caret.stroke({ width: 2, color: PLATE_INK, alignment: 1 })
+      for (let i = 0; i < lit; i++)
+        caret.rect(
+          -CARET_W / 2 + i * (CARET_PX + CARET_GAP),
+          CARET_Y - CARET_PX / 2,
+          CARET_PX,
+          CARET_PX,
+        )
+      caret.fill(CARET_INK)
     },
     destroy() {
       node.destroy({ children: true })

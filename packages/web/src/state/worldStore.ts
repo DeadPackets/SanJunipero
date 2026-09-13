@@ -3,6 +3,7 @@ import {
   type AssetRecord,
   type ServerBoard,
   type ServerDirector,
+  type ServerMind,
   type ServerMsg,
   type ServerScene,
   type ServerThreads,
@@ -22,6 +23,8 @@ const RECENT_EVENTS_CAP = 400
  *  past forward. A replay is not live — it never moves the live watermark — but its time moves. */
 type ViewMode = { live: true } | { live: false; replaying: boolean; tick: number }
 type Thought = { agentId: string; tick: number; text: string; importance: number }
+/** A provider call in flight, or one that has landed. The wire's own two words. */
+export type MindState = ServerMind['state']
 /** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
  *  which is the Pixi handle and has nothing to do with this. */
 export type TownScene = ServerScene['scene']
@@ -76,6 +79,9 @@ export type WorldStore = {
   threads: () => ServerThreads | null
   /** The gateway's own survey, not just the row it cut to. */
   board: () => ServerBoard | null
+  /** Who is thinking right now, and as of when. Dropped on a scrub and a replay with the
+   *  director and the board, for the same reason: it is about the live minute. */
+  minds: () => ReadonlyMap<string, { state: MindState; tick: number }>
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** The world log's head as the server last reported it — the signal a read model refetches on,
@@ -108,6 +114,13 @@ export function createWorldStore(): WorldStore {
   let director: ServerDirector | null = null
   let threads: ServerThreads | null = null
   let board: ServerBoard | null = null
+  // Swapped, never mutated: `useSyncExternalStore` re-renders on identity, so a Map edited in
+  // place leaves the rail showing the minute before this one.
+  let minds: ReadonlyMap<string, { state: MindState; tick: number }> = new Map()
+  const setMind = (agentId: string, state: MindState, tick: number): void => {
+    if (minds.get(agentId)?.state === state) return
+    minds = new Map(minds).set(agentId, { state, tick })
+  }
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
@@ -170,6 +183,7 @@ export function createWorldStore(): WorldStore {
     getDirector: () => director,
     threads: () => threads,
     board: () => board,
+    minds: () => minds,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -235,6 +249,7 @@ export function createWorldStore(): WorldStore {
           director = null
           threads = null
           board = null
+          minds = new Map()
           forgetScenes()
           break
         case 'replaying':
@@ -246,6 +261,7 @@ export function createWorldStore(): WorldStore {
           director = null
           threads = null
           board = null
+          minds = new Map()
           forgetScenes()
           break
         case 'mood':
@@ -262,6 +278,8 @@ export function createWorldStore(): WorldStore {
           if (thoughts.length > THOUGHT_LOG_CAP)
             thoughts.splice(0, thoughts.length - THOUGHT_LOG_CAP)
           latest.set(msg.agentId, { tick: msg.tick, text: msg.text })
+          // A landed thought ends the flight whether or not the `idle` frame beat it here.
+          setMind(msg.agentId, 'idle', msg.tick)
           break
         case 'assets':
           records.push(...msg.records)
@@ -284,6 +302,9 @@ export function createWorldStore(): WorldStore {
           break
         case 'threads':
           threads = msg
+          break
+        case 'mind':
+          setMind(msg.agentId, msg.state, msg.tick)
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

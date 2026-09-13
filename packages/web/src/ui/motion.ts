@@ -22,6 +22,10 @@ export const MOTION_FLOOR_MS = 90
 
 export type MotionExemption = { what: string; ms: number; because: string }
 
+/** One lap of the thinking caret. It lives here rather than beside the drawing because the
+ *  table below is what allows it past the ceiling, and pixi may not reach this file. */
+export const CARET_LAP_MS = 900
+
 // Motions past MOTION_CEILING_MS; a test asserts every long motion in the product has a row here.
 export const MOTION_EXEMPT: readonly MotionExemption[] = [
   {
@@ -41,6 +45,13 @@ export const MOTION_EXEMPT: readonly MotionExemption[] = [
       'the world’s own clock — a tick of the simulation is shared out among the tiles it ' +
       'carried a body over, and the alternative to spending it is teleporting the body ' +
       '2.5 times a second',
+  },
+  {
+    what: 'caret',
+    ms: CARET_LAP_MS,
+    because:
+      'the provider’s own clock — a turn takes 10 to 90 seconds, and a caret that laps in ' +
+      'under a third of a second is the spinner this mark exists to not be',
   },
 ]
 

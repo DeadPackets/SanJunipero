@@ -7,7 +7,9 @@ export type { LiveCast, LiveOps } from './liveCast.js'
 export {
   ensureObserverTables,
   latestMoods,
+  mindsSince,
   moodsSince,
+  publishMind,
   publishMood,
   publishThought,
   thoughtsSince,

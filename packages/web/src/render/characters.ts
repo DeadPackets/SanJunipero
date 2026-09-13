@@ -20,6 +20,7 @@ import { artOptional, characterArt, type TextureBook } from './textures.js'
 import {
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
+  caretLit,
   createOverhead,
   overheadRow,
   type Overhead,
@@ -92,6 +93,9 @@ type CharEntry = {
   overhead: Overhead
   /** the kind the slot is drawing, so the atlas is cut once and not once a frame */
   glyphKind: EmoteKind | null
+  /** a provider call is in flight for this body AND the shot is about it, and when that began */
+  deciding: boolean
+  caretSinceMs: number
   /** the pointer is on this body, so the ONE hover plate is theirs this frame */
   hovered: boolean
   hit: Polygon
@@ -416,6 +420,8 @@ export function createCharacterLayer(
       ringSinceMs: now,
       overhead,
       glyphKind: null,
+      deciding: false,
+      caretSinceMs: now,
       hovered: false,
       hit,
       figureH: 0,
@@ -514,6 +520,9 @@ export function createCharacterLayer(
     const cast = open?.open === true ? open.participants : null
     const heard = talk.voices()
     const inScene = new Set(cast ?? [])
+    // Only the shot's cast and the viewer's own pick wear a caret: twelve lit at once is
+    // twelve loading spinners, which says the page is broken rather than that these are minds.
+    const minds = store.minds()
     const floor = cast === null ? null : floorHolder(cast, heard)
     const live = new Set<string>()
     // Two passes: a rank belongs to a TILE, not to a body, so where each one stands depends on
@@ -649,7 +658,17 @@ export function createCharacterLayer(
       e.overhead.node.position.set(sx, sy - CHAR_TARGET_PX - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)
-      e.overhead.node.visible = row !== null
+      const deciding =
+        minds.get(a.id)?.state === 'deciding' &&
+        (inScene.has(a.id) || a.id === scene.pickedId) &&
+        a.alive
+      if (deciding !== e.deciding) {
+        e.deciding = deciding
+        e.caretSinceMs = nowMs
+      }
+      const lit = deciding ? caretLit(e.caretSinceMs, nowMs, wantsMotion) : 0
+      e.overhead.setCaret(lit)
+      e.overhead.node.visible = row !== null || lit > 0
       // ONE placement rule for every label in the product, and the layer applies it: the plate
       // is welded to the feet and only leaves them when the view has no room down there. Said
       // every frame, because the body it names walks.

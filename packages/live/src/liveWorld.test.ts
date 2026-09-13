@@ -25,7 +25,7 @@ import {
 } from '@sj/shared'
 import { unregisterVerb, VERBS } from '@sj/engine'
 import { EventStore } from '@sj/engine/store'
-import { thoughtsSince, type LiveCast } from '@sj/gateway'
+import { mindsSince, thoughtsSince, type LiveCast } from '@sj/gateway'
 import { startDevWorld, foundersFor, townStructuresFor, type DevWorld } from '@sj/town'
 import {
   LIVE_PHYSICS,
@@ -408,6 +408,15 @@ function thoughtTexts(dir: string): string[] {
   }
 }
 
+function mindMarks(dir: string): string[] {
+  const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
+  try {
+    return mindsSince(db, 0).map((m) => `${m.agentId}:${m.state}`)
+  } finally {
+    db.close()
+  }
+}
+
 function thinkers(dir: string): Set<string> {
   const db = new Database(join(dir, 'world.db'), { readonly: true, fileMustExist: true })
   try {
@@ -459,6 +468,30 @@ describe('★ THE SEAM — a served world whose bodies are driven by minds', () 
     expect(texts).not.toContain('The path is clear enough.')
     expect(texts).not.toContain('Hm.')
     expect(new Set(texts)).toEqual(new Set([THOUGHT]))
+  }, 30_000)
+
+  it('★ a turn writes that a mind is deciding before it writes what the mind thought', async () => {
+    const dir = tmp()
+    const { world } = await liveWorld({ dir })
+    await run(world, 6)
+
+    const marks = mindMarks(dir)
+    expect(marks.length).toBeGreaterThan(0)
+    expect(marks[0]!.endsWith(':deciding')).toBe(true)
+    // Every caret lit is a caret put out, and no body ever carries two at once. The last turn
+    // of a run is still in flight when the town stops, so its idle is the one that never comes.
+    const lit = new Set<string>()
+    for (const m of marks) {
+      const [id, state] = m.split(':')
+      if (state === 'deciding') {
+        expect(lit.has(id!)).toBe(false)
+        lit.add(id!)
+      } else {
+        expect(lit.has(id!)).toBe(true)
+        lit.delete(id!)
+      }
+    }
+    expect(marks.filter((m) => m.endsWith(':idle')).length).toBeGreaterThan(0)
   }, 30_000)
 
   it('★ THE PUPPET STRINGS ARE OFF: a cast that never acts leaves every body standing still', async () => {

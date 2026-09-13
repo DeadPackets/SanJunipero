@@ -3013,3 +3013,11 @@ body:has(.cold-open) .dossier-rail { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .drawer-sheet { transition: none; }
 }
+
+/* ── the minds visible: which of these bodies has a provider call in flight ────────────────
+   Steady, never pulsing: several quiet edges lit at once say these are minds, where a dot that
+   throbs says the page is loading. --sky is 2.27:1 on the night, under the 3:1 non-text floor. */
+.dossier-card[data-deciding]::before {
+  content: ''; position: absolute; inset-block: 0; inset-inline-start: 0;
+  width: 2px; background: var(--operator);
+}

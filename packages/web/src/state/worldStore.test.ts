@@ -522,3 +522,52 @@ describe('the story frames', () => {
     }
   })
 })
+
+describe('the minds in flight', () => {
+  it('holds who is deciding, and lets the town take it back', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    expect(store.minds().size).toBe(0)
+    store.applyServer({ t: 'mind', agentId: 'walker', tick: 3, state: 'deciding' })
+    expect(store.minds().get('walker')).toEqual({ state: 'deciding', tick: 3 })
+    store.applyServer({ t: 'mind', agentId: 'walker', tick: 5, state: 'idle' })
+    expect(store.minds().get('walker')?.state).toBe('idle')
+  })
+
+  // The frames are one road apart on the way out of the gateway, and a caret left lit because
+  // one of them was dropped is a body that reads as thinking for the rest of the session.
+  it('ends the flight on the thought itself, not only on the idle frame', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    store.applyServer({ t: 'mind', agentId: 'walker', tick: 3, state: 'deciding' })
+    store.applyServer({ t: 'thought', agentId: 'walker', tick: 4, text: 'Cold.', importance: 8 })
+    expect(store.minds().get('walker')?.state).toBe('idle')
+  })
+
+  it('★ drops them wherever the director is dropped', () => {
+    const snap = makeSnapshot()
+    for (const away of [
+      { t: 'scrubbed' as const, reqId: 1, tick: 1, state: snap.state },
+      { t: 'replaying' as const, reqId: 1, tick: 1, seq: 1, state: snap.state },
+    ]) {
+      const store = createWorldStore()
+      store.applyServer(makeSnapshot())
+      store.applyServer({ t: 'mind', agentId: 'walker', tick: 3, state: 'deciding' })
+      store.applyServer(away)
+      expect(store.minds().size).toBe(0)
+    }
+  })
+
+  // `useSyncExternalStore` re-renders on identity alone, so a map edited in place leaves the
+  // rail showing the minute before this one.
+  it('hands out a new map when a mind changes and the same one when nothing did', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    const before = store.minds()
+    store.applyServer({ t: 'mind', agentId: 'walker', tick: 3, state: 'deciding' })
+    const after = store.minds()
+    expect(after).not.toBe(before)
+    store.applyServer({ t: 'mind', agentId: 'walker', tick: 4, state: 'deciding' })
+    expect(store.minds()).toBe(after)
+  })
+})

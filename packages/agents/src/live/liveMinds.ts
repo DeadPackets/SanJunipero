@@ -95,6 +95,9 @@ export type BootMindsOpts = {
   onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
   /** The word a mind holds about how it is, whenever that word changes. */
   onMood?: (m: { tick: number; agentId: string; mood: string }) => void
+  /** A provider call for this body is in flight, and again when it is not. */
+  onTurnStart?: (m: { tick: number; agentId: string }) => void
+  onTurnEnd?: (m: { tick: number; agentId: string }) => void
   /** Per-mind runtime state to put back after `start`, which is what clears it. */
   restoring?: ReadonlyMap<string, RuntimeSnapshot>
   /** Adjudication and codification, injected because agents may not import the arbiter. */
@@ -212,6 +215,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       ...(opts.dreamLlm === undefined ? {} : { dreamLlm: makeDreamLlm(opts.dreamLlm(spec.id)) }),
       ...(opts.onThought === undefined ? {} : { onThought: opts.onThought }),
       ...(opts.onMood === undefined ? {} : { onMood: opts.onMood }),
+      ...(opts.onTurnStart === undefined ? {} : { onTurnStart: opts.onTurnStart }),
+      ...(opts.onTurnEnd === undefined ? {} : { onTurnEnd: opts.onTurnEnd }),
       ...(scenes === null ? {} : { scenes }),
       ties: { store: ties, cast: livingCast },
       ...(spec.wantBias === undefined ? {} : { wantBias: spec.wantBias }),

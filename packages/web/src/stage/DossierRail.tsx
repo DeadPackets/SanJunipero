@@ -41,6 +41,8 @@ export type Dossier = {
   pressure: number | null
   /** in the camera's own cut this minute */
   onScreen: boolean
+  /** a provider call is in flight for this body right now */
+  deciding: boolean
   /** where this card stands. The DOM order never changes, so a reorder is a transform. */
   rank: number
 }
@@ -49,6 +51,8 @@ export type RailOpts = {
   pressure: ReadonlyMap<string, number> | null
   /** `director.cut?.agentIds` — who the camera is scored for this minute */
   cutCast: readonly string[]
+  /** `store.minds()` read down to the ones in flight; empty off the live edge */
+  deciding?: ReadonlySet<string>
   now: number
 }
 
@@ -65,6 +69,7 @@ export function dossiers(state: WorldState | null, opts: RailOpts): Dossier[] {
       condition: conditionsOf(a)[0] ?? null,
       pressure: opts.pressure === null ? null : (opts.pressure.get(a.id) ?? 0),
       onScreen: opts.cutCast.includes(a.id),
+      deciding: opts.deciding?.has(a.id) ?? false,
       rank: 0,
     }))
   rows.sort(
@@ -90,6 +95,7 @@ export function DossierRail({ store }: { store: WorldStore }) {
   const board = useSyncExternalStore(store.subscribe, store.board, store.board)
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
   const director = useSyncExternalStore(store.subscribe, store.getDirector, store.getDirector)
+  const minds = useSyncExternalStore(store.subscribe, store.minds, store.minds)
   useSyncExternalStore(store.subscribe, store.assetsSeq, store.assetsSeq)
   const cutCast = director?.cut?.agentIds
 
@@ -102,7 +108,11 @@ export function DossierRail({ store }: { store: WorldStore }) {
         : pressureIndex(board?.rows ?? NO_BOARD, threads?.threads ?? NO_THREADS),
     [board, threads],
   )
-  const cards = dossiers(state, { pressure, cutCast: cutCast ?? [], now })
+  const deciding = useMemo(
+    () => new Set([...minds].filter(([, m]) => m.state === 'deciding').map(([id]) => id)),
+    [minds],
+  )
+  const cards = dossiers(state, { pressure, cutCast: cutCast ?? [], deciding, now })
   if (cards.length === 0) return null
   return (
     <DossierRailBody
@@ -130,6 +140,7 @@ export function DossierRailBody({
           return (
             <li
               className={d.onScreen ? 'dossier-card lit' : 'dossier-card'}
+              data-deciding={d.deciding ? '' : undefined}
               key={d.id}
               style={{ '--rank': d.rank } as CSSProperties}
             >

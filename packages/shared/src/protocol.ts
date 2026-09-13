@@ -90,6 +90,17 @@ export const ServerThought = z
     importance: z.number().int().min(1).max(10),
   })
   .strict()
+// A mind in flight. `thought` can only ever say a mind HAS thought, after the provider answered
+// and the object parsed; this frame says one is thinking now, and again when it stops.
+export const ServerMind = z
+  .object({
+    t: z.literal('mind'),
+    agentId: z.string().min(1),
+    tick,
+    state: z.enum(['deciding', 'idle']),
+  })
+  .strict()
+export type ServerMind = z.infer<typeof ServerMind>
 // The word a mind holds about how it is. Sent when it changes and once to each new viewer, so
 // the roster can say "worn down" in the mind's own words rather than guess from the body.
 export const ServerMood = z
@@ -230,6 +241,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerScrubbed,
   ServerReplaying,
   ServerThought,
+  ServerMind,
   ServerMood,
   ServerAssets,
   ServerScene,

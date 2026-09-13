@@ -190,3 +190,39 @@ describe('what the rail actually renders', () => {
     expect(renderToStaticMarkup(createElement(DossierRail, { store: createWorldStore() }))).toBe('')
   })
 })
+
+// ★ Several quiet edges lit at once across the rail is the clearest statement the interface can
+// make that these are minds, and it makes it without a single spinner.
+describe('★ the rail says which of these are thinking', () => {
+  it('marks only the bodies with a call in flight', () => {
+    const list = rail(world(body('nadia', 'Nadia'), body('yusuf', 'Yusuf')), {
+      deciding: new Set(['yusuf']),
+    })
+    const html = renderToStaticMarkup(createElement(DossierRailBody, { cards: list }))
+    expect(html.match(/data-deciding/g)).toHaveLength(1)
+    expect(list.find((d) => d.id === 'yusuf')?.deciding).toBe(true)
+    expect(list.find((d) => d.id === 'nadia')?.deciding).toBe(false)
+  })
+
+  it('marks nobody off the live edge, where the frame does not exist', () => {
+    const list = rail(world(body('nadia', 'Nadia')))
+    const html = renderToStaticMarkup(createElement(DossierRailBody, { cards: list }))
+    expect(html).not.toContain('data-deciding')
+  })
+
+  it('reads the store, so a mind frame reaches a card without a second wire', () => {
+    const store = createWorldStore()
+    store.applyServer({
+      t: 'snapshot',
+      tick: 0,
+      seq: 1,
+      state: world(body('nadia', 'Nadia'), body('yusuf', 'Yusuf')),
+      config: DEFAULT_CONFIG,
+      laws: {},
+      live: true,
+    })
+    store.applyServer({ t: 'mind', agentId: 'nadia', tick: 3, state: 'deciding' })
+    const html = renderToStaticMarkup(createElement(DossierRail, { store }))
+    expect(html.match(/data-deciding/g)).toHaveLength(1)
+  })
+})

@@ -60,8 +60,11 @@ vi.mock('pixi.js', () => {
 import { Container as MockContainer, Texture as MockTexture } from 'pixi.js'
 import { EMOTE_KINDS } from './charAnim.js'
 import { CONDITIONS, STATES, STATE_WORD, type AgentView } from '../ui/status.js'
+import { CARET_LAP_MS } from '../ui/motion.js'
 import {
+  CARET_SQUARES,
   GLYPH_PX,
+  caretLit,
   OVERHEAD_PRIORITY,
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
@@ -193,7 +196,7 @@ describe('★ the slot is one glyph, and nothing else stands over a head', () =>
     o.setRow(row)
     return { parent, o, node: o.node as unknown as Drawn }
   }
-  type Drawn = { mask: unknown; children: Drawn[]; fills: number[] }
+  type Drawn = { mask: unknown; children: Drawn[]; fills: number[]; visible: boolean }
   const walk = (n: Drawn): Drawn[] => [n, ...n.children.flatMap(walk)]
 
   it('sits eight pixels above the head, where 7A puts it', () => {
@@ -202,11 +205,15 @@ describe('★ the slot is one glyph, and nothing else stands over a head', () =>
     expect(GLYPH_PX).toBeLessThan(SLOT_PX)
   })
 
-  it('★ draws one plate and one glyph, and nothing that counts', () => {
+  it('★ draws one plate, one glyph and a caret nobody wears by default', () => {
     const { o, node } = slot()
-    expect(node.children, 'the plate and the mark, and no row of blocks').toHaveLength(2)
+    // The third is the thinking caret. It counts nothing about the world: no job, no denominator,
+    // no progress, and it is dark until the shot is about the body under it.
+    expect(node.children, 'the plate, the mark and the caret').toHaveLength(3)
+    expect(node.children[2]!.visible, 'and it starts dark').toBe(false)
     for (const row of OVERHEAD_PRIORITY) o.setRow(row)
-    expect(node.children, 'and no news ever adds a third thing').toHaveLength(2)
+    expect(node.children, 'and no news ever adds a fourth thing').toHaveLength(3)
+    expect(node.children[2]!.visible, 'and no news lights the caret').toBe(false)
   })
 
   // With chips on everyone in the viewport, a mask per chip is a render target per person.
@@ -227,5 +234,48 @@ describe('★ the slot is one glyph, and nothing else stands over a head', () =>
     expect(urgent.fills[1], 'news wears the ember plate').toBe(0xe8785a)
     expect(quiet.fills[1]).not.toBe(urgent.fills[1])
     expect(quiet.fills[0], 'and both stand on the same ink').toBe(urgent.fills[0])
+  })
+})
+
+// ★ THE CARET: the one mark that says a mind is in flight, and the reason it is not a spinner.
+// A turn takes 10 to 90 seconds, so a lit dot on every head most of the time is wallpaper.
+describe('★ the thinking caret', () => {
+  it('fills left to right, one square per third of a lap, and starts over', () => {
+    const at = (ms: number) => caretLit(0, ms, true)
+    expect([at(0), at(299), at(300), at(599), at(600), at(899)]).toEqual([1, 1, 2, 2, 3, 3])
+    expect(at(CARET_LAP_MS)).toBe(1)
+    expect(at(CARET_LAP_MS * 3 + 450)).toBe(2)
+  })
+
+  it('★ lights all three and stops for a viewer who asked for stillness', () => {
+    for (const ms of [0, 200, 500, 880]) expect(caretLit(0, ms, false)).toBe(CARET_SQUARES)
+  })
+
+  it('draws its own ground and one square per lit step, and puts itself away at zero', () => {
+    const o = createOverhead(new MockContainer())
+    const caret = o.node.children[2] as unknown as {
+      visible: boolean
+      rects: number[][]
+      fills: number[]
+    }
+    o.setCaret(1)
+    expect(caret.visible).toBe(true)
+    expect(caret.rects, 'the slab plus one square').toHaveLength(2)
+    o.setCaret(CARET_SQUARES)
+    expect(caret.rects).toHaveLength(1 + CARET_SQUARES)
+    // the slab's paper, then the squares' one ink: the mark never floats on the world's own art
+    expect(caret.fills).toHaveLength(2)
+    o.setCaret(0)
+    expect(caret.visible).toBe(false)
+  })
+
+  it('redraws only when the count moves, because this runs every frame for every body', () => {
+    const o = createOverhead(new MockContainer())
+    const caret = o.node.children[2] as unknown as { rects: number[][] }
+    o.setCaret(2)
+    const drawn = caret.rects.length
+    o.setCaret(2)
+    o.setCaret(2)
+    expect(caret.rects).toHaveLength(drawn)
   })
 })

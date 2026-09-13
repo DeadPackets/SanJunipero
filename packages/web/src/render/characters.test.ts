@@ -196,6 +196,7 @@ function makeStore(agents: MutableAgents): {
   setScene: (s: TownScene | null) => void
   setMoving: (v: boolean) => void
   setTick: (t: number) => void
+  setMinds: (m: Record<string, 'deciding' | 'idle'>) => void
 } {
   const handlers = new Set<(evts: SimEvent[]) => void>()
   const tension = createTension({
@@ -207,6 +208,7 @@ function makeStore(agents: MutableAgents): {
   let scene: TownScene | null = null
   let moving = true
   let tick = 0
+  let minds = new Map<string, { state: 'deciding' | 'idle'; tick: number }>()
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
     getMode: () =>
@@ -217,6 +219,7 @@ function makeStore(agents: MutableAgents): {
     thoughtsLog: () => [],
     recentEvents: () => [],
     shotScene: () => scene,
+    minds: () => minds,
     tension,
     assetsSeq: () => 0,
     assetRecords: () => [],
@@ -237,6 +240,9 @@ function makeStore(agents: MutableAgents): {
     },
     setTick: (t) => {
       tick = t
+    },
+    setMinds: (m) => {
+      minds = new Map(Object.entries(m).map(([id, state]) => [id, { state, tick }]))
     },
     emit: (evts) => {
       for (const fn of handlers) fn(evts)
@@ -1474,5 +1480,56 @@ describe('★ the contact shadow reads the sun the arc draws', () => {
     spy.mockClear()
     layer.tick(800)
     expect(spy, 'one answer serves the whole cast').toHaveBeenCalledTimes(1)
+  })
+})
+
+// ★ TWELVE PULSING DOTS READ AS TWELVE LOADING SPINNERS. A turn takes 10 to 90 seconds, so a
+// caret on every mind in flight is lit over most of the town most of the time and says nothing.
+describe('★ the thinking caret goes only over a body the shot is about', () => {
+  const CAST = ['amara', 'nadia']
+  const scene = (id: string, participants: readonly string[]): TownScene =>
+    ({ id, open: true, kind: 'talk', participants, tick: 0 }) as unknown as TownScene
+
+  /** Every body's overhead node, in the order the layer created them. */
+  const slots = (s: Scene): InstanceType<typeof MockContainer>[] =>
+    (s.layers as unknown as Record<string, InstanceType<typeof MockContainer>>).worldText!.children
+
+  const drive = (
+    pickedId: string | null,
+    minds: Record<string, 'deciding' | 'idle'>,
+    cast: readonly string[] = CAST,
+  ): InstanceType<typeof MockContainer>[] => {
+    const agents = Object.fromEntries(
+      ['amara', 'nadia', 'salma'].map((n) => [n, makeAgent(n, 103 + n.length, 77)]),
+    )
+    const own = makeScene()
+    ;(own as unknown as { pickedId: string | null }).pickedId = pickedId
+    const { store, setScene, setMinds } = makeStore(agents)
+    setScene(scene('sc_1', cast))
+    setMinds(minds)
+    const layer = createCharacterLayer(own, makeBook().book, store, () => {})
+    layer.tick(1000)
+    return slots(own)
+  }
+
+  it('★ lights the cast and leaves the bystander alone', () => {
+    const [amara, nadia, salma] = drive(null, {
+      amara: 'deciding',
+      nadia: 'idle',
+      salma: 'deciding',
+    })
+    expect(amara!.visible, 'in the shot and thinking').toBe(true)
+    expect(nadia!.visible, 'in the shot and done thinking').toBe(false)
+    expect(salma!.visible, 'thinking, but this shot is not about her').toBe(false)
+  })
+
+  it('lights a body the viewer pinned, whatever the camera is doing', () => {
+    const [, , salma] = drive('salma', { salma: 'deciding' })
+    expect(salma!.visible).toBe(true)
+  })
+
+  it('puts the caret out when the flight ends, with no glyph left standing', () => {
+    const [amara] = drive(null, { amara: 'idle' })
+    expect(amara!.visible).toBe(false)
   })
 })

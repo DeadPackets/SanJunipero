@@ -434,6 +434,8 @@ async function setup(opts: {
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
   onMood?: (m: { tick: number; agentId: string; mood: string }) => void
+  onTurnStart?: (m: { tick: number; agentId: string }) => void
+  onTurnEnd?: (m: { tick: number; agentId: string }) => void
   adjudicator?: Adjudicator
   budgetUsd?: number
   knownAfar?: boolean
@@ -489,6 +491,8 @@ async function setup(opts: {
     dreamLlm: opts.dreamLlm,
     onThought: opts.onThought,
     onMood: opts.onMood,
+    onTurnStart: opts.onTurnStart,
+    onTurnEnd: opts.onTurnEnd,
     adjudicator: opts.adjudicator,
   })
   runtime.start(AGENT)
@@ -3089,5 +3093,92 @@ describe('★ the morning line names what this mind wants', () => {
     const { runtime } = await setup({ model, mindConfig: FAST_MIND, simConfig: STILL_BODY })
     expect(runtime.wantSaid(0)).toBeNull()
     expect(runtime.wantSaid(2880)).toBe('to belong somewhere, to be one of them')
+  })
+})
+
+describe('a mind in flight (the mind frame)', () => {
+  /** A provider that holds its first answer until the test lets it go. */
+  function gatedModel(): { model: MockLanguageModelV4; release: () => void } {
+    let open = (): void => {}
+    const gate = new Promise<void>((resolve) => {
+      open = resolve
+    })
+    let first = true
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        if (first) {
+          first = false
+          await gate
+        }
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(askedShape(BENIGN_TURN)) }],
+          finishReason: { unified: 'stop' as const, raw: undefined },
+          usage: ZERO_USAGE,
+          warnings: [],
+        }
+      },
+    })
+    return {
+      model,
+      release: () => {
+        open()
+      },
+    }
+  }
+
+  const marksOf = (
+    marks: string[],
+  ): {
+    onTurnStart: (m: { tick: number; agentId: string }) => void
+    onTurnEnd: (m: { tick: number; agentId: string }) => void
+  } => ({
+    onTurnStart: (m) => marks.push(`start:${m.agentId}:${m.tick}`),
+    onTurnEnd: (m) => marks.push(`end:${m.agentId}:${m.tick}`),
+  })
+
+  it('★ says a mind is deciding while the provider is still thinking, and idle when it answers', async () => {
+    const marks: string[] = []
+    const { model, release } = gatedModel()
+    const { loop } = await setup({ model, mindConfig: FAST_MIND, ...marksOf(marks) })
+    await stepUntil(loop, () => marks.length >= 1, 100)
+    // The whole point of the frame: it is out before the answer is, so a ten to ninety second
+    // wait is not a still sprite.
+    expect(marks).toHaveLength(1)
+    expect(marks[0]!.startsWith(`start:${AGENT}:`)).toBe(true)
+    release()
+    await stepUntil(loop, () => marks.length >= 2, 100)
+    expect(marks[0]!.startsWith(`start:${AGENT}:`)).toBe(true)
+    expect(marks[1]!.startsWith(`end:${AGENT}:`)).toBe(true)
+  })
+
+  it('ends the flight when the provider throws, so no caret is left lit', async () => {
+    const marks: string[] = []
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        await Promise.resolve()
+        throw new Error('provider down')
+      },
+    })
+    const { loop } = await setup({
+      model,
+      mindConfig: FAST_MIND,
+      maxRetries: 0,
+      ...marksOf(marks),
+    })
+    await stepUntil(loop, () => marks.length >= 2, 100)
+    expect(marks[0]!.startsWith('start:')).toBe(true)
+    expect(marks[1]!.startsWith('end:')).toBe(true)
+  })
+
+  it('★ ends the flight when the body dies while the provider is thinking', async () => {
+    const marks: string[] = []
+    const { model, release } = gatedModel()
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND, ...marksOf(marks) })
+    await stepUntil(loop, () => marks.length >= 1, 100)
+    runtime.stop()
+    release()
+    await stepUntil(loop, () => marks.length >= 2, 100)
+    // A corpse still owes the screen its idle. Without this the caret never goes out.
+    expect(marks[1]!.startsWith(`end:${AGENT}:`)).toBe(true)
   })
 })

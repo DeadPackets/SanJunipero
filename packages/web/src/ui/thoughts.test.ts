@@ -263,3 +263,31 @@ describe('the thoughts button', () => {
     }
   })
 })
+
+// ★ A thought lands on the live socket while a scrubbed viewer is standing in a past minute.
+// Drawn there it is a sentence over a head that the minute on screen never held.
+describe('★ the wisp belongs to the minute it was thought in', () => {
+  const t = { agentId: 'omar', importance: 10 }
+
+  it('draws nothing at all while the clock on screen is stopped', () => {
+    expect(shouldBubble(t, null, [], true)).toBe(true)
+    expect(shouldBubble(t, null, [], false)).toBe(false)
+    expect(shouldBubble(t, 'omar', ['omar'], false), 'not even the subject').toBe(false)
+  })
+
+  // Measured, not asserted from the brief: for the exact set the caret is drawn on, the shipped
+  // gate already passes every thought, so an importance floor over them would change nothing.
+  it('★ passes every weight for the cast and the pick, at every importance', () => {
+    const weights = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    expect(
+      weights.filter((n) => shouldBubble({ agentId: 'omar', importance: n }, 'omar', [])),
+    ).toEqual(weights)
+    expect(
+      weights.filter((n) => shouldBubble({ agentId: 'omar', importance: n }, null, ['omar'])),
+    ).toEqual(weights)
+    // and for a stranger the floor is real, which is the whole reason the gate exists
+    expect(
+      weights.filter((n) => shouldBubble({ agentId: 'omar', importance: n }, null, [])),
+    ).toEqual([6, 7, 8, 9, 10])
+  })
+})

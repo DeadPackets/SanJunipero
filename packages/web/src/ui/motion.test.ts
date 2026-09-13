@@ -153,7 +153,7 @@ describe('the exemptions from the motion band', () => {
       )
       expect(e.because.length, `${e.what} has no reason`).toBeGreaterThan(24)
     }
-    expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling', 'walk'])
+    expect(MOTION_EXEMPT.map((e) => e.what)).toEqual(['ambient', 'fling', 'walk', 'caret'])
   })
 
   it('★ the walk is one of them, and it was over the ceiling before anyone wrote it down', () => {

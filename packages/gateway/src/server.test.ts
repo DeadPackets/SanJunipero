@@ -16,7 +16,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
-import { ensureObserverTables, publishThought } from './observer.js'
+import { ensureObserverTables, publishMind, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
 import { connect } from './testutil.js'
@@ -706,4 +706,100 @@ describe('★ the story ribbon survives a restart', () => {
     expect(row?.members).toEqual(['omar', 'salma'])
     expect(row?.terms).not.toContain('partnership_strained')
   }, 30000)
+})
+
+describe('the mind frame', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-gwmind-'))
+  const open: (WebSocket | Gateway)[] = []
+  afterAll(async () => {
+    for (const o of open) {
+      if (o instanceof WebSocket) o.close()
+      else await o.close()
+    }
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('★ sends both halves of a turn in order, and hands a late viewer only who is still deciding', async () => {
+    const dbPath = join(dir, 'minds.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 3; i++) loop.step()
+    // ★ A town that died mid-turn left this behind, with no idle after it. A gateway that read
+    // the table back would light a caret on a body that stopped thinking in a previous process.
+    publishMind(db, { tick: 1, agentId: 'ghost', state: 'deciding' })
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const a = await connect(gw.port)
+    open.push(a)
+    await hello(a)
+    const aFrames: string[] = []
+    collect(a, aFrames)
+
+    publishMind(db, { tick: loop.state.tick, agentId: 'walker', state: 'deciding' })
+    publishMind(db, { tick: loop.state.tick, agentId: 'other', state: 'deciding' })
+    publishMind(db, { tick: loop.state.tick, agentId: 'walker', state: 'idle' })
+    gw.pump()
+    await wait(80)
+    const minds = aFrames.map((f) => ServerMsg.parse(JSON.parse(f))).filter((m) => m.t === 'mind')
+    // Both halves inside one poll. Dropping the idle of a pair leaves a caret lit on a body
+    // that has already answered.
+    expect(minds.map((m) => `${m.agentId}:${m.state}`)).toEqual([
+      'walker:deciding',
+      'other:deciding',
+      'walker:idle',
+    ])
+
+    const b = await connect(gw.port)
+    open.push(b)
+    const bFrames: string[] = []
+    collect(b, bFrames)
+    b.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
+    await wait(120)
+    const greeted = bFrames.map((f) => ServerMsg.parse(JSON.parse(f))).filter((m) => m.t === 'mind')
+    expect(greeted.map((m) => `${m.agentId}:${m.state}`)).toEqual(['other:deciding'])
+  })
+
+  it('carries on when the world was written before the minds table existed', async () => {
+    const dbPath = join(dir, 'old.db')
+    const db = openDb(dbPath)
+    db.exec(`CREATE TABLE observer_thoughts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tick INTEGER NOT NULL, agent_id TEXT NOT NULL, text TEXT NOT NULL,
+      importance INTEGER NOT NULL DEFAULT 5
+    );
+    CREATE TABLE observer_moods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tick INTEGER NOT NULL, agent_id TEXT NOT NULL, mood TEXT NOT NULL
+    );`)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('old-world'),
+      onTick: ({ tick, emit }) => {
+        if (tick === 1)
+          emit('agent_spawned', {
+            id: 'walker',
+            name: 'walker',
+            x: 0,
+            y: 0,
+            ageDays: ADULT_AGE_DAYS,
+          })
+      },
+    })
+    for (let i = 0; i < 3; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const a = await connect(gw.port)
+    open.push(a)
+    await hello(a)
+    const aFrames: string[] = []
+    collect(a, aFrames)
+    publishThought(db, { tick: loop.state.tick, agentId: 'walker', text: 'Still here.' })
+    expect(() => {
+      gw.pump()
+    }).not.toThrow()
+    await wait(80)
+    const kinds = aFrames.map((f) => (JSON.parse(f) as { t: string }).t)
+    expect(kinds).toContain('thought')
+    expect(kinds).not.toContain('mind')
+  })
 })

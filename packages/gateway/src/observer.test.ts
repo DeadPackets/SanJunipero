@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import {
   UNWEIGHED_IMPORTANCE,
   ensureObserverTables,
   latestMoods,
+  maxMindId,
+  mindsSince,
   moodsSince,
+  publishMind,
   publishMood,
   publishThought,
   thoughtsSince,
@@ -108,5 +112,40 @@ describe('observer mood feed', () => {
       'fisher:sore@9',
       'farmer:cross@30',
     ])
+  })
+})
+
+describe('observer mind feed', () => {
+  it('reads both halves of a turn in id order, and where a fresh reader should start', () => {
+    const db = new Database(':memory:')
+    ensureObserverTables(db)
+    publishMind(db, { tick: 1, agentId: 'farmer', state: 'deciding' })
+    publishMind(db, { tick: 2, agentId: 'fisher', state: 'deciding' })
+    publishMind(db, { tick: 3, agentId: 'farmer', state: 'idle' })
+    expect(mindsSince(db, 0).map((m) => `${m.agentId}:${m.state}`)).toEqual([
+      'farmer:deciding',
+      'fisher:deciding',
+      'farmer:idle',
+    ])
+    expect(mindsSince(db, 2).map((m) => `${m.agentId}:${m.state}`)).toEqual(['farmer:idle'])
+    // ★ A gateway that started reading at 0 would replay a dead town's last `deciding`, which
+    // has no `idle` behind it, and light a caret nothing puts out.
+    expect(maxMindId(db)).toBe(3)
+    expect(mindsSince(db, maxMindId(db))).toEqual([])
+    db.close()
+  })
+
+  it('drops rows older than a sim-day, so a row per turn per body is not kept forever', () => {
+    const db = new Database(':memory:')
+    ensureObserverTables(db)
+    const count = (): number =>
+      (db.prepare('SELECT COUNT(*) AS n FROM observer_minds').get() as { n: number }).n
+    for (let i = 0; i < 127; i++) {
+      publishMind(db, { tick: 10, agentId: 'farmer', state: 'idle' })
+    }
+    expect(count()).toBe(127)
+    publishMind(db, { tick: MINUTES_PER_DAY * 3, agentId: 'farmer', state: 'idle' })
+    expect(count()).toBe(1)
+    db.close()
   })
 })

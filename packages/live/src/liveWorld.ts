@@ -76,7 +76,7 @@ import {
   openNarratorDb,
   type TranscriptRecord,
 } from '@sj/narrator'
-import { publishMood, publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
+import { publishMind, publishMood, publishThought, type LiveCast, type LiveOps } from '@sj/gateway'
 import { createCastArt, createDiscoveryArt } from './discoveryCommission.js'
 
 /** Dollars in a rolling 24 real hours, the budget a weeks-long stream is actually run on:
@@ -700,6 +700,12 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         },
         onMood: (m) => {
           if (!stopped) publishMood(db, m)
+        },
+        onTurnStart: (m) => {
+          if (!stopped) publishMind(db, { ...m, state: 'deciding' })
+        },
+        onTurnEnd: (m) => {
+          if (!stopped) publishMind(db, { ...m, state: 'idle' })
         },
       })
       // What a birth writes outside the world log — the household and the mother's name — is

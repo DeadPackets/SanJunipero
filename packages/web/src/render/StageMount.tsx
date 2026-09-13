@@ -258,7 +258,7 @@ export function StageMount({
             const held = store.shotScene()
             const inTheRoom = held?.open ? held.participants : NOBODY
             for (const t of store.thoughtsLog().slice(seenThoughts - said))
-              if (shouldBubble(t, bubbleSubject(s), inTheRoom))
+              if (shouldBubble(t, bubbleSubject(s), inTheRoom, store.timeMoving()))
                 bubbles?.spawnThought(t.agentId, t.text)
             seenThoughts = said
           }

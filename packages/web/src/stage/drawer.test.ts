@@ -150,6 +150,7 @@ describe('the dossier rail with a full census', () => {
     condition: null,
     pressure: 1 - i / 12,
     onScreen: i === 0,
+    deciding: false,
     rank: i,
   }))
 
