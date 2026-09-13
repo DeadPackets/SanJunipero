@@ -15,7 +15,7 @@ import {
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import type { WorldState } from '@sj/engine/state'
 import type { Subject } from '../../stage/index.js'
-import { bustStyle } from '../../ui/bustStyle.js'
+import { bustStyle, useDressed, NO_RECORDS } from '../../ui/bustStyle.js'
 import { editions } from '../../ui/dispatches.js'
 import { bondsFeed, chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { PersonLink } from '../../ui/PersonLink.js'
@@ -399,6 +399,7 @@ export function Standing({ store, onSubject }: PageProps) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
   const records = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
+  const dressed = useDressed(store)
   const record = useFeed(chronicleFeed)
   const paper = useFeed(dispatchesFeed)
   const firsts = useFeed(milestonesFeed)
@@ -432,7 +433,7 @@ export function Standing({ store, onSubject }: PageProps) {
         bonds: bonds.data?.bonds ?? NO_BONDS,
         deathTicks,
       }}
-      records={records}
+      records={dressed ? records : NO_RECORDS}
       onSubject={onSubject}
     />
   )

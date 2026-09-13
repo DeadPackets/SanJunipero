@@ -6,6 +6,7 @@ import { EMPTY_LINEAGE } from '../../ui/bondModel2.js'
 import { changeLog, personalityRows, type PersonalityRow } from '../../ui/becoming.js'
 import { aimsFeed, bondsFeed, lineageFeed } from '../../ui/feeds.js'
 import { strongestTie } from '../../ui/roster/tieLine.js'
+import { useDressed, NO_RECORDS } from '../../ui/bustStyle.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
@@ -36,6 +37,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   useSyncExternalStore(store.subscribe, store.assetsSeq, store.assetsSeq) // faces re-resolve on codex pushes
+  const dressed = useDressed(store)
   const [sort, setSort] = useState<RosterSort>('name')
   const [openId, setOpenId] = useState<string | null>(null)
   const bonds = useFeed(bondsFeed).data
@@ -48,7 +50,7 @@ function People({ store, onSubject }: Pick<PageProps, 'store' | 'onSubject'>) {
       personalityRows,
     ).data ?? NO_CHANGES
 
-  const records = store.assetRecords()
+  const records = dressed ? store.assetRecords() : NO_RECORDS
   const events = store.recentEvents()
   const earshot = store.getConfig()?.movement.earshotRadius
   // `rosterRows2` hands them back by name; a second pass only earns its keep off that order.

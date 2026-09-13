@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore, type CSSProperties } from 'react'
 import type { StakeScore, ThreadRow } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
-import { bustStyle, type BustStyle } from '../ui/bustStyle.js'
+import { bustStyle, useDressed, type BustStyle } from '../ui/bustStyle.js'
 import { CONDITION_WORD, conditionsOf, stateLine, type Condition } from '../ui/status.js'
 import { boardRows, heatShare } from '../ui/threadModel.js'
 import { sharePercent } from './ShotBoard.js'
@@ -97,6 +97,7 @@ export function DossierRail({ store }: { store: WorldStore }) {
   const director = useSyncExternalStore(store.subscribe, store.getDirector, store.getDirector)
   const minds = useSyncExternalStore(store.subscribe, store.minds, store.minds)
   useSyncExternalStore(store.subscribe, store.assetsSeq, store.assetsSeq)
+  const dressed = useDressed(store)
   const cutCast = director?.cut?.agentIds
 
   // A scrub and a replay null both frames at once. The census is still true of the minute on
@@ -117,7 +118,7 @@ export function DossierRail({ store }: { store: WorldStore }) {
   return (
     <DossierRailBody
       cards={cards}
-      bustOf={(id) => bustStyle(store.assetRecords(), id, RAIL_BUST_PX)}
+      bustOf={dressed ? (id) => bustStyle(store.assetRecords(), id, RAIL_BUST_PX) : NO_BUST}
     />
   )
 }

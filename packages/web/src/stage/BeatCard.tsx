@@ -11,7 +11,7 @@ import {
   type ThreadRow,
 } from '@sj/shared'
 import type { TownScene, WorldStore } from '../state/worldStore.js'
-import { bustStyle, type BustStyle } from '../ui/bustStyle.js'
+import { bustStyle, useDressed, type BustStyle } from '../ui/bustStyle.js'
 import { aimsFeed } from '../ui/feeds.js'
 import { ladderLine, type LadderLine } from '../ui/sentenceLadder.js'
 import { VALENCE_TONE, threadCapsules } from '../ui/threadModel.js'
@@ -196,6 +196,7 @@ export function BeatCard({ store }: { store: WorldStore }) {
   const now = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
   useSyncExternalStore(store.subscribe, store.assetsSeq, store.assetsSeq)
+  const dressed = useDressed(store)
   const aims = useFeed(aimsFeed).data?.aims ?? NO_AIMS
   const [book, setBook] = useState<SceneBook>(NO_BOOK)
   const [moves, setMoves] = useState<MoveBook>(NO_MOVES)
@@ -224,7 +225,10 @@ export function BeatCard({ store }: { store: WorldStore }) {
   })
   if (view === null) return null
   return (
-    <BeatCardBody view={view} bustOf={(id) => bustStyle(store.assetRecords(), id, BEAT_BUST_PX)} />
+    <BeatCardBody
+      view={view}
+      bustOf={dressed ? (id) => bustStyle(store.assetRecords(), id, BEAT_BUST_PX) : NO_BUST}
+    />
   )
 }
 

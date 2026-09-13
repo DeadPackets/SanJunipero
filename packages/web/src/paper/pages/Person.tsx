@@ -9,7 +9,7 @@ import {
   tickToMoment,
 } from '@sj/shared'
 import { resolveAssetId } from '../../render/textures.js'
-import { bustStyle } from '../../ui/bustStyle.js'
+import { bustStyle, useDressed } from '../../ui/bustStyle.js'
 import { biographyOf, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
 import { aimsFeed, bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { familyLine, strongestTie } from '../../ui/roster/tieLine.js'
@@ -294,6 +294,7 @@ export function PersonLedgerView({
 export function PersonPage({ tab, subject, store, onSubject }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
+  const dressed = useDressed(store)
   const dispatches = useFeed(dispatchesFeed).data
   const aims = useFeed(aimsFeed).data
   const bonds = useFeed(bondsFeed).data
@@ -321,7 +322,7 @@ export function PersonPage({ tab, subject, store, onSubject }: PageProps) {
   const records = store.assetRecords()
   const portraitId = resolveAssetId(records, 'portrait', a.id)
   // no painted portrait yet → the v4 sprite bust stands in (smooth hi-res crop, not pixelated)
-  const bust = portraitId === null ? bustStyle(records, a.id, 52) : null
+  const bust = portraitId === null && dressed ? bustStyle(records, a.id, 52) : null
   const carrying = Object.values(state!.items).filter(
     (it) => it.loc.t === 'agent' && it.loc.id === a.id,
   )

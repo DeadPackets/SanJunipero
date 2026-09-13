@@ -1,5 +1,16 @@
+import { useSyncExternalStore } from 'react'
 import type { AssetRecord } from '@sj/shared'
 import { characterArt } from '../render/textures.js'
+import type { WorldStore } from '../state/worldStore.js'
+
+/** Has the town been revealed? No surface may cut a bust before it has: a 40 px head costs the
+ *  whole sheet, and twelve of them go out ahead of the ground. */
+export function useDressed(store: WorldStore): boolean {
+  return useSyncExternalStore(store.subscribe, store.dressed, store.dressed)
+}
+
+/** What a surface hands `bustStyle` while the town is still being dressed. */
+export const NO_RECORDS: AssetRecord[] = []
 
 export const BUST_FIGURE_SHARE = 0.45 // bust crop = head + shoulders ≈ top 45% of the chibi figure
 

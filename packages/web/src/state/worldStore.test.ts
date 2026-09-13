@@ -571,3 +571,19 @@ describe('the minds in flight', () => {
     expect(store.minds()).toBe(after)
   })
 })
+
+describe('the reveal', () => {
+  it('starts undressed and tells every reader once, however often it is set', () => {
+    const store = createWorldStore()
+    let woke = 0
+    store.subscribe(() => {
+      woke++
+    })
+    expect(store.dressed()).toBe(false)
+    store.setDressed()
+    expect(store.dressed()).toBe(true)
+    expect(woke).toBe(1)
+    store.setDressed()
+    expect(woke).toBe(1)
+  })
+})

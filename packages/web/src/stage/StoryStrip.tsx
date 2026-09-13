@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore, type CSSProperties } from 'react'
 import { WHY_NAMES_MAX, agentName, castWords, type ThreadRow } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
-import { bustStyle } from '../ui/bustStyle.js'
+import { bustStyle, useDressed, NO_RECORDS } from '../ui/bustStyle.js'
 import { VALENCE_TONE, threadCapsules, type Capsule } from '../ui/threadModel.js'
 
 /** Three capsules at 320px is 984px of a 1920px band. The sheet drops the second and the third
@@ -65,6 +65,7 @@ export function castLabel(c: Capsule, nameOf: (agentId: string) => string): stri
 export function StoryStrip({ store }: { store: WorldStore }) {
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
   const director = useSyncExternalStore(store.subscribe, store.getDirector, store.getDirector)
+  const dressed = useDressed(store)
   const cut = director?.cut?.agentIds
 
   // ★ A ledger of its own per pass. `remember` books every line it hands back, so a ledger kept
@@ -89,7 +90,7 @@ export function StoryStrip({ store }: { store: WorldStore }) {
   if (threads === null) return null
 
   const nameOf = (id: string): string => agentName(store.getState()?.agents, id)
-  const records = store.assetRecords()
+  const records = dressed ? store.assetRecords() : NO_RECORDS
 
   return (
     <div className="story-strip">

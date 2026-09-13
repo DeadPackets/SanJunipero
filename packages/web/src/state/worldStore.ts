@@ -84,6 +84,10 @@ export type WorldStore = {
   minds: () => ReadonlyMap<string, { state: MindState; tick: number }>
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
+  /** Has the reveal happened? A bust is a whole 400 KB character sheet on the wire, so none may
+   *  go out ahead of the ground the town stands on. */
+  dressed: () => boolean
+  setDressed: () => void
   /** The world log's head as the server last reported it — the signal a read model refetches on,
    *  instead of on a wall-clock timer. */
   logSeq: () => number
@@ -102,6 +106,7 @@ export function createWorldStore(): WorldStore {
   let paused = false
   let liveEdge = 0
   let assetsSeq = 0
+  let dressed = false
   let thoughtsSeq = 0
   let logSeq = 0
   const records: AssetRecord[] = []
@@ -187,6 +192,12 @@ export function createWorldStore(): WorldStore {
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
+    dressed: () => dressed,
+    setDressed: () => {
+      if (dressed) return
+      dressed = true
+      for (const fn of subs) fn()
+    },
     getConfig: () => config,
     getLaws: () => laws,
     lawHistory: () => lawChanges,

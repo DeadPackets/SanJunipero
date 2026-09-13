@@ -11,7 +11,7 @@ import {
   tickerText,
   type SpokenLine,
 } from '../ui/broadcast.js'
-import { bustStyle } from '../ui/bustStyle.js'
+import { bustStyle, useDressed } from '../ui/bustStyle.js'
 import { editions } from '../ui/dispatches.js'
 import { chronicleFeed, dispatchesFeed } from '../ui/feeds.js'
 import { endpoint, useFeed } from '../ui/useEndpoint.js'
@@ -108,6 +108,7 @@ export function LowerThird({
   broadcast?: boolean
 }) {
   const spoken = useSpokenInShot(store, shot)
+  const dressed = useDressed(store)
   const paper = useFeed(broadcast ? dispatchesFeed : NO_PAPER).data
   const latest = useMemo(() => (paper === null ? null : (editions(paper)[0] ?? null)), [paper])
 
@@ -121,7 +122,7 @@ export function LowerThird({
   const typed = useTypedInto(words, spoken?.bornMs ?? 0)
   if (line === null) return null
   const bust =
-    line.kind === 'speech'
+    line.kind === 'speech' && dressed
       ? bustStyle(store.assetRecords(), line.agentId, broadcast ? BUST_PX : BUST_DESK_PX)
       : null
 

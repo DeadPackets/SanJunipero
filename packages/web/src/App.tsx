@@ -40,6 +40,7 @@ import { playClosesPaper, pointPlay, useMomentEnd, type MomentPlay } from './ui/
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { firstWorryLine, stripReady, useColdOpen } from './ui/coldOpen.js'
+import { useDressed } from './ui/bustStyle.js'
 import { useDensity } from './ui/density.js'
 import { aimsFeed } from './ui/feeds.js'
 import { useFeed } from './ui/useEndpoint.js'
@@ -187,16 +188,10 @@ export function App() {
   const aims = useFeed(aimsFeed).data
   // The card leaves when the town is DRESSED, never when the scene object exists: art in hand
   // is the only thing that makes the reveal a town rather than an empty field.
-  const [dressed, setDressed] = useState(false)
+  const dressed = useDressed(store)
   useEffect(() => {
-    let live = true
-    void whenDressed().then(() => {
-      if (live) setDressed(true)
-    })
-    return () => {
-      live = false
-    }
-  }, [])
+    void whenDressed().then(store.setDressed)
+  }, [store])
   // A primitive, never the folded state: `getState()` is a fresh object every tick and would
   // re-render the whole app sixty times for a count that has not moved.
   const readLiving = (): number => livingCount(store.getState()?.agents)

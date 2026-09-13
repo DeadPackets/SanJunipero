@@ -38,8 +38,14 @@ const ART: AssetRecord = {
 }
 
 /** Only what the slab reads off a store: who spoke, what they are called, and their sheet. */
-function fakeStore(): { store: WorldStore; say: (id: string, text: string) => void } {
+function fakeStore(startDressed = true): {
+  store: WorldStore
+  say: (id: string, text: string) => void
+  dress: () => void
+} {
   const subs = new Set<(evts: SimEvent[]) => void>()
+  const viewers = new Set<() => void>()
+  let dressed = startDressed
   const agents = {
     nadia: { id: 'nadia', name: 'Nadia' },
     yusuf: { id: 'yusuf', name: 'Yusuf' },
@@ -50,12 +56,21 @@ function fakeStore(): { store: WorldStore; say: (id: string, text: string) => vo
         subs.add(fn)
         return () => subs.delete(fn)
       },
+      subscribe: (fn: () => void) => {
+        viewers.add(fn)
+        return () => viewers.delete(fn)
+      },
+      dressed: () => dressed,
       getState: () => ({ agents }),
       assetRecords: () => [ART],
     } as unknown as WorldStore,
     say: (agentId, text) => {
       const ev = { type: 'agent_spoke', payload: { agentId, text } } as unknown as SimEvent
       for (const fn of [...subs]) fn([ev])
+    },
+    dress: () => {
+      dressed = true
+      for (const fn of [...viewers]) fn()
     },
   }
 }
@@ -172,6 +187,29 @@ describe('★ the caption belongs to the shot, and goes with it', () => {
     expect(CSS).toMatch(
       /\[data-broadcast='on'\] \.lower-third-bust \{[^}]*width: 96px; height: 96px;/,
     )
+  })
+
+  // ★ Measured on three cold loads: twelve character sheets, 4 829 076 bytes, went out as CSS
+  // backgrounds the instant the codex landed, ahead of the ground and outside the loader's cap.
+  it('★ paints no bust before the town is dressed: a 28 px head costs the whole sheet', async () => {
+    vi.useFakeTimers()
+    const { store, say, dress } = fakeStore(false)
+    const { host } = await mount(
+      createElement(LowerThird, { store, shot: ['nadia'] as readonly string[] }),
+    )
+    await act(async () => {
+      say('nadia', LINE)
+    })
+    const bust = (): HTMLElement | null => host.querySelector<HTMLElement>('.lower-third-bust')
+    expect(bust(), 'the slab still holds the space').not.toBeNull()
+    expect(bust()?.style.backgroundImage, 'no sheet url is on the wire yet').toBe('')
+    expect(bust()?.className).toBe('lower-third-bust none')
+
+    await act(async () => {
+      dress()
+    })
+    expect(bust()?.style.backgroundImage).toContain('asset_nadia')
+    expect(bust()?.className).toBe('lower-third-bust')
   })
 
   it('★ the desk asks the paper for nothing: an idle tab would poll for it forever', async () => {

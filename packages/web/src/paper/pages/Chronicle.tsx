@@ -16,7 +16,7 @@ import { OutOfReach } from '../../ui/OutOfReach.js'
 import { PersonLink } from '../../ui/PersonLink.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
-import { bustStyle } from '../../ui/bustStyle.js'
+import { bustStyle, useDressed } from '../../ui/bustStyle.js'
 import { lastVisitTick } from '../../ui/storage.js'
 import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
 import { useFeed, type Read } from '../../ui/useEndpoint.js'
@@ -500,6 +500,7 @@ function Firsts({ store, onPlay, onSubject }: PageProps) {
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const records = useSyncExternalStore(store.subscribe, store.assetRecords, store.assetRecords)
+  const dressed = useDressed(store)
   const read = useFeed(milestonesFeed)
   return (
     <FirstsView
@@ -508,7 +509,7 @@ function Firsts({ store, onPlay, onSubject }: PageProps) {
       edge={edge}
       lastVisit={lastVisitTick()}
       people={state?.agents}
-      records={records}
+      records={dressed ? records : NO_RECORDS}
       onPlay={onPlay}
       onSubject={onSubject}
     />

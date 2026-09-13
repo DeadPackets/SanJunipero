@@ -1,4 +1,4 @@
-import { Assets, Container, Graphics, Texture } from 'pixi.js'
+import { Container, Graphics } from 'pixi.js'
 import { SPEECH_MAX_CHARS } from '@sj/shared'
 import { WORLD_TEXT_LINE_H } from '../textFloor.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
@@ -51,7 +51,7 @@ import { rectInView } from './cull.js'
 import { FACINGS, tileToScreen } from './iso.js'
 import { ZOOM_STOPS } from './camera.js'
 import { CHAR_TARGET_PX, SHEET_ROWS } from './charAnim.js'
-import { characterArt, fadeArtIn } from './textures.js'
+import { LOAD_PRIORITY, TextureBook, characterArt, fadeArtIn } from './textures.js'
 import { MOTION, progress } from '../ui/motion.js'
 import { characterCell, rendersOnMap } from './characters.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -368,15 +368,17 @@ export function createBubbleLayer(scene: Scene, store: WorldStore): BubbleLayer 
     }
   }
 
-  // One readback per person, from the idle cell the character layer already loaded. Until it
-  // lands the bubble is plain cream, which is the material it leans away from anyway.
+  // One readback per person, from the idle cell the character layer already loaded. Through the
+  // book, so the queue sees it: the same url in flight is the same promise and no second request.
+  const book = new TextureBook()
   const tints = new Map<string, number | null>()
   const speakerFill = (agentId: string): number => {
     const known = tints.get(agentId)
     if (known !== undefined) return known ?? SPEECH_FILL
     tints.set(agentId, null)
     const art = characterArt(store.assetRecords(), agentId)
-    void Assets.load<Texture>(art.url)
+    void book
+      .get(art.url, LOAD_PRIORITY.far)
       .then((sheet) => {
         const cell = characterCell(sheet, art, SHEET_ROWS[0], FACINGS[0])
         if (cell === null) return
