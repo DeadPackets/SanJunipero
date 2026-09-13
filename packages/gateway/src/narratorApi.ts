@@ -33,7 +33,7 @@ import { makeMomentsReader } from './moments.js'
 import type { Router } from './router.js'
 import type { WorldMirror } from './worldMirror.js'
 import { makeSeqCache, sendPrebuilt } from './seqCache.js'
-import { sendJson, toEvent } from './http.js'
+import { parseTarget, sendJson, toEvent } from './http.js'
 import { reportOnce } from './degraded.js'
 
 export type NarratorApiDeps = {
@@ -105,15 +105,15 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
 
   // A free key is a cache a stranger can miss on purpose. The clamped pair is also the memo key,
   // so every over-long window collapses onto the same entry.
-  const windowOf = (url: URL): { fromTick: number; toTick: number } => {
+  const windowOf = (q: URLSearchParams): { fromTick: number; toTick: number } => {
     const liveTick = deps.mirror.state().tick
     const pin = (raw: string | null, fallback: number): number => {
       const n = Number(raw ?? fallback)
       if (!Number.isFinite(n)) return fallback
       return Math.min(Math.max(Math.trunc(n), 0), liveTick)
     }
-    const fromTick = pin(url.searchParams.get('fromTick'), 0)
-    return { fromTick, toTick: Math.max(fromTick, pin(url.searchParams.get('toTick'), liveTick)) }
+    const fromTick = pin(q.get('fromTick'), 0)
+    return { fromTick, toTick: Math.max(fromTick, pin(q.get('toTick'), liveTick)) }
   }
 
   const chronicleEntries = (fromTick: number, toTick: number): readonly ChronicleEntry[] =>
@@ -165,8 +165,9 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
     })
 
   router.route('GET', '/api/chronicle', (req: IncomingMessage, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const { fromTick, toTick } = windowOf(url)
+    const { fromTick, toTick } = windowOf(
+      parseTarget(req.url)?.searchParams ?? new URLSearchParams(),
+    )
     sendPrebuilt(
       res,
       cache.json(`chronicle:${fromTick}:${toTick}`, () => ({

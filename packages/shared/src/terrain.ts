@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseMeta } from './assetManifest.js'
 
 export const TERRAIN_TILE_KINDS = [
   'grass',
@@ -42,14 +43,5 @@ export const TerrainTileManifestSchema = z
   .strict()
 export type TerrainTileManifest = z.infer<typeof TerrainTileManifestSchema>
 
-export function parseTerrainTileManifest(meta: string | null): TerrainTileManifest | null {
-  if (meta === null) return null
-  let raw: unknown
-  try {
-    raw = JSON.parse(meta)
-  } catch {
-    return null
-  }
-  const r = TerrainTileManifestSchema.safeParse(raw)
-  return r.success ? r.data : null
-}
+export const parseTerrainTileManifest = (meta: string | null): TerrainTileManifest | null =>
+  parseMeta(TerrainTileManifestSchema, meta)

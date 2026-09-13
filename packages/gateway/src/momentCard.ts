@@ -1,4 +1,4 @@
-import { type DayPhase, type Moment, agentName, dayPhaseFromTick, tickToMoment } from '@sj/shared'
+import { type DayPhase, type Moment, dayPhaseFromTick, tickToMoment } from '@sj/shared'
 import { attr } from './http.js'
 import { CARD_HEIGHT, CARD_WIDTH } from './agentCard.js'
 
@@ -98,8 +98,3 @@ export function momentAt(moments: readonly Moment[], tick: number, day: number):
   // `moments` already arrives newest day first and highest stakes first inside a day.
   return moments.find((m) => m.day === day) ?? null
 }
-
-export const momentCardNames =
-  (agents: Parameters<typeof agentName>[0]) =>
-  (id: string): string =>
-    agentName(agents, id)

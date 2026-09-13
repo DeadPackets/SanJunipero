@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { TOGGLABLE_PATHS } from '@sj/engine'
 import { reportOnce } from './degraded.js'
 import { parseTarget, sendJson } from './http.js'
+import { matchSegments } from './router.js'
 
 const ADMIN_LAWS_PATH = '/admin/laws'
 const DEFAULT_ADMIN_HOST = '127.0.0.1'
@@ -55,19 +56,6 @@ export function readBody(req: IncomingMessage): Promise<string | null> {
       answer(null)
     })
   })
-}
-
-function match(route: AdminRoute, pathname: string): Record<string, string> | null {
-  const want = route.path.split('/').filter(Boolean)
-  const got = pathname.split('/').filter(Boolean)
-  if (want.length !== got.length) return null
-  const params: Record<string, string> = {}
-  for (let i = 0; i < want.length; i++) {
-    const seg = want[i]!
-    if (seg.startsWith(':')) params[seg.slice(1)] = got[i]!
-    else if (seg !== got[i]) return null
-  }
-  return params
 }
 
 // The admin channel is a separate server on a separate port from the read-only
@@ -133,8 +121,9 @@ export function createLawsAdmin(opts: LawsAdminOpts): Server {
       sendJson(res, { error: 'bad request' }, 400)
       return
     }
+    const segs = url.pathname.split('/').filter(Boolean)
     for (const route of routes) {
-      const params = match(route, url.pathname)
+      const params = matchSegments(route.path.split('/').filter(Boolean), segs)
       if (params === null) continue
       if (route.method !== (req.method ?? 'GET')) {
         sendJson(res, { error: `${route.method} only` }, 405)

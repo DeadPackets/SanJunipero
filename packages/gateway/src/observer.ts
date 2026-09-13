@@ -54,14 +54,14 @@ function stmts(db: Database.Database): Stmts {
       'INSERT INTO observer_thoughts (tick, agent_id, text, importance) VALUES (?, ?, ?, ?)',
     ),
     since: db.prepare(
-      'SELECT id, tick, agent_id, text, importance FROM observer_thoughts WHERE id > ? ORDER BY id',
+      'SELECT id, tick, agent_id AS agentId, text, importance FROM observer_thoughts WHERE id > ? ORDER BY id',
     ),
     insertMood: db.prepare('INSERT INTO observer_moods (tick, agent_id, mood) VALUES (?, ?, ?)'),
     moodsSince: db.prepare(
-      'SELECT id, tick, agent_id, mood FROM observer_moods WHERE id > ? ORDER BY id',
+      'SELECT id, tick, agent_id AS agentId, mood FROM observer_moods WHERE id > ? ORDER BY id',
     ),
     latestMoods: db.prepare(
-      'SELECT id, tick, agent_id, mood FROM observer_moods WHERE id IN (SELECT MAX(id) FROM observer_moods GROUP BY agent_id) ORDER BY id',
+      'SELECT id, tick, agent_id AS agentId, mood FROM observer_moods WHERE id IN (SELECT MAX(id) FROM observer_moods GROUP BY agent_id) ORDER BY id',
     ),
   }
   prepared.set(db, fresh)
@@ -79,20 +79,13 @@ export function thoughtsSince(
   db: Database.Database,
   idExclusive: number,
 ): { id: number; tick: number; agentId: string; text: string; importance: number }[] {
-  const rows = stmts(db).since.all(idExclusive) as {
+  return stmts(db).since.all(idExclusive) as {
     id: number
     tick: number
-    agent_id: string
+    agentId: string
     text: string
     importance: number
   }[]
-  return rows.map((r) => ({
-    id: r.id,
-    tick: r.tick,
-    agentId: r.agent_id,
-    text: r.text,
-    importance: r.importance,
-  }))
 }
 
 export type MoodRow = { id: number; tick: number; agentId: string; mood: string }
@@ -104,21 +97,13 @@ export function publishMood(
   stmts(db).insertMood.run(m.tick, m.agentId, m.mood)
 }
 
-const moodRows = (rows: unknown[]): MoodRow[] =>
-  (rows as { id: number; tick: number; agent_id: string; mood: string }[]).map((r) => ({
-    id: r.id,
-    tick: r.tick,
-    agentId: r.agent_id,
-    mood: r.mood,
-  }))
-
 export function moodsSince(db: Database.Database, idExclusive: number): MoodRow[] {
-  return moodRows(stmts(db).moodsSince.all(idExclusive))
+  return stmts(db).moodsSince.all(idExclusive) as MoodRow[]
 }
 
 /** One row per mind, the word it holds now: what a late viewer is handed at the greeting. */
 export function latestMoods(db: Database.Database): MoodRow[] {
-  return moodRows(stmts(db).latestMoods.all())
+  return stmts(db).latestMoods.all() as MoodRow[]
 }
 
 export type MindRow = { id: number; tick: number; agentId: string; state: 'deciding' | 'idle' }
@@ -141,7 +126,7 @@ function mindStmts(db: Database.Database): MindStmts {
   const fresh: MindStmts = {
     insert: db.prepare('INSERT INTO observer_minds (tick, agent_id, state) VALUES (?, ?, ?)'),
     since: db.prepare(
-      'SELECT id, tick, agent_id, state FROM observer_minds WHERE id > ? ORDER BY id',
+      'SELECT id, tick, agent_id AS agentId, state FROM observer_minds WHERE id > ? ORDER BY id',
     ),
     maxId: db.prepare('SELECT MAX(id) AS id FROM observer_minds'),
     trim: db.prepare('DELETE FROM observer_minds WHERE tick < ?'),
@@ -168,16 +153,11 @@ export function publishMind(
   }
 }
 
-const mindRows = (rows: unknown[]): MindRow[] =>
-  (rows as { id: number; tick: number; agent_id: string; state: string }[]).map((r) => ({
-    id: r.id,
-    tick: r.tick,
-    agentId: r.agent_id,
-    state: r.state === 'deciding' ? 'deciding' : 'idle',
-  }))
-
 export function mindsSince(db: Database.Database, idExclusive: number): MindRow[] {
-  return mindRows(mindStmts(db).since.all(idExclusive))
+  const rows = mindStmts(db).since.all(idExclusive) as (Omit<MindRow, 'state'> & {
+    state: string
+  })[]
+  return rows.map((r) => ({ ...r, state: r.state === 'deciding' ? 'deciding' : 'idle' }))
 }
 
 /** Where a fresh gateway starts reading. Rows a previous process wrote are history: a town that

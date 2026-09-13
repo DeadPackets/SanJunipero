@@ -37,16 +37,6 @@ function tilesFrom(s: SitedThing, x: number, y: number): number {
   return Math.max(dx, dy)
 }
 
-/** A tile already written as words is already an answer; only a raw pair is resolved. `segment.ts`
- *  is the one writer of that format, and this is its one reader. */
-export function placeWordsForLocation(
-  structures: readonly SitedThing[],
-  location: string,
-): string | null {
-  const m = /^(\d+),(\d+)$/u.exec(location)
-  return m === null ? location : placeWordsAt(structures, Number(m[1]), Number(m[2]))
-}
-
 /** R4: a place is words or it is nothing — a viewer is never handed a pair of numbers. */
 export function placeWordsAt(
   structures: readonly SitedThing[],

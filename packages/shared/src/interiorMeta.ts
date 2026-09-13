@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseMeta } from './assetManifest.js'
 
 // The renderer's room vocabulary, not enterability — that is roofed. Every enterable kind must
 // have a room here (interiors.test.ts); shed is the one unenterable exception, pinned by name.
@@ -48,15 +49,8 @@ export const LibraryItemManifestSchema = z
   .strict()
 export type LibraryItemManifest = z.infer<typeof LibraryItemManifestSchema>
 
-export function parseLibraryItemManifest(meta: string | null): LibraryItemManifest | null {
-  if (meta === null) return null
-  try {
-    const r = LibraryItemManifestSchema.safeParse(JSON.parse(meta))
-    return r.success ? r.data : null
-  } catch {
-    return null
-  }
-}
+export const parseLibraryItemManifest = (meta: string | null): LibraryItemManifest | null =>
+  parseMeta(LibraryItemManifestSchema, meta)
 
 // The six original furnishings include `tools`, which the addendum resolves as "anvil + saw wall rack".
 export const FURNISHING_KIND_ALIASES: Record<string, string> = { tools: 'anvil' }

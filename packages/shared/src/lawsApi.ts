@@ -23,4 +23,3 @@ export type LawRow = z.infer<typeof LawRowSchema>
 
 // Newest first, repealed laws included — a rule the town let go of is part of its story.
 export const LawsResponseSchema = z.object({ laws: z.array(LawRowSchema) }).strict()
-export type LawsResponse = z.infer<typeof LawsResponseSchema>

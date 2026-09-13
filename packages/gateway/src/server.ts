@@ -47,7 +47,7 @@ import { mountCrawlerRoutes } from './crawler.js'
 import { adminChannelPort, makeAdminProxy } from './adminProxy.js'
 import { reportOnce } from './degraded.js'
 import { frameText, notFound, parseTarget, sendJson } from './http.js'
-import type { RouteHandler, Router } from './router.js'
+import { matchSegments, type RouteHandler, type Router } from './router.js'
 
 export type GatewayOpts = {
   dbPath: string
@@ -187,23 +187,17 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     }
     const segs = url.pathname.split('/').filter(Boolean)
     for (const r of routes) {
-      if (r.method !== (req.method ?? 'GET') || r.segs.length !== segs.length) continue
-      const params: Record<string, string> = {}
+      if (r.method !== (req.method ?? 'GET')) continue
+      const params = matchSegments(r.segs, segs)
+      if (params === null) continue
+      // A malformed escape is not this route's path: `decodeURIComponent` throws, and unguarded
+      // that throw is an uncaughtException in the listener that ticks the town.
       let ok = true
-      for (let i = 0; i < r.segs.length; i++) {
-        const p = r.segs[i]!
-        // A malformed escape is not this route's path: `decodeURIComponent` throws, and unguarded
-        // that throw is an uncaughtException in the listener that ticks the town.
-        if (p.startsWith(':')) {
-          try {
-            params[p.slice(1)] = decodeURIComponent(segs[i]!)
-          } catch {
-            ok = false
-            break
-          }
-        } else if (p !== segs[i]) {
+      for (const [k, v] of Object.entries(params)) {
+        try {
+          params[k] = decodeURIComponent(v)
+        } catch {
           ok = false
-          break
         }
       }
       if (ok) {

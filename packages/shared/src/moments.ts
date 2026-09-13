@@ -25,7 +25,6 @@ export const MomentSchema = z
 export type Moment = z.infer<typeof MomentSchema>
 
 export const MomentsResponseSchema = z.object({ moments: z.array(MomentSchema) }).strict()
-export type MomentsResponse = z.infer<typeof MomentsResponseSchema>
 
 /** What the town calls a room with no topic yet. Never "Scene 12" and never the day's chapter
  *  title, which every scene of that day would have shared. */

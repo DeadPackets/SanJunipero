@@ -38,7 +38,6 @@ export const DiscoveryResponseSchema = z
     discoveries: z.array(DiscoveryRecordSchema),
   })
   .strict()
-export type DiscoveryResponse = z.infer<typeof DiscoveryResponseSchema>
 
 // The intent is the agent's OWN words and never appears here: the chronicle is agent-visible,
 // and a mind reading its own sentence back is the loop the one-way glass prevents.

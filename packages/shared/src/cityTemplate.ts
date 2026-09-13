@@ -8,6 +8,7 @@ import {
   blockRect,
   doorFrontOf,
   freePlots,
+  placedTiles,
   plattedBlocks,
   streetTiles,
   type Ground,
@@ -551,12 +552,7 @@ export function doorTile(s: StructureBox): { dx: number; dy: number } {
   return { dx: s.dx + ((s.w - 1) >> 1), dy: s.dy + s.h - 1 }
 }
 
-export function structureTiles(s: StructureBox): { dx: number; dy: number }[] {
-  const out: { dx: number; dy: number }[] = []
-  for (let dy = s.dy; dy < s.dy + s.h; dy++)
-    for (let dx = s.dx; dx < s.dx + s.w; dx++) out.push({ dx, dy })
-  return out
-}
+export const structureTiles = placedTiles
 
 /** The tile the door opens onto — outside the building, on the face its `facing` names: SW opens
  *  on the +y face, SE on the +x, and there is no third. `frontages` measures it. */

@@ -4,11 +4,11 @@
 import {
   BLOCK,
   PITCH,
-  STREET,
   blockIsPlattable,
   doorFrontOf,
   place,
   plotsOf,
+  streetBandTiles,
   type Ground,
   type Plot,
   type TileXY,
@@ -216,29 +216,11 @@ export function blockGroundOf(
     for (let dx = x0; dx < x0 + BLOCK; dx++) cleared.push(worldOf(square, { dx, dy }))
   const paved: WorldXY[] = []
   const seen = new Set<string>()
-  for (let s = 0; s < STREET; s++) {
-    for (let dx = x0 - STREET; dx < x0 + BLOCK + STREET; dx++) {
-      for (const t of [
-        { dx, dy: y0 + BLOCK + s },
-        { dx, dy: y0 - 1 - s },
-      ]) {
-        const k = `${t.dx},${t.dy}`
-        if (seen.has(k) || ground(t.dx, t.dy) === 'water') continue
-        seen.add(k)
-        paved.push(worldOf(square, t))
-      }
-    }
-    for (let dy = y0 - STREET; dy < y0 + BLOCK + STREET; dy++) {
-      for (const t of [
-        { dx: x0 + BLOCK + s, dy },
-        { dx: x0 - 1 - s, dy },
-      ]) {
-        const k = `${t.dx},${t.dy}`
-        if (seen.has(k) || ground(t.dx, t.dy) === 'water') continue
-        seen.add(k)
-        paved.push(worldOf(square, t))
-      }
-    }
+  for (const t of streetBandTiles(block.i, block.j)) {
+    const k = `${t.dx},${t.dy}`
+    if (seen.has(k) || ground(t.dx, t.dy) === 'water') continue
+    seen.add(k)
+    paved.push(worldOf(square, t))
   }
   return { cleared, paved }
 }

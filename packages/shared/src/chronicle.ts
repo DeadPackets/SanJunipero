@@ -211,7 +211,6 @@ export function chronicleCast(ev: SimEvent, isAgent: (id: string) => boolean): s
 }
 
 export const ChronicleResponseSchema = z.object({ entries: z.array(ChronicleEntrySchema) }).strict()
-export type ChronicleResponse = z.infer<typeof ChronicleResponseSchema>
 
 export function chronicleIcon(type: string): string {
   return CHRONICLE_ICONS[type] ?? CHRONICLE_FALLBACK_ICON
@@ -283,9 +282,6 @@ export const UNNAMED_CONSTRUCT_COPY = 'a gathering nobody has named yet'
 // is enforced. `(?!\w)` closes the boundary because a `\b` can never follow the final `.` of A.I.
 export const FORBIDDEN_FRAMING =
   /\b(AI|A\.I\.|artificial intelligence|language models?|LLMs?|neural|prompts?|context windows?|tokens?|chatbots?|simulations?)(?!\w)/i
-
-export const CONSTRUCT_CHRONICLE_WEIGHT = 16
-export const CONSTRUCT_CHRONICLE_ICON = 'star'
 
 // The observer's voice: what they do, and what they call it if they call it anything. Never
 // the type, which is ours.

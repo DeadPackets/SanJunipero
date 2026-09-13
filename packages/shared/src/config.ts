@@ -745,7 +745,6 @@ export const SimConfigSchema = z
   .strict()
 
 export type SimConfig = z.infer<typeof SimConfigSchema>
-export type CropDef = z.infer<typeof CropDefSchema>
 export type RecipeDef = z.infer<typeof RecipeSchema>
 export type StructureRecipeDef = z.infer<typeof StructureRecipeSchema>
 

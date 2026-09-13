@@ -249,24 +249,29 @@ export function freePlots(rings: number, ground: Ground): Plot[] {
 export function streetTiles(rings: number, ground: Ground): TileXY[] {
   const seen = new Set<string>()
   const out: TileXY[] = []
-  const add = (dx: number, dy: number): void => {
-    const k = `${dx},${dy}`
-    if (seen.has(k) || ground(dx, dy) === 'water') return
-    seen.add(k)
-    out.push({ dx, dy })
-  }
   for (const b of [...plattedBlocks(rings, ground), { i: 0, j: 0 }]) {
-    const x0 = b.i * PITCH,
-      y0 = b.j * PITCH
-    for (let s = 0; s < STREET; s++) {
-      for (let dx = x0 - STREET; dx < x0 + BLOCK + STREET; dx++) {
-        add(dx, y0 + BLOCK + s)
-        add(dx, y0 - 1 - s)
-      }
-      for (let dy = y0 - STREET; dy < y0 + BLOCK + STREET; dy++) {
-        add(x0 + BLOCK + s, dy)
-        add(x0 - 1 - s, dy)
-      }
+    for (const t of streetBandTiles(b.i, b.j)) {
+      const k = `${t.dx},${t.dy}`
+      if (seen.has(k) || ground(t.dx, t.dy) === 'water') continue
+      seen.add(k)
+      out.push(t)
+    }
+  }
+  return out
+}
+
+/** The street band around one block, in a fixed order and with the shared tiles still in it.
+ *  Blocks a PITCH apart share a band, so a caller over more than one block dedupes. */
+export function streetBandTiles(i: number, j: number): TileXY[] {
+  const x0 = i * PITCH,
+    y0 = j * PITCH
+  const out: TileXY[] = []
+  for (let s = 0; s < STREET; s++) {
+    for (let dx = x0 - STREET; dx < x0 + BLOCK + STREET; dx++) {
+      out.push({ dx, dy: y0 + BLOCK + s }, { dx, dy: y0 - 1 - s })
+    }
+    for (let dy = y0 - STREET; dy < y0 + BLOCK + STREET; dy++) {
+      out.push({ dx: x0 + BLOCK + s, dy }, { dx: x0 - 1 - s, dy })
     }
   }
   return out

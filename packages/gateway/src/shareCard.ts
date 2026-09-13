@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type Database from 'better-sqlite3'
 import sharp from 'sharp'
-import { MINUTES_PER_DAY, type Moment, momentToTick, personAt } from '@sj/shared'
+import { MINUTES_PER_DAY, type Moment, agentName, momentToTick, personAt } from '@sj/shared'
 // The deep path, never the package root: `@sj/narrator`'s index reaches @sj/llm and the `ai`
 // SDK, which the scripted stream must never load (town/src/liveSeam.test.ts).
 import { renderShareCard } from '@sj/narrator/shareCard'
@@ -11,7 +11,7 @@ import type { Router } from './router.js'
 import { reportOnce } from './degraded.js'
 import { AGENT_ID } from './api.js'
 import { makeSpriteReader, renderAgentCard, type AgentRead } from './agentCard.js'
-import { CARD_CAST_MAX, momentAt, momentCardNames, renderMomentCard } from './momentCard.js'
+import { CARD_CAST_MAX, momentAt, renderMomentCard } from './momentCard.js'
 
 export const TOWN_NAME = 'San Junipero'
 
@@ -265,7 +265,8 @@ export function mountShareCard(router: Router, deps: ShareCardDeps): void {
       })
     }
     const busts = await Promise.all(scene.cast.slice(0, CARD_CAST_MAX).map(spriteFor))
-    return renderMomentCard(scene, busts, momentCardNames(deps.mirror.state().agents))
+    const agents = deps.mirror.state().agents
+    return renderMomentCard(scene, busts, (id) => agentName(agents, id))
   }
 
   router.route('GET', '/card/moment/:day/:time', (_req, res, params) => {

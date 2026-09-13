@@ -56,22 +56,20 @@ export const BuildingManifestSchema = z
   .strict()
 export type BuildingManifest = z.infer<typeof BuildingManifestSchema>
 
-export function parseCharacterAtlasManifest(meta: string | null): CharacterAtlasManifest | null {
+/** Manifest text off a codex row: unreadable JSON and a row that fails the schema both read as
+ *  no manifest at all. */
+export function parseMeta<T>(schema: z.ZodType<T>, meta: string | null): T | null {
   if (meta === null) return null
   try {
-    const r = CharacterAtlasManifestSchema.safeParse(JSON.parse(meta))
+    const r = schema.safeParse(JSON.parse(meta))
     return r.success ? r.data : null
   } catch {
     return null
   }
 }
 
-export function parseBuildingManifest(meta: string | null): BuildingManifest | null {
-  if (meta === null) return null
-  try {
-    const r = BuildingManifestSchema.safeParse(JSON.parse(meta))
-    return r.success ? r.data : null
-  } catch {
-    return null
-  }
-}
+export const parseCharacterAtlasManifest = (meta: string | null): CharacterAtlasManifest | null =>
+  parseMeta(CharacterAtlasManifestSchema, meta)
+
+export const parseBuildingManifest = (meta: string | null): BuildingManifest | null =>
+  parseMeta(BuildingManifestSchema, meta)
