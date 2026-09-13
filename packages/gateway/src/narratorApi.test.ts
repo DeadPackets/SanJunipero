@@ -213,6 +213,44 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(1, 1, 2, 3, 2, 1, 9)
+    // Day 1 holds two scored scenes, so the served row has to be the hotter one's own columns.
+    ndb
+      .prepare(
+        `INSERT INTO heat_scores (scene_id, conflict, novelty, firsts, stakes, dramatic_irony, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(2, 4, 0, 0, 0, 0, 4)
+    ndb
+      .prepare(
+        `INSERT INTO heat_scores (scene_id, conflict, novelty, firsts, stakes, dramatic_irony, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(3, 0, 1, 0, 5, 1, 7)
+    ndb
+      .prepare(
+        `INSERT INTO milestones (kind, label, event_seq, day, tick, tier, domain, agent_ids,
+         construct_id, name_provenance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run('first_joke', 'The first joke', 9100, 1, 1450, '2.5', 'semantic', '["cara"]', null, null)
+    ndb
+      .prepare(
+        `INSERT INTO semantic_first_detected (concept_kind, agent_id, day, source_kind, event_seq,
+         memory_ref, quote, quote2, provenance2, confidence, rationale)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        'joke',
+        'cara',
+        1,
+        'speech',
+        9100,
+        null,
+        'the goat got there first and it knew it',
+        null,
+        null,
+        0.91,
+        'a deliberate absurdity landed for a laugh',
+      )
     ndb.close()
 
     gw = await createGateway({
@@ -337,7 +375,30 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
         memberIds: '["alice","bob"]',
       },
     ])
-    expect(body.heat).toEqual([{ day: 0, total: 9 }])
+    expect(body.heat).toEqual([
+      { day: 1, total: 7, conflict: 0, novelty: 1, firsts: 0, stakes: 5, dramaticIrony: 1 },
+      { day: 0, total: 9, conflict: 1, novelty: 2, firsts: 3, stakes: 2, dramaticIrony: 1 },
+    ])
+  })
+
+  it('sends the five parts of the day’s hottest scene, and they add up to what it called it', async () => {
+    const body = (await (await fetch(`${base}/api/dispatches`)).json()) as {
+      heat: {
+        day: number
+        total: number
+        conflict: number
+        novelty: number
+        firsts: number
+        stakes: number
+        dramaticIrony: number
+      }[]
+    }
+    expect(body.heat).toHaveLength(2)
+    for (const h of body.heat) {
+      expect(h.conflict + h.novelty + h.firsts + h.stakes + h.dramaticIrony, `day ${h.day}`).toBe(
+        h.total,
+      )
+    }
   })
 
   /** The narrator writes day N's paper SECONDS into day N, after the first GET of that day has
@@ -376,8 +437,31 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
           eventSeq: 8999,
           quote: 'we should call it the Long Sit',
         },
+        detected: null,
+      },
+      {
+        kind: 'first_joke',
+        label: 'The first joke',
+        eventSeq: 9100,
+        day: 1,
+        tick: 1450,
+        tier: 2.5,
+        domain: 'semantic',
+        agentIds: ['cara'],
+        nameProvenance: null,
+        detected: { quote: 'the goat got there first and it knew it', day: 1 },
       },
     ])
+  })
+
+  // ★ The detection pass scores itself and says why. Both are the machine talking about its own
+  // work, and `glassScan` is the reason neither may cross to a page.
+  it('★ carries the caught line and never the pass’s own score or reasoning', async () => {
+    const wire = await (await fetch(`${base}/api/milestones`)).text()
+    expect(wire).toContain('the goat got there first and it knew it')
+    expect(wire).not.toContain('confidence')
+    expect(wire).not.toContain('rationale')
+    expect(wire).not.toContain('a deliberate absurdity landed for a laugh')
   })
 
   // ★ `/api/moments` used to serve the narrator's time-window segments — dozens a day, every one

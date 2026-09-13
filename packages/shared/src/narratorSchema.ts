@@ -67,7 +67,10 @@ export const NARRATOR_READ_TABLES: Readonly<Record<string, readonly string[]>> =
   publications: ['day', 'kind', 'title', 'body', 'subject_id'],
   eras: ['start_day', 'end_day', 'title', 'text'],
   institutions: ['kind', 'name', 'description', 'founding_scene_id', 'member_ids'],
-  heat_scores: ['scene_id', 'total'],
+  heat_scores: ['scene_id', 'conflict', 'novelty', 'firsts', 'stakes', 'dramatic_irony', 'total'],
+  // The quote and the day only. `confidence` and `rationale` are the pass talking about
+  // itself, and the far side of this glass is a reader.
+  semantic_first_detected: ['concept_kind', 'day', 'quote'],
 }
 
 export type ChapterRow = { day: number; title: string; text: string }
@@ -97,6 +100,8 @@ export type MilestoneRead = {
   domain: string
   agentIds: string[]
   nameProvenance: Omit<QuotedName, 'byId'> | null
+  /** The line the narrator caught, where this first was found in somebody's speech. */
+  detected?: { quote: string; day: number } | null
 }
 
 /** A JSON column of a ledger read through the glass: unparseable is one thin row, not a 500. */

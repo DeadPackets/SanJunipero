@@ -245,9 +245,14 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
            ORDER BY s.day DESC LIMIT ${DISPATCH_MAX}`,
         ),
         // One reading a day: the hottest scene the narrator scored is what the day felt like.
+        // The five bare columns come off the row MAX() picked, which SQLite guarantees only
+        // while this query carries exactly one aggregate.
         heat: readOrEmpty(
           db,
-          `SELECT s.day AS day, MAX(h.total) AS total FROM heat_scores h
+          `SELECT s.day AS day, MAX(h.total) AS total, h.conflict AS conflict,
+             h.novelty AS novelty, h.firsts AS firsts, h.stakes AS stakes,
+             h.dramatic_irony AS dramaticIrony
+           FROM heat_scores h
            JOIN scenes s ON s.id = h.scene_id GROUP BY s.day ORDER BY s.day DESC
            LIMIT ${DISPATCH_MAX}`,
         ),
@@ -261,7 +266,18 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
       deps.narratorDb,
       `SELECT ${MILESTONE_SELECT} FROM milestones ORDER BY id`,
     )
-    sendJson(res, rows.map(milestoneFromRow))
+    // Read apart rather than joined: a narrator db written before this table still answers
+    // every first, with no quote, instead of answering none.
+    const detected = new Map(
+      readOrEmpty<{ concept_kind: string; day: number; quote: string }>(
+        deps.narratorDb,
+        'SELECT concept_kind, day, quote FROM semantic_first_detected',
+      ).map((d) => [`first_${d.concept_kind}`, { quote: d.quote, day: d.day }]),
+    )
+    sendJson(
+      res,
+      rows.map((r) => ({ ...milestoneFromRow(r), detected: detected.get(r.kind) ?? null })),
+    )
   })
 
   const momentsFromLog = makeMomentsReader(deps)
