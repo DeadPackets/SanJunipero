@@ -20,6 +20,11 @@ export const BROWSER_SAFE_IMPORTS: readonly string[] = [
   'react-dom/client',
   'react-force-graph-2d',
   'pixi.js',
+  'three',
+  'three/addons/postprocessing/EffectComposer.js',
+  'three/addons/postprocessing/OutputPass.js',
+  'three/addons/postprocessing/RenderPass.js',
+  'three/addons/postprocessing/UnrealBloomPass.js',
   'zod',
   'node:crypto',
   // the latin subset alone: the town's copy is latin, and the full packages are 28 @font-face

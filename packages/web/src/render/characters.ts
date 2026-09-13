@@ -3,8 +3,9 @@ import type { SimEvent } from '@sj/shared'
 import { tilesPerTickFor } from '@sj/engine/verbs'
 import type { AgentBody, WorldState } from '@sj/engine/state'
 import type { WorldStore } from '../state/worldStore.js'
+import { clearBody } from './three/clearance.js'
 import { bodyDepthBox } from './depth.js'
-import { facingFrom, feetOf, type Facing } from './iso.js'
+import { facingFrom, feetOf, tileToScreen, type Facing } from './iso.js'
 import type { DepthEntry } from './layers.js'
 import type { Scene } from './scene.js'
 import {
@@ -633,6 +634,7 @@ export function createCharacterLayer(
     const ranks = crowdOffsets(standing)
     // once a frame for every body: the sun's height is a function of the minute, not of who
     const sun = shadowCast(nowTick)
+    const solid = scene.spatial ? Object.values(state.structures) : []
     for (const { a, e, pos, bobY } of drawing) {
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
@@ -657,7 +659,8 @@ export function createCharacterLayer(
             }
       const px = pos.x + e.crowd.dx
       const py = pos.y + e.crowd.dy
-      const { sx, sy } = feetOf(px, py)
+      const ground = scene.spatial ? clearBody(px + 0.5, py + 0.5, solid) : null
+      const { sx, sy } = ground ? tileToScreen(ground.x, ground.y) : feetOf(px, py)
       e.sprite.position.set(sx, sy + bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
       // ★ The sun's own height, off the same token the arc draws: a low sun draws the blob

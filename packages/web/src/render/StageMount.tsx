@@ -4,6 +4,7 @@ import { parseRoute, routeToPath } from '../ui/route.js'
 import { FIRST_FRAME_COPY, firstFrameStuck } from '../ui/firstFrame.js'
 import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
+import { createThreeWorld } from './three/world.js'
 import { installFaces } from './textFaces.js'
 import { TextureBook } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
@@ -85,6 +86,8 @@ export function StageMount({
   useEffect(() => {
     const rootEl = rootRef.current
     if (rootEl === null) return
+    let three: ReturnType<typeof createThreeWorld> | null = null
+    const spatial = new URLSearchParams(location.search).get('renderer') !== 'pixi'
     let scene: Scene | null = null
     let disposed = false
     let published = false
@@ -123,6 +126,7 @@ export function StageMount({
       // one the keyboard can still drive.
       sceneRef.current = null
       interiorRef.current = null
+      three?.destroy()
       landmarks?.destroy()
       toponyms?.destroy()
       interior?.destroy()
@@ -144,7 +148,7 @@ export function StageMount({
     // Faces install before the scene exists so the first label drawn is already a bitmap
     // glyph; installFaces resolves even when the webfonts never do.
     void installFaces(document)
-      .then(() => createScene(rootEl, store))
+      .then(() => createScene(rootEl, store, spatial))
       .then((s) => {
         if (disposed) {
           s.destroy()
@@ -169,12 +173,12 @@ export function StageMount({
         const pick = (p: WorldPick): void => onPickRef.current?.(p)
         // The rig already refuses a drag and anything that landed on a body or a building, so
         // what reaches here is bare ground — and bare ground is how a pick is put back down.
-        s.onTilePointer(() => onGroundRef.current?.())
+        if (!spatial) s.onTilePointer(() => onGroundRef.current?.())
         offSync = store.subscribe(() => {
-          syncEntities(s, book, store, openDoor, pick)
+          if (!spatial) syncEntities(s, book, store, openDoor, pick)
           nameTown()
         })
-        syncEntities(s, book, store, openDoor, pick)
+        if (!spatial) syncEntities(s, book, store, openDoor, pick)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
         offCamera = s.onCamera(() => {
           marks.place()
@@ -193,15 +197,15 @@ export function StageMount({
         s.bubbles = bubbles
         acts = createActLayer(s, store)
         moments = createMomentEmotes(s, store, book)
-        atmosphere = createAtmosphere(s)
-        s.atmosphere = atmosphere
+        if (!spatial) atmosphere = createAtmosphere(s)
+        if (atmosphere) s.atmosphere = atmosphere
         weather = createWeatherLayer(s, store)
         ambient = createAmbient(s, store, { weather, bubbles, chars })
-        lightPools = createLightPools(s, store)
-        fireflies = createFireflies(s, store)
-        smoke = createSmoke(s, store)
-        clouds = createClouds(s, store)
-        vignette = createVignette(s.app) // last onto app.stage: over the weather
+        if (!spatial) lightPools = createLightPools(s, store)
+        if (!spatial) fireflies = createFireflies(s, store)
+        if (!spatial) smoke = createSmoke(s, store)
+        if (!spatial) clouds = createClouds(s, store)
+        if (!spatial) vignette = createVignette(s.app) // last onto app.stage: over the weather
         sceneRef.current = s
         const charLayer = chars
         s.anchorOf = (agentId) => {
@@ -228,6 +232,13 @@ export function StageMount({
             }
           }
         })
+        if (spatial)
+          three = createThreeWorld(rootEl, s, store, chars, {
+            select: selectAgent,
+            door: openDoor,
+            pick,
+            ground: () => onGroundRef.current?.(),
+          })
         let seenThoughts = store.thoughtsSeq()
         let lastMs = performance.now()
         tickFn = () => {
@@ -252,6 +263,7 @@ export function StageMount({
             atmosphere?.update(state)
             weather?.setKind(state.weather.kind)
           }
+          three?.tick(dt)
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
           if (said > seenThoughts) {

@@ -62,6 +62,7 @@ export function sceneClock(app: { ticker: { start(): void; stop(): void } | null
 
 export type Scene = {
   app: Application
+  spatial?: boolean
   /** Run or pause the scene's own clock. The ONLY way to do it: `app.ticker` is null on a
    *  destroyed scene, and a caller upstream of the teardown cannot know which it is holding. */
   setTicking(on: boolean): void
@@ -171,10 +172,17 @@ export function rendererOptions(rootEl: HTMLElement, dpr: number): Partial<Appli
   }
 }
 
-export async function createScene(rootEl: HTMLElement, store: WorldStore): Promise<Scene> {
+export async function createScene(
+  rootEl: HTMLElement,
+  store: WorldStore,
+  spatial = false,
+): Promise<Scene> {
   TextureSource.defaultOptions.scaleMode = 'nearest' // global NEAREST law — before any texture exists
   const app = new Application()
-  await app.init(rendererOptions(rootEl, globalThis.devicePixelRatio))
+  await app.init({
+    ...rendererOptions(rootEl, globalThis.devicePixelRatio),
+    backgroundAlpha: spatial ? 0 : 1,
+  })
   rootEl.appendChild(app.canvas)
   // `resizeTo` only tracks window resizes, but a panel opening changes the root element itself,
   // and a stage that got smaller can leave the camera showing outside the world.
@@ -224,6 +232,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
 
   function rebakeGround(terrain: TileId[][], records?: AssetRecord[]): void {
     // the view first: a bake with a stale view bakes chunks nobody is looking at
+    if (spatial) return
     baker.setView(viewRect())
     baker.rebake(terrain, records ?? store.assetRecords())
   }
@@ -311,6 +320,7 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
   const clock = sceneClock(app)
   const scene: Scene = {
     app,
+    spatial,
     setTicking: clock.set,
     textScale: 1,
     pickedId: null,
@@ -321,7 +331,13 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     screen,
     entities: layers.entities,
     overlay: layers.overlay,
-    ring: createSceneRing({ layers, pointOf: (kind, id) => scene.pointOf(kind, id) }, store),
+    ring: createSceneRing(
+      {
+        layers: spatial ? { ...layers, groundDecal: layers.overlay } : layers,
+        pointOf: (kind, id) => scene.pointOf(kind, id),
+      },
+      store,
+    ),
     addDepthSource: (fn) => {
       depthSources.add(fn)
       return () => depthSources.delete(fn)
@@ -427,6 +443,10 @@ export async function createScene(rootEl: HTMLElement, store: WorldStore): Promi
     attend.tick()
     bloom.tick()
   }
-  app.ticker.add(postTick)
+  if (!spatial) app.ticker.add(postTick)
+  if (spatial) {
+    graded.renderable = false
+    layers.entities.eventMode = 'none'
+  }
   return scene
 }
