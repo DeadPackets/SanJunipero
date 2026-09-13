@@ -226,7 +226,7 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     expect(roomIsFull(s, s.structures.structure_1!)).toBe(true)
     expect(enter(s, 'a3')).toMatchObject({
       ok: false,
-      reason: 'there is no floor left in there — 2 bodies fill it',
+      reason: 'there is no floor left in there, 2 bodies fill it',
     })
   })
 
@@ -240,7 +240,7 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     }
     expect(enter(big, 'a5')).toMatchObject({
       ok: false,
-      reason: 'there is no floor left in there — 4 bodies fill it',
+      reason: 'there is no floor left in there, 4 bodies fill it',
     })
   })
 
@@ -304,7 +304,7 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
     s = fold(s, ev(21, 'agent_entered', { agentId: 'stranger2', structureId: 'structure_1' }))
     expect(enter(s, 'owner')).toMatchObject({
       ok: false,
-      reason: 'there is no floor left in there — 2 bodies fill it',
+      reason: 'there is no floor left in there, 2 bodies fill it',
     })
     // And with room in it, a stranger is let in exactly as the owner would be.
     s = fold(s, ev(22, 'agent_exited', { agentId: 'stranger1', structureId: 'structure_1' }))

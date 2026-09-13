@@ -243,7 +243,7 @@ describe('the refusal names what is actually in the way', () => {
     expect(refuse(one, 'fill')).toBeNull()
     const two = holding(one, 'item_bucket_2', 'bucket')
     expect(refuse(two, 'fill')).toBe(
-      'which one — the bucket (item_bucket_2) or the waterskin (item_skin_1)?',
+      'which one, the bucket (item_bucket_2) or the waterskin (item_skin_1)?',
     )
   })
 
@@ -468,7 +468,7 @@ describe('submitIntent', () => {
     s = holding(s, 'item_fish_2', 'fish')
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', {})).toEqual({
       ok: false,
-      reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
+      reason: 'which one, the bread (item_bread_1) or the fish (item_fish_2)?',
     })
   })
 })
@@ -576,7 +576,7 @@ describe('an act named right and answered wide', () => {
     s = holding(s, 'item_fish_2', 'fish')
     expect(submitIntent(s, DEFAULT_CONFIG, 'a1', 'eat', WIDE)).toEqual({
       ok: false,
-      reason: 'which one — the bread (item_bread_1) or the fish (item_fish_2)?',
+      reason: 'which one, the bread (item_bread_1) or the fish (item_fish_2)?',
     })
   })
 

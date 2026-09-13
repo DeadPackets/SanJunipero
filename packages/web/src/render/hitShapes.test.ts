@@ -249,12 +249,11 @@ describe('★ a building is a volume, and the landed target was the ground under
     [2, 4],
   ]
 
-  it('THE DEFECT: the flat footprint diamond and the drawn sprite barely touch', () => {
+  it('THE DEFECT: the flat footprint diamond is a sliver of the drawn sprite', () => {
     // The art is fitted to a (w+h)·32 SQUARE whose lowest opaque row is the sprite's own anchor,
-    // so the drawn body occupies y ∈ [−side, 0] while the ground plan runs from the footprint's
-    // north vertex DOWN.
+    // and the ground plan stands on that same point: 64 × 32 of plate under a 128 × 128 body.
     const flat = legacyFootprintPolygon(footprintDiamond(2, 2), 1)
-    expect(polygonBounds(flat)).toEqual({ w: 64, h: 32, cx: 0, cy: 8 })
+    expect(polygonBounds(flat)).toEqual({ w: 64, h: 32, cx: 0, cy: -16 })
     const prism = artPrismPolygon(2, 2, 1)
     expect(polygonBounds(prism)).toEqual({ w: 128, h: 128, cx: 0, cy: -64 })
   })

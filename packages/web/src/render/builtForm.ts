@@ -4,7 +4,9 @@ import { TILE_H, TILE_W } from './iso.js'
 // accent — so it reads as a building nobody has painted yet, never as missing art. Generic over
 // kind on purpose: the hole reopens each time the world learns to raise something new.
 
-/** The footprint diamond in the sprite's LOCAL space, origin at the centre tile's top vertex — the one ground shape both the hit area and the built form are cut from. */
+/** The footprint diamond in the sprite's LOCAL space, its SOUTH vertex on the origin, which is
+ *  where `feetOf` stands the sprite — the one ground shape both the hit area and the built form
+ *  are cut from. */
 export function footprintDiamond(w: number, h: number): number[] {
   const corners: readonly (readonly [number, number])[] = [
     [0.5 - w / 2, 0.5 - h / 2], // north
@@ -12,7 +14,8 @@ export function footprintDiamond(w: number, h: number): number[] {
     [w / 2 + 0.5, h / 2 + 0.5], // south
     [0.5 - w / 2, h / 2 + 0.5], // west
   ]
-  return corners.flatMap(([dx, dy]) => [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2)])
+  const feet = ((w + h + 2) * TILE_H) / 4
+  return corners.flatMap(([dx, dy]) => [(dx - dy) * (TILE_W / 2), (dx + dy) * (TILE_H / 2) - feet])
 }
 
 /** One MASTER_PALETTE ramp per material, lit from above: top catches the light, south-east holds mid tone, south-west falls away, plinth is the ground contact. */
@@ -110,8 +113,12 @@ function hashKind(kind: string): number {
   return h
 }
 
+// Every diamond sits on its own south vertex, so a smaller one has to be lifted back onto the
+// centre of the one it is cut inside, or the walls creep south of their own plinth.
 function inset(w: number, h: number, by: number): number[] {
-  return footprintDiamond(Math.max(w - by * 2, 0.1), Math.max(h - by * 2, 0.1))
+  const a = Math.max(w - by * 2, 0.1)
+  const b = Math.max(h - by * 2, 0.1)
+  return raise(footprintDiamond(a, b), ((a + b - w - h) * TILE_H) / 4)
 }
 
 function raise(poly: number[], dy: number): number[] {

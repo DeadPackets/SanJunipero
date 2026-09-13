@@ -371,7 +371,7 @@ describe('verb: craft', () => {
     const granary = asked('granary')
     expect(granary.ok).toBe(false)
     if (!granary.ok) {
-      expect(granary.reason).toBe(`cannot build a granary — ${WANTS_DISCOVERING}`)
+      expect(granary.reason).toBe(`cannot build a granary, ${WANTS_DISCOVERING}`)
     }
 
     // An empty recipe is a deliberate `no`, not a gap in the town's knowledge: routing it to the

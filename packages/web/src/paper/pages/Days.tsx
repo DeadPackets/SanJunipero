@@ -1,5 +1,5 @@
 import { useMemo, useRef, useSyncExternalStore } from 'react'
-import { MINUTES_PER_DAY, tickToMoment } from '@sj/shared'
+import { MINUTES_PER_DAY } from '@sj/shared'
 import {
   MARK_GLYPH,
   MARK_GLYPH_PX,
@@ -21,6 +21,7 @@ import { milestonesFeed } from '../../ui/feeds.js'
 import { pointPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { useFrameCoalesced } from '../../ui/onFrame.js'
+import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
 
 const KEY_STEP_TICKS = 10
@@ -66,7 +67,6 @@ function DayStripView({
   const span = Math.max(1, edge)
   const trackRef = useRef<HTMLDivElement>(null)
   const frac = Math.min(1, viewTick / span)
-  const m = tickToMoment(viewTick)
 
   const pick = (clientX: number): void => {
     const el = trackRef.current
@@ -116,7 +116,6 @@ function DayStripView({
       )}
       <div className="day-marks">
         {marks.map((mk) => {
-          const at = tickToMoment(mk.tick)
           return (
             <button
               key={`${mk.kind}-${mk.tick}`}
@@ -124,7 +123,7 @@ function DayStripView({
               className="mark"
               data-kind={mk.kind}
               style={{ left: markLeft(mk.tick, span) }}
-              aria-label={`Day ${at.day} ${at.time}. ${mk.words}. Watch this moment.`}
+              aria-label={`${momentStamp(mk.tick)}. ${mk.words}. Watch this moment.`}
               onClick={() => {
                 onMark(mk)
               }}
@@ -146,7 +145,7 @@ function DayStripView({
         aria-valuemin={0}
         aria-valuemax={edge}
         aria-valuenow={viewTick}
-        aria-valuetext={`Day ${m.day} ${m.time}`}
+        aria-valuetext={momentStamp(viewTick)}
         onKeyDown={onKey}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId)

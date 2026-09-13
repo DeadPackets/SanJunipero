@@ -59,8 +59,8 @@ describe('the three dwellings read as three buildings even with no art', () => {
 })
 
 describe('footprintDiamond — the one ground-shape both the hit area and the form are cut from', () => {
-  it('is the tile diamond for a 1×1, north vertex at the local origin', () => {
-    expect(footprintDiamond(1, 1)).toEqual([0, 0, 16, 8, 0, 16, -16, 8])
+  it('is the tile diamond for a 1×1, south vertex at the local origin', () => {
+    expect(footprintDiamond(1, 1)).toEqual([0, -16, 16, -8, 0, 0, -16, -8])
   })
 
   it('grows with the footprint and never wider than the ground it stands on', () => {

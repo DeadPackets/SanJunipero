@@ -242,7 +242,7 @@ describe('★ a mark is read the way a person would read it', () => {
   it('★ a mark left blank with two readings names them both and asks', () => {
     let s = held(world(), 'item_1', 'bread')
     s = held(s, 'item_2', 'fish')
-    expect(refuses(s, 'eat', {})).toBe('which one — the bread (item_1) or the fish (item_2)?')
+    expect(refuses(s, 'eat', {})).toBe('which one, the bread (item_1) or the fish (item_2)?')
   })
 
   it('and one reading only is simply read in', () => {

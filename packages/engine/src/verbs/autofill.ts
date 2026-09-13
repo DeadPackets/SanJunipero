@@ -120,7 +120,7 @@ function ambiguity(
 ): string | null {
   const fits = readingsOf(state, config, agentId, verb, params)
   if (fits.length < 2) return null
-  return `which one — ${nameOf(state, fits[0]!)} or ${nameOf(state, fits[1]!)}?`
+  return `which one, ${nameOf(state, fits[0]!)} or ${nameOf(state, fits[1]!)}?`
 }
 
 // In this body's hands first, then nearest, then by id: a kind names one thing every time.

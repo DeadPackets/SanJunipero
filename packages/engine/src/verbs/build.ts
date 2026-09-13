@@ -79,7 +79,7 @@ function roadBlockRefusal(
     for (let dx = 0; dx < w; dx++) {
       const tile = state.terrain[y + dy]?.[x + dx]
       if (tile !== undefined && isTravelled(tile)) {
-        return `that would stand in the way — the ${words(kind)} goes on the ground beside the way, not on it`
+        return `that would stand in the way, the ${words(kind)} goes on the ground beside the way, not on it`
       }
     }
   }
@@ -96,7 +96,7 @@ function footprintRefusal(
 ): string | null {
   const recipe = buildableRecipe(config, d.kind)!
   if (!nearRect(state, agentId, d.x, d.y, w, h))
-    return `not close enough to build — stand within reach of (${d.x}, ${d.y})`
+    return `not close enough to build, stand within reach of (${d.x}, ${d.y})`
   const site = siteAt(state, d.x, d.y)
   if (site?.kind === d.kind) return null // resume: materials already spent
   for (const s of Object.values(state.structures)) {
@@ -246,7 +246,7 @@ function computeBuildSite(
       lay: [],
       refusal: nearRect(state, agentId, mine.x, mine.y, mine.w, mine.h)
         ? null
-        : `walls are already up for a ${words(params.kind)}${door === null ? '' : ` — go and stand at (${door.x}, ${door.y})`}`,
+        : `walls are already up for a ${words(params.kind)}${door === null ? '' : `, go and stand at (${door.x}, ${door.y})`}`,
     }
   }
   const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
@@ -361,7 +361,7 @@ function plottedRefusal(
     if (a.x < site.x || a.x >= site.x + site.w || a.y < site.y || a.y >= site.y + site.h) continue
     // A body inside the footprint would be walled in by its own walls.
     return a.id === agentId
-      ? `you are standing on the ground itself — ${go}`
+      ? `you are standing on the ground itself, ${go}`
       : 'someone is in the way'
   }
   for (const [k, qty] of Object.entries(buildableRecipe(config, kind)!.inputs)) {

@@ -645,7 +645,7 @@ const walk: VerbDef = makeVerb({
   params: WalkParams,
   validate(state, config, agentId, params) {
     const a = state.agents[agentId]!
-    if (a.insideId !== undefined) return 'you are indoors; step outside first'
+    if (a.insideId !== undefined) return 'you are indoors, step outside first'
     const to = walkDestination(state, config, agentId, params)
     if ('refusal' in to) return to.refusal
     // 90 of rehearsal 7's 360 walks were this: a body setting off for the tile under its own
@@ -749,7 +749,7 @@ const sleep: VerbDef = makeVerb({
     if (!config.structures.sleepIndoorsOnly || mayLieDownRough(state, config, agentId)) return null
     const s = a.insideId === undefined ? undefined : state.structures[a.insideId]
     if (s?.stage !== 'complete' || !isRoofedKind(config, s.kind)) {
-      return 'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
+      return 'there is nothing over you here, find somewhere to lie down. Weary enough and the bare ground will do'
     }
     return null
   },
@@ -782,7 +782,7 @@ const enter: VerbDef = makeVerb({
     // floor, so it reads as a thing that changes when somebody steps out.
     if (roomIsFull(state, s)) {
       const n = occupantsOf(state, s.id).length
-      return `there is no floor left in there — ${n === 1 ? 'one body fills' : `${n} bodies fill`} it`
+      return `there is no floor left in there, ${n === 1 ? 'one body fills' : `${n} bodies fill`} it`
     }
     return null
   },
@@ -971,7 +971,7 @@ const eat: VerbDef = makeVerb({
     if (!item) return 'not holding that'
     if (item.loc.t === 'agent' && item.loc.id !== agentId) return 'someone is holding that'
     if (mealInHand(state, agentId, p.data.itemId) === undefined) {
-      return 'not holding that — go and stand beside it first'
+      return 'not holding that, go and stand beside it first'
     }
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
     if (item.kind === HERB_KIND && !ailing(state, config, agentId))
@@ -1447,7 +1447,7 @@ const plant: VerbDef = makeVerb({
     const p = PlantParams.safeParse(params)
     if (!p.success) return 'planting needs ground and a seed to sow'
     if (tileAt(state, p.data.x, p.data.y) !== 6) return 'crops need farmland'
-    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind} — ${WANTS_DISCOVERING}`
+    if (!config.crops[p.data.kind]) return `no such crop: ${p.data.kind}, ${WANTS_DISCOVERING}`
     if (!withinReach(state, agentId, p.data.x, p.data.y)) return 'not close enough to plant'
     for (const c of Object.values(state.crops)) {
       if (!c.withered && c.x === p.data.x && c.y === p.data.y) return 'that plot is already planted'
@@ -1804,7 +1804,7 @@ const build: VerbDef = makeVerb({
     // Only a name the config has never heard of is a proposal the court should hear.
     if (buildableRecipe(config, kind) === null)
       return config.structures.recipes[kind] === undefined
-        ? `cannot build a ${kind} — ${WANTS_DISCOVERING}`
+        ? `cannot build a ${kind}, ${WANTS_DISCOVERING}`
         : `cannot build a ${kind}`
     const plotted = buildIsPlotted(state, config, kind)
     const p = (plotted ? PlottedBuildParams : SitedBuildParams).safeParse(params)
@@ -1812,7 +1812,7 @@ const build: VerbDef = makeVerb({
     // it; a mind that names a coordinate anyway is told plainly that it does not get to.
     if (!p.success) {
       return plotted
-        ? `where a ${words(kind)} stands is the town's to say, not yours — name the thing to raise and nothing else`
+        ? `where a ${words(kind)} stands is the town's to say, not yours. Name the thing to raise and nothing else`
         : BUILD_NEEDS_A_THING_AND_A_PLACE
     }
     const answer = buildSiteOf(state, config, agentId, p.data)
@@ -1823,7 +1823,7 @@ const build: VerbDef = makeVerb({
     if (plotted && answer.resume === null) {
       const days = daysUntilNewGround(state, config)
       if (days > 0)
-        return `there is no new ground to build on for another ${days === 1 ? 'day' : `${days} days`} — what is already standing can still be worked on`
+        return `there is no new ground to build on for another ${days === 1 ? 'day' : `${days} days`}. What is already standing can still be worked on`
     }
     return null
   },
@@ -2516,7 +2516,7 @@ const teach: VerbDef = makeVerb({
     })
     if (bad) return bad
     if (!config.skills.tracks.includes(p.data.track))
-      return `no such skill: ${p.data.track} — ${WANTS_DISCOVERING}`
+      return `no such skill: ${p.data.track}, ${WANTS_DISCOVERING}`
     if ((state.agents[agentId]!.skills[p.data.track] ?? 0) === 0) return 'nothing to teach'
     return null
   },
@@ -2801,7 +2801,7 @@ const leaveTown: VerbDef = makeVerb({
   takes: 'minutes',
   validate(state, _config, agentId) {
     const a = state.agents[agentId]!
-    if (a.insideId !== undefined) return 'you are indoors; step outside first'
+    if (a.insideId !== undefined) return 'you are indoors, step outside first'
     if (!isMapRim(state, a.x, a.y)) return "you are not at the valley's edge"
     return null
   },

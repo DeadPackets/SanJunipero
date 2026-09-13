@@ -323,7 +323,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
         submitIntent(at({ t: 'tile', x: 5, y: 5 }), DEFAULT_CONFIG, 'a1', 'eat', {
           itemId: 'item_1',
         }),
-      ).toEqual({ ok: false, reason: 'not holding that — go and stand beside it first' })
+      ).toEqual({ ok: false, reason: 'not holding that, go and stand beside it first' })
     })
 
     it('a loaf in another pair of hands is not within anybody else’s reach', () => {

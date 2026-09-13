@@ -469,7 +469,7 @@ describe('verb: teach', () => {
     const s = patchAgent(makeWorld(), 'a1', { skills: { farming: 100 } })
     expect(submitIntent(s, CFG, 'a1', 'teach', { targetId: 'a2', track: 'alchemy' })).toEqual({
       ok: false,
-      reason: `no such skill: alchemy — ${WANTS_DISCOVERING}`,
+      reason: `no such skill: alchemy, ${WANTS_DISCOVERING}`,
     })
     expect(s.agents.a2!.skills.alchemy).toBeUndefined()
   })

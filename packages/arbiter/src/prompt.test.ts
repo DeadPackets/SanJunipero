@@ -45,9 +45,9 @@ describe('mundane-vs-novel anchors (C9 batch-8 calibration)', () => {
     const { system } = assembleAdjudicationPrompt(fixtureBlocks())
     const anchors = system.split('\n').filter((l) => l.startsWith('"I '))
     expect(anchors).toHaveLength(3)
-    expect(anchors[0]).toContain('— map:')
-    expect(anchors[1]).toContain('— attempt:')
-    expect(anchors[2]).toContain('— impossible:')
+    expect(anchors[0]).toContain('is map:')
+    expect(anchors[1]).toContain('is attempt:')
+    expect(anchors[2]).toContain('is impossible:')
   })
 
   it('tells the arbiter which question decides attempt against impossible', () => {
@@ -216,8 +216,8 @@ describe('what the town has learned to do, as the court reads it', () => {
 
   it('lists each minted verb with the keys it reads, after the authored roster', () => {
     const { system } = assembleAdjudicationPrompt(fixtureBlocks({ learned }))
-    expect(system).toContain('recipe:smoke_fish (nothing) — Hang the catch in smoke')
-    expect(system).toContain('recipe:wager (itemId, targetId) — Stake a thing on a claim')
+    expect(system).toContain('recipe:smoke_fish (nothing): Hang the catch in smoke')
+    expect(system).toContain('recipe:wager (itemId, targetId): Stake a thing on a claim')
     expect(system.indexOf('recipe:wager')).toBeGreaterThan(system.indexOf('walk (x, y)'))
     expect(system).not.toMatch(FORBIDDEN_FRAMING)
   })
@@ -393,8 +393,8 @@ describe('what stands around the asker', () => {
   it('names every structure in sight and the ground underfoot, in the asker block', () => {
     const user = assembleAdjudicationPrompt(seeing()).messages[0]!.content
     expect(user).toContain('Standing nearby:')
-    expect(user).toContain('a well at 14, 8')
-    expect(user).toContain('a house at 10, 6')
+    expect(user).toContain('a well at (14, 8)')
+    expect(user).toContain('a house at (10, 6)')
     expect(user).toContain('The ground here: grass, water')
   })
 

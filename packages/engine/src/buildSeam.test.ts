@@ -102,7 +102,7 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: 67, y: 92 })).toEqual({
       ok: false,
       reason:
-        "where a house stands is the town's to say, not yours — name the thing to raise and nothing else",
+        "where a house stands is the town's to say, not yours. Name the thing to raise and nothing else",
     })
   })
 
@@ -156,7 +156,7 @@ describe('★ how an agent builds: the plot, never the coordinate', () => {
     const s = withBuilder(base, 'a', { x: claim.site.x, y: claim.site.y })
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' })).toEqual({
       ok: false,
-      reason: `you are standing on the ground itself — go and stand at (${claim.door.x}, ${claim.door.y})`,
+      reason: `you are standing on the ground itself, go and stand at (${claim.door.x}, ${claim.door.y})`,
     })
   })
 

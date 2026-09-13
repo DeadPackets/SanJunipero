@@ -101,7 +101,7 @@ import {
   type AssetRecord,
   type SimConfig,
 } from '@sj/shared'
-import { tileToScreen } from './iso.js'
+import { feetOf, tileToScreen } from './iso.js'
 import { Container as MockContainer } from 'pixi.js'
 import {
   BUILDING_PX_PER_TILE,
@@ -357,9 +357,10 @@ describe('★ enterability is asked of the config, and there is no second list',
 // building sprite is about twice as wide as the ground it stands on. The prism is the drawn cell
 // with its corners cut off by the diamond, so it claims no pixel outside the picture.
 
-// the sprite sits at the top vertex of its centre tile; local points are offsets from there
+// `syncEntities` stands the sprite on `feetOf`, the SOUTH vertex of the plan; local points are
+// offsets from there
 function spriteAt(s: Structure): { sx: number; sy: number } {
-  return tileToScreen(s.x + s.w / 2 - 0.5, s.y + s.h / 2 - 0.5)
+  return feetOf(s.x, s.y, s.w, s.h)
 }
 function worldPoly(local: number[], s: Structure): [number, number][] {
   const at = spriteAt(s)
@@ -386,6 +387,12 @@ function drawnDoorPoint(s: Structure): [number, number] {
   return [at.sx, at.sy - ((s.w + s.h) * BUILDING_PX_PER_TILE) / 5]
 }
 
+/** The ridge of the DRAWN art: the top centre of the cell, four fifths of the way up. */
+function drawnRidgePoint(s: Structure): [number, number] {
+  const at = spriteAt(s)
+  return [at.sx, at.sy - ((s.w + s.h) * BUILDING_PX_PER_TILE * 4) / 5]
+}
+
 /** The whole drawn cell's corner points, so "outside the picture" can be tested. */
 function drawnCorners(s: Structure): [number, number][] {
   const at = spriteAt(s)
@@ -399,10 +406,12 @@ function drawnCorners(s: Structure): [number, number][] {
 }
 
 describe('a structure hit-tests the structure', () => {
-  it('★ THE DEFECT: the landed flat diamond does not contain the drawn doorway at all', () => {
+  // The witness used to be the doorway. Once the diamond was put back on its own plot it holds
+  // the doorway, and the ridge is the point a ground plan can never reach.
+  it('★ THE DEFECT: the landed flat diamond does not contain the drawn body at all', () => {
     for (const [w, h] of SHAPES) {
       const s = box(20, 20, w, h)
-      const [px, py] = drawnDoorPoint(s)
+      const [px, py] = drawnRidgePoint(s)
       expect(contains(worldPoly(footprintHitPoints(w, h), s), px, py), `${w}x${h}`).toBe(false)
     }
   })
@@ -458,9 +467,46 @@ describe('a structure hit-tests the structure', () => {
   })
 
   it('is a diamond the size of the footprint, and scales with the sprite (the before-state)', () => {
-    expect(footprintHitPoints(1, 1)).toEqual([0, 0, 16, 8, 0, 16, -16, 8])
-    expect(footprintHitPoints(2, 2)).toEqual([0, -8, 32, 8, 0, 24, -32, 8])
-    expect(footprintHitPoints(1, 1, 2)).toEqual([0, 0, 8, 4, 0, 8, -8, 4])
+    expect(footprintHitPoints(1, 1)).toEqual([0, -16, 16, -8, 0, 0, -16, -8])
+    expect(footprintHitPoints(2, 2)).toEqual([0, -32, 32, -16, 0, 0, -32, -16])
+    expect(footprintHitPoints(1, 1, 2)).toEqual([0, -8, 8, -4, 0, 0, -8, -4])
+  })
+
+  // ★ The diamond was cut from the plan's NORTH vertex while the sprite stands on its SOUTH one,
+  // so a 1×1 at (5, 7) held its plot at world y 96..112 and drew its plinth at 112..128.
+  it('★ stands a plinth ON its own plot, never one footprint south of it', () => {
+    for (const [w, h] of SHAPES) {
+      const s = box(5, 7, w, h)
+      const at = feetOf(s.x, s.y, s.w, s.h)
+      const plinth = builtFormSpec(s.kind, w, h).plinth.poly
+      const corners = [
+        tileToScreen(s.x, s.y),
+        tileToScreen(s.x + w, s.y),
+        tileToScreen(s.x + w, s.y + h),
+        tileToScreen(s.x, s.y + h),
+      ]
+      expect(
+        corners.map((c, i) => [c.sx - at.sx - plinth[i * 2]!, c.sy - at.sy - plinth[i * 2 + 1]!]),
+        `${w}\u00d7${h}`,
+      ).toEqual([
+        [0, 0],
+        [0, 0],
+        [0, 0],
+        [0, 0],
+      ])
+    }
+  })
+
+  // ★ Phase 5b hangs the cast off the same diamond, so a plinth that moves and a mark that does
+  // not would leave the shadow behind on the old ground.
+  it('★ lays the no-art ground mark under the corrected plinth', () => {
+    const ys = (poly: readonly number[]): number[] => poly.filter((_, i) => i % 2 === 1)
+    for (const [w, h] of SHAPES) {
+      const mark = structureMarks('house', w, h, false, SHADOW_REST)[0]!.poly
+      const plinth = builtFormSpec('house', w, h).plinth.poly
+      const mid = (p: readonly number[]): number => (Math.max(...ys(p)) + Math.min(...ys(p))) / 2
+      expect(mid(mark), `${w}\u00d7${h}`).toBeCloseTo(mid(plinth), 9)
+    }
   })
 })
 

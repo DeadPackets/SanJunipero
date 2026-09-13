@@ -7,6 +7,10 @@
   --parchment: #F6E8D5;
   --ink: #43394A;
   --deep: #241F2B;
+  /* Five roles read this one, at 61 sites: the accent proper (selection, a control that is on
+     or under the hand), the focus ring, a bar or a level that is full, the town's own work
+     (a first, a turn, a change), and the system's own voice (the replay stamp, the day-bar
+     state, the camera chip). The last one belongs to --sky and contradicts the rest. */
   --honey: #F2C879;
 
   /* Below: a step of one of the five, never a sixth colour. */
@@ -174,9 +178,11 @@ body {
 .stage-mount canvas { display: block; }
 .stage-mount:focus-visible { outline: 2px solid var(--honey); outline-offset: -2px; }
 
-/* ── fps overlay: the town's health meter (toggle `f`) ── */
+/* ── fps overlay: the town's health meter (toggle Shift+P) ── */
+/* Its own row and no further: spanning to `open-end` let the 1fr row swallow the span, so the
+   head row stayed 0 and the meter hung 64px down over the shot board that owns `right-1`. */
 .fps-overlay {
-  grid-area: head; grid-row: head-start / open-end;
+  grid-area: head;
   justify-self: end; align-self: start; z-index: 30;
   display: grid; gap: var(--s-1); justify-items: start;
   padding: var(--s-1) var(--s-2);

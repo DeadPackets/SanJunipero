@@ -280,11 +280,11 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
 // The type ids are the vocabulary the model must answer with, so every one of them is on the
 // page in front of it (canon-vocabulary law). None of these words ever reaches an agent.
 export const CONSTRUCT_TYPE_INSTRUCTION = `You read the ops record of a town nobody in it can hear you discussing. Some bodies keep coming back to the same ground. For each one below, say which kind of thing it is, using exactly one of these ids and no other word:
-festival — a recurring occasion of celebration, dancing, feasting or song
-faith — a recurring occasion of prayer, mourning, offering or reverence
-council — a recurring occasion of talk where a decision is being reached, often with one voice deferred to
-market — a recurring occasion of goods changing hands
-custom — a recurring occasion that is plainly none of the four above; use it freely, the list is not the world
+festival: a recurring occasion of celebration, dancing, feasting or song
+faith: a recurring occasion of prayer, mourning, offering or reverence
+council: a recurring occasion of talk where a decision is being reached, often with one voice deferred to
+market: a recurring occasion of goods changing hands
+custom: a recurring occasion that is plainly none of the four above. Use it freely, the list is not the world
 Answer for every key you are given and invent no keys. Name the kind only. Never a name for the thing itself: a name comes out of their own mouths or not at all.`
 
 export const ClassificationSchema = z

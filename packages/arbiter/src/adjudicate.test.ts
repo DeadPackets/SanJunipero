@@ -1093,7 +1093,7 @@ describe('the roster the town is told', () => {
     ])
     // And the court is shown it on the next novel ask.
     await arbiter.adjudicate('I chart the river shallows', TAMAR_CTX)
-    expect(llm.lastSystem).toContain('recipe:roster_basket (nothing) — Weave reeds into a basket.')
+    expect(llm.lastSystem).toContain('recipe:roster_basket (nothing): Weave reeds into a basket.')
 
     arbiter.revert('recipe:roster_basket', 'test')
     expect(arbiter.roster().map((e) => e.id)).toEqual(['express:toast'])

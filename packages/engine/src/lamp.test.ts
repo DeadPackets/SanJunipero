@@ -188,7 +188,7 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
       expect(r).toEqual({
         ok: false,
         reason:
-          'that would stand in the way — the lamp post goes on the ground beside the way, not on it',
+          'that would stand in the way, the lamp post goes on the ground beside the way, not on it',
       })
     }
     // And the verge one tile over takes it, so the refusal is a redirection and not a wall.

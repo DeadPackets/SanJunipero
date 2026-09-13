@@ -180,7 +180,7 @@ describe('destruction ejects occupants', () => {
 
 describe('sleep is indoors-only (C9 T2b)', () => {
   const OUTDOORS =
-    'there is nothing over you here; find somewhere to lie down — weary enough and the bare ground will do'
+    'there is nothing over you here, find somewhere to lie down. Weary enough and the bare ground will do'
 
   it('refuses a bed under the sky, allows one inside a house', () => {
     let s = withAgent(withHouse(world()), 'a1', 2, 3)
