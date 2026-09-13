@@ -1,10 +1,6 @@
 import { agentName } from '@sj/shared'
-import type { BondsResponse } from '@sj/shared'
+import type { BondKind, BondsResponse } from '@sj/shared'
 import {
-  BOND_LEVELS,
-  BOND_LEVEL_WORD,
-  BOND_TYPES,
-  BOND_TYPE_WORD,
   bondArc,
   bondLevel,
   bondTypeOf,
@@ -16,27 +12,6 @@ import {
   type LineageLike,
 } from './bondModel2.js'
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
-
-/** ★ The key is a legend, not news. It opens the first time somebody looks at the graph —
- *  thirteen chips and no words is a picture nobody can read — and stays shut once they have
- *  shut it, for as long as the tab lives. */
-const BONDS_KEY_SHUT = 'sj.bondsKeyShut'
-
-export function keyOpensBy(storage: Pick<Storage, 'getItem'> | null): boolean {
-  try {
-    return storage?.getItem(BONDS_KEY_SHUT) == null
-  } catch {
-    return true // storage throws in a sandboxed frame; an unrememberable viewer gets the legend
-  }
-}
-
-export function rememberKey(storage: Pick<Storage, 'setItem'> | null, open: boolean): void {
-  try {
-    if (!open) storage?.setItem(BONDS_KEY_SHUT, '1')
-  } catch {
-    /* nothing to do: they get it again, which is the safe half of the bargain */
-  }
-}
 
 // Four channels, one meaning each: EVERY LIVING PERSON IS A NODE, so strangers are visible; edge
 // length is LEVEL, edge mark is TYPE, edge colour is the ARC — colour is never the only signal.
@@ -96,6 +71,20 @@ export const ARC_COLOR: Readonly<Record<BondArc['direction'], string>> = {
 export const LENS_BACKGROUND = '#322B38'
 
 /**
+ * ★ WHAT THE TIE IS MADE OF, in the sheet's own accents: rose is love and blood, sage is what
+ * one gave the other, honey is what they made together, ember is harm. `--sky` is not here: it
+ * is the system's own voice, and it is 2.27:1 on the ground this is drawn on.
+ */
+export const KIND_COLOR: Readonly<Record<BondKind, string>> = {
+  partner: '#C47876', // --rose
+  kin: '#F2C6C2', // --rose-pale
+  friend: '#93B573', // --sage
+  owe: '#DCE8C8', // --sage-pale
+  work: '#F2C879', // --honey
+  rival: '#E8785A', // --ember
+}
+
+/**
  * Every living person is a node; only pairs that are more than strangers get a line. A kin edge is
  * oriented PARENT → CHILD however the endpoint stored it, so one family fact draws one mark.
  */
@@ -147,60 +136,4 @@ export function toRelationGraph(
     alive: people[id]?.alive !== false,
   }))
   return { nodes, links }
-}
-
-export type LegendRow = {
-  // 'kind' is the traffic view's one axis — see `societyGraph.ts`.
-  axis: 'level' | 'type' | 'arc' | 'kind'
-  /** what identifies this row: a colour for the arc axis, a level id or a type id otherwise */
-  key: string
-  swatch: string
-  words: string
-  /** what the mark looks like, so the legend can DRAW the encoding rather than describe it */
-  dash: readonly number[] | null
-  strokeCount: 1 | 2
-}
-
-const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
-  warming: 'Getting closer',
-  cooling: 'Drifting apart',
-  steady: 'Holding steady',
-}
-
-/** Every row says what the channel means and carries the mark it means it with, so the legend is a
- *  key rather than a paragraph. */
-export function relationLegend(): LegendRow[] {
-  const out: LegendRow[] = []
-  for (const level of BOND_LEVELS) {
-    out.push({
-      axis: 'level',
-      key: level,
-      swatch: ARC_COLOR.steady,
-      words: BOND_LEVEL_WORD[level],
-      dash: null,
-      strokeCount: 1,
-    })
-  }
-  for (const type of BOND_TYPES) {
-    if (type === 'none') continue // "no family tie" is the absence of a mark, not one
-    out.push({
-      axis: 'type',
-      key: type,
-      swatch: ARC_COLOR.steady,
-      words: BOND_TYPE_WORD[type],
-      dash: TYPE_STROKE[type].dash,
-      strokeCount: TYPE_STROKE[type].strokeCount,
-    })
-  }
-  for (const dir of ['warming', 'steady', 'cooling'] as const) {
-    out.push({
-      axis: 'arc',
-      key: dir,
-      swatch: ARC_COLOR[dir],
-      words: ARC_WORD[dir],
-      dash: null,
-      strokeCount: 1,
-    })
-  }
-  return out
 }

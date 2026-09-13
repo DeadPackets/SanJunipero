@@ -27,7 +27,7 @@ const NOTE: readonly (readonly [number, number])[] = [
   [4, 7],
 ]
 
-/** ★ OFF IS A MARK, NEVER A DARKER GROUND — the rule `.legend-chip.off` set and the wisp keeps.
+/** ★ OFF IS A MARK, NEVER A DARKER GROUND, the rule the old bonds key set and the wisp keeps.
  *  The flag is gone and the head is hollow, so the two states differ in SHAPE before they
  *  differ in any colour, which is the only signal a `forced-colors` viewer is left with. */
 const NOTE_OFF: readonly (readonly [number, number])[] = [

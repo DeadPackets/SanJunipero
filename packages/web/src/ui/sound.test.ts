@@ -403,7 +403,7 @@ describe('★ the ♪ toggle', () => {
     }
   })
 
-  // ★ OFF IS A MARK, NOT A DARKER GROUND — the rule `.legend-chip.off` set and the wisp keeps.
+  // ★ OFF IS A MARK, NOT A DARKER GROUND: the wisp empties its note and keeps its paper.
   it('★ empties the note rather than swapping the paper', () => {
     const rects = (s: 'on' | 'muted'): number => html(s).match(/<rect/g)?.length ?? 0
     expect(rects('on')).toBeGreaterThan(rects('muted'))

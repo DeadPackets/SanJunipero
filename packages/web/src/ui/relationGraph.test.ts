@@ -2,20 +2,25 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { bondFrom, type Bond, type BondAct, type BondKind, type BondsResponse } from '@sj/shared'
+import {
+  BOND_KINDS,
+  bondFrom,
+  type Bond,
+  type BondAct,
+  type BondKind,
+  type BondsResponse,
+} from '@sj/shared'
 import { GAMIFICATION_BAN } from './townStats.js'
 import { BOND_LEVELS, BOND_TYPES, LEVEL_RANK, bondArc, type LineageLike } from './bondModel2.js'
 import { BondDetail, FadedBond } from '../paper/pages/BondDetail.js'
-import { LegendChip } from './LegendChip.js'
+import { orbitOf } from './bondOrbit.js'
 import {
   ARC_COLOR,
+  KIND_COLOR,
   LENS_BACKGROUND,
   LEVEL_DISTANCE,
   NO_LINK_LEVEL,
   TYPE_STROKE,
-  keyOpensBy,
-  relationLegend,
-  rememberKey,
   toRelationGraph,
 } from './relationGraph.js'
 import type { PeopleIndex } from './bondModel2.js'
@@ -75,6 +80,9 @@ const contrast = (fg: string, bg: string): number => {
   const [hi, lo] = a > b ? [a, b] : [b, a]
   return (hi + 0.05) / (lo + 0.05)
 }
+
+/** --sky: the system's own voice, and 2.27:1 on the night this picture is drawn on. */
+const SKY = '#3E6786'
 
 const at = (tick: number, kind: BondKind): BondAct => ({ tick, kind })
 
@@ -203,61 +211,51 @@ describe('edge colour carries the ARC, and clears the ground it is drawn on', ()
   })
 })
 
-// ── THE LEGEND ─────────────────────────────────────────────────────────────────────────────
-describe('relationLegend explains all three axes without becoming a manual', () => {
-  const rows = relationLegend()
-
-  it('covers every axis, and every level and family tie it can draw', () => {
-    for (const axis of ['level', 'type', 'arc'] as const) {
-      expect(rows.filter((r) => r.axis === axis).length, axis).toBeGreaterThan(0)
-    }
-    expect(
-      rows
-        .filter((r) => r.axis === 'level')
-        .map((r) => r.key)
-        .sort(),
-    ).toEqual([...BOND_LEVELS].sort())
-    // "no family tie" is the ABSENCE of a mark, so it is not a legend row
-    expect(rows.filter((r) => r.axis === 'type').map((r) => r.key)).not.toContain('none')
+// ── ★ THE PICTURE THAT NEEDS A KEY HAS FAILED ────────────────────────────────────────────
+// Thirteen chips explaining four channels was a manual standing on the graph. The channels now
+// have to be readable off the picture, so what used to be asserted about the legend is asserted
+// about the marks themselves.
+describe('★ an edge\u2019s colour IS what the world recorded between the pair', () => {
+  it('★ is total over BOND_KINDS, and no two kinds are drawn the same', () => {
+    for (const k of BOND_KINDS) expect(KIND_COLOR[k], k).toMatch(/^#[0-9A-F]{6}$/)
+    expect(new Set(Object.values(KIND_COLOR)).size).toBe(BOND_KINDS.length)
   })
 
-  it('every word passes the copy scans', () => {
-    for (const r of rows) {
-      expect(r.words.length, r.key).toBeGreaterThan(2)
-      expect(r.words, r.key).not.toMatch(GAMIFICATION_BAN)
-      expect(r.words, r.key).not.toMatch(/\d/)
-      expect(r.words, r.key).not.toMatch(/_/)
+  it('★ takes every colour from the sheet and clears 3:1 on the ground it is drawn on', () => {
+    for (const k of BOND_KINDS) {
+      expect(MASTER_PALETTE, `${k} ${KIND_COLOR[k]}`).toContain(KIND_COLOR[k].toUpperCase())
+      expect(contrast(KIND_COLOR[k], LENS_BACKGROUND), k).toBeGreaterThanOrEqual(3)
     }
   })
 
-  it('is short enough to read — three axes, not a page', () => {
-    expect(rows.length).toBeLessThanOrEqual(14)
-  })
-})
-
-// ── AUDIT M4: the off state was a DIMMING; the ask was a MARK ──────────────────────────────
-describe('the legend’s off chip is a struck-through mark, not an opacity', () => {
-  const row = relationLegend()[0]!
-  const render = (off: boolean): string =>
-    renderToStaticMarkup(createElement(LegendChip, { row, off, onToggle: () => {} }))
-
-  it('★ renders a strike ELEMENT when off, and none when on', () => {
-    expect(render(true)).toContain('class="legend-strike"')
-    expect(render(false)).not.toContain('legend-strike')
+  // --sky is the system's own voice and 2.27:1 here, so the sixth accent is not a candidate.
+  it('never paints a tie in the colour reserved for our own voice', () => {
+    expect(Object.values(KIND_COLOR)).not.toContain(SKY)
+    expect(contrast(SKY, LENS_BACKGROUND)).toBeLessThan(3)
   })
 
-  it('never signals its state with transparency', () => {
-    for (const off of [true, false]) {
-      expect(render(off)).not.toMatch(/opacity/i)
-      expect(render(off)).not.toMatch(/rgba\([^)]*0?\.\d+\)/)
-    }
-  })
-
-  it('says its state out loud, and draws its own mark', () => {
-    expect(render(true)).toContain('aria-pressed="false"')
-    expect(render(false)).toContain('aria-pressed="true"')
-    expect(render(false)).toContain('<svg')
-    expect(render(false)).not.toMatch(EMOJI)
+  it('★ draws each spoke in its own bond\u2019s kind, read off the orbit rather than a key', () => {
+    const rivals = Array.from({ length: 3 }, () => at(0, 'rival'))
+    const orbit = orbitOf(
+      'amara',
+      api([
+        bond(
+          'amara',
+          'nadia',
+          'partner',
+          Array.from({ length: 6 }, () => at(0, 'partner')),
+        ),
+        bond('amara', 'yusuf', 'rival', rivals),
+      ]),
+      NO_LINEAGE,
+      PEOPLE,
+      0,
+    )!
+    const of = (id: string) => orbit.ties.find((t) => t.id === id)!
+    expect(of('nadia').kind).toBe('partner')
+    expect(of('nadia').color).toBe(KIND_COLOR.partner)
+    expect(of('yusuf').kind).toBe('rival')
+    expect(of('yusuf').color).toBe(KIND_COLOR.rival)
   })
 })
 
@@ -274,6 +272,7 @@ describe('BondDetail — the arc, the evidence, and NO filled bar', () => {
       level: 'friendly' as const,
       arc,
       words: 'Amara and Nadia are partners, and they are friends.',
+      onSubject: () => {},
       onClose: () => {},
     }),
   )
@@ -314,6 +313,7 @@ describe('BondDetail — the arc, the evidence, and NO filled bar', () => {
         level: 'acquaintances' as const,
         arc,
         words: 'Amara and Yusuf know each other a little.',
+        onSubject: () => {},
         onClose: () => {},
       }),
     )
@@ -337,54 +337,5 @@ describe('★ a bond that decays while its panel is open', () => {
   it('is the branch the graph takes when the lookup finds nothing', () => {
     const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
     expect(source).toContain('<FadedBond onClose={closeDetail} />')
-  })
-})
-
-// ★ Thirteen chips and no words is a picture nobody can read, and the key was shut by default:
-// the one thing that explains the graph had to be found before the graph could be read.
-describe('★ the key opens on the first look and remembers being shut', () => {
-  const store = (): Storage => {
-    const map = new Map<string, string>()
-    return {
-      getItem: (k: string) => map.get(k) ?? null,
-      setItem: (k: string, v: string) => map.set(k, v),
-    } as unknown as Storage
-  }
-
-  it('★ opens for a viewer who has never shut it', () => {
-    expect(keyOpensBy(store())).toBe(true)
-  })
-
-  it('★ stays shut for the rest of the tab once it has been shut', () => {
-    const s = store()
-    rememberKey(s, false)
-    expect(keyOpensBy(s)).toBe(false)
-  })
-
-  it('remembers nothing about opening it again — only the dismissal is a decision', () => {
-    const s = store()
-    rememberKey(s, true)
-    expect(keyOpensBy(s)).toBe(true)
-  })
-
-  it('gives the legend to a viewer whose browser refuses to remember them', () => {
-    const refuses = {
-      getItem: () => {
-        throw new Error('sandboxed')
-      },
-      setItem: () => {
-        throw new Error('sandboxed')
-      },
-    } as unknown as Storage
-    expect(keyOpensBy(refuses)).toBe(true)
-    expect(() => {
-      rememberKey(refuses, false)
-    }).not.toThrow()
-  })
-
-  it('is the default the graph actually opens with', () => {
-    const source = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
-    expect(source).toContain('useState(() => keyOpensBy(sessionStore()))')
-    expect(source).toContain('rememberKey(sessionStore(), !keyOpen)')
   })
 })

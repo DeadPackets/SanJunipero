@@ -8,11 +8,9 @@ import {
   GONE_RING,
   TRAFFIC_STROKE,
   halosOf,
-  institutionLegend,
   societyFrom,
   trafficDistance,
   trafficGraph,
-  trafficLegend,
 } from './societyGraph.js'
 import { NODE_ALIVE, NODE_DEAD, type PeopleIndex } from './bondModel2.js'
 
@@ -72,12 +70,6 @@ describe('the traffic key', () => {
     )
     expect(new Set(marks).size).toBe(TRAFFIC_KINDS.length)
   })
-
-  it('carries the mark it means, on one axis', () => {
-    const rows = trafficLegend()
-    expect(rows.map((r) => r.axis)).toEqual(TRAFFIC_KINDS.map(() => 'kind'))
-    expect(rows.map((r) => r.words)).toEqual(['Spoke with', 'Gave to', 'Taught', 'Struck'])
-  })
 })
 
 describe('halosOf — the ring a person wears for what they belong to', () => {
@@ -123,12 +115,6 @@ describe('halosOf — the ring a person wears for what they belong to', () => {
     expect(new Set(INSTITUTION_KINDS.map((k) => INSTITUTION_RING[k].color)).size).toBe(
       INSTITUTION_KINDS.length,
     )
-  })
-
-  it('keys only the kinds this town actually formed', () => {
-    expect(institutionLegend(halosOf(list))).toEqual(['group', 'role', 'rule'])
-    expect(institutionLegend(halosOf([list[3]!]))).toEqual(['rule'])
-    expect(institutionLegend(halosOf([]))).toEqual([])
   })
 
   it('★ never borrows a colour already drawn on a node — the two fills, or the dead ring', () => {

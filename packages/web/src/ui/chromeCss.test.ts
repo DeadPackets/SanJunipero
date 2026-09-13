@@ -26,6 +26,10 @@ const LANE_BLOCKS: readonly (readonly [lane: string, mark: string])[] = [
   ['the shot board and the dossier rail', '/* ── the shot board and the dossier rail:'],
   ['the frame’s second composition', "/* ── the frame's second composition:"],
   ['the phone drawer', '/* ── the phone drawer: everything else behind a swipe'],
+  [
+    'every name is a door',
+    '/* ── every name is a door: the one link the paper opens a person with',
+  ],
 ]
 
 describe('★ chrome.css survives the merge trains intact', () => {

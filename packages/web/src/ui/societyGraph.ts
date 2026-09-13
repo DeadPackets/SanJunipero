@@ -1,6 +1,5 @@
 import { agentName } from '@sj/shared'
 import { NODE_ALIVE, NODE_DEAD, type BondNode, type PeopleIndex } from './bondModel2.js'
-import type { LegendRow } from './relationGraph.js'
 
 export const TRAFFIC_KINDS = ['talk', 'give', 'teach', 'attack'] as const
 export type TrafficKind = (typeof TRAFFIC_KINDS)[number]
@@ -105,17 +104,6 @@ export function trafficGraph(
   return { nodes, links }
 }
 
-export function trafficLegend(): LegendRow[] {
-  return TRAFFIC_KINDS.map((kind) => ({
-    axis: 'kind',
-    key: kind,
-    swatch: TRAFFIC_STROKE[kind].color,
-    words: TRAFFIC_WORD[kind],
-    dash: TRAFFIC_STROKE[kind].dash,
-    strokeCount: TRAFFIC_STROKE[kind].strokeCount,
-  }))
-}
-
 /** The ring a person who is no longer living wears. Named here so the institution rings can be
  *  proved not to borrow it. */
 export const GONE_RING = '#F4E289'
@@ -167,12 +155,4 @@ export function halosOf(list: readonly Institution[]): Map<string, Halo> {
     }
   }
   return out
-}
-
-/** Only the kinds this town has actually formed: a key row for a thing nobody founded
- *  explains a mark that is not on the picture. */
-export function institutionLegend(halos: ReadonlyMap<string, Halo>): InstitutionKind[] {
-  const seen = new Set<InstitutionKind>()
-  for (const halo of halos.values()) for (const k of halo.kinds) seen.add(k)
-  return INSTITUTION_KINDS.filter((k) => seen.has(k))
 }

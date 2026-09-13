@@ -509,68 +509,6 @@ body {
   font-family: var(--font-body); font-size: var(--f-2); font-style: italic; color: var(--ink-quiet);
 }
 
-/* R6: thirteen chips permanently across the corner is a card standing on the graph, and on a
-   larger town a node spawns behind it. The key opens on request; shut, it is one control. */
-
-.key-summary {
-  display: inline-flex; align-items: center; gap: var(--s-4);
-  min-width: 10.5rem; min-height: 44px; padding: var(--s-2) var(--s-5); cursor: pointer;
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--ink); background: var(--cream) var(--grain);
-  border: 2px solid var(--ink); border-radius: 0; box-shadow: var(--ledge);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .key-summary { transition-property: background-color, translate, box-shadow; }
-}
-.key-summary:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
-.key-summary:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-
-/* struck-out chips keep filtering while the key is shut — say so where the key is */
-.key-filtered {
-  font-family: var(--font-px); font-size: var(--f-1);
-  background: var(--current); color: var(--deep);
-  padding: var(--s-1) var(--s-2); box-shadow: var(--frame-tight);
-}
-
-.legend-chip {
-  display: inline-flex; align-items: center; gap: var(--s-3);
-  border: 2px solid var(--ink); border-radius: 0; background: var(--parchment);
-  color: var(--ink); font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase;
-  padding: var(--s-2) var(--s-4); min-height: 44px; cursor: pointer;
-  box-shadow: var(--ledge);
-  transition-property: color, background-color, translate, box-shadow;
-}
-.legend-chip:hover { translate: 0 -2px; box-shadow: var(--ledge-hi); }
-.legend-chip:active { translate: 0 1px; }
-/* The off state is a MARK, not a dimming: a struck-through chip says "filtered out", a faded one
-   says "less important". */
-.legend-chip { position: relative; }
-/* full-strength ink even when off: the STRIKE is the signal, so the word stays as readable
-   as every other chip's. Fading it would say "less important", which it is not. */
-.legend-chip.off { color: var(--ink); background: var(--sand); }
-.legend-strike {
-  position: absolute; left: var(--s-4); right: var(--s-4); top: 50%;
-  height: 2px; background: var(--ink); pointer-events: none;
-}
-.legend-mark { flex: none; }
-.legend-word { line-height: 1; }
-/* One band per axis, the label over its own chips: with no layout rule the axes ran inline and
-   a spilled row started 86px left of the row above it, under no label at all. */
-.bonds-legend { display: grid; gap: var(--s-5); margin-top: var(--s-4); }
-.legend-axis {
-  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
-}
-.legend-axis + .legend-axis { border-top: 1px solid var(--ink-quiet); padding-top: var(--s-5); }
-.legend-axis-name {
-  flex: 0 0 100%;
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--ink-quiet);
-}
-.legend-stamp {
-  font-size: var(--f-1); color: var(--ink-quiet); margin-left: var(--s-2);
-  font-family: var(--font-data); font-variant-numeric: tabular-nums;
-}
-
 /* ── what passed between two people: the bond detail ── */
 .bond-detail {
   max-height: 18rem; overflow-y: auto; overscroll-behavior: contain;
@@ -977,17 +915,15 @@ body {
 
 /* 5 · press has weight — every control moves and drops a shadow step, not just the camera's */
 
-.legend-chip:active { translate: 0 1px; box-shadow: var(--ledge-in); }
-
 /* Hover arrives in 150ms and leaves the instant the pointer does. A transition reads the
    duration of the state it goes TO, so the 0s belongs on the base and the 150ms on `:hover`. */
 @media (prefers-reduced-motion: no-preference) {
-  .feed-tab, .legend-chip, .signpost-arm, .room-door, .place-row, .roster-sort,
-  .roster-row, .key-summary, .discovery-leaf, .stage-exit, .stage-live {
+  .feed-tab, .signpost-arm, .room-door, .place-row, .roster-sort,
+  .roster-row, .discovery-leaf, .stage-exit, .stage-live {
     transition-duration: 0s;
   }
-  .feed-tab:hover, .legend-chip:hover, .signpost-arm:hover, .room-door:hover,
-  .place-row:hover, .roster-sort:hover, .roster-row:hover, .key-summary:hover,
+  .feed-tab:hover, .signpost-arm:hover, .room-door:hover,
+  .place-row:hover, .roster-sort:hover, .roster-row:hover,
   .discovery-leaf:hover, .stage-exit:hover, .stage-live:hover {
     transition-duration: var(--t-fast);
   }
@@ -2049,11 +1985,6 @@ body:has(.cold-open) .scene-card { display: none; }
 .matrix-key li { display: inline-flex; align-items: center; gap: var(--s-3); }
 .matrix-swatch { width: 16px; height: 16px; box-shadow: 0 0 0 1px var(--ink); flex: none; }
 .bonds-views { display: flex; gap: var(--s-3); row-gap: var(--s-4); flex-wrap: wrap; align-items: center; }
-.legend-halo {
-  display: inline-flex; align-items: center; gap: var(--s-2); flex: none;
-  font-family: var(--font-px); font-size: var(--f-1); text-transform: uppercase; color: var(--ink);
-}
-.legend-halo svg { flex: none; }
 
 .laws, .laws-admin { display: grid; gap: var(--s-3); font-size: var(--f-3); }
 
@@ -2071,7 +2002,7 @@ body:has(.cold-open) .scene-card { display: none; }
 
 /* Forced colours drop `box-shadow`, and the pixel slab IS a box-shadow. */
 @media (forced-colors: active) {
-  .badge, .edition, .era-band, .mark-tip, .key-summary, .legend-chip, .moment-card,
+  .badge, .edition, .era-band, .mark-tip, .moment-card,
   .roster-row, .roster-expanded, .rr-face, .rr-mood, .discovery-leaf, .law-cell, .ops-word,
   .ops-answer, .found-clicked, .edge, .place-row, .diff, .sheet-note.operator, .rx-full,
   .rx-level, .portrait, .need-track, .day-track, .day-bar-cursor, .skeleton-row, .paper,
@@ -2088,7 +2019,7 @@ body:has(.cold-open) .scene-card { display: none; }
 /* A finger cannot hover: every lift the sheet paints on :hover stayed lit after the tap. */
 @media (hover: none) {
   .roster-row:hover, .place-row:hover, .moment-card:hover, .discovery-leaf:hover,
-  .key-summary:hover, .legend-chip:hover, .signpost-arm:hover,
+  .signpost-arm:hover,
   .room-door:hover, .rx-full:hover, .roster-sort:hover, .mark:hover .mark-glyph {
     translate: 0 0;
   }
@@ -2144,8 +2075,8 @@ body:has(.cold-open) .scene-card { display: none; }
    an 8px grid and the ladder has no legal size for it under 16, so the mark is drawn as pixels. */
 .thoughts-button { margin-bottom: var(--s-3); }
 .thoughts-glyph { display: block; image-rendering: pixelated; }
-/* Off steps one notch inside the same family, the way `.legend-chip.off` does — honey to sand is
-   1.10:1, so the paper is never the signal; the emptied wisp is. Deep holds 11.2:1 on sand. */
+/* Off steps one notch inside the same family — honey to sand is 1.10:1, so the paper is never
+   the signal; the emptied wisp is. Deep holds 11.2:1 on sand. */
 .thoughts-button[aria-pressed='false'],
 .sound-button[aria-pressed='false'] { background: var(--sand); }
 .thoughts-button[aria-pressed='false']:hover,

@@ -2,10 +2,11 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import type { Bond, BondsResponse } from '@sj/shared'
+import type { Bond, BondKind, BondsResponse } from '@sj/shared'
 import { EMPTY_LINEAGE, type PeopleIndex } from './bondModel2.js'
 import { LEVEL_DISTANCE, NO_LINK_LEVEL } from './relationGraph.js'
 import {
+  DRIFT_MIN,
   STRENGTH_FULL,
   STROKE_MAX,
   STROKE_MIN,
@@ -14,6 +15,7 @@ import {
   orbitRings,
   orbitStroke,
 } from './bondOrbit.js'
+import { KIND_COLOR } from './relationGraph.js'
 import { MATRIX_LEVELS, levelMatrix, shortName } from './bondMatrix.js'
 import { BondOrbit } from '../paper/pages/BondOrbit.js'
 import { LevelMatrixTable } from '../paper/pages/LevelMatrix.js'
@@ -27,13 +29,20 @@ const PEOPLE: PeopleIndex = {
   salma: { name: 'Salma', alive: true },
 }
 
-const bond = (aId: string, bId: string, warmth: number): Bond =>
+const bond = (
+  aId: string,
+  bId: string,
+  warmth: number,
+  priorWarmth = warmth,
+  kind: BondKind = 'friend',
+): Bond =>
   ({
     id: `${aId}-${bId}`,
     aId,
     bId,
+    kind,
     warmth,
-    priorWarmth: warmth,
+    priorWarmth,
     lastUpdatedTick: 0,
     levelChangedTick: 0,
     acts: [],
@@ -126,6 +135,46 @@ describe('★ the orbit stands people at their real distance', () => {
     expect(orbit.ties.map((t) => t.id)).toEqual(['nadia', 'omar', 'salma'])
   })
 
+  // ★ THE BEARING IS THE PERSON'S. It came off the warmth sort, so one quarrel swung half the
+  // town around the dial: the reader could not watch a tie move because nothing held still.
+  it('★ keeps a person on their own bearing when their level changes', () => {
+    const cooled: BondsResponse = {
+      asOfTick: 0,
+      bonds: [bond('amara', 'nadia', -20), bond('amara', 'omar', 5), bond('nadia', 'omar', 12)],
+    }
+    const after = orbitOf('amara', cooled, EMPTY_LINEAGE, PEOPLE, 0)!
+    const bearing = (o: typeof orbit, id: string): number => o.ties.find((t) => t.id === id)!.angle
+    for (const id of ['nadia', 'omar', 'salma']) {
+      expect(bearing(after, id), id).toBe(bearing(orbit, id))
+    }
+    // ...and the distance is what moved
+    expect(after.ties.find((t) => t.id === 'nadia')!.r).toBeGreaterThan(
+      orbit.ties.find((t) => t.id === 'nadia')!.r,
+    )
+    // every bearing is its own, and they are spread over the whole dial
+    expect(new Set(after.ties.map((t) => t.angle)).size).toBe(after.ties.length)
+  })
+
+  // ★ SIGNED, never the absolute value: a marriage and a betrayal are not the same shape.
+  it('★ carries the arc as a signed number, in and out of the middle', () => {
+    const moved: BondsResponse = {
+      asOfTick: 0,
+      bonds: [
+        bond('amara', 'nadia', 40, 10, 'partner'),
+        bond('amara', 'omar', 5, 30, 'rival'),
+        bond('amara', 'salma', 12, 12, 'work'),
+      ],
+    }
+    const o = orbitOf('amara', moved, EMPTY_LINEAGE, PEOPLE, 0)!
+    const of = (id: string) => o.ties.find((t) => t.id === id)!
+    expect(of('nadia').drift).toBe(30)
+    expect(of('omar').drift).toBe(-25)
+    expect(of('salma').drift).toBe(0)
+    // and the colour is the kind, so the two channels cannot be read off each other
+    expect(of('nadia').color).toBe(KIND_COLOR.partner)
+    expect(of('omar').color).toBe(KIND_COLOR.rival)
+  })
+
   it('says nothing at all about somebody the town does not have', () => {
     expect(orbitOf('nobody', API, EMPTY_LINEAGE, PEOPLE, 0)).toBeNull()
   })
@@ -197,6 +246,54 @@ describe('★ the two views a reader gets', () => {
     }),
   )
 
+  // ★ WHAT THE ARROWHEAD SAYS, and the one number that says it. Drawn from the sign, so a pair
+  // that warmed points at the middle and a pair that cooled points away from it.
+  it('★ points the head IN when a pair warmed and OUT when it cooled, and draws none for still', () => {
+    const moved: BondsResponse = {
+      asOfTick: 0,
+      bonds: [
+        bond('amara', 'nadia', 40, 10, 'partner'),
+        bond('amara', 'omar', 5, 30, 'rival'),
+        bond('amara', 'salma', 12, 12, 'work'),
+      ],
+    }
+    const o = orbitOf('amara', moved, EMPTY_LINEAGE, PEOPLE, 0)!
+    const drawn = renderToStaticMarkup(
+      createElement(BondOrbit, { orbit: o, onCentre: () => undefined }),
+    )
+    // three alters, one of them steady
+    expect(drawn.match(/class="orbit-head"/g)).toHaveLength(2)
+
+    // the head's tip against its own node, on the same spoke
+    const heads = [...drawn.matchAll(/points="([^"]+)"/g)].map((m) => m[1]!)
+    const tipR = (pts: string): number => {
+      const [x, y] = pts.split(' ')[0]!.split(',').map(Number)
+      return Math.hypot(x!, y!)
+    }
+    const warmer = o.ties.find((t) => t.id === 'nadia')!
+    const cooler = o.ties.find((t) => t.id === 'omar')!
+    const nodeR = (id: string): number => o.ties.find((t) => t.id === id)!.r
+    // warming: the tip sits nearer the middle than where the head stands on the spoke
+    expect(tipR(heads[0]!)).toBeLessThan(nodeR(warmer.id))
+    // cooling: the tip sits further out than where it stands
+    expect(tipR(heads[1]!)).toBeGreaterThan(nodeR(cooler.id) * 0.62)
+    expect(drawn).toContain('Getting closer.')
+    expect(drawn).toContain('Drifting apart.')
+  })
+
+  it('★ says nothing at all about a pair that has not moved by as much as one act', () => {
+    const barely: BondsResponse = {
+      asOfTick: 0,
+      bonds: [bond('amara', 'nadia', 40, 40 - DRIFT_MIN / 2, 'partner')],
+    }
+    const o = orbitOf('amara', barely, EMPTY_LINEAGE, PEOPLE, 0)!
+    const drawn = renderToStaticMarkup(
+      createElement(BondOrbit, { orbit: o, onCentre: () => undefined }),
+    )
+    expect(drawn).not.toContain('orbit-head')
+    expect(drawn).not.toContain('Getting closer.')
+  })
+
   it('draws a ring for every level in use and a spoke only where there is a tie', () => {
     expect(plot.match(/class="orbit-ring"/g)).toHaveLength(orbit.rings.length)
     // three alters, two of them met: Salma gets a node and no line
@@ -260,10 +357,10 @@ describe('★ the two views a reader gets', () => {
 describe('★ the tab is one vertical sheet, and the town graph is legible', () => {
   const src = readFileSync(new URL('../paper/pages/BondsGraph.tsx', import.meta.url), 'utf8')
 
-  it('★ stacks the three, and crams nothing side by side', () => {
+  it('★ stacks the four, and crams nothing side by side', () => {
     expect(src).toContain('className="bonds-sheet"')
-    expect(src.match(/className="bonds-section"/g)).toHaveLength(3)
-    expect(src.indexOf('bonds-graph')).toBeLessThan(src.indexOf('<BondOrbit'))
+    expect(src.match(/className="bonds-section"/g)).toHaveLength(4)
+    expect(src.indexOf('bonds-strongest')).toBeLessThan(src.indexOf('<BondOrbit'))
     expect(src.indexOf('<BondOrbit')).toBeLessThan(src.indexOf('<LevelMatrixTable'))
     expect(/\.bonds-sheet \{([^}]*)\}/.exec(CSS)?.[1]).toContain('display: grid')
   })
@@ -294,8 +391,21 @@ describe('★ the tab is one vertical sheet, and the town graph is legible', () 
     expect(src).toContain('Choose anyone above to open their orbit.')
   })
 
-  // The legend opening itself the first time is already the law; the stack must not lose it.
-  it('keeps the key open on a first visit', () => {
-    expect(src).toContain('useState(() => keyOpensBy(sessionStore()))')
+  // ★ The picture that needs a key has failed. There is no key any more, so there must be no
+  // control that offers one and no chip that filters the picture down behind the reader's back.
+  it('★ carries no legend, no key and no chip that hides an edge', () => {
+    expect(src).not.toContain('LegendChip')
+    expect(src).not.toContain('How to read this')
+    expect(src).not.toContain('bonds-legend')
+    expect(src).not.toContain('keyOpensBy')
+  })
+
+  // ★ One person's orbit is the answer to "who is this one to everybody else". The field of
+  // slabs answers nothing until a reader asks it for the town, so it waits behind its own control.
+  it('★ opens with the orbit and keeps the whole town behind a control', () => {
+    expect(src.indexOf('<BondOrbit')).toBeLessThan(src.indexOf('bonds-graph'))
+    expect(src).toContain('const [townOpen, setTownOpen] = useState(false)')
+    expect(src).toContain('Show the town')
+    expect(src).toContain('aria-controls="bonds-town"')
   })
 })

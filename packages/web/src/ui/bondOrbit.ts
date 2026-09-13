@@ -1,7 +1,8 @@
 import { agentName } from '@sj/shared'
-import type { BondsResponse } from '@sj/shared'
+import type { BondKind, BondsResponse } from '@sj/shared'
 import {
   LEVEL_RANK,
+  NODE_DEAD,
   bondIndex,
   bondLevel,
   bondWarmth,
@@ -12,7 +13,7 @@ import {
   type LineageLike,
   type PeopleIndex,
 } from './bondModel2.js'
-import { ARC_COLOR, LEVEL_DISTANCE, NO_LINK_LEVEL, TYPE_STROKE } from './relationGraph.js'
+import { KIND_COLOR, LEVEL_DISTANCE, NO_LINK_LEVEL, TYPE_STROKE } from './relationGraph.js'
 
 // ★ ONE PERSON'S ORBIT — the question people actually ask is about a person, so distance from the
 // middle does the work the whole-town graph spends a force simulation on. The rings ARE
@@ -52,8 +53,12 @@ export const STRENGTH_FULL = 20
 export const STROKE_MIN = 2
 export const STROKE_MAX = 6
 
-/** THE THIRD CHANNEL. Type is the dash, the arc is the colour, and how much of a tie there is
- *  is how heavy the line is — so two ties at the same distance still differ. */
+/** The smallest recorded act is worth one (`BOND_VALENCE.friend`), so a pair that has moved by
+ *  less than that has not moved by as much as one thing anybody did. */
+export const DRIFT_MIN = 1
+
+/** THE THIRD CHANNEL. Type is the dash, the kind is the colour, the arrowhead is the arc, and how
+ *  much of a tie there is is how heavy the line is, so two ties at the same distance still differ. */
 export function orbitStroke(warmth: number): number {
   const t = Math.min(1, Math.abs(warmth) / STRENGTH_FULL)
   return STROKE_MIN + (STROKE_MAX - STROKE_MIN) * t
@@ -67,8 +72,13 @@ export type OrbitTie = {
   drawn: boolean
   level: BondLevel
   type: BondType
+  /** What the world recorded most of between the two. Null when it has recorded nothing. */
+  kind: BondKind | null
   arc: BondArc
   warmth: number
+  /** ★ SIGNED: `warmth - priorWarmth`. A marriage and a betrayal are not the same shape, so the
+   *  arrowhead points in and out, and its absolute value never draws anything. */
+  drift: number
   /** straight off `LEVEL_DISTANCE` — the ring this person sits on */
   r: number
   /** degrees clockwise from the top */
@@ -121,13 +131,26 @@ export function orbitOf(
   }
   const rings = orbitRings(coldest)
 
-  const ties = seen.map((t, i) => {
-    const angle = (i * 360) / seen.length
+  // ★ THE BEARING IS THE PERSON'S, NOT THEIR WARMTH'S. Angle came off the warmth sort, so one
+  // quarrel swung half the town around the dial and no two visits agreed. Sorted by id, a
+  // person keeps their bearing and only their DISTANCE moves, which is the whole picture.
+  const bearing = new Map(
+    seen
+      .map((t) => t.id)
+      .sort()
+      .map((id, i, all) => [id, (i * 360) / all.length]),
+  )
+
+  const ties = seen.map((t) => {
+    const angle = bearing.get(t.id) ?? 0
     const rad = ((angle - 90) * Math.PI) / 180
     const r = LEVEL_DISTANCE[t.level]
     const stroke = TYPE_STROKE[t.type]
+    const kind = t.bond?.kind ?? null
     return {
       ...t,
+      kind,
+      drift: t.bond === null ? 0 : t.warmth - t.bond.priorWarmth,
       drawn: t.level !== NO_LINK_LEVEL,
       r,
       angle,
@@ -135,7 +158,7 @@ export function orbitOf(
       y: r * Math.sin(rad),
       dash: stroke.dash,
       strokeCount: stroke.strokeCount,
-      color: ARC_COLOR[t.arc.direction],
+      color: kind === null ? NODE_DEAD : KIND_COLOR[kind],
       width: orbitStroke(t.warmth),
     }
   })

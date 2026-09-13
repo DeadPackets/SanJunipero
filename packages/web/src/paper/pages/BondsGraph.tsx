@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
-import { tickToMoment, type BondsResponse } from '@sj/shared'
+import type { BondsResponse } from '@sj/shared'
 import { strongestPairs } from '../../ui/roster/tieLine.js'
 
 // Day 0 showed a key and no words: a page about people that named nobody.
@@ -8,7 +8,7 @@ const STRANGERS_STILL = 'Nobody is more than a stranger to anybody yet. Give it 
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
 import { TEXT_MIN_PX } from '../../textFloor.js'
-import { LegendChip } from '../../ui/LegendChip.js'
+import { PersonLink } from '../../ui/PersonLink.js'
 import { BondDetail, FadedBond } from './BondDetail.js'
 import {
   EMPTY_LINEAGE,
@@ -17,23 +17,14 @@ import {
   type BondNode,
   type PeopleIndex,
 } from '../../ui/bondModel2.js'
-import {
-  keyOpensBy,
-  relationLegend,
-  rememberKey,
-  toRelationGraph,
-  type LegendRow,
-  type RelationLink,
-} from '../../ui/relationGraph.js'
+import { toRelationGraph, type RelationLink } from '../../ui/relationGraph.js'
 import {
   EMPTY_SOCIETY,
   GONE_RING,
   INSTITUTION_RING,
   halosOf,
-  institutionLegend,
   societyFrom,
   trafficGraph,
-  trafficLegend,
   type Halo,
 } from '../../ui/societyGraph.js'
 import { EMPTY_DISPATCHES } from '../../ui/dispatches.js'
@@ -45,7 +36,6 @@ import { bondsFeed, dispatchesFeed, lineageFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
-import { sessionStore } from '../../ui/storage.js'
 
 /** Views, not layers on one picture: how close people are and what has passed between them are
  *  different questions. */
@@ -97,13 +87,6 @@ const NO_HALO: Halo = { kinds: [], names: [] }
 
 type Drawn = Pick<RelationLink, 'distance' | 'dash' | 'strokeCount' | 'color' | 'words'>
 
-const AXIS_NAME: Readonly<Record<LegendRow['axis'], string>> = {
-  level: 'How close',
-  type: 'Family',
-  arc: 'Which way',
-  kind: 'What passed',
-}
-
 /** A node once the simulation has placed it. `x`/`y` are absent until the first tick. */
 type PositionedNode = BondNode & { x?: number; y?: number }
 
@@ -125,18 +108,18 @@ export function BondsGraph({
   const lineage = useFeed(lineageFeed).data ?? EMPTY_LINEAGE
   const paper = useFeed(dispatchesFeed).data ?? EMPTY_DISPATCHES
   const halos = useMemo(() => halosOf(paper.institutions), [paper.institutions])
-  const haloKinds = useMemo(() => institutionLegend(halos), [halos])
   const [view, setView] = useState<SocietyView>('ties')
+  // ★ The whole-town picture is the SECOND question. One person's orbit answers "who is this one
+  // to everybody else"; the field of slabs answers nothing until a reader asks it for the town.
+  const [townOpen, setTownOpen] = useState(false)
   // Not fetched until somebody asks for it: `null` is the endpoint layer's own "do not read".
   const trafficRead = useEndpointFor(
-    view === 'traffic' ? '/api/society' : null,
+    townOpen && view === 'traffic' ? '/api/society' : null,
     societyFrom,
     SOCIETY_REFETCH_MS,
   )
   const traffic = useFeed(trafficRead)
   const wireDown = view === 'ties' ? bonds.failed : traffic.failed
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const [keyOpen, setKeyOpen] = useState(() => keyOpensBy(sessionStore()))
   const [selected, setSelected] = useState<RelationLink | null>(null)
   // Whose orbit is open below the town graph. Null until somebody picks one, and then it is
   // the person the town has the most to say about.
@@ -173,7 +156,7 @@ export function BondsGraph({
     return () => {
       ro.disconnect()
     }
-  }, [])
+  }, [townOpen])
 
   const nameSig = useMemo(() => peopleSignature(state?.agents), [state])
 
@@ -206,21 +189,7 @@ export function BondsGraph({
     () => levelMatrix(api ?? EMPTY_API, lineage, people, asOf),
     [api, lineage, people, asOf],
   )
-  const legend = useMemo(() => (view === 'ties' ? relationLegend() : trafficLegend()), [view])
-  const axes = view === 'ties' ? (['level', 'type', 'arc'] as const) : (['kind'] as const)
-  const key = (r: LegendRow): string => `${r.axis}:${r.key}`
-  const links = useMemo(
-    () =>
-      view === 'ties'
-        ? ties.links.filter(
-            (l) =>
-              !hidden.has(`level:${l.level}`) &&
-              !hidden.has(`type:${l.type}`) &&
-              !hidden.has(`arc:${l.arc.direction}`),
-          )
-        : passed.links.filter((l) => !hidden.has(`kind:${l.kind}`)),
-    [view, ties, passed, hidden],
-  )
+  const links = useMemo(() => (view === 'ties' ? ties.links : passed.links), [view, ties, passed])
 
   // The simulation writes x/y onto these very objects, so they are handed over uncloned: a
   // clone would discard the layout on every render.
@@ -370,18 +339,9 @@ export function BondsGraph({
     [graphData],
   )
 
-  const toggle = (k: string): void => {
-    setHidden((prev) => {
-      const next = new Set(prev)
-      if (next.has(k)) next.delete(k)
-      else next.add(k)
-      return next
-    })
-  }
-
   return (
-    // ★ A VERTICAL SHEET, never two pictures crammed side by side: the whole town first, then
-    // one person's orbit, then the grid every pair has an address in.
+    // ★ A VERTICAL SHEET, never two pictures crammed side by side: the sentences first, then the
+    // one person the reader picked, then the whole town on request, then the grid.
     <div className="bonds-sheet">
       <section className="bonds-section">
         <h3 className="feed-head">Everyone, and who they are to each other</h3>
@@ -394,148 +354,6 @@ export function BondsGraph({
         ) : (
           api !== null && <p className="feed-empty">{STRANGERS_STILL}</p>
         )}
-        <div className="bonds-graph">
-          {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
-              keys, and a second tablist nested in its panel would be one the keyboard cannot
-              walk. */}
-          <div className="bonds-views" role="group" aria-label="What the picture shows">
-            {SOCIETY_VIEWS.map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={v === view}
-                className={v === view ? 'feed-tab active' : 'feed-tab'}
-                onClick={() => {
-                  setView(v)
-                  setHidden(new Set())
-                }}
-              >
-                {SOCIETY_VIEW_LABEL[v]}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="key-summary"
-              aria-expanded={keyOpen}
-              aria-controls="bonds-key"
-              onClick={() => {
-                setKeyOpen(!keyOpen)
-                rememberKey(sessionStore(), !keyOpen)
-              }}
-            >
-              {keyOpen ? 'Hide the key' : 'How to read this'}
-              {hidden.size > 0 && <span className="key-filtered">{hidden.size} hidden</span>}
-            </button>
-          </div>
-          {keyOpen && (
-            <div id="bonds-key" className="bonds-legend" role="group" aria-label="How to read this">
-              {axes.map((axis) => (
-                <div className="legend-axis" key={axis} data-axis={axis}>
-                  <span className="legend-axis-name">{AXIS_NAME[axis]}</span>
-                  {legend
-                    .filter((r) => r.axis === axis)
-                    .map((r) => (
-                      <LegendChip
-                        key={key(r)}
-                        row={r}
-                        off={hidden.has(key(r))}
-                        onToggle={() => {
-                          toggle(key(r))
-                        }}
-                      />
-                    ))}
-                </div>
-              ))}
-              {haloKinds.length > 0 && (
-                <div className="legend-axis" data-axis="formed">
-                  <span className="legend-axis-name">What they formed</span>
-                  {haloKinds.map((kind) => (
-                    <span className="legend-halo" key={kind}>
-                      {/* a ring, drawn at the size the graph draws it, so a dotted one is not a
-                          solid one at swatch scale */}
-                      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
-                        <rect x="4" y="4" width="14" height="14" fill="var(--night)" />
-                        <rect
-                          x="2"
-                          y="2"
-                          width="18"
-                          height="18"
-                          fill="none"
-                          stroke={INSTITUTION_RING[kind].color}
-                          strokeWidth="2"
-                          strokeDasharray={INSTITUTION_RING[kind].dash?.join(' ')}
-                        />
-                      </svg>
-                      <span className="legend-word">{INSTITUTION_RING[kind].words}</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {api !== null && (
-                <span className="legend-stamp">
-                  as of Day {tickToMoment(api.asOfTick).day} {tickToMoment(api.asOfTick).time}
-                </span>
-              )}
-            </div>
-          )}
-
-          {(view === 'ties' ? api : traffic.data) === null ? (
-            // A field of unconnected people is what BOTH a tieless town and an unanswered fetch
-            // look like, so the wait — and the refusal — say which.
-            wireDown ? (
-              <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
-            ) : (
-              <p className="feed-empty" role="status" aria-busy="true">
-                Reading the town’s ties…
-              </p>
-            )
-          ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
-            <p className="feed-empty">{view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}</p>
-          ) : null}
-
-          {view === 'ties' &&
-            selected !== null &&
-            api !== null &&
-            (openBond ? (
-              <BondDetail
-                bond={openBond}
-                people={people}
-                type={selected.type}
-                level={selected.level}
-                arc={selected.arc}
-                words={selected.words}
-                onClose={closeDetail}
-              />
-            ) : (
-              <FadedBond onClose={closeDetail} />
-            ))}
-
-          {roll}
-
-          <div className="bonds-canvas" ref={boxRef}>
-            <ForceGraph2D
-              width={dims.w}
-              height={dims.h}
-              backgroundColor="rgba(0,0,0,0)"
-              graphData={graphData}
-              nodeVal={nodeVal}
-              nodeLabel={nodeLabel}
-              ref={fgRef}
-              nodeCanvasObjectMode={nodeMode}
-              nodeCanvasObject={drawNode}
-              linkCanvasObject={drawLink}
-              onRenderFramePost={drawNames}
-              nodeColor={nodeColor}
-              linkColor={linkColor}
-              linkWidth={linkWidth}
-              linkLineDash={linkLineDash}
-              linkLabel={linkLabel}
-              onLinkClick={onLinkClick}
-              onNodeClick={onNodeClick}
-            />
-          </div>
-          <p className="bonds-hint">Choose anyone above to open their orbit.</p>
-        </div>
       </section>
 
       <section className="bonds-section">
@@ -543,17 +361,7 @@ export function BondsGraph({
           <h3 className="feed-head">
             {orbit === null ? 'One person’s orbit' : `${orbit.name}, and everyone`}
           </h3>
-          {orbit !== null && (
-            <button
-              type="button"
-              className="feed-tab"
-              onClick={() => {
-                onSubject({ id: orbit.id, kind: 'agent', name: orbit.name })
-              }}
-            >
-              Open {orbit.name}’s story
-            </button>
-          )}
+          {orbit !== null && <PersonLink id={orbit.id} name={orbit.name} onSubject={onSubject} />}
         </div>
         {orbit === null ? (
           bonds.failed ? (
@@ -567,6 +375,105 @@ export function BondsGraph({
           <EmptyOrbit name={orbit.name} />
         ) : (
           <BondOrbit orbit={orbit} onCentre={setPicked} />
+        )}
+      </section>
+
+      <section className="bonds-section">
+        <div className="bonds-section-head">
+          <h3 className="feed-head">The whole town at once</h3>
+          <button
+            type="button"
+            className={townOpen ? 'feed-tab active' : 'feed-tab'}
+            aria-expanded={townOpen}
+            aria-controls="bonds-town"
+            onClick={() => {
+              setTownOpen(!townOpen)
+            }}
+          >
+            {townOpen ? 'Put the town away' : 'Show the town'}
+          </button>
+        </div>
+        {townOpen && (
+          <div id="bonds-town" className="bonds-graph">
+            {/* Toggles, not a tablist: the paper's own tab bar owns that pattern and its arrow
+                keys, and a second tablist nested in its panel would be one the keyboard cannot
+                walk. */}
+            <div className="bonds-views" role="group" aria-label="What the picture shows">
+              {SOCIETY_VIEWS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={v === view}
+                  className={v === view ? 'feed-tab active' : 'feed-tab'}
+                  onClick={() => {
+                    setView(v)
+                  }}
+                >
+                  {SOCIETY_VIEW_LABEL[v]}
+                </button>
+              ))}
+            </div>
+
+            {(view === 'ties' ? api : traffic.data) === null ? (
+              // A field of unconnected people is what BOTH a tieless town and an unanswered fetch
+              // look like, so the wait — and the refusal — say which.
+              wireDown ? (
+                <OutOfReach onRetry={view === 'ties' ? bondsFeed.retry : trafficRead.retry} />
+              ) : (
+                <p className="feed-empty" role="status" aria-busy="true">
+                  Reading the town’s ties…
+                </p>
+              )
+            ) : graph.links.length === 0 && graph.nodes.length > 0 ? (
+              <p className="feed-empty">
+                {view === 'ties' ? EMPTY_COPY.bonds : EMPTY_COPY.traffic}
+              </p>
+            ) : null}
+
+            {view === 'ties' &&
+              selected !== null &&
+              api !== null &&
+              (openBond ? (
+                <BondDetail
+                  bond={openBond}
+                  people={people}
+                  type={selected.type}
+                  level={selected.level}
+                  arc={selected.arc}
+                  words={selected.words}
+                  onSubject={onSubject}
+                  onClose={closeDetail}
+                />
+              ) : (
+                <FadedBond onClose={closeDetail} />
+              ))}
+
+            {roll}
+
+            <div className="bonds-canvas" ref={boxRef}>
+              <ForceGraph2D
+                width={dims.w}
+                height={dims.h}
+                backgroundColor="rgba(0,0,0,0)"
+                graphData={graphData}
+                nodeVal={nodeVal}
+                nodeLabel={nodeLabel}
+                ref={fgRef}
+                nodeCanvasObjectMode={nodeMode}
+                nodeCanvasObject={drawNode}
+                linkCanvasObject={drawLink}
+                onRenderFramePost={drawNames}
+                nodeColor={nodeColor}
+                linkColor={linkColor}
+                linkWidth={linkWidth}
+                linkLineDash={linkLineDash}
+                linkLabel={linkLabel}
+                onLinkClick={onLinkClick}
+                onNodeClick={onNodeClick}
+              />
+            </div>
+            <p className="bonds-hint">Choose anyone above to open their orbit.</p>
+          </div>
         )}
       </section>
 

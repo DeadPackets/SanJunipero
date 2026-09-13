@@ -1,8 +1,16 @@
 import { BOND_LEVEL_WORD } from '../../ui/bondModel2.js'
-import { type Orbit, type OrbitTie } from '../../ui/bondOrbit.js'
+import { DRIFT_MIN, type Orbit, type OrbitTie } from '../../ui/bondOrbit.js'
 
 /** A doubled stroke is the second family channel; the pair is offset by its own width. */
 const DOUBLE_GAP = 1.6
+/** How far down the spoke the head sits, and how big it is in orbit units. */
+const HEAD_AT = 0.62
+const HEAD_LEN = 13
+const HEAD_HALF = 7
+/** What the arrowhead says, for a reader who cannot see it. Off the same signed number. */
+const driftWords = (drift: number): string =>
+  Math.abs(drift) < DRIFT_MIN ? '' : drift > 0 ? 'Getting closer.' : 'Drifting apart.'
+
 /** Orbit units to a percentage of the box, so a node lands on the end of its own spoke. */
 const pct = (v: number, box: number): string => `${((v + box) / (box * 2)) * 100}%`
 
@@ -26,14 +34,37 @@ function Tie({ tie }: { tie: OrbitTie }) {
           strokeDasharray={tie.dash === null ? undefined : tie.dash.map((d) => d * 3).join(' ')}
         />
       ))}
+      <Head tie={tie} />
     </>
   )
 }
 
+/**
+ * ★ SIGNED, never its absolute value: the head points IN when the pair has warmed since the last
+ * half-life and OUT when it has cooled. Distance from the middle is closeness, so the direction
+ * of travel is the direction along the spoke, and a marriage and a betrayal are opposite shapes.
+ */
+function Head({ tie }: { tie: OrbitTie }) {
+  if (Math.abs(tie.drift) < DRIFT_MIN) return null
+  const len = Math.hypot(tie.x, tie.y) || 1
+  const [ux, uy] = [tie.x / len, tie.y / len]
+  const [px, py] = [-uy, ux]
+  // -1 puts the tip back down the spoke toward the middle, +1 on out past the node.
+  const way = tie.drift > 0 ? -1 : 1
+  const [tx, ty] = [tie.x * HEAD_AT + ux * way * HEAD_LEN, tie.y * HEAD_AT + uy * way * HEAD_LEN]
+  const [bx, by] = [tie.x * HEAD_AT, tie.y * HEAD_AT]
+  const points = [
+    `${tx},${ty}`,
+    `${bx + px * HEAD_HALF},${by + py * HEAD_HALF}`,
+    `${bx - px * HEAD_HALF},${by - py * HEAD_HALF}`,
+  ].join(' ')
+  return <polygon className="orbit-head" points={points} fill={tie.color} />
+}
+
 /** ★ THE ORBIT — ego-centric, and the rings are the graph's own `LEVEL_DISTANCE`, so distance
  *  here is the number the town picture is laid out with rather than a drawing. Each spoke carries
- *  all three detail channels at once: the dash is the family tie, the colour is which way it is
- *  going, and the weight is how much of it there is.
+ *  every detail channel at once: the dash is the family tie, the colour is what the tie is made
+ *  of, the arrowhead is which way it is going, and the weight is how much of it there is.
  *
  *  The rings and the spokes scale with the box; the NAMES do not. A glyph inside the viewBox
  *  would be 10px on a 300px phone, and nothing in this product renders below twelve. */
@@ -91,7 +122,7 @@ export function BondOrbit({ orbit, onCentre }: { orbit: Orbit; onCentre: (id: st
                 onCentre(tie.id)
               }}
             >
-              {tie.words} Open {tie.name}’s orbit.
+              {tie.words} {driftWords(tie.drift)} Open {tie.name}’s orbit.
             </button>
           </li>
         ))}

@@ -226,7 +226,7 @@ describe('the thoughts button', () => {
     renderToStaticMarkup(createElement(ThoughtsButton, { thoughts, onToggle: () => {} }))
 
   // A switch, not a disclosure: it opens nothing, so `aria-pressed` and never `aria-expanded`.
-  // Pressed is ON — the polarity `.legend-chip` set — and the label never restates the state.
+  // Pressed is ON, and the label never restates the state.
   it('★ says which way it is set, and opens nothing', () => {
     expect(html('shown')).toContain('aria-pressed="true"')
     expect(html('hidden')).toContain('aria-pressed="false"')

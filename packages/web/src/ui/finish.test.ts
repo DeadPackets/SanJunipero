@@ -47,13 +47,7 @@ const named = <T extends readonly string[]>(list: T): T => {
 // ── 1 · optical alignment ─────────────────────────────────────────────────────────────────
 // An icon beside a word is two boxes of different heights: centring them centres the BOXES, and
 // what a reader sees is the two baselines disagreeing.
-const ICON_LABEL_PAIRS = named([
-  '.legend-chip',
-  '.bonds-views',
-  '.feed-line',
-  '.room-roll li',
-  '.rr-doing',
-])
+const ICON_LABEL_PAIRS = named(['.bonds-views', '.feed-line', '.room-roll li', '.rr-doing'])
 
 describe('1 · an icon and its word sit on one line, declared and never defaulted', () => {
   it('states align-items on every inline icon+label pair', () => {
@@ -130,13 +124,11 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 // Every control that lifts on hover, not the seven somebody happened to list.
 const CONTROLS = named([
   '.feed-tab',
-  '.legend-chip',
   '.signpost-arm',
   '.room-door',
   '.place-row',
   '.roster-sort',
   '.roster-row',
-  '.key-summary',
   '.discovery-leaf',
 ])
 

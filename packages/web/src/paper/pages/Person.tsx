@@ -34,8 +34,10 @@ import {
 import { EMPTY_LINEAGE, bondArc, bondTypeOf, relationLine } from '../../ui/bondModel2.js'
 import { skillPhrase } from '../../ui/roster/expand.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
+import { PersonLink } from '../../ui/PersonLink.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { Skeleton } from './Skeleton.js'
+import type { Subject } from '../../stage/index.js'
 import type { PageProps } from './types.js'
 
 const NEED_LOW = 30
@@ -209,6 +211,7 @@ export function PersonLedgerView({
   ledger,
   ledgerWire,
   nameOf = () => SOMEONE,
+  onSubject = () => undefined,
 }: {
   agent: LedgerAgent
   tick: number
@@ -216,6 +219,7 @@ export function PersonLedgerView({
   ledger: readonly LedgerRow[] | null
   ledgerWire?: Wire
   nameOf?: (id: string) => string
+  onSubject?: (subject: Subject) => void
 }) {
   return (
     <>
@@ -275,7 +279,9 @@ export function PersonLedgerView({
         ) : (
           ledger.map((row) => (
             <article key={row.personId}>
-              <h4>{nameOf(row.personId)}</h4>
+              <h4>
+                <PersonLink id={row.personId} name={nameOf(row.personId)} onSubject={onSubject} />
+              </h4>
               <p className="doc">{row.doc}</p>
             </article>
           ))
@@ -285,7 +291,7 @@ export function PersonLedgerView({
   )
 }
 
-export function PersonPage({ tab, subject, store }: PageProps) {
+export function PersonPage({ tab, subject, store, onSubject }: PageProps) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const dispatches = useFeed(dispatchesFeed).data
@@ -368,7 +374,7 @@ export function PersonPage({ tab, subject, store }: PageProps) {
         </p>
       )}
       {tab === 'Bonds' ? (
-        <Edges agentId={a.id} store={store} />
+        <Edges agentId={a.id} store={store} onSubject={onSubject} />
       ) : tab === 'Ledger' ? (
         <PersonLedgerView
           agent={a}
@@ -377,6 +383,7 @@ export function PersonPage({ tab, subject, store }: PageProps) {
           ledger={ledger.data}
           ledgerWire={{ failed: ledger.failed, retry: ledgerRead.retry }}
           nameOf={(id) => agentName(state?.agents, id)}
+          onSubject={onSubject}
         />
       ) : (
         <PersonStoryView
@@ -392,7 +399,15 @@ export function PersonPage({ tab, subject, store }: PageProps) {
   )
 }
 
-function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] }) {
+function Edges({
+  agentId,
+  store,
+  onSubject,
+}: {
+  agentId: string
+  store: PageProps['store']
+  onSubject: (subject: Subject) => void
+}) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const api = useFeed(bondsFeed).data
@@ -414,6 +429,13 @@ function Edges({ agentId, store }: { agentId: string; store: PageProps['store'] 
         )
         return (
           <li key={b.id} className="edge">
+            <p className="edge-who">
+              <PersonLink
+                id={otherId}
+                name={agentName(state?.agents, otherId)}
+                onSubject={onSubject}
+              />
+            </p>
             <p className="edge-line">{words}</p>
             <p className="edge-when">
               Since Day {tickToMoment(b.formedTick).day}, last on Day{' '}

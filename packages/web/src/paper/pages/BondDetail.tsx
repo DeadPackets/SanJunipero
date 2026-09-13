@@ -8,7 +8,9 @@ import {
   type BondType,
   type PeopleIndex,
 } from '../../ui/bondModel2.js'
+import { PersonLink } from '../../ui/PersonLink.js'
 import { ARC_COLOR } from '../../ui/relationGraph.js'
+import type { Subject } from '../../stage/index.js'
 import { momentStamp } from '../stamp.js'
 
 const ARC_WORD: Readonly<Record<BondArc['direction'], string>> = {
@@ -40,6 +42,7 @@ export function BondDetail({
   level,
   arc,
   words,
+  onSubject,
   onClose,
 }: {
   bond: Bond
@@ -49,6 +52,7 @@ export function BondDetail({
   arc: BondArc
   /** the `relationLine` sentence the graph already built — one sentence, one author */
   words: string
+  onSubject: (subject: Subject) => void
   onClose: () => void
 }) {
   const newestFirst = [...bond.recent].reverse()
@@ -61,7 +65,9 @@ export function BondDetail({
         <span className="bond-level">{BOND_LEVEL_WORD[level]}</span>
         {type !== 'none' && <span className="bond-type">{BOND_TYPE_WORD[type]}</span>}
         <h3 className="bond-title">
-          {agentName(people, bond.aId)} &amp; {agentName(people, bond.bId)}
+          <PersonLink id={bond.aId} name={agentName(people, bond.aId)} onSubject={onSubject} />
+          {' & '}
+          <PersonLink id={bond.bId} name={agentName(people, bond.bId)} onSubject={onSubject} />
         </h3>
         <button type="button" className="bond-close" onClick={onClose} aria-label="Close this bond">
           ×

@@ -105,8 +105,6 @@ const QUIET_SITES = [
   '.chapter-head .stamp',
   '.biography-head .stamp',
   '.room-who',
-  '.legend-chip.off',
-  '.legend-stamp',
   // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a
   // count that can only go up cannot express a relationship cooling.
   '.bond-evidence',
@@ -148,19 +146,6 @@ describe('--ink-quiet — the de-emphasis token', () => {
   })
 })
 
-// R6: a shut key must still say that lines are being filtered out, so the badge that says it
-// is the one piece of chrome that carries ink on a saturated fill.
-describe('the filtered-count badge on the shut bonds key', () => {
-  it('paints its own two tokens, and they clear AA', () => {
-    const body = ruleBody(CSS, '.key-filtered')
-    const fg = /color:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
-    const bg = /background:\s*var\(--([\w-]+)\)/.exec(body)?.[1]
-    expect(fg).toBe('deep')
-    expect(bg).toBe('current')
-    expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
-  })
-})
-
 // ── ★ ONE COLOUR, ONE QUESTION ────────────────────────────────────────────────────────────
 // --ember was read at nine sites answering six questions: is this body ill, is this the one I
 // am in, which material is this first cut from, is a filter on, where is the tape, and how much
@@ -174,7 +159,6 @@ const ROLES: Readonly<Record<string, readonly string[]>> = {
     ".moment-card[data-open='yes']",
     ".discovery-leaf[aria-current='true']",
     ".room-door[aria-pressed='true']",
-    '.key-filtered',
     '.playhead',
     '.day-bar-cursor',
     '.story-here',
