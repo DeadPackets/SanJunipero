@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+Resuming the v2 drive? Read `docs/HANDOVER-2026-09-13.md` first. It carries the state, the
+laws, the owner's rulings and what is still open.
+
 San Junipero is a simulated town. Every fact of it is an event in a log that replays
 byte-for-byte, and the bodies in it are driven by LLM minds when a live run asks for them.
 
