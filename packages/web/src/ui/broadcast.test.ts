@@ -168,6 +168,9 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
       'the director’s cue — 6.00px',
       'the scene card — 7.00px',
       'the scene card’s stamp — 6.00px',
+      'the quiet band — 6.00px',
+      'the story strip — 6.00px',
+      'the story’s state — 6.00px',
     ])
     expect(captionMinPx()).toBeCloseTo(5.4, 3)
   })
@@ -180,6 +183,7 @@ describe('R2 · every caption in the broadcast frame survives the downscale', ()
       'the director’s cue',
       'the chronicle ticker',
       'the scene card',
+      'the story strip',
     ]
     for (const what of promised) {
       expect(BROADCAST_CAPTIONS.map((c) => c.what)).toContain(what)

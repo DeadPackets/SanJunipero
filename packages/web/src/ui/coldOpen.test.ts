@@ -3,11 +3,13 @@ import { MOTION } from './motion.js'
 import {
   COLD_OPEN_FADE_MS,
   COLD_OPEN_IN_MS,
+  COLD_OPEN_STRIP_MS,
   COLD_OPEN_WAIT_MS,
   coldOpen,
   coldOpenLine,
   firstWorryLine,
   peopleWords,
+  stripReady,
 } from './coldOpen.js'
 
 // Every case here drives the real sequence over a clock the test hands it. Nothing reads the
@@ -73,6 +75,7 @@ describe('★ the cold open', () => {
       line: null,
       gone: true,
       spent: true,
+      sinceMs: 12_000 + COLD_OPEN_FADE_MS,
     })
     for (const t of [12_400, 20_000, 3_600_000])
       expect(open.at(t, { ...TOWN }).line, `at ${String(t)}ms`).toBe(null)
@@ -96,7 +99,27 @@ describe('★ the cold open', () => {
   it('★ a hand on the camera before the town arrives cancels the whole sequence', () => {
     const open = coldOpen(0)
     open.dismiss(50)
-    expect(open.at(5000, { ...TOWN })).toEqual({ line: null, gone: true, spent: true })
+    expect(open.at(5000, { ...TOWN })).toEqual({
+      line: null,
+      gone: true,
+      spent: true,
+      sinceMs: COLD_OPEN_STRIP_MS,
+    })
+  })
+
+  // ★ The premise gets the first three seconds alone. The strip comes up on the plan's own beat,
+  // and a sequence that never ran or is already over holds nothing back.
+  it('★ lets the foot strip in at 3 s, and never holds it once the open is over', () => {
+    const open = coldOpen(0)
+    expect(stripReady(open.at(0, { ...TOWN }))).toBe(false)
+    expect(stripReady(open.at(COLD_OPEN_STRIP_MS - 1, { ...TOWN }))).toBe(false)
+    expect(stripReady(open.at(COLD_OPEN_STRIP_MS, { ...TOWN }))).toBe(true)
+    expect(stripReady(open.at(20_000, { ...TOWN }))).toBe(true)
+    const skipped = coldOpen(0)
+    skipped.dismiss(50)
+    expect(stripReady(skipped.at(60, { ...TOWN }))).toBe(true)
+    // No town at all is no strip: there is nothing for it to say and nothing to stand over.
+    expect(stripReady(coldOpen(0).at(0, { dressed: true, living: 0 }))).toBe(false)
   })
 
   // The second line is a person, not a count: the one thing a first page owes a reader.

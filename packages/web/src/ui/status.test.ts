@@ -21,6 +21,7 @@ import {
   TALK_RECENT_TICKS,
   conditionsOf,
   drivesOf,
+  leftWords,
   stateLine,
   stateWord,
   statusLiteralOffenders,
@@ -163,14 +164,31 @@ describe('STATES — one state per person, and the array IS the priority', () =>
   // so anywhere with room for a sentence says how long there is left of it.
   it('the line says the act and how far there is to go, and drops the number when there is none', () => {
     expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 40 } }))).toBe(
-      'Fishing — 40 min to go',
+      'Fishing, 40 min to go',
     )
     expect(stateLine(body({ activity: { verb: 'fish', ticksRemaining: 0 } }))).toBe('Fishing')
     expect(stateLine(body({ activity: { verb: 'fish' } }))).toBe('Fishing')
     expect(stateLine(body())).toBe('Between things')
     // The state still rules the word: a sleeper is asleep however long the clock says.
     expect(stateLine(body({ asleep: true, activity: { verb: 'fish', ticksRemaining: 9 } }))).toBe(
-      'Asleep — 9 min to go',
+      'Asleep, 9 min to go',
+    )
+  })
+
+  // A house takes 2880 ticks. Printed as minutes that is a four-figure number on a rail card,
+  // and the design forbids a bare integer anywhere on screen.
+  it('★ says a long act in hours and days, never as a four-figure count of minutes', () => {
+    expect(leftWords(40)).toBe('40 min')
+    expect(leftWords(60)).toBe('1 h')
+    expect(leftWords(90)).toBe('1 h 30 min')
+    expect(leftWords(1440)).toBe('1 day')
+    expect(leftWords(2880)).toBe('2 days')
+    expect(leftWords(4320)).toBe('3 days')
+    expect(stateLine(body({ activity: { verb: 'build', ticksRemaining: 2880 } }))).toBe(
+      'Building, 2 days to go',
+    )
+    expect(stateLine(body({ activity: { verb: 'build', ticksRemaining: 2880 } }))).not.toMatch(
+      /\d{4}/,
     )
   })
 

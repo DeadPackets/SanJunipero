@@ -304,7 +304,7 @@ describe('a day-0 person’s page makes no claim the run has not earned', () => 
         ledger: [],
       }),
     )
-    expect(busy).toContain('Building — 12 min to go')
+    expect(busy).toContain('Building, 12 min to go')
     expect(busy.match(/Building/g)?.length).toBe(1)
   })
 

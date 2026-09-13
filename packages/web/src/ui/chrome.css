@@ -1538,20 +1538,22 @@ body:has(.cold-open) .scene-card { display: none; }
     minmax(0, 1fr)
     minmax(44px, auto)
     minmax(var(--cue-floor), auto)
-    auto auto auto
+    auto auto auto auto auto
     max(var(--mark-inset), env(safe-area-inset-bottom));
   grid-template-areas:
     '.    .          .      .           .'
     '.    bar        bar    bar         .'
     '.    head       head   head        .'
     '.    left-1     .      right-1     .'
-    '.    left-2     .      .           .'
+    '.    left-2     .      right-2     .'
     '.    open       open   open        .'
     '.    third      third  third       .'
     '.    cue        cue    cue         .'
     '.    sound      .      foot-right  .'
     '.    wisp       .      foot-right  .'
     '.    foot-left  .      foot-right  .'
+    '.    strip      strip  strip       .'
+    '.    ticker     ticker ticker      .'
     '.    .          .      .           .';
 }
 /* A short window has 75px between the caption and the corner stack: four lines reserved there
@@ -2536,3 +2538,472 @@ body:has(.cold-open) .scene-card { display: none; }
   image-rendering: pixelated;
 }
 .moment-card.lead { flex-direction: column; }
+
+/* ── THE STORY STRIP: the band that says what has been running here without you ───────────── */
+/* Three capsules over the foot of the picture, in every mode. The one the camera is on wears the
+   paper and the lift; the rest stand in the band's own night. Nothing here prints a raw score. */
+.story-strip {
+  grid-area: strip; grid-column: edge; z-index: 21;
+  min-height: 84px;
+  display: flex; align-items: center; justify-content: center;
+  padding-inline: var(--s-5);
+  /* The same 92% the band at the top is drawn on: the town keeps moving behind it. */
+  background: color-mix(in srgb, var(--deep) 92%, transparent);
+  box-shadow: inset 0 2px 0 0 var(--ink);
+  pointer-events: none; overflow: hidden;
+}
+.story-quiet {
+  margin: 0;
+  font-family: var(--font-body); font-size: var(--f-3); font-weight: 600;
+  letter-spacing: 0.08em; color: var(--cream-quiet);
+}
+.story-row {
+  display: flex; align-items: center; gap: var(--s-5);
+  margin: 0; padding: 0; list-style: none; min-width: 0;
+}
+/* Four rows in 64px: the cast beside a label row, the town's own sentence, and the heat. */
+.story-capsule {
+  flex: 0 1 320px; min-width: 0; height: 64px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) 3px;
+  column-gap: var(--s-4); row-gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-left: var(--s-3) solid var(--ink-quiet);
+  background: var(--night);
+  box-shadow: var(--frame-tight);
+}
+/* The same stripe the beat card wears, off the same sign: a courtship and a quarrel came off the
+   wire opposite and rendered identically. Neutral takes no accent and reads at 1.55:1 on purpose. */
+.story-capsule[data-tone='cost'] { border-left-color: var(--rose); }
+.story-capsule[data-tone='gain'] { border-left-color: var(--sage); }
+/* ★ The camera agrees with the top capsule on under half of all ticks, so being ON SCREEN is a
+   change of paper and a lift off the band, never an outline somebody has to hunt for. */
+.story-capsule.lit { background: var(--cream); box-shadow: var(--frame); }
+.story-cast {
+  grid-column: 1; grid-row: 1 / -1; align-self: center;
+  display: flex; align-items: center;
+}
+.story-bust {
+  flex: none; width: 26px; height: 26px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;   /* the bust IS world art */
+  box-shadow: var(--frame-tight);
+}
+.story-bust + .story-bust { margin-left: -8px; }
+.story-bust.none { background-color: var(--sand); }
+.story-meta {
+  grid-column: 2; grid-row: 1;
+  display: flex; align-items: baseline; gap: var(--s-3);
+  margin: 0; min-width: 0;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.18em; white-space: nowrap;
+  color: var(--cream-quiet);
+}
+.story-capsule.lit .story-meta { color: var(--ink-quiet); }
+/* Ours, not the town's: the one mark on this band that says where the picture is pointed. */
+.story-here {
+  flex: none; padding: 0 var(--s-2);
+  background: var(--current); color: var(--deep);
+}
+.story-state { flex: none; }
+.story-became {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: 0.04em; text-transform: none;
+}
+.story-days {
+  margin-left: auto; flex: none;
+  font-family: var(--font-data); letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
+}
+/* The town's own sentence, or the cast when it has written none. Two lines, then it stops. */
+.story-line {
+  grid-column: 2; grid-row: 2; margin: 0; min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-family: var(--font-title); font-size: var(--f-3); font-weight: 500; line-height: 1.3;
+  color: var(--cream);
+}
+.story-capsule.lit .story-line { color: var(--ink); }
+/* A sim-day old and still the town's own words, so it is kept and marked rather than dropped:
+   the sheet's own de-emphasis, which is a colour and never an opacity. */
+.story-line[data-stale='yes'] { color: var(--cream-quiet); }
+.story-capsule.lit .story-line[data-stale='yes'] { color: var(--ink-quiet); }
+/* Heat over the story's own peak. The share arrives as a width and there is no other bar. */
+/* No `align-self`: the track is 3px of a fixed row and anything but stretch gave it its own
+   content height, which is zero. Measured at 0px tall at every width before this line. */
+/* The track is the capsule's other paper: ink on night read at 1.25:1 and sand on cream at
+   1.34:1, so the denominator was invisible and a share could only be read against a neighbour. */
+.story-heat { grid-column: 2; grid-row: 3; background: var(--sand); }
+.story-heat-fill { display: block; height: 100%; width: var(--share); background: var(--ember); }
+.story-capsule.lit .story-heat { background: var(--night); }
+.story-capsule.lit .story-heat-fill { background: var(--ember-ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .story-capsule {
+    animation: story-capsule-in var(--t-med) var(--ease-enter) backwards;
+    animation-delay: calc(var(--step) * var(--stagger));
+  }
+  .story-heat-fill { transition: width var(--t-med) var(--ease-move); }
+}
+@keyframes story-capsule-in {
+  from { opacity: 0; translate: 0 var(--s-4); }
+  to { opacity: 1; translate: 0 0; }
+}
+/* Three capsules are 984px plus two gutters: under 1096px the third squeezed to 284px and the
+   sentence clamped from four lines to two. Two capsules keep the 320px the band was drawn at. */
+@media (max-width: 1099.98px) {
+  .story-capsule:nth-child(n + 3) { display: none; }
+}
+/* One capsule on a phone. The band has a row of its own now, so no slab stands in it. */
+@media (max-width: 900px) {
+  .story-strip { min-height: 76px; }
+  .story-capsule { flex: 1 1 auto; }
+  .story-capsule:nth-child(n + 2) { display: none; }
+}
+/* The slab is a box-shadow, and forced colours drop it. */
+@media (forced-colors: active) {
+  .story-capsule, .story-bust { border: 2px solid CanvasText; }
+}
+
+/* ── the beat card: what the room wants, what it is trying, and where it turned ─────────────
+   Every row is a source the town already wrote. A row with no source is left out, so the card
+   is short in a quiet minute rather than padded with a placeholder. */
+/* Measured: at 1920 the arms go to --px 3 and stand 294px tall, so the signpost reaches up to
+   y=670 and a card bottom-anchored at open-end (679) lost 9px under a plank. Its own row under
+   the board, filling what is left up to its cap, so it can never leave that band at any height. */
+.beat-card {
+  grid-area: right-2; grid-row: right-2-start / open-end;
+  justify-self: end; align-self: stretch; z-index: 22;
+  box-sizing: border-box; width: min(380px, 34vw); max-height: 240px;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-left: var(--s-3) solid var(--ink-quiet);
+  background: var(--deep) var(--grain);
+  box-shadow: var(--frame);
+  pointer-events: none; overflow: hidden;
+}
+.beat-card[data-tone='cost'] { border-left-color: var(--rose); }
+.beat-card[data-tone='gain'] { border-left-color: var(--sage); }
+
+/* The one row that survives a close: the faces and the word the camera used for the room. */
+.beat-card-head { display: flex; align-items: center; gap: var(--s-4); min-height: 32px; }
+.beat-card-busts { display: flex; flex: none; }
+.beat-card-bust {
+  width: 26px; height: 26px; margin-right: -8px;
+  background-repeat: no-repeat;
+  box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.beat-card-bust.none { background: var(--night); }
+.beat-card-kind {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cream-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.beat-card-more {
+  flex: none;
+  font-family: var(--font-data); font-size: var(--f-1); font-variant-numeric: tabular-nums;
+  color: var(--cream-quiet);
+}
+
+/* Two lines, then it stops. The card is capped at 240px and a typical town sentence runs to
+   three lines here, so an unclamped head cut the TURN row and both chips off mid-glyph. */
+.beat-card-line {
+  margin: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  font-family: var(--font-title); font-size: var(--f-6); font-weight: 500;
+  line-height: 1.2; text-wrap: pretty;
+  color: var(--cream);
+}
+/* Same mark as the strip's: a day-old head is kept and quieted, never passed off as this minute. */
+.beat-card-line[data-stale='yes'] { color: var(--cream-quiet); }
+.beat-card-rows { display: grid; gap: var(--s-2); margin: 0; }
+.beat-card-row { display: grid; grid-template-columns: 5ch 1fr; gap: var(--s-4); align-items: baseline; }
+/* Manrope, not the pixel face, for the reason `.paper-tab` already carries: Silkscreen is drawn
+   on an 8px em and 12px resamples it, and WANT, TRY and TURN are words. */
+.beat-card-label {
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--honey);
+}
+/* One line each, the same cut `.shot-why` takes: three two-line rows plus the head is 236px of
+   a 235px box at 1280x800, and the chips under them went out through the bottom edge. */
+.beat-card-text {
+  margin: 0; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 400;
+  line-height: 1.4;
+  color: var(--cream);
+}
+
+/* What the talk changed, in the town's own sentence, edged by what the tie is worth. */
+.beat-card-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); margin: 0; padding: 0; list-style: none; }
+.beat-card-chip {
+  padding: var(--s-2) var(--s-3);
+  border-left: 2px solid var(--ink-quiet);
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 400;
+  text-wrap: pretty;
+  color: var(--cream); background: var(--night);
+}
+.beat-card-chip[data-tone='cost'] { border-left-color: var(--rose); }
+.beat-card-chip[data-tone='gain'] { border-left-color: var(--sage); }
+
+/* A closed room keeps its stripe and its faces and drops the rest: the want and the try are
+   about a talk that is over, and the chips are what is left to read. */
+.beat-card[data-open='off'] :is(.beat-card-line, .beat-card-rows) { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .beat-card { animation: beat-card-in var(--t-med) var(--ease-enter) backwards; }
+  @keyframes beat-card-in {
+    from { opacity: 0; translate: 0 var(--s-4); }
+    to { opacity: 1; translate: 0 0; }
+  }
+}
+@media (max-width: 1000px), (max-height: 620px) {
+  .beat-card { display: none; }
+}
+
+/* ── the three densities: which surfaces are up in stage, watch and deck ────────────────────
+   A mode change is a fade and never a resize, so every panel keeps its box in all three and
+   the world behind it never reflows. `visibility` waits out the fade so nothing hidden takes a tab. */
+.app[data-density='stage'] .at-watch,
+.app[data-density='stage'] .at-deck,
+.app[data-density='watch'] .at-deck {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app .at-watch, .app .at-deck {
+    transition: opacity var(--t-slow) var(--ease-move), visibility 0s var(--ease-move);
+  }
+  .app[data-density='stage'] .at-watch,
+  .app[data-density='stage'] .at-deck,
+  .app[data-density='watch'] .at-deck {
+    transition: opacity var(--t-slow) var(--ease-move), visibility 0s var(--ease-move) var(--t-slow);
+  }
+}
+
+/* ── the shot board and the dossier rail: what the camera nearly cut to, and who is under it ──
+   Both reorder by translating absolutely placed rows, never by moving them in flow: the rail
+   restacks every few seconds and this box has no GPU to spend on a layout pass. */
+.shot-board {
+  grid-area: right-1; justify-self: end; align-self: start; z-index: 22;
+  box-sizing: border-box; width: min(300px, 30vw); height: 116px;
+  padding: var(--s-2) var(--s-4);
+  background: var(--deep) var(--grain);
+  box-shadow: var(--frame);
+  pointer-events: none; overflow: hidden;
+  --shot-row: 34px;
+}
+.shot-rows { position: relative; height: 100%; margin: 0; padding: 0; list-style: none; }
+.shot-row {
+  position: absolute; inset-inline: 0; top: 0;
+  box-sizing: border-box; height: var(--shot-row); padding-top: var(--s-1);
+  translate: 0 calc(var(--rank) * (var(--shot-row) + var(--s-1)));
+}
+.shot-line {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  margin: 0 0 var(--s-2) 0; min-width: 0;
+}
+/* De-emphasis is a colour and never an opacity, so a row the camera is not on steps back to the
+   quiet cream rather than fading to a ratio nobody can read off the sheet. */
+.shot-who {
+  flex: none; max-width: 45%;
+  font-family: var(--font-body); font-size: var(--f-2); font-weight: 600;
+  color: var(--cream-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.shot-why {
+  flex: 1; min-width: 0;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 400;
+  color: var(--cream-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.shot-row.lit .shot-who { color: var(--cream); }
+.shot-bar { display: block; height: var(--s-3); background: var(--night); }
+.shot-bar-fill {
+  display: block; height: 100%;
+  background: var(--cream-quiet);
+}
+.shot-row.lit .shot-bar-fill { background: var(--honey); }
+
+.dossier-rail {
+  grid-area: left-1; grid-row: left-1-start / open-end;
+  justify-self: start; align-self: stretch; z-index: 22;
+  box-sizing: border-box; width: min(300px, 26vw);
+  padding: var(--s-3) 0;
+  background: color-mix(in srgb, var(--deep) 94%, transparent);
+  /* Twelve living bodies are 672px of a 623px box at 1080p and the last card sat under the fade
+     with no way to reach it. The rail is the one panel a hand may take: in Deck the viewer is
+     hands-on, and the sheet's own law is that a scrollbar on a scrollable region is always there. */
+  pointer-events: auto; overflow-x: hidden; overflow-y: auto;
+  scrollbar-color: var(--cream-quiet) var(--night);
+  scrollbar-width: thin;
+  /* the clip is a fade, so a card at the fold reads as more below and not as one cut in two */
+  mask-image: linear-gradient(to bottom, black calc(100% - var(--s-8)), transparent);
+  --dossier-row: 56px;
+}
+.dossier-cards {
+  position: relative; height: calc(var(--rows) * var(--dossier-row));
+  margin: 0; padding: 0; list-style: none;
+}
+.dossier-card {
+  position: absolute; inset-inline: 0; top: 0;
+  box-sizing: border-box; height: var(--dossier-row);
+  display: grid; align-items: center; gap: 0 var(--s-4);
+  grid-template-columns: var(--s-2) 44px minmax(0, 1fr);
+  grid-template-areas: 'gutter bust name' 'gutter bust doing';
+  padding: var(--s-2) var(--s-5) var(--s-2) 0;
+  translate: 0 calc(var(--rank) * var(--dossier-row));
+}
+.dossier-gutter { grid-area: gutter; align-self: stretch; background: var(--night); }
+.dossier-gutter-fill {
+  display: block; width: 100%;
+  background: var(--cream-quiet);
+}
+.dossier-card.lit .dossier-gutter-fill { background: var(--honey); }
+.dossier-bust {
+  grid-area: bust;
+  width: 44px; height: 44px;
+  background-repeat: no-repeat;
+  box-shadow: var(--frame-tight);
+  image-rendering: pixelated;
+}
+.dossier-bust.none { background: var(--night); }
+/* One ring, and it says one thing: something about this body is critical. A need never takes an
+   accent, so the ring is the quiet cream and not a colour that already answers another question. */
+.dossier-bust[data-cond] { box-shadow: 0 0 0 2px var(--cream-quiet); }
+.dossier-name {
+  grid-area: name; align-self: end; margin: 0; min-width: 0;
+  font-family: var(--font-title); font-size: var(--f-3); font-weight: 500;
+  color: var(--cream-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dossier-card.lit .dossier-name { color: var(--cream); }
+.dossier-doing {
+  grid-area: doing; align-self: start; margin: 0; min-width: 0;
+  font-family: var(--font-body); font-size: var(--f-1); font-weight: 400;
+  color: var(--cream-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The reorder, the two bars and the four marks that change colour when the camera moves. Under
+   reduced motion there is no rule at all, so a new order and a new subject are both a cut. */
+@media (prefers-reduced-motion: no-preference) {
+  .shot-row, .dossier-card {
+    transition: translate var(--t-slow) var(--ease-move);
+    transition-delay: calc(min(var(--rank), 8) * var(--stagger));
+  }
+  .shot-who, .dossier-name { transition: color var(--t-slow) var(--ease-move); }
+  .shot-bar-fill {
+    transition: width var(--t-med) var(--ease-move), background-color var(--t-slow) var(--ease-move);
+  }
+  .dossier-gutter-fill {
+    transition: height var(--t-med) var(--ease-move), background-color var(--t-slow) var(--ease-move);
+  }
+}
+
+/* Below 1280px the rail is a strip of faces: the same order, the same gutter, no words. */
+@media (max-width: 1280px) {
+  .dossier-rail { width: 64px; }
+  .dossier-card { grid-template-columns: var(--s-2) 44px; padding-right: 0; }
+  .dossier-name, .dossier-doing { display: none; }
+}
+@media (max-width: 1000px), (max-height: 620px) {
+  .shot-board, .dossier-rail { display: none; }
+}
+/* The same order the scene card already waits in: the rail and the town's first sentence take
+   the same corner and stood on each other 272x69 for the whole cold open. */
+body:has(.cold-open) .dossier-rail { opacity: 0; }
+/* The slab is a box-shadow, and forced colours drop it — the ring with it. */
+@media (forced-colors: active) {
+  .shot-board, .dossier-bust { border: 2px solid CanvasText; }
+}
+
+/* ── the frame's second composition: what the three deck surfaces do on a stream ─────────────
+   The stream is read at quarter scale, so a panel either carries broadcast type or it leaves.
+   The story band stays and grows; the three instruments go, and none of them is a caption. */
+[data-broadcast='on'] .beat-card,
+[data-broadcast='on'] .shot-board,
+[data-broadcast='on'] .dossier-rail { display: none; }
+
+/* Four times the desk's capsule, so the town's own sentence clears the subtitle floor at 0.25.
+   The band keeps its row, so nothing above it moves when the stream frame takes the rest. */
+/* The crawl used to hang off the bottom inset and reach 24px up into whatever was above it.
+   The band below the strip is a row now, so the two stand in the frame instead of on each other. */
+[data-broadcast='on'] .stage-ticker { grid-area: ticker; grid-column: edge; }
+[data-broadcast='on'] .story-strip { min-height: 152px; }
+[data-broadcast='on'] .story-capsule { flex: 0 1 640px; height: 128px; }
+[data-broadcast='on'] .story-meta { font-size: var(--f-bcast); letter-spacing: 0.08em; }
+[data-broadcast='on'] .story-line { font-size: var(--f-bcast); }
+[data-broadcast='on'] .story-quiet { font-size: var(--f-bcast); }
+
+/* ── the phone drawer: everything else behind a swipe ────────────────────────────────────────
+   Above 1000px the drawer is `display: contents`, so the three panels are grid items of the
+   frame and stand in their own areas. Below it they are one sheet, mounted exactly once. */
+.drawer-sheet {
+  grid-column: edge; grid-row: open-start / foot-left-start;
+  align-self: end; z-index: 26;
+  display: contents;
+}
+.drawer-body { display: contents; }
+.drawer-handle {
+  /* The row is the corner cluster's, the column is the window's: centred in the `foot-left`
+     column the bar sat at x=97 of 390, over the help button rather than under the picture. */
+  grid-area: foot-left; grid-column: edge; justify-self: center; align-self: end; z-index: 25;
+  display: none;
+}
+.drawer-scrim { display: none; }
+
+@media (max-width: 1000px) {
+  .drawer-scrim { display: block; }
+  .drawer-sheet {
+    box-sizing: border-box; max-height: 100%; padding: var(--s-5);
+    display: flex; flex-direction: column; gap: var(--s-4);
+    background: var(--deep) var(--grain);
+    box-shadow: inset 0 2px 0 0 var(--ink);
+    transform: translateY(102%); visibility: hidden;
+    /* Longhand, so the open state carries only the delay: a second `transition` shorthand there
+       outranked the reduced-motion switch-off and the sheet still slid for 300ms under reduce. */
+    transition-property: transform, visibility;
+    transition-duration: var(--t-slow), 0s;
+    transition-timing-function: var(--ease-enter);
+    transition-delay: 0s, var(--t-slow);
+  }
+  .drawer-sheet[data-open='yes'] {
+    transform: translateY(0); visibility: visible;
+    transition-delay: 0s, 0s;
+  }
+  .drawer-body {
+    display: flex; flex-direction: column; gap: var(--s-4);
+    min-height: 0; overflow: hidden;
+  }
+  /* The frame places all three at every other width, so nothing in here re-places them: only
+     the widths and the room the column has to give are written. The board asks the frame for
+     `align-self: start`, which in a column is 16px of shrink-to-fit around an absolute list. */
+  .drawer-body > * { align-self: stretch; flex: none; }
+  .drawer-body .beat-card { display: flex; width: auto; max-height: none; }
+  .drawer-body .shot-board { display: block; width: auto; }
+  .drawer-body .dossier-rail { display: block; flex: 0 1 auto; min-height: 112px; }
+  /* Watch holds the beat card alone, and a box kept for a panel nobody can see is a hole in a
+     sheet this small. The no-reflow contract is about the world behind a panel, and there is
+     no world behind this one. */
+  .app[data-density='watch'] .drawer-body .at-deck { display: none; }
+
+  .drawer-handle {
+    display: grid; place-items: center;
+    width: 44px; min-height: 44px; padding: 0;
+    background: none; border: 0; cursor: pointer; touch-action: none;
+  }
+  .drawer-bar { width: 36px; height: 4px; background: var(--cream-quiet); }
+  .drawer-handle:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
+}
+/* Stage is the world, the band that says when and the story strip. The sheet goes down with the
+   handle that opens it rather than standing there with nothing in it. */
+.app[data-density='stage'] .drawer-sheet { transform: translateY(102%); visibility: hidden; }
+.app[data-density='stage'] .drawer-scrim { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) {
+  .drawer-sheet { transition: none; }
+}

@@ -8,10 +8,15 @@ import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
 import { whenDressed } from './render/textures.js'
 import type { Scene } from './render/scene.js'
 import {
+  BeatCard,
   DirectorCue,
+  DossierRail,
+  Drawer,
   Figures,
   LowerThird,
   Nameplate,
+  ShotBoard,
+  StoryStrip,
   Ticker,
   SpeechLive,
   SubjectRing,
@@ -34,7 +39,8 @@ import { useAutoCut } from './ui/autoCut.js'
 import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
-import { firstWorryLine, useColdOpen } from './ui/coldOpen.js'
+import { firstWorryLine, stripReady, useColdOpen } from './ui/coldOpen.js'
+import { useDensity } from './ui/density.js'
 import { aimsFeed } from './ui/feeds.js'
 import { useFeed } from './ui/useEndpoint.js'
 import { escapeStep } from './ui/interaction.js'
@@ -112,6 +118,8 @@ export function App() {
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
   const { autoCut, handbackAt, toggle: toggleDirector } = useAutoCut()
+  // How much of the chrome is up: Stage, Watch or Deck. One owner, and the sheet does the rest.
+  const density = useDensity()
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   // What just happened, on the stage: a moment outranks the shot's own caption for six seconds.
   const moment = useStageCue(store)
@@ -302,6 +310,7 @@ export function App() {
 
   const pickSubject = (next: Subject): void => {
     setSubject(next)
+    if (next.kind === 'agent') density.show('deck')
     openPage(next.kind === 'agent' ? 'person' : 'building')
   }
 
@@ -392,6 +401,7 @@ export function App() {
     },
     onDirector: toggleDirector,
     onThoughts: toggleThoughts,
+    onDensity: density.cycle,
   })
 
   return (
@@ -399,6 +409,7 @@ export function App() {
       className="app"
       ref={appRef}
       data-broadcast={route.broadcast ? 'on' : undefined}
+      data-density={density.mode}
       data-paper={sheet === null ? undefined : 'on'}
       data-replay={play === null || route.broadcast ? undefined : 'on'}
     >
@@ -453,7 +464,10 @@ export function App() {
         store={store}
         paperOpen={sheet !== null}
         onFocus={setFocus}
-        onOpen={setSubject}
+        onOpen={(next) => {
+          setSubject(next)
+          density.show('deck')
+        }}
       />
       <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
       <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
@@ -473,7 +487,19 @@ export function App() {
           {worry !== null && <p className="cold-open-worry">{worry}</p>}
         </div>
       )}
-      <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />
+      {/* The stream is its own composition and keeps the card it has captions for. Everywhere
+          else the beat card is the one card, and Stage has neither. */}
+      {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
+      {/* Below 1000px the frame has no room for the three, so the drawer is their room. Above
+          it the drawer is `display: contents` and they stand in their own areas. */}
+      {!route.broadcast && (
+        <Drawer>
+          <BeatCard store={store} />
+          <ShotBoard store={store} />
+          <DossierRail store={store} />
+        </Drawer>
+      )}
+      {stripReady(cold.frame) && <StoryStrip store={store} />}
       <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode

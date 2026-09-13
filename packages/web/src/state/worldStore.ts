@@ -1,9 +1,11 @@
 import {
   SimConfigSchema,
   type AssetRecord,
+  type ServerBoard,
   type ServerDirector,
   type ServerMsg,
   type ServerScene,
+  type ServerThreads,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -69,6 +71,11 @@ export type WorldStore = {
   /** What the gateway says is worth watching, and the act the day has reached. One frame, kept
    *  until the next one changes it — the camera, the cue and the stamp all read this one. */
   getDirector: () => ServerDirector | null
+  /** The stories the gateway is running, ranked. Dropped with the director and for the same
+   *  reason: they are about the live minute, not the one a scrub is standing in. */
+  threads: () => ServerThreads | null
+  /** The gateway's own survey, not just the row it cut to. */
+  board: () => ServerBoard | null
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** The world log's head as the server last reported it — the signal a read model refetches on,
@@ -99,6 +106,8 @@ export function createWorldStore(): WorldStore {
   const scenes = new Map<string, TownScene>()
   let openList: readonly TownScene[] = NO_SCENES
   let director: ServerDirector | null = null
+  let threads: ServerThreads | null = null
+  let board: ServerBoard | null = null
   let laws: Record<string, unknown> = {}
   const lawChanges: LawChange[] = []
   const subs = new Set<() => void>()
@@ -159,6 +168,8 @@ export function createWorldStore(): WorldStore {
     shotScene: () => (shotSceneId === null ? null : (scenes.get(shotSceneId) ?? null)),
     tension,
     getDirector: () => director,
+    threads: () => threads,
+    board: () => board,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -222,6 +233,8 @@ export function createWorldStore(): WorldStore {
           // The live cut is about the live minute. Left standing it aimed the camera and the
           // caption at people doing something that has not happened in the minute on screen.
           director = null
+          threads = null
+          board = null
           forgetScenes()
           break
         case 'replaying':
@@ -231,6 +244,8 @@ export function createWorldStore(): WorldStore {
           state = msg.state as WorldState
           mode = { live: false, replaying: true, tick: msg.tick }
           director = null
+          threads = null
+          board = null
           forgetScenes()
           break
         case 'mood':
@@ -263,6 +278,12 @@ export function createWorldStore(): WorldStore {
           break
         case 'director':
           director = msg
+          break
+        case 'board':
+          board = msg
+          break
+        case 'threads':
+          threads = msg
           break
       }
       if (mode.live) liveEdge = Math.max(liveEdge, state?.tick ?? 0)

@@ -1,6 +1,6 @@
 // A person has exactly ONE STATE and zero or more CONDITIONS, and the two vocabularies are DISJOINT
 // sets of words, asserted — so a condition can never quietly become a synonym of a state.
-import { verbPhraseGerund } from '@sj/shared'
+import { MINUTES_PER_DAY, verbPhraseGerund } from '@sj/shared'
 
 /** A structural read of `AgentBody`. An absent optional field simply never matches its row, so every
  *  rule here is correct before the fields it anticipates exist. */
@@ -81,12 +81,25 @@ export function stateWord(a: AgentView, nowTick?: number): string {
   return STATE_WORD[s]
 }
 
+/** Ticks left as a person says them. A house takes 2880 ticks, which is two days and not a
+ *  four-figure count of minutes. */
+export function leftWords(ticks: number): string {
+  if (ticks < 60) return `${ticks} min`
+  if (ticks < MINUTES_PER_DAY) {
+    const h = Math.floor(ticks / 60)
+    const m = ticks % 60
+    return m === 0 ? `${h} h` : `${h} h ${m} min`
+  }
+  const d = Math.round((ticks / MINUTES_PER_DAY) * 10) / 10
+  return d === 1 ? '1 day' : `${d} days`
+}
+
 /** The word plus how far there is to go. An act is minutes long now, so a surface with room for
  *  a sentence says the minutes: a still body with no number on it reads as a stuck one. */
 export function stateLine(a: AgentView, nowTick?: number): string {
   const left = a.activity?.ticksRemaining ?? 0
   const word = stateWord(a, nowTick)
-  return left > 0 ? `${word} — ${left} min to go` : word
+  return left > 0 ? `${word}, ${leftWords(left)} to go` : word
 }
 
 /** CONDITION: zero or more, from a DISJOINT vocabulary. A condition is never a state, so it

@@ -177,9 +177,14 @@ const ROLES: Readonly<Record<string, readonly string[]>> = {
     '.key-filtered',
     '.playhead',
     '.day-bar-cursor',
+    '.story-here',
   ],
   // how hot: the top of the stakes band, and the material cut for a mind's own working out
-  ember: [".stage-scene-stamp[data-stakes='hot']", ".first-plate[data-material='ember']"],
+  ember: [
+    ".stage-scene-stamp[data-stakes='hot']",
+    ".first-plate[data-material='ember']",
+    '.story-heat-fill',
+  ],
   // the step under it, so the band is one heat at two strengths
   'ember-pale': [".stage-scene-stamp[data-stakes='warm']"],
   // struck metal: the tier the town's own work is cut at

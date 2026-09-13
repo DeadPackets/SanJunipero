@@ -20,6 +20,9 @@ export const BROADCAST_REMOVED: readonly { selector: string; why: string }[] = [
   { selector: '.paper', why: 'a 760px reading sheet is 190px on a phone' },
   { selector: '.town-dim', why: 'the sheet is gone, so what it dimmed for is gone too' },
   { selector: '.fps-overlay', why: 'an instrument, not a picture' },
+  { selector: '.beat-card', why: 'a 13px want and try is 3.25px on a 480px player' },
+  { selector: '.shot-board', why: 'what the camera nearly did is a director’s question' },
+  { selector: '.dossier-rail', why: 'twenty-two bodies down the flank of a phone-sized picture' },
 ]
 
 /**
@@ -51,6 +54,9 @@ export const BROADCAST_CAPTIONS: readonly BroadcastCaption[] = [
     from: 'sheet',
     selector: "[data-broadcast='on'] .scene-card-title",
   },
+  { what: 'the quiet band', from: 'sheet', selector: "[data-broadcast='on'] .story-quiet" },
+  { what: 'the story strip', from: 'sheet', selector: "[data-broadcast='on'] .story-line" },
+  { what: 'the story’s state', from: 'sheet', selector: "[data-broadcast='on'] .story-meta" },
 ]
 
 export type SpokenLine = { agentId: string; name: string; words: string }

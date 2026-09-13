@@ -466,3 +466,59 @@ describe('onFirstSnapshot', () => {
     expect(ran).toBe(0)
   })
 })
+
+describe('the story frames', () => {
+  const threads = {
+    t: 'threads' as const,
+    tick: 3,
+    threads: [
+      {
+        id: 'th_well',
+        members: ['amara', 'salma'],
+        heat: 12,
+        peak: 24,
+        state: 'rising' as const,
+        valence: -1 as const,
+        openedTick: 1,
+        lastPaidTick: 3,
+        terms: ['quarrel' as const],
+      },
+    ],
+  }
+  const board = {
+    t: 'board' as const,
+    tick: 3,
+    rows: [{ sceneId: 'sc_1', agentIds: ['amara'], score: 9, why: 'they are shouting' }],
+  }
+
+  it('holds the ranked stories and the shot board as they arrive', () => {
+    const store = createWorldStore()
+    store.applyServer(makeSnapshot())
+    expect(store.threads()).toBeNull()
+    expect(store.board()).toBeNull()
+    store.applyServer(threads)
+    store.applyServer(board)
+    expect(store.threads()?.threads[0]?.id).toBe('th_well')
+    expect(store.board()?.rows[0]?.score).toBe(9)
+  })
+
+  // ★ They are about the live minute, exactly as the cut is, so they go where the cut goes:
+  // left standing, the strip tells a viewer standing in the past what is hot right now.
+  it('★ drops both wherever the director is dropped', () => {
+    const snap = makeSnapshot()
+    for (const away of [
+      { t: 'scrubbed' as const, reqId: 1, tick: 1, state: snap.state },
+      { t: 'replaying' as const, reqId: 1, tick: 1, seq: 1, state: snap.state },
+    ]) {
+      const store = createWorldStore()
+      store.applyServer(makeSnapshot())
+      store.applyServer(cutTo('sc_1'))
+      store.applyServer(threads)
+      store.applyServer(board)
+      store.applyServer(away)
+      expect(store.getDirector()).toBeNull()
+      expect(store.threads()).toBeNull()
+      expect(store.board()).toBeNull()
+    }
+  })
+})

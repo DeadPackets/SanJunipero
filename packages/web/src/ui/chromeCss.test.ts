@@ -20,6 +20,12 @@ const BANNERS = LINES.filter((l) => /^\/\* [──══]/u.test(l))
 const LANE_BLOCKS: readonly (readonly [lane: string, mark: string])[] = [
   ['the Discovery Record', '/* ── the Discovery Record: a chain of museum labels'],
   ['THE SIGNPOST AND THE PAPER', '\n.signpost {\n'],
+  ['THE STORY STRIP', '/* ── THE STORY STRIP: the band that says what has been running'],
+  ['the beat card', '/* ── the beat card: what the room wants, what it is trying'],
+  ['the three densities', '/* ── the three densities: which surfaces are up in stage'],
+  ['the shot board and the dossier rail', '/* ── the shot board and the dossier rail:'],
+  ['the frame’s second composition', "/* ── the frame's second composition:"],
+  ['the phone drawer', '/* ── the phone drawer: everything else behind a swipe'],
 ]
 
 describe('★ chrome.css survives the merge trains intact', () => {
@@ -618,7 +624,10 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
       if (props === undefined || !ms) continue
       if (!FADE_ONLY.test(props)) loud.push(`${(sel ?? '').trim()} — ${props}`)
     }
-    for (const sel of ['.paper', '.discovery-leaf']) {
+    // A mark is excused the guard only by switching its whole transition off under reduce, and
+    // the list is checked against the sheet rather than trusted.
+    const STILLED = ['.paper', '.discovery-leaf', '.drawer-sheet']
+    for (const sel of STILLED) {
       expect(BARE, sel).toMatch(
         new RegExp(
           `@media \\(prefers-reduced-motion: reduce\\)[\\s\\S]{0,200}?\\${sel} \\{[^}]*transition: none`,
@@ -626,7 +635,7 @@ describe('★ nothing moves for a viewer who asked for stillness', () => {
       )
     }
     expect(
-      loud.filter((l) => !l.startsWith('.paper ') && !l.startsWith('.discovery-leaf')),
+      loud.filter((l) => !STILLED.some((s) => l.startsWith(`${s} `) || l.startsWith(`${s}[`))),
     ).toEqual([])
   })
 

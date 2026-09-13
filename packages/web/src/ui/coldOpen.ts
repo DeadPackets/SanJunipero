@@ -76,9 +76,21 @@ export function firstWorryLine(
   return `On ${name}’s mind: ${worry}.`
 }
 
+/** When the foot strip writes the current story, measured from the reveal. The premise gets the
+ *  first three seconds to itself, then the town says what has been running without you. */
+export const COLD_OPEN_STRIP_MS = 3000
+
 /** What the first frame says this instant. `gone` is the fade running, `spent` is the sequence
- *  over for the whole session. */
-export type ColdOpenFrame = { line: string | null; gone: boolean; spent: boolean }
+ *  over for the whole session, and `sinceMs` is how long the reveal has been up. */
+export type ColdOpenFrame = {
+  line: string | null
+  gone: boolean
+  spent: boolean
+  sinceMs: number
+}
+
+/** Whether the strip may come up over the open. A sequence that is over holds nothing back. */
+export const stripReady = (f: ColdOpenFrame): boolean => f.spent || f.sinceMs >= COLD_OPEN_STRIP_MS
 
 export type ColdOpen = {
   at: (nowMs: number, town: { dressed: boolean; living: number }) => ColdOpenFrame
@@ -89,8 +101,9 @@ export type ColdOpen = {
 /** A hand on the camera: the same three the director stands down for. */
 const HAND_ON_CAMERA = ['pointerdown', 'keydown', 'wheel'] as const
 
-const NOTHING: ColdOpenFrame = { line: null, gone: false, spent: false }
-const OVER: ColdOpenFrame = { line: null, gone: true, spent: true }
+const NOTHING: ColdOpenFrame = { line: null, gone: false, spent: false, sinceMs: 0 }
+/** Dismissed before the reveal ever ran: the sequence is over and nothing waits on it. */
+const SKIPPED: ColdOpenFrame = { line: null, gone: true, spent: true, sinceMs: COLD_OPEN_STRIP_MS }
 
 export function coldOpen(startedMs: number): ColdOpen {
   let shownMs: number | null = null
@@ -99,7 +112,7 @@ export function coldOpen(startedMs: number): ColdOpen {
   return {
     at(nowMs, town) {
       if (shownMs === null) {
-        if (outMs !== null) return OVER
+        if (outMs !== null) return SKIPPED
         // An empty town has nothing to say here, and the reveal waits on ART rather than on the
         // scene object: that is the whole of what stops the pop-in.
         if (town.living < 1) return NOTHING
@@ -107,10 +120,11 @@ export function coldOpen(startedMs: number): ColdOpen {
         shownMs = nowMs
         line = coldOpenLine(town.living)
       }
+      const sinceMs = nowMs - shownMs
       const out = outMs ?? shownMs + COLD_OPEN_OUT_MS
-      if (nowMs >= out + COLD_OPEN_FADE_MS) return OVER
-      if (nowMs >= out) return { line, gone: true, spent: false }
-      return { line: nowMs - shownMs < COLD_OPEN_IN_MS ? null : line, gone: false, spent: false }
+      if (nowMs >= out + COLD_OPEN_FADE_MS) return { line: null, gone: true, spent: true, sinceMs }
+      if (nowMs >= out) return { line, gone: true, spent: false, sinceMs }
+      return { line: sinceMs < COLD_OPEN_IN_MS ? null : line, gone: false, spent: false, sinceMs }
     },
     dismiss(nowMs) {
       outMs ??= nowMs

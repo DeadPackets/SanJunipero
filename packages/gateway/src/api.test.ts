@@ -238,7 +238,15 @@ describe('observer data apis', () => {
     // that has one. Bob has no database and is simply not in it.
     expect(await (await fetch(`${base}/api/aims`)).json()).toEqual({
       aims: [
-        { agentId: 'alice', day: 5, mood: 'wary', goal: 'keep the fire in', worry: 'the roof' },
+        {
+          agentId: 'alice',
+          day: 5,
+          mood: 'wary',
+          goal: 'keep the fire in',
+          worry: 'the roof',
+          goals: ['keep the fire in', 'owe Bob a loaf'],
+          worries: ['the roof'],
+        },
       ],
     })
     expect(await (await fetch(`${base}/api/agent/bob/journal`)).json()).toEqual([])
