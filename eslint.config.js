@@ -62,14 +62,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: false,
-        project: [
-          'packages/agents/tsconfig.scripts.json',
-          'packages/arbiter/tsconfig.scripts.json',
-          'packages/forge/tsconfig.scripts.json',
-          'packages/gateway/tsconfig.scripts.json',
-          'packages/narrator/tsconfig.scripts.json',
-          'packages/town/tsconfig.scripts.json',
-        ],
+        project: ['tsconfig.scripts.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },

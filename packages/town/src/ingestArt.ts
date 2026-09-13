@@ -48,10 +48,6 @@ export function ingestLibraryArt(db: Database.Database): IngestEntry[] {
   return registerCommittedItems(new AssetCodex(db))
 }
 
-export function ingestCastArt(db: Database.Database): IngestEntry[] {
-  return registerCommittedCast(new AssetCodex(db))
-}
-
 export function ingestProductionArt(db: Database.Database): IngestEntry[] {
   const codex = new AssetCodex(db)
   return [...registerCommittedBuildings(codex), ...registerCommittedCast(codex)]

@@ -71,30 +71,6 @@ for (const f of files) {
     console.log('milestones:', q('SELECT day, tier, label FROM milestones ORDER BY day'))
 }
 
-// The valley road, off the world's own log. What art cost is already in `spend by caller` above,
-// under `forge` — faces and objects come out of the one pocket.
-const world = process.env.SJ_WORLD_DB ?? join(root, 'data', 'dev-world.db')
-if (existsSync(world)) {
-  db?.close()
-  db = new Database(world, { readonly: true })
-  console.log(`\n== ${world}`)
-  console.log(
-    'the road:',
-    q(
-      "SELECT type, COUNT(*) n FROM events WHERE type IN ('agent_arrived','agent_departed')" +
-        ' GROUP BY type',
-    ),
-  )
-  // Everyone who came, minus everyone who went, per sim-day — the population curve the cap bounds.
-  console.log(
-    'population change by sim-day:',
-    q(
-      "SELECT tick / 1440 day, SUM(CASE WHEN type IN ('agent_spawned','agent_born','agent_arrived')" +
-        " THEN 1 ELSE -1 END) delta FROM events WHERE type IN ('agent_spawned','agent_born'," +
-        "'agent_arrived','agent_died','agent_departed') GROUP BY day ORDER BY day",
-    ),
-  )
-}
 db?.close()
 
 // The town's own log: who came up the road, who went down it, and how many people the valley

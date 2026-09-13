@@ -40,7 +40,6 @@ import {
 } from '@sj/shared'
 import { seededItemKinds } from '@sj/engine'
 import {
-  ingestCastArt,
   ingestLibraryArt,
   ingestProductionArt,
   ingestTerrainArt,
@@ -284,22 +283,6 @@ describe('ingestLibraryArt', () => {
       }
     }
   })
-})
-
-describe('ingestCastArt', () => {
-  it('registers one packed sheet per founder, idempotently', async () => {
-    const db = openForgeDb(join(dir, 'cast.db'))
-    const codex = new AssetCodex(db)
-
-    const first = ingestCastArt(db)
-    expect(first.map((e) => e.kind).sort()).toEqual(
-      [...CAST_IDS].map((id) => `character:${id}`).sort(),
-    )
-    expect(first.every((e) => e.action === 'registered')).toBe(true)
-    expect(ingestCastArt(db).every((e) => e.action === 'unchanged')).toBe(true)
-    expect(codex.listSince(0).filter((r) => r.class === 'rig-part')).toHaveLength(CAST_IDS.length)
-    db.close()
-  }, 30_000)
 })
 
 describe('the boot resolves every kind the world will ask for', () => {

@@ -3,7 +3,6 @@
 import {
   DAYS_PER_YEAR,
   founderSex,
-  doorFrontTile,
   founderSeat,
   nextDawnTick,
   T_PATH,
@@ -37,7 +36,7 @@ import {
   type WorldState,
   type TickHandler,
 } from '@sj/engine'
-import { devTown, type DevStructure } from './devTown.js'
+import { devTown, doorFrontOf, type DevStructure } from './devTown.js'
 // Type-only, so no import cycle survives compilation.
 import type { DevMapKind } from './devWorld.js'
 
@@ -360,17 +359,6 @@ function heldWood(state: WorldState, agentId: string): number {
   return n
 }
 
-function masonErrandCost(
-  state: WorldState,
-  config: SimConfig,
-  agentId: string,
-  claim: { door: { x: number; y: number } },
-): number | null {
-  const out = walkEnergyCost(state, config, agentId, claim.door)
-  const work = workEnergyCost(state, config, agentId, config.construction.houseTicks)
-  return out === null || work === null ? null : out + work
-}
-
 export function masonIntent(
   state: WorldState,
   config: SimConfig,
@@ -394,10 +382,11 @@ export function masonIntent(
   }
   const claim = claimInWorld(state, MASON_NEED)
   if (claim === null) return null
-  const errand = masonErrandCost(state, config, agentId, claim)
+  const out = walkEnergyCost(state, config, agentId, claim.door)
+  const work = workEnergyCost(state, config, agentId, config.construction.houseTicks)
   // The reserve for taking on WORK is bedtime, not the collapse floor: a body does not choose
   // an errand it will finish face-down.
-  if (errand === null || a.needs.energy - errand <= GO_HOME_BELOW) return null
+  if (out === null || work === null || a.needs.energy - (out + work) <= GO_HOME_BELOW) return null
   return isAdjacentToRect(a.x, a.y, claim.site)
     ? { verb: 'build', params: { kind: MASON_KIND } }
     : { verb: 'walk', params: { x: claim.door.x, y: claim.door.y } }
@@ -440,6 +429,22 @@ const LAMP_KIND = 'lamp_post'
 
 type LampSite = { x: number; y: number; stand: { x: number; y: number } }
 
+const NEIGHBOURS = [
+  [0, 1],
+  [1, 0],
+  [0, -1],
+  [-1, 0],
+] as const
+
+/** The first of the four neighbours a body can stand on, in that order. */
+const standBeside = (
+  state: WorldState,
+  p: { x: number; y: number },
+): { x: number; y: number } | undefined =>
+  NEIGHBOURS.map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy })).find((q) =>
+    isPassable(state, q.x, q.y),
+  )
+
 /** How far off a door the search will walk to find ground that is not the way itself. Three
  *  tiles: the grammar's streets are two wide with a shoulder. */
 export const LAMP_VERGE_REACH = 3
@@ -473,14 +478,7 @@ function lampSites(state: WorldState, want: number): LampSite[] {
           const p = { x: door.x + dx, y: door.y + dy }
           if (isWay(p.x, p.y) || touchesPost(p.x, p.y) || !isPassable(state, p.x, p.y)) continue
           // Standing IN the street is fine; it is the POST that must keep off it.
-          const stand = [
-            [0, 1],
-            [1, 0],
-            [0, -1],
-            [-1, 0],
-          ]
-            .map(([sx, sy]) => ({ x: p.x + sx!, y: p.y + sy! }))
-            .find((q) => isPassable(state, q.x, q.y))
+          const stand = standBeside(state, p)
           if (stand === undefined) continue
           found = { x: p.x, y: p.y, stand }
         }
@@ -523,14 +521,7 @@ function lamplighterIntent(
     if (s.stage !== 'complete') continue
     if ((s.fueledUntilTick ?? -1) >= dawn) continue
     if (isAdjacentToRect(a.x, a.y, s)) return { verb: 'stoke', params: { structureId: s.id } }
-    const stand = [
-      [0, 1],
-      [1, 0],
-      [0, -1],
-      [-1, 0],
-    ]
-      .map(([dx, dy]) => ({ x: s.x + dx!, y: s.y + dy! }))
-      .find((q) => isPassable(state, q.x, q.y))
+    const stand = standBeside(state, s)
     if (stand === undefined) continue
     return arrivesStanding(state, config, agentId, stand)
       ? { verb: 'walk', params: { x: stand.x, y: stand.y } }
@@ -597,18 +588,7 @@ export function homeOf(state: WorldState, agentId: string): Structure | null {
 /** `null` on a town with no well — the frozen fixture, which keeps its own waypoints. */
 function wellsideTile(structures: readonly DevStructure[]): { x: number; y: number } | null {
   const well = structures.find((s) => s.kind === 'well')
-  if (well === undefined) return null
-  const d = doorFrontTile({
-    kind: well.kind,
-    dx: well.x,
-    dy: well.y,
-    w: well.w,
-    h: well.h,
-    facing: well.facing,
-    owner: null,
-    furnishings: [],
-  })
-  return { x: d.dx, y: d.dy }
+  return well === undefined ? null : doorFrontOf(well)
 }
 
 /** Each founder starts at their own door, so the first frame reads as households. A town with
@@ -625,17 +605,7 @@ export function foundersFor(
     const home = byName.get(founderSeat(f.id) ?? '')
     if (home === undefined) throw new Error(`foundersFor: no roof in this town for ${f.id}`)
     // A hand-computed south-centre is wrong once buildings turn; this is the tile `doorTile` picks.
-    const d = doorFrontTile({
-      kind: home.kind,
-      dx: home.x,
-      dy: home.y,
-      w: home.w,
-      h: home.h,
-      facing: home.facing,
-      owner: null,
-      furnishings: [],
-    })
-    const spawn = { x: d.dx, y: d.dy }
+    const spawn = doorFrontOf(home)
     return { ...f, spawn, patrol: [spawn, wellside ?? spawn] }
   })
 }

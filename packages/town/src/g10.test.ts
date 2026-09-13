@@ -10,6 +10,7 @@ import {
   MomentsResponseSchema,
   ROAD_AUTOTILE_KEYS,
   TERRAIN_TILE_KINDS,
+  TOWN_RINGS_GENESIS,
   momentToTick,
   parseTerrainTileManifest,
   roadAutotileKind,
@@ -23,8 +24,8 @@ import { AssetCodex, openForgeDb, registerTerrainTiles } from '@sj/forge'
 import { NARRATOR_DDL } from '@sj/shared/narratorSchema'
 import { WorldMirror, createGateway, type Gateway } from '@sj/gateway'
 import {
-  PLAZA_TILE,
   makeShowcaseMap,
+  plazaTile,
   roadReach,
   showcaseDoorTile,
   showcaseTerrain,
@@ -348,7 +349,8 @@ describe('GATE G10 — automated half, gateway side', () => {
     })
 
     it('leaves the plaza standing — the showcase map is genesis input, not a runtime edit', () => {
-      expect(makeShowcaseMap().terrain[PLAZA_TILE.y]![PLAZA_TILE.x]).toBe(T_ROAD)
+      const plaza = plazaTile(TOWN_RINGS_GENESIS)
+      expect(makeShowcaseMap().terrain[plaza.y]![plaza.x]).toBe(T_ROAD)
     })
   })
 })

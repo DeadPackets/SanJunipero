@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { FOUNDER_IDS, T_EARTH, T_GRASS, cityStructures } from '@sj/shared'
+import { FOUNDER_IDS, TOWN_RINGS_GENESIS, T_EARTH, T_GRASS, cityStructures } from '@sj/shared'
 import { TOWN_STRUCTURES, townStructuresFor } from './founders.js'
 import { devStructureId, devTown, type DevStructure } from './devTown.js'
-import { SHOWCASE_ANCHOR, SHOWCASE_H, SHOWCASE_W } from './showcaseMap.js'
+import { SHOWCASE_ANCHOR, showcaseSpan } from './showcaseMap.js'
 
 // Same footprint rule as showcaseStructureTiles, over DevStructure's open `kind`.
 const tilesOf = (s: DevStructure): { x: number; y: number }[] => {
@@ -64,8 +64,8 @@ describe('devTown — one town, not two', () => {
       for (const t of tilesOf(s)) {
         expect(t.x).toBeGreaterThanOrEqual(0)
         expect(t.y).toBeGreaterThanOrEqual(0)
-        expect(t.x).toBeLessThan(SHOWCASE_W)
-        expect(t.y).toBeLessThan(SHOWCASE_H)
+        expect(t.x).toBeLessThan(showcaseSpan(TOWN_RINGS_GENESIS))
+        expect(t.y).toBeLessThan(showcaseSpan(TOWN_RINGS_GENESIS))
       }
     }
   })

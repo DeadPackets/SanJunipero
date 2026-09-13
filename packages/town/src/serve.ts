@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { foundingIds } from '@sj/shared'
 import { adminChannelPort, adminOpsRoutes, createLawsAdmin, type LiveCast } from '@sj/gateway'
 import { DEV_DB_PATH, SHOWCASE_CONFIG, startDevWorld } from './devWorld.js'
-import { intEnv, parseWorldEnv } from './worldEnv.js'
+import { asNumber, intEnv, parseWorldEnv } from './worldEnv.js'
 
 const STOP_GRACE_MS = 19_000
 
@@ -27,9 +27,9 @@ export const BUILD_FIRST = 'pnpm --filter @sj/web build'
 const numEnv = (name: string, ok: (n: number) => boolean): number | undefined => {
   const raw = process.env[name]
   if (raw === undefined) return undefined
-  // `Number('') === 0`: a bare `SJ_SPEND_CAP_USD=` would read as a cap of zero, and every
-  // `cap > 0` guard downstream is off at zero.
-  const asked = raw.trim() === '' ? Number.NaN : Number(raw)
+  // A bare `SJ_SPEND_CAP_USD=` would read as a cap of zero, and every `cap > 0` guard
+  // downstream is off at zero.
+  const asked = asNumber(raw)
   if (ok(asked)) return asked
   console.log(`stream: ${name}=${raw} ignored; using the built-in default`)
   return undefined

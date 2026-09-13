@@ -26,14 +26,11 @@ import type { TileId } from '@sj/engine/state'
 export const SHOWCASE_MARGIN = 8
 
 export const showcaseSpan = (rings: number): number => townSpan(rings) + 2 * SHOWCASE_MARGIN
-export const SHOWCASE_W = showcaseSpan(TOWN_RINGS_GENESIS)
-export const SHOWCASE_H = showcaseSpan(TOWN_RINGS_GENESIS)
 
 export const SHOWCASE_ANCHOR = { x: SHOWCASE_MARGIN, y: SHOWCASE_MARGIN } as const
 
 // spec §10 forest edge, east
 export const forestBandX0 = (rings: number): number => SHOWCASE_ANCHOR.x + townSpan(rings) + 4
-export const FOREST_BAND_X0 = forestBandX0(TOWN_RINGS_GENESIS)
 
 // spec §10 rocky hill, NE
 export const rockHill = (rings: number): { x0: number; y0: number; x1: number; y1: number } => ({
@@ -42,14 +39,12 @@ export const rockHill = (rings: number): { x0: number; y0: number; x1: number; y
   x1: showcaseSpan(rings) - 1,
   y1: SHOWCASE_MARGIN - 5,
 })
-export const ROCK_HILL = rockHill(TOWN_RINGS_GENESIS)
 
 // Reserved, not placed: the fixture only keeps this meadow tile clear.
 export const standingStoneTile = (rings: number): { x: number; y: number } => ({
   x: SHOWCASE_ANCHOR.x + townSpan(rings) + 1,
   y: SHOWCASE_ANCHOR.y + 1,
 })
-export const STANDING_STONE_TILE = standingStoneTile(TOWN_RINGS_GENESIS)
 
 /** The ford is the only place a deck can span: the channel runs three tiles and the bridge
  *  recipe spans two. The spit stays terrain WATER, so `townGroundOf` never plats on it. */
@@ -83,7 +78,6 @@ export const plazaTile = (rings: number): { x: number; y: number } => ({
   x: SHOWCASE_ANCHOR.x + plazaCentreOf(rings).dx,
   y: SHOWCASE_ANCHOR.y + plazaCentreOf(rings).dy,
 })
-export const PLAZA_TILE = plazaTile(TOWN_RINGS_GENESIS)
 
 // The city template's kinds, not a smaller invented set — dropping the well, the fire pit or
 // the wagon would make the showcase a different town from the one genesis builds.

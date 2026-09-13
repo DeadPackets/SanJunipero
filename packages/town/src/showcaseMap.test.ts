@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   CITY_H,
   CITY_W,
+  TOWN_RINGS_GENESIS,
   RIVER_HALF,
   RIVER_LOCAL_DX,
   T_PATH,
@@ -18,14 +19,8 @@ import { TERRAIN_COST, makeFixtureMap } from '@sj/engine'
 import { DEV_MAP_DEFAULT, devTerrain } from './devWorld.js'
 import {
   FORD_ROWS,
-  FOREST_BAND_X0,
-  PLAZA_TILE,
-  ROCK_HILL,
   SHOWCASE_ANCHOR,
-  SHOWCASE_H,
   SHOWCASE_MARGIN,
-  SHOWCASE_W,
-  STANDING_STONE_TILE,
   ShowcaseMapSchema,
   forestBandX0,
   makeShowcaseMap,
@@ -44,16 +39,17 @@ import {
 } from './showcaseMap.js'
 
 const map = makeShowcaseMap()
+const GENESIS_SPAN = showcaseSpan(TOWN_RINGS_GENESIS)
 const tileAt = (x: number, y: number): number => map.terrain[y]![x]!
 
 describe('makeShowcaseMap', () => {
   // ★ THE MAP IS SIZED BY THE TOWN: a fixture that pins its own size clips the next ring off.
   it('is a grid the whole town fits in, and it parses under its own schema', () => {
     expect(() => ShowcaseMapSchema.parse(map)).not.toThrow()
-    expect(map.terrain).toHaveLength(SHOWCASE_H)
-    for (const row of map.terrain) expect(row).toHaveLength(SHOWCASE_W)
-    expect(SHOWCASE_W).toBeGreaterThan(CITY_W)
-    expect(SHOWCASE_H).toBeGreaterThan(CITY_H)
+    expect(map.terrain).toHaveLength(GENESIS_SPAN)
+    for (const row of map.terrain) expect(row).toHaveLength(GENESIS_SPAN)
+    expect(GENESIS_SPAN).toBeGreaterThan(CITY_W)
+    expect(GENESIS_SPAN).toBeGreaterThan(CITY_H)
   })
 
   it('is deterministic — two calls deep-equal', () => {
@@ -150,23 +146,26 @@ describe('the founders landscape (spec §10)', () => {
   })
 
   it('carries a forest band on the east edge and a rocky hill in the north-east', () => {
-    expect(tileAt(SHOWCASE_W - 1, SHOWCASE_H - 1)).toBe(3)
-    expect(tileAt(FOREST_BAND_X0, SHOWCASE_H - 1)).toBe(3)
-    expect(tileAt(ROCK_HILL.x1, ROCK_HILL.y0)).toBe(4)
+    const hill = rockHill(TOWN_RINGS_GENESIS)
+    expect(tileAt(GENESIS_SPAN - 1, GENESIS_SPAN - 1)).toBe(3)
+    expect(tileAt(forestBandX0(TOWN_RINGS_GENESIS), GENESIS_SPAN - 1)).toBe(3)
+    expect(tileAt(hill.x1, hill.y0)).toBe(4)
   })
 
   it('reserves an open meadow tile beyond the edge of town for the standing stone', () => {
-    expect(tileAt(STANDING_STONE_TILE.x, STANDING_STONE_TILE.y)).toBe(T_GRASS)
+    const stone = standingStoneTile(TOWN_RINGS_GENESIS)
+    expect(tileAt(stone.x, stone.y)).toBe(T_GRASS)
     const built = new Set(
       map.structures.flatMap(showcaseStructureTiles).map((t) => `${t.x},${t.y}`),
     )
-    expect(built.has(`${STANDING_STONE_TILE.x},${STANDING_STONE_TILE.y}`)).toBe(false)
+    expect(built.has(`${stone.x},${stone.y}`)).toBe(false)
   })
 })
 
 describe('the road lattice', () => {
   it('starts at a plaza that is itself road', () => {
-    expect(tileAt(PLAZA_TILE.x, PLAZA_TILE.y)).toBe(T_ROAD)
+    const plaza = plazaTile(TOWN_RINGS_GENESIS)
+    expect(tileAt(plaza.x, plaza.y)).toBe(T_ROAD)
   })
 
   // The strict question: the door tile IS the road it opens onto, not "a road near the back wall".
@@ -202,8 +201,8 @@ describe('the road lattice', () => {
 describe('showcaseTerrain', () => {
   it('hands the dev world a plain TileId grid', () => {
     const t = showcaseTerrain()
-    expect(t).toHaveLength(SHOWCASE_H)
-    expect(t[0]).toHaveLength(SHOWCASE_W)
+    expect(t).toHaveLength(GENESIS_SPAN)
+    expect(t[0]).toHaveLength(GENESIS_SPAN)
   })
 })
 
@@ -267,12 +266,6 @@ describe('★ the showcase map is sized by the ring count, not by a constant', (
 
   it('leaves ring 1 byte-identical, so every landed gate folds the world it always did', () => {
     expect(makeShowcaseMap(SHOWCASE_ANCHOR, 1)).toEqual(makeShowcaseMap())
-    expect(showcaseSpan(1)).toBe(SHOWCASE_W)
-    expect(showcaseSpan(1)).toBe(SHOWCASE_H)
-    expect(forestBandX0(1)).toBe(FOREST_BAND_X0)
-    expect(rockHill(1)).toEqual(ROCK_HILL)
-    expect(standingStoneTile(1)).toEqual(STANDING_STONE_TILE)
-    expect(plazaTile(1)).toEqual(PLAZA_TILE)
   })
 
   it('★ puts the plaza where a GROWN town keeps it, not where a one-ring town kept it', () => {

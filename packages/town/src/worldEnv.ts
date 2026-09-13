@@ -28,11 +28,13 @@ const DEFAULTS: Pick<WorldEnv, 'interiors' | 'builders' | 'bridge' | 'jointBuild
   jointBuild: false,
 }
 
+/** `Number('') === 0`: a key left with nothing after the `=` is a knob nobody set, and taking
+ *  it as zero is the unlit town compose.yaml warns about. */
+export const asNumber = (raw: string): number => (raw.trim() === '' ? Number.NaN : Number(raw))
+
 export const intEnv = (name: string, fallback: number, min: number): number => {
   const raw = process.env[name]
-  // `Number('') === 0`: a key left with nothing after the `=` is a knob nobody set, and taking
-  // it as zero is the unlit town compose.yaml warns about.
-  const asked = raw === undefined ? fallback : raw.trim() === '' ? Number.NaN : Number(raw)
+  const asked = raw === undefined ? fallback : asNumber(raw)
   if (Number.isInteger(asked) && asked >= min) return asked
   if (raw !== undefined) console.log(`world: ${name}=${raw} ignored; using ${fallback}`)
   return fallback

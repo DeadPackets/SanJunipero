@@ -1,6 +1,7 @@
 import {
   TOWN_RINGS_GENESIS,
   TOWN_SQUARE,
+  doorFrontTile,
   makeCityTemplate,
   townOrigin,
   type CityStructure,
@@ -26,6 +27,24 @@ export type DevStructure = {
   flammable: boolean
   /** The template's own name. Dropped, no mouth can say the place and hearsay never fires. */
   name?: string
+}
+
+/** The tile the door opens onto, in the same frame the structure's x and y are written in. */
+export function doorFrontOf(s: Pick<DevStructure, 'kind' | 'x' | 'y' | 'w' | 'h' | 'facing'>): {
+  x: number
+  y: number
+} {
+  const d = doorFrontTile({
+    kind: s.kind,
+    dx: s.x,
+    dy: s.y,
+    w: s.w,
+    h: s.h,
+    facing: s.facing,
+    owner: null,
+    furnishings: [],
+  })
+  return { x: d.dx, y: d.dy }
 }
 
 export type DevTown = {

@@ -234,21 +234,17 @@ export async function startDevWorld(
     // copy of the art cache on every boot.
     const tiles = await ingestTerrainArt(forgeDb) // code-painted, offline, $0 — never throws on a missing root
     console.log(`dev world: ingested terrain tiles (${tiles.length} records, road strip included)`)
-    try {
-      const entries = ingestProductionArt(forgeDb)
-      console.log(`dev world: ingested production art (${entries.length} assets)`)
-    } catch (e) {
-      console.log(
-        `dev world: production art not ingested — ${e instanceof Error ? e.message : String(e)}`,
-      )
-    }
-    try {
-      const lib = ingestLibraryArt(forgeDb)
-      console.log(`dev world: ingested library art (${lib.length} items, furniture included)`)
-    } catch (e) {
-      console.log(
-        `dev world: library art not ingested — ${e instanceof Error ? e.message : String(e)}`,
-      )
+    for (const [what, count] of [
+      ['production art', () => `${ingestProductionArt(forgeDb).length} assets`],
+      ['library art', () => `${ingestLibraryArt(forgeDb).length} items, furniture included`],
+    ] as const) {
+      try {
+        console.log(`dev world: ingested ${what} (${count()})`)
+      } catch (e) {
+        console.log(
+          `dev world: ${what} not ingested — ${e instanceof Error ? e.message : String(e)}`,
+        )
+      }
     }
   }
   forgeDb.close()

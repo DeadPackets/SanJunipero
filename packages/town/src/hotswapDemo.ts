@@ -1,8 +1,6 @@
-import { pathToFileURL } from 'node:url'
 import type Database from 'better-sqlite3'
 import type { AssetRecord } from '@sj/shared'
-import { AssetCodex, encodePng, openForgeDb, paletteRgb, type RawImage, type Rgb } from '@sj/forge'
-import { DEV_DB_PATH } from './devWorld.js'
+import { AssetCodex, encodePng, paletteRgb, type RawImage, type Rgb } from '@sj/forge'
 
 export const HOUSE_PX = 64
 
@@ -67,20 +65,4 @@ export async function registerDemoHouse(db: Database.Database): Promise<AssetRec
     attempts: 1,
     costUsd: 0,
   })
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const dbPath = process.argv[2] ?? DEV_DB_PATH // the dev world db carries the forge tables too
-  const db = openForgeDb(dbPath)
-  registerDemoHouse(db)
-    .then((rec) => {
-      console.log(
-        `the house is raised: ${rec.id} (kind ${rec.kind}) → viewers swap on the next pump`,
-      )
-      db.close()
-    })
-    .catch((err: unknown) => {
-      console.error(err)
-      process.exitCode = 1
-    })
 }
