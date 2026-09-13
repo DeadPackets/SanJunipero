@@ -10,6 +10,7 @@ import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, heatSpokes, type Edition, type HeatSpoke } from '../../ui/dispatches.js'
+import { townAsleep } from '../../ui/directorCut.js'
 import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { PersonLink } from '../../ui/PersonLink.js'
@@ -24,6 +25,7 @@ import type { Subject } from '../../stage/index.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
 import { EditionView, Moments } from './Moments.js'
+import { NightWatch } from './NightWatch.js'
 import { Skeleton } from './Skeleton.js'
 import { Standing } from './Standing.js'
 import type { PageProps } from './types.js'
@@ -258,16 +260,20 @@ function Record(props: PageProps) {
         ))}
       </div>
 
-      <Standing {...props} />
+      {townAsleep(state?.agents) ? (
+        <NightWatch store={store} onSubject={props.onSubject} />
+      ) : (
+        <Standing {...props} />
+      )}
 
       {/* THE FRONT PAGE: the day's own paper is the lead story and the live feed is the column
           beside it. Below the sheet's own 40rem the two stack, which is what a narrow broadsheet
           has always done. */}
       <div className="bs-front">
         <section className="block bs-lead">
-          {/* The edition carries its own headline, so the section name is for the reader who
-              cannot see that it is one. */}
-          <h3 className="stage-sr">The day’s paper</h3>
+          {/* The Standing above it is the lead now, so the day's paper is a section under it:
+              two drop caps at --f-6 in one 380px column read as two headlines fighting. */}
+          <h3 className="feed-head">The day’s paper</h3>
           {latest === null && paper.failed ? (
             <OutOfReach onRetry={dispatchesFeed.retry} />
           ) : latest === null && entries.length > 0 ? (
@@ -275,7 +281,7 @@ function Record(props: PageProps) {
           ) : latest === null ? (
             <p className="feed-empty">{EMPTY_COPY.paper}</p>
           ) : (
-            <EditionView e={latest} lead />
+            <EditionView e={latest} />
           )}
         </section>
 

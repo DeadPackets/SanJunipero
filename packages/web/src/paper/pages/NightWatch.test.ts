@@ -6,6 +6,7 @@ import { MINUTES_PER_DAY, nightStartTick } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { createWorldStore, type WorldStore } from '../../state/worldStore.js'
 import { townAsleep } from '../../ui/directorCut.js'
+import { ChroniclePage } from './Chronicle.js'
 import { NightWatch } from './NightWatch.js'
 
 type Row = { tick: number; day: number; text: string; kind: 'journal' | 'dream' }
@@ -56,6 +57,7 @@ afterEach(async () => {
     for (const root of roots.splice(0)) root.unmount()
   })
   document.body.replaceChildren()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
 })
 
@@ -124,5 +126,112 @@ describe('the night watch', () => {
     expect(townAsleep(ABED)).toBe(true)
     expect(townAsleep({ ...ABED, gil: { alive: true, asleep: false } })).toBe(false)
     expect(townAsleep({})).toBe(false)
+  })
+})
+
+const wroteBoth = (id: string): Row[] => [
+  { tick: DUSK + 10, day: 3, text: `${id} banked the fire.`, kind: 'journal' },
+  { tick: DUSK + 20, day: 3, text: `${id} was walking a road.`, kind: 'dream' },
+]
+
+/** ★ Twelve sleepers on a 30 s beat is a fetch every 2.5 s all night for two lines that were
+ *  written once. Before this, three beats cost 48 reads; the card now hands its poll back. */
+describe('★ the night poll stops when it has what it came for', () => {
+  const beats = async (n: number): Promise<void> => {
+    for (let i = 0; i < n; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(30_000)
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+    }
+  }
+  const TWELVE = Object.fromEntries(
+    Array.from({ length: 12 }, (_, i) => [`p${i}`, { alive: true, asleep: true, name: `P${i}` }]),
+  )
+
+  it('★ reads each of twelve sleepers once, and not again once the card holds both', async () => {
+    const { calls } = gateway(
+      Object.fromEntries(Object.keys(TWELVE).map((id) => [id, wroteBoth(id)])),
+    )
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    const host = await watch(town(TWELVE))
+    expect(host.querySelectorAll('.night-card')).toHaveLength(12)
+    await beats(3)
+    expect(calls.filter((u) => u.includes('/journal'))).toHaveLength(12)
+  })
+
+  it('keeps asking while a sleeper has written only one of the two', async () => {
+    const { calls } = gateway({
+      q0: [{ tick: DUSK + 10, day: 3, text: 'Half a page.', kind: 'journal' }],
+    })
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    await watch(town({ q0: { alive: true, asleep: true, name: 'Q' } }))
+    await beats(2)
+    expect(calls.filter((u) => u.includes('/journal'))).toHaveLength(3)
+  })
+})
+
+const NO_OP = (): void => undefined
+
+async function record(store: WorldStore): Promise<HTMLElement> {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  roots.push(root)
+  await act(async () => {
+    root.render(
+      createElement(ChroniclePage, {
+        tab: 'Record',
+        subject: null,
+        thing: null,
+        momentId: null,
+        store,
+        scene: null,
+        operatorToken: null,
+        insideId: null,
+        gapTicks: null,
+        onSubject: NO_OP,
+        onInside: NO_OP,
+        onScrub: NO_OP,
+        onPlay: NO_OP,
+        onLive: NO_OP,
+        onNotice: NO_OP,
+        onMoment: NO_OP,
+      }),
+    )
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  return host
+}
+
+describe('★ the Record swaps its front page for the night, and swaps nothing back', () => {
+  it('gives the day the Standing and no night watch at all', async () => {
+    gateway({})
+    const host = await record(town({ r0: { alive: true, asleep: false, name: 'Rae' } }))
+    expect(host.querySelector('.board-line'), 'the Standing never mounted').not.toBeNull()
+    expect(host.querySelector('.night-cards')).toBeNull()
+  })
+
+  it('gives the night the watch, and the Standing goes down with the sun', async () => {
+    gateway({ s0: wroteBoth('Sen') })
+    const host = await record(town({ s0: { alive: true, asleep: true, name: 'Sen' } }))
+    expect(host.querySelector('.night-card')).not.toBeNull()
+    expect(host.querySelector('.board-line'), 'the Standing came back at night').toBeNull()
+    expect(host.querySelector('.standing-line')).toBeNull()
+  })
+
+  // ★ A sleeping town nobody has written in yet shows the day log alone. The Standing does NOT
+  // come back into the gap: the front page is the night's, written or not.
+  it('★ shows neither when the town is asleep and nobody has written tonight', async () => {
+    gateway({ t0: [] })
+    const host = await record(town({ t0: { alive: true, asleep: true, name: 'Tam' } }))
+    expect(host.querySelector('.night-card')).toBeNull()
+    expect(host.querySelector('.board-line')).toBeNull()
+    expect(host.querySelector('.standing-line')).toBeNull()
+    expect(host.querySelector('.record-range'), 'the Record itself went with it').not.toBeNull()
   })
 })

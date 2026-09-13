@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { agentName, nightStartTick } from '@sj/shared'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Subject } from '../../stage/index.js'
@@ -44,14 +44,19 @@ function NightCard({
   since: number
   onSubject: (subject: Subject) => void
 }) {
+  // A journal and a dream are written once a night, so a card holding both has nothing left to
+  // ask for: the url goes null, the reader loses its last subscriber and the interval is cleared.
+  const [held, setHeld] = useState<{ wrote: JournalRow; dreamt: JournalRow } | null>(null)
   const read = usePolled<JournalRow[]>(
-    `/api/agent/${encodeURIComponent(agentId)}/journal`,
+    held === null ? `/api/agent/${encodeURIComponent(agentId)}/journal` : null,
     journalRows,
     NIGHT_POLL_MS,
   )
   const tonight = (read.data ?? []).filter((r) => r.tick >= since)
-  const wrote = lastOf(tonight, 'journal')
-  const dreamt = lastOf(tonight, 'dream')
+  const found = { wrote: lastOf(tonight, 'journal'), dreamt: lastOf(tonight, 'dream') }
+  if (held === null && found.wrote !== null && found.dreamt !== null)
+    setHeld({ wrote: found.wrote, dreamt: found.dreamt })
+  const { wrote, dreamt } = held ?? found
   if (wrote === null && dreamt === null) return null
   return (
     <li className="night-card">
@@ -81,7 +86,7 @@ export function NightWatch({
     <ol className="night-cards" aria-label="What the town wrote tonight">
       {abed.map((id) => (
         <NightCard
-          key={id}
+          key={`${id}@${since}`}
           agentId={id}
           name={agentName(state?.agents, id)}
           since={since}

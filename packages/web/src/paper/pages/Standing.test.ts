@@ -212,9 +212,12 @@ describe('the Standing', () => {
     expect(html.match(/class="person-link"/g)).toHaveLength(2)
   })
 
-  it('★ falls to the day’s chapter title when the town is quiet, and to nothing after that', () => {
+  // ★ The chapter title is the edition's own headline and the Record prints it under the
+  // Standing already. On a quiet town the two read the same sentence twice in one column.
+  it('★ prints no lead when the ladder falls to the chapter, so the edition says it once', () => {
     const quiet = draw({ ...RICH, threads: null })
-    expect(quiet).toContain('The week the well ran low')
+    expect(quiet).not.toContain('standing-line')
+    expect(quiet).not.toContain('The week the well ran low')
     const mute = draw({ ...RICH, threads: null, chapter: null })
     expect(mute).not.toContain('standing-line')
   })

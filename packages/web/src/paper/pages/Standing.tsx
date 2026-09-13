@@ -63,8 +63,8 @@ const newestFor = (
   return null
 }
 
-/** The top story's own sentence, then the day's chapter title, then nothing. The ladder decides:
- *  no rung of it is written here and there is no last resort. */
+/** The top story's own sentence, or nothing. The ladder decides the rung, and a line that fell
+ *  to the chapter is the edition's own headline, which the Record prints under this once already. */
 function leadOf(
   threads: ServerThreads | null,
   entries: readonly ChronicleEntry[],
@@ -85,7 +85,7 @@ function leadOf(
     now,
     new Map(),
   )
-  if (line === null) return null
+  if (line === null || line.rung === 'chapter') return null
   return { text: line.text, cast: top?.members.slice(0, THREAD_MEMBER_CAP) ?? [] }
 }
 

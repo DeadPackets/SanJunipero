@@ -14,6 +14,7 @@ import { App, wayBack } from '../App.js'
 import { ReplayScene } from '../stage/ReplayScene.js'
 import { SCENE_IN_MS, SCENE_OUT_MS, SCENE_TOTAL_MS, SCENES } from './sceneTransition.js'
 import { TITLE_CARD_MS, castNames, dipAlpha, pointPlay } from './replayRun.js'
+import { paperDock, rememberPaperDock } from './storage.js'
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
 const src = (f: string): string => readFileSync(join(import.meta.dirname, f), 'utf8')
@@ -369,5 +370,22 @@ describe('★ what the App puts on the glass, driven by the world', () => {
       host.querySelectorAll('.stage-scene-stamp'),
       'a second reader of the hold struck the stamp twice',
     ).toHaveLength(1)
+  })
+})
+
+// ★ The dock was a button inside the sheet, so the one thing that had to know where the Almanac
+// stands — Watch, which put it away on every play — could not ask.
+describe('★ the Almanac stands where App says it stands, and one key moves it', () => {
+  it('★ docks on `a`, and the next visit opens where this one left it', async () => {
+    const host = await mount(createElement(App))
+    townArrives(world!)
+    expect(host.querySelector<HTMLElement>('.paper')?.dataset.dock).toBe('off')
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
+    })
+    expect(host.querySelector<HTMLElement>('.paper')?.dataset.dock).toBe('on')
+    expect(host.querySelector<HTMLElement>('.town-dim[data-dock]')?.dataset.dock).toBe('on')
+    expect(paperDock(localStorage)).toBe('docked')
+    rememberPaperDock(localStorage, 'sheet')
   })
 })

@@ -7,7 +7,7 @@ import { PageBoundary } from './PageBoundary.js'
 import { PageBody } from './pages/index.js'
 import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
-import { localStore, paperDock, rememberPaperDock } from '../ui/storage.js'
+import type { PaperDock } from '../ui/storage.js'
 import {
   PAGE_TABS,
   PAGE_TITLE,
@@ -35,7 +35,9 @@ export function Paper({
   operatorToken,
   insideId,
   gapTicks,
+  dock,
   onTab,
+  onDock,
   onClose,
   onSubject,
   onInside,
@@ -54,7 +56,9 @@ export function Paper({
   operatorToken: string | null
   insideId: string | null
   gapTicks: number | null
+  dock: PaperDock
   onTab: (tab: string) => void
+  onDock: () => void
   onClose: () => void
   onSubject: (subject: Subject) => void
   onInside: (structureId: string | null) => void
@@ -76,8 +80,7 @@ export function Paper({
   const tabs = PAGE_TABS[key] as readonly string[]
   const current = hasTab(key, tab) ? tab : tabs[0]!
   const [notice, setNotice] = useState<PaperNotice | null>(null)
-  const [docked, setDocked] = useState(() => paperDock(localStore()) === 'docked')
-  const dock = docked ? 'on' : 'off'
+  const docked = dock === 'docked'
 
   // The opener is whatever was pressed to raise the sheet, and it gets the focus back on the way
   // down. Its own effect, so a tab change does not bounce focus through it and announce twice.
@@ -134,7 +137,7 @@ export function Paper({
       <div
         className="town-dim"
         data-open={open ? 'yes' : 'no'}
-        data-dock={dock}
+        data-dock={docked ? 'on' : 'off'}
         onClick={onClose}
         aria-hidden="true"
         ref={dimRef}
@@ -143,7 +146,7 @@ export function Paper({
         className="paper"
         id="paper"
         data-open={open ? 'yes' : 'no'}
-        data-dock={dock}
+        data-dock={docked ? 'on' : 'off'}
         data-book={isArm(key) ? key : undefined}
         role="dialog"
         aria-modal="false"
@@ -244,15 +247,7 @@ export function Paper({
             </p>
             {/* The narrow dateline lifts this flank to row 1, off the tabs' own row. */}
             <div className="paper-marginalia">
-              <button
-                type="button"
-                className="paper-dock"
-                aria-pressed={docked}
-                onClick={() => {
-                  setDocked(!docked)
-                  rememberPaperDock(localStore(), docked ? 'sheet' : 'docked')
-                }}
-              >
+              <button type="button" className="paper-dock" aria-pressed={docked} onClick={onDock}>
                 dock
               </button>
               <button type="button" className="paper-close" onClick={onClose}>

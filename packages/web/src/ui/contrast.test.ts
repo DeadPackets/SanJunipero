@@ -102,7 +102,6 @@ const QUIET_SITES = [
   '.feed-empty',
   '.edition-temper',
   '.edition-caption',
-  '.chapter-head .stamp',
   '.biography-head .stamp',
   '.room-who',
   // `.bond-count` is gone: task 85 retired the strength bar and the count under it, because a

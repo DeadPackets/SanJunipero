@@ -1,6 +1,13 @@
 import { useEffect } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { SCENE_OUT_MS, SCENE_TOTAL_MS, transitionAlpha } from './sceneTransition.js'
+import type { PaperDock } from './storage.js'
+
+/** Watch used to put the Almanac away on every play. Docked it is a column beside the town that
+ *  dims nothing, so there is nothing to put away. */
+export function playClosesPaper(dock: PaperDock): boolean {
+  return dock !== 'docked'
+}
 
 /** A point event is watched from three sim-minutes before it to ten after: long enough for the
  *  bodies to arrive and the thing to land, short enough that day 3 of a nine-day town is not a

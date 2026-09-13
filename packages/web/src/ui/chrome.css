@@ -347,25 +347,24 @@ body {
   }
   .feed-jump:hover { transition-duration: var(--t-fast); }
 }
-/* One stagger for all three lists, at the motion table's own 30ms, capped at 6 steps. */
+/* One stagger for both lists, at the motion table's own 30ms, capped at 6 steps. */
 @media (prefers-reduced-motion: no-preference) {
-  :is(.feed-line, .edition-slot, .strip-list > li) {
+  :is(.feed-line, .strip-list > li) {
     animation: feed-in var(--t-fast) var(--ease-enter) backwards;
     animation-delay: calc(var(--stagger-i, 6) * var(--stagger));
   }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(1) { --stagger-i: 0; }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(2) { --stagger-i: 1; }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(3) { --stagger-i: 2; }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(4) { --stagger-i: 3; }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(5) { --stagger-i: 4; }
-  :is(.feed-line, .edition-slot, .strip-list > li, .stage-ring-arms button):nth-child(6) { --stagger-i: 5; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(1) { --stagger-i: 0; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(2) { --stagger-i: 1; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(3) { --stagger-i: 2; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(4) { --stagger-i: 3; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(5) { --stagger-i: 4; }
+  :is(.feed-line, .strip-list > li, .stage-ring-arms button):nth-child(6) { --stagger-i: 5; }
   @keyframes feed-in {
     from { opacity: 0; translate: 0 6px; }
     to { opacity: 1; translate: 0 0; }
   }
 }
 
-.paper-run { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-6); }
 .edition { background: var(--cream); padding: var(--s-4) var(--s-5); box-shadow: var(--frame-tight); }
 .edition-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-4);
@@ -614,12 +613,6 @@ body {
 .thumb-cast { overflow: hidden; text-overflow: ellipsis; }
 .thumb-where { flex: none; font-style: italic; }
 
-.chapter { margin: 0; }
-.chapter-head { margin: 0 0 var(--s-1); font-weight: 600; text-wrap: balance; }
-.chapter-head .stamp {
-  margin-right: var(--s-3); font-size: var(--f-1); font-weight: 400; color: var(--ink-quiet);
-  font-family: var(--font-data); font-variant-numeric: tabular-nums;
-}
 .chapter-text { margin: 0; white-space: pre-wrap; text-wrap: pretty; }
 
 /* ── townsfolk roster (Townsfolk lens, nobody picked) ── */

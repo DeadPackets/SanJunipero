@@ -25,7 +25,6 @@ import {
   type PageKey,
 } from './pageModel.js'
 
-import { paperDock, rememberPaperDock } from '../ui/storage.js'
 import { stamp } from './stamp.js'
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
@@ -53,7 +52,9 @@ const sheetOf = (over: Partial<Parameters<typeof Paper>[0]> = {}): ReactElement 
     operatorToken: null,
     insideId: null,
     gapTicks: null,
+    dock: 'sheet',
     onTab: () => {},
+    onDock: () => {},
     onClose: () => {},
     onSubject: () => {},
     onInside: () => {},
@@ -376,7 +377,8 @@ describe('the paper', () => {
     expect(html).toContain('class="bs-front"')
     expect(html).toContain('class="block bs-lead"')
     expect(html).toContain('class="bs-column"')
-    expect(html).toMatch(/class="stage-sr">The day’s paper</)
+    // Named out loud now: the edition under it stepped down, so the section head is the head.
+    expect(html).toMatch(/class="feed-head">The day’s paper</)
     expect(html).toContain('What mattered')
     expect(html).toContain('Since you arrived')
   })
@@ -737,17 +739,24 @@ describe('★ the Almanac shell', () => {
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
   })
 
-  it('★ docks as a column, stops dimming the town, and remembers it', async () => {
-    const p = await live({ page: 'chronicle', tab: 'Record' })
+  // The sheet asks and does not decide: Watch has to know where the Almanac stands before it
+  // can stop putting it away, so App owns the answer and the storage that remembers it.
+  it('★ docks as a column and stops dimming the town, on the word of whoever owns it', async () => {
+    const asked: string[] = []
+    const p = await live({
+      page: 'chronicle',
+      tab: 'Record',
+      onDock: () => asked.push('dock'),
+    })
     expect(p.el('.paper')?.dataset.dock).toBe('off')
     expect(p.el('.town-dim')?.dataset.dock).toBe('off')
     await act(async () => {
       p.el('.paper-dock')?.click()
     })
+    expect(asked, 'the sheet docked itself').toEqual(['dock'])
+    await p.again({ dock: 'docked' })
     expect(p.el('.paper')?.dataset.dock).toBe('on')
     expect(p.el('.town-dim')?.dataset.dock).toBe('on')
     expect(p.el('.paper-dock')?.getAttribute('aria-pressed')).toBe('true')
-    expect(paperDock(localStorage)).toBe('docked')
-    rememberPaperDock(localStorage, 'sheet')
   })
 })

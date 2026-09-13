@@ -5,6 +5,7 @@ import { onCamera } from './autoCut.js'
 import {
   MOMENT_LEAD_TICKS,
   MOMENT_TAIL_TICKS,
+  playClosesPaper,
   pointPlay,
   pointWindow,
   reachedEnd,
@@ -33,6 +34,13 @@ describe('★ clicking a chronicle line plays the moment, it does not freeze on 
     const onPlay = APP.slice(APP.indexOf('const onPlay'), APP.indexOf('const onLive'))
     expect(onPlay).toContain('closePaper()')
     expect(onPlay.indexOf('closePaper()')).toBeLessThan(onPlay.indexOf('handle?.replay'))
+  })
+
+  // ★ ...and stops closing it once it no longer has to. Docked the Almanac is a 380px column
+  // beside the town with the dim at 0, so putting it away costs the reader their place.
+  it('★ leaves the Almanac up when it is docked, because a docked column dims nothing', () => {
+    expect(playClosesPaper('sheet')).toBe(true)
+    expect(playClosesPaper('docked')).toBe(false)
   })
 
   it('★ every way into the past but the drag is a play', () => {

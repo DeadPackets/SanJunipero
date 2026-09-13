@@ -36,7 +36,7 @@ import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
+import { playClosesPaper, pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { firstWorryLine, stripReady, useColdOpen } from './ui/coldOpen.js'
@@ -45,7 +45,7 @@ import { aimsFeed } from './ui/feeds.js'
 import { useFeed } from './ui/useEndpoint.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
-import { localStore, sessionStore } from './ui/storage.js'
+import { localStore, paperDock, rememberPaperDock, sessionStore } from './ui/storage.js'
 import { rememberThoughts, thoughtsSetting } from './ui/thoughts.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -112,6 +112,8 @@ export function App() {
   }))
   const [keysOpen, setKeysOpen] = useState(false)
   const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
+  // Where the Almanac stands. It lives here, not in the sheet, because Watch has to ask.
+  const [dock, setDock] = useState(() => paperDock(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
@@ -269,13 +271,14 @@ export function App() {
   )
   const onPlay = useCallback(
     (next: MomentPlay) => {
-      // The paper sits at 66% of the screen and dims the town: a replay behind it is invisible.
-      closePaper()
+      // As a sheet the paper takes 66% of the screen and dims the town, and a replay behind it
+      // is invisible. Docked it takes 380px and dims nothing, so it stays up.
+      if (playClosesPaper(dock)) closePaper()
       setPlay(next)
       handle?.replay(next.from)
       address(next.from)
     },
-    [handle, address, closePaper],
+    [handle, address, closePaper, dock],
   )
   const onLive = useCallback(() => {
     setPlay(null)
@@ -372,6 +375,14 @@ export function App() {
     scene.pickedId = subject?.id ?? null
   }, [scene, subject])
 
+  // The 1000px floor is the sheet's, not this file's: every dock rule sits inside that media
+  // query, so below it the attribute flips and the Almanac stays the sheet it was.
+  const toggleDock = useCallback(() => {
+    const next = dock === 'docked' ? 'sheet' : 'docked'
+    setDock(next)
+    rememberPaperDock(localStore(), next)
+  }, [dock])
+
   const toggleThoughts = useCallback(() => {
     const next = thoughts === 'hidden' ? 'shown' : 'hidden'
     setThoughts(next)
@@ -402,6 +413,7 @@ export function App() {
     onDirector: toggleDirector,
     onThoughts: toggleThoughts,
     onDensity: density.cycle,
+    onDock: toggleDock,
   })
 
   return (
@@ -533,6 +545,8 @@ export function App() {
         operatorToken={operatorToken}
         insideId={insideId}
         gapTicks={gapTicks}
+        dock={dock}
+        onDock={toggleDock}
         onTab={(tab) => {
           setSheet((prev) => (prev === null ? prev : { ...prev, tab }))
         }}

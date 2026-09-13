@@ -71,9 +71,9 @@ function Motif({ moment }: { moment: Moment }) {
   )
 }
 
-export function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
+export function EditionView({ e }: { e: Edition }) {
   return (
-    <article className={lead ? 'edition lead' : 'edition'}>
+    <article className="edition">
       <p className="edition-head">
         <span className="edition-day">Day {e.day}</span>
         {e.temper !== null && <span className="edition-temper">{e.temper}</span>}
