@@ -7,7 +7,7 @@ import type { MindSpec } from './liveMinds.js'
 // Goals are neutral on purpose — a goal like "cut timber for a deck" is the fixture
 // instructing the mind.
 export type Mind = MindSpec
-const voice = (
+export const voice = (
   register: string,
   rhythm: string,
   tics: string[],

@@ -1,8 +1,7 @@
 // The four who may come up the valley road after the founding, in the order they arrive. Not
 // in `FOUNDER_MINDS`: an arrival draws the next one off this list.
 import { DAYS_PER_YEAR, type Pace } from '@sj/shared'
-import type { IdentityCore } from '../prompt/assemble.js'
-import type { Mind } from './founderMinds.js'
+import { voice, type Mind } from './founderMinds.js'
 
 export type Traveller = Mind & {
   /** Why they came up the valley road, in one line. */
@@ -10,23 +9,6 @@ export type Traveller = Mind & {
   /** How fast this heart lets somebody close. */
   pace: Pace
 }
-
-const voice = (
-  register: string,
-  rhythm: string,
-  tics: string[],
-  neverSays: string[],
-  exampleLines: string[],
-  typical: number,
-  burst: number,
-): IdentityCore['voiceCard'] => ({
-  register,
-  rhythm,
-  tics,
-  neverSays,
-  exampleLines,
-  wordBudget: { typical, burst },
-})
 
 export const TRAVELLER_MINDS: Traveller[] = [
   {

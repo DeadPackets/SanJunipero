@@ -28,7 +28,7 @@ export type HeatCtx = {
 // so 2.5 is representable.
 export type MilestoneTier = 1 | 2 | 2.5 | 3
 
-export type MilestoneRow = {
+export type Milestone = {
   kind: string
   tier: MilestoneTier
   domain: string
@@ -41,8 +41,6 @@ export type MilestoneRow = {
   // Present only when the town named the thing itself, kept verbatim (G9).
   nameProvenance?: QuotedName
 }
-// One registry, one type: C7's ledger grew columns, it did not gain a rival.
-export type Milestone = MilestoneRow
 
 export type FirstCtx = {
   seenKinds: Set<string>
