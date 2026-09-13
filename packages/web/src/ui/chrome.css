@@ -1507,6 +1507,9 @@ body:has(.cold-open) .scene-card { display: none; }
 
 .signpost {
   grid-area: foot-right; grid-row: open-start / foot-right-end;
+  /* Layout containment makes this the pole's containing block. `position` is banned on a mark,
+     and without a block of its own the absolute pole anchored to the frame and ran the left edge. */
+  contain: layout;
   justify-self: end; align-self: end; z-index: 25;
   display: grid; justify-items: start; padding-bottom: calc(10px * var(--px));
   /* one drawn pixel is --px screen pixels: every size below is a whole number of them */
@@ -2495,7 +2498,8 @@ body:has(.cold-open) .scene-card { display: none; }
 }
 /* Four rows in 64px: the cast beside a label row, the town's own sentence, and the heat. */
 .story-capsule {
-  flex: 0 1 320px; min-width: 0; height: 64px;
+  /* 76, not 64: two lines of the sentence at --f-3 need 36px and 64 left them 27. */
+  flex: 0 1 320px; min-width: 0; height: 76px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) 3px;
@@ -3010,6 +3014,16 @@ body:has(.cold-open) .dossier-rail { opacity: 0; }
   .paper[data-dock='on'][data-open='yes'] { transform: translateX(0); }
   /* The grip pulls a sheet DOWN, and a column has nowhere down to go. */
   .paper[data-dock='on'] .paper-grip { display: none; }
+  /* A 380px column is narrower than the tabs at any viewport, so the dateline takes the shape
+     the sheet takes under 1920: tabs on a second row that scrolls, the marginalia beside the day. */
+  .paper[data-dock='on'] .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }
+  .paper[data-dock='on'] .paper-tabs {
+    grid-row: 2; grid-column: 1 / -1; justify-self: stretch; flex-wrap: nowrap;
+    overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+    border-top: 1px solid var(--ink-quiet);
+  }
+  .paper[data-dock='on'] .paper-tab { flex: none; scroll-snap-align: start; }
+  .paper[data-dock='on'] .paper-marginalia { grid-row: 1; grid-column: 2; }
 }
 
 /* ── every name is a door: the one link the paper opens a person with ──────────────────────
