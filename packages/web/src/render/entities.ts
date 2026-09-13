@@ -11,13 +11,14 @@ import { HIT_MIN_PX, artPrismPolygon, extrudeDiamond, inflateToMin } from './hit
 import { anchorForSprite } from './tooltip.js'
 import type { Scene } from './scene.js'
 import {
-  LOAD_PRIORITY,
   TextureBook,
   artOptional,
   buildingArt,
   dressDelay,
   fadeArtIn,
   openBoot,
+  raiseWaiting,
+  rankInView,
   textureUrlFor,
   type BuildingArt,
 } from './textures.js'
@@ -435,10 +436,7 @@ export function syncEntities(
   const midY = view.y + view.h / 2
   const span = Math.hypot(view.w, view.h) / 2
   const loadAt = (sx: number, sy: number): Load => ({
-    priority:
-      sx >= view.x && sx <= view.x + view.w && sy >= view.y && sy <= view.y + view.h
-        ? LOAD_PRIORITY.near
-        : LOAD_PRIORITY.far,
+    priority: rankInView(view, sx, sy),
     delayMs: dressDelay(Math.hypot(sx - midX, sy - midY), span),
   })
 
@@ -612,6 +610,12 @@ export function syncEntities(
       tags.hideAll() // a torn-down sprite never fires pointerout, so its tag would hang
     }
   }
+
+  // `rig.fitToTown` is still running when the first sync ranks the town, so what the shot holds
+  // is not settled yet. Only a url still waiting can move, so this is free once the queue drains.
+  for (const entry of sync.entries.values())
+    if (entry.url !== NO_ART)
+      raiseWaiting(entry.url, rankInView(view, entry.sprite.position.x, entry.sprite.position.y))
 
   // THE hot-load path — on new codex records, re-resolve every url and swap in place
   const seq = store.assetsSeq()

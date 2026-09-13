@@ -10,7 +10,7 @@ import {
 } from './groundBake.js'
 import { groundField, MATERIAL_REPEAT_PX, SKIRT_KIND } from './groundField.js'
 import { TILE_H, TILE_W } from './iso.js'
-import { TextureBook } from './textures.js'
+import { LOAD_PRIORITY, TextureBook } from './textures.js'
 
 const SS = 8 // sub-samples per axis
 const FIELD_LUMA = 148.6 // the grass field the critique measured
@@ -233,5 +233,25 @@ describe('★ a material the codex cannot serve', () => {
     expect(flat).toBeGreaterThan(0)
     await flush()
     expect(s.renders.length).toBe(flat * 2)
+  })
+
+  // ★ The bake runs before `openBoot`, so the book cannot know a material is terrain. Left to
+  // be inferred, every ground url ranked `ordinary` and loaded behind the town standing on it.
+  it('★ asks for every material at the ground rank, which it names rather than infers', () => {
+    const ranks: (number | undefined)[] = []
+    const book = {
+      peek: () => null,
+      get: (_url: string, priority?: number) => {
+        ranks.push(priority)
+        return new Promise<never>(() => {})
+      },
+      swap: () => new Promise<never>(() => {}),
+    } as unknown as TextureBook
+    const baker = createGroundBaker({ render: () => {} }, new Container(), book)
+    const terrain = bigTownTerrain(1) as never
+    baker.setView(viewAt(0.25, groundField(terrain, RECORDS)))
+    baker.rebake(terrain, RECORDS)
+    expect(ranks.length).toBeGreaterThan(0)
+    expect(ranks).toEqual(ranks.map(() => LOAD_PRIORITY.ground))
   })
 })

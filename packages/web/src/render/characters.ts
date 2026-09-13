@@ -16,7 +16,13 @@ import {
 } from './hitShapes.js'
 import { anchorForSprite } from './tooltip.js'
 import { shadowCast } from '../ui/skyModel.js'
-import { artOptional, characterArt, type TextureBook } from './textures.js'
+import {
+  artOptional,
+  characterArt,
+  raiseWaiting,
+  rankInView,
+  type TextureBook,
+} from './textures.js'
 import {
   SLOT_ABOVE_HEAD_PX,
   SLOT_PX,
@@ -258,6 +264,9 @@ export function createCharacterLayer(
   const entries = new Map<string, CharEntry>()
   const sheets = new Map<string, Sheet>() // agentId → resolved art + loaded texture
   let lastAssetsSeq = store.assetsSeq()
+  /** Whether a delta has arrived. The codex catch-up rides the hello, ahead of every delta, so
+   *  a town still at zero records by then has none and its people wear the gateway's sheet. */
+  let sawDelta = false
   let emoteAtlas: Texture | null = null
   let emotesHidden = false
   /** Who is answering whom, so a talker turns to their partner rather than out to sea. */
@@ -271,12 +280,21 @@ export function createCharacterLayer(
     for (const e of entries.values()) e.glyphKind = null
   }, artOptional)
 
-  const loadSheet = (agentId: string, swapFrom: string | null): void => {
+  /** Where a body stands in the shot, so its sheet is ranked by the same rule its neighbours'
+   *  buildings are: what the camera can see loads before what it cannot. */
+  const sheetRank = (sx: number, sy: number): number => rankInView(scene.viewRect(), sx, sy)
+
+  const loadSheet = (agentId: string, swapFrom: string | null, sx: number, sy: number): void => {
+    // The codex IS the manifest. Ahead of it a body cannot be told from one the codex has no
+    // atlas for, and asking anyway spent 400 KB a body on sheets the atlas replaced.
+    if (store.assetsSeq() === 0 && !sawDelta) return
     const art = characterArt(store.assetRecords(), agentId)
     const sheet: Sheet = { art, texture: null }
     sheets.set(agentId, sheet)
     const p =
-      swapFrom !== null && swapFrom !== art.url ? book.swap(swapFrom, art.url) : book.get(art.url)
+      swapFrom !== null && swapFrom !== art.url
+        ? book.swap(swapFrom, art.url)
+        : book.get(art.url, sheetRank(sx, sy))
     void p.then((t) => {
       if (sheets.get(agentId) !== sheet) return // superseded by a newer resolve
       sheet.texture = t
@@ -365,7 +383,10 @@ export function createCharacterLayer(
 
   const ensure = (agentId: string, x: number, y: number): CharEntry => {
     let e = entries.get(agentId)
-    if (e !== undefined) return e
+    if (e !== undefined) {
+      if (!sheets.has(agentId)) loadSheet(agentId, null, e.sprite.position.x, e.sprite.position.y)
+      return e
+    }
     const sprite = new Sprite()
     sprite.anchor.set(0.5, FEET_Y / CELL)
     sprite.scale.set(CHAR_TARGET_PX / 64)
@@ -446,7 +467,8 @@ export function createCharacterLayer(
     e = e2
     setHitScale(e, CHAR_TARGET_PX / 64, 64)
     entries.set(agentId, e)
-    loadSheet(agentId, null)
+    const feet = feetOf(x, y)
+    loadSheet(agentId, null, feet.sx, feet.sy)
     return e
   }
 
@@ -460,6 +482,7 @@ export function createCharacterLayer(
   }
 
   const offEvents = store.onEvents((evts: SimEvent[]) => {
+    sawDelta = true
     const state = store.getState()
     if (state === null) return
     const now = performance.now()
@@ -507,11 +530,20 @@ export function createCharacterLayer(
     const seq = store.assetsSeq()
     if (seq !== lastAssetsSeq) {
       lastAssetsSeq = seq
-      for (const agentId of entries.keys()) {
+      for (const [agentId, e] of entries) {
         const prev = sheets.get(agentId)
         const next = characterArt(store.assetRecords(), agentId)
-        if (prev?.art.url !== next.url) loadSheet(agentId, prev?.art.url ?? null)
+        if (prev?.art.url !== next.url)
+          loadSheet(agentId, prev?.art.url ?? null, e.sprite.position.x, e.sprite.position.y)
       }
+    }
+    // `rig.fitToTown` is still running when the first bodies ask, so the shot they were ranked
+    // against is not the shot. Only a sheet still waiting can move.
+    const shot = scene.viewRect()
+    for (const [agentId, e] of entries) {
+      const sheet = sheets.get(agentId)
+      if (sheet?.texture !== null) continue
+      raiseWaiting(sheet.art.url, rankInView(shot, e.sprite.position.x, e.sprite.position.y))
     }
     const nowTick = store.getTick()
     const wantsMotion = scene.wantsMotion()

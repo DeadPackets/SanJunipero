@@ -28,7 +28,7 @@ import {
 } from './groundField.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { furrowLines, HEADLAND_COLOR, KERB_COLOR, patchOutline, type Tile } from './patches.js'
-import { artOptional, type TextureBook } from './textures.js'
+import { LOAD_PRIORITY, artOptional, type TextureBook } from './textures.js'
 import { tileKind } from './tileset.js'
 
 // A grid of fixed-size chunks, not one texture the size of the field: a whole-map bake grows as
@@ -267,9 +267,10 @@ export function createGroundBaker(
       const gen = ++generation
       // allSettled, never all: one material the codex cannot serve would leave every chunk on
       // its flat fallback for the life of the bake, not just the layer that failed.
+      // The rank is named, not inferred: the bake runs before the codex is open.
       void Promise.allSettled(
         urls.map(async (u) => {
-          loaded.set(u, await book.get(u))
+          loaded.set(u, await book.get(u, LOAD_PRIORITY.ground))
         }),
       )
         .then(() => {

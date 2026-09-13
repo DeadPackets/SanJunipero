@@ -143,6 +143,18 @@ export const artOptional = (): undefined => undefined
  *  shot goes before what is not, and a caller that ranks nothing sits between the two. */
 export const LOAD_PRIORITY = { ground: 0, near: 1, ordinary: 2, far: 3 } as const
 
+/** What the camera can see goes before what it cannot. One rule for every layer: a body and a
+ *  building standing on the same tile must not disagree about whether they are in the shot. */
+export function rankInView(
+  view: { x: number; y: number; w: number; h: number },
+  sx: number,
+  sy: number,
+): number {
+  return sx >= view.x && sx <= view.x + view.w && sy >= view.y && sy <= view.y + view.h
+    ? LOAD_PRIORITY.near
+    : LOAD_PRIORITY.far
+}
+
 /** A browser holds six connections open to one origin. More in flight than that hands the
  *  ordering back to the network, which is the one thing the queue exists to take. */
 const MAX_IN_FLIGHT = 6
@@ -154,7 +166,7 @@ const ready = new Map<string, Texture>()
 const registered = new Set<string>()
 const artClass = new Map<string, AssetClass>()
 
-type Wanted = { priority: number; start: () => void }
+type Wanted = { url: string; priority: number; start: () => void; drop: () => void }
 const wanted: Wanted[] = []
 let inFlight = 0
 
@@ -172,6 +184,7 @@ function pump(): void {
 function fetchTexture(url: string, priority: number): Promise<Texture> {
   return new Promise<Texture>((resolve, reject) => {
     wanted.push({
+      url,
       priority,
       start: () => {
         void Assets.load<Texture>(url)
@@ -181,9 +194,29 @@ function fetchTexture(url: string, priority: number): Promise<Texture> {
             pump()
           })
       },
+      drop: () => {
+        reject(new Error(`dropped ${url}`))
+      },
     })
     pump()
   })
+}
+
+/** A url the layer has swapped away from before a connection came free. It never started, so
+ *  nothing is drawn from it and downloading it now is bytes nobody will ever see. */
+function dropWaiting(url: string): void {
+  const i = wanted.findIndex((w) => w.url === url)
+  if (i >= 0) wanted.splice(i, 1)[0]!.drop()
+}
+
+/** A rank read before the camera settled is a guess, and `get` hands back the cached promise
+ *  without looking at the new one. Moves a url still WAITING: one in flight cannot be recalled. */
+export function raiseWaiting(url: string, priority: number): void {
+  for (const w of wanted)
+    if (w.url === url && priority < w.priority) {
+      w.priority = priority
+      if (priority <= LOAD_PRIORITY.near) mustLand.add(url)
+    }
 }
 
 /** What a url is art of. The codex answers for everything it holds, and the gateway's character
@@ -229,19 +262,51 @@ const DRESSED_TIMEOUT_MS = 3000
  *  asks on its own subscription, so the one that asks first must not answer for the rest. */
 const FIRST_FRAME_CLASSES: readonly AssetClass[] = ['terrain', 'building', CHARACTER_CLASS]
 
-let outstanding = 0
 let dressedYet = false
 let booted = false
 let firstFrame: readonly AssetClass[] = []
+let firstAskMs: number | null = null
+let givingUp: ReturnType<typeof setTimeout> | null = null
 const asked = new Set<string>()
+/** The ground and what is in the shot. Dressed is these in hand, so a reveal is a town rather
+ *  than a field of stand-ins with the art still on the wire. */
+const mustLand = new Set<string>()
 const waitingOnArt = new Set<() => void>()
 
-/** Resolves once every class the first frame is made of has answered, or after `timeoutMs`. A
- *  card that leaves on the scene object reveals an empty field that fills in afterwards. */
-export function whenDressed(timeoutMs = DRESSED_TIMEOUT_MS): Promise<void> {
+function giveUp(): void {
+  for (const release of waitingOnArt) release()
+  waitingOnArt.clear()
+}
+
+/** The budget belongs to the LOADING, not to the bundle and the socket in front of it, so it
+ *  runs from the first ask: the first moment any art could have been in hand. */
+function armGiveUp(): void {
+  if (givingUp !== null) return
+  const from = firstAskMs ?? performance.now()
+  givingUp = setTimeout(giveUp, Math.max(0, from + DRESSED_TIMEOUT_MS - performance.now()))
+}
+
+/** The reveal is asked for on mount, which is before the socket has said what the town is, so
+ *  a waiter that arrived ahead of the first ask is re-armed against it. */
+function noteFirstAsk(): void {
+  if (firstAskMs !== null) return
+  firstAskMs = performance.now()
+  if (givingUp === null) return
+  clearTimeout(givingUp)
+  givingUp = null
+  armGiveUp()
+}
+
+/** Resolves once the ground and everything in the shot is in hand, or on the timeout. A card
+ *  that leaves on the scene object reveals an empty field that fills in afterwards. */
+export function whenDressed(timeoutMs?: number): Promise<void> {
   if (dressedYet) return Promise.resolve()
   return new Promise<void>((resolve) => {
     waitingOnArt.add(resolve)
+    if (timeoutMs === undefined) {
+      armGiveUp()
+      return
+    }
     setTimeout(() => {
       waitingOnArt.delete(resolve)
       resolve()
@@ -260,14 +325,13 @@ function askedClasses(): Set<AssetClass> {
   return out
 }
 
-function settled(): void {
-  outstanding--
-  if (dressedYet || !booted || outstanding > 0 || asked.size === 0) return
+function settled(url: string): void {
+  mustLand.delete(url)
+  if (dressedYet || !booted || mustLand.size > 0 || asked.size === 0) return
   const seen = askedClasses()
   for (const k of firstFrame) if (!seen.has(k)) return
   dressedYet = true
-  for (const release of waitingOnArt) release()
-  waitingOnArt.clear()
+  giveUp()
 }
 
 export class TextureBook {
@@ -282,21 +346,23 @@ export class TextureBook {
     if (p === undefined) {
       register(url)
       asked.add(url)
-      outstanding++
-      p = fetchTexture(url, priority ?? rankOf(url)).then(
+      const rank = priority ?? rankOf(url)
+      if (rank <= LOAD_PRIORITY.near) mustLand.add(url)
+      noteFirstAsk()
+      p = fetchTexture(url, rank).then(
         (t) => {
           // GCSystem unloads an untouched source, and an unloaded source is a null one that
           // takes the stage down on the next frame that draws it.
           t.source.autoGarbageCollect = false
           ready.set(url, t)
-          settled()
+          settled(url)
           return t
         },
         (err: unknown) => {
           // A fetch that failed once — a gateway restarting under a live socket — must not be
           // this url's answer for the rest of the session.
           cache.delete(url)
-          settled()
+          settled(url)
           throw err
         },
       )
@@ -308,6 +374,7 @@ export class TextureBook {
   /** NOT `Assets.unload`: that destroys the texture and nulls its source, and the batcher reads
    *  `source.alphaMode` unguarded, so the stage goes down on the next frame that draws it. */
   async swap(oldUrl: string, newUrl: string): Promise<Texture> {
+    if (oldUrl !== newUrl) dropWaiting(oldUrl)
     const next = await this.get(newUrl) // free the old source only once the new one is in hand
     if (oldUrl !== newUrl) {
       ready.get(oldUrl)?.source.unload()

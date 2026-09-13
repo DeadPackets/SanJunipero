@@ -157,7 +157,7 @@ import { BODY_SPRITE_W, depthOrder, type DepthBox } from './depth.js'
 import { HIT_MIN_PX, SHOULDER_W, bodyHitPolygon, inflateToMin, polygonBounds } from './hitShapes.js'
 import { FACINGS, feetOf, tileToScreen } from './iso.js'
 import type { Scene } from './scene.js'
-import type { TextureBook } from './textures.js'
+import { LOAD_PRIORITY, type TextureBook } from './textures.js'
 
 type MutableAgents = Record<
   string,
@@ -197,6 +197,7 @@ function makeStore(agents: MutableAgents): {
   setMoving: (v: boolean) => void
   setTick: (t: number) => void
   setMinds: (m: Record<string, 'deciding' | 'idle'>) => void
+  setAssetsSeq: (n: number) => void
 } {
   const handlers = new Set<(evts: SimEvent[]) => void>()
   const tension = createTension({
@@ -209,19 +210,23 @@ function makeStore(agents: MutableAgents): {
   let moving = true
   let tick = 0
   let minds = new Map<string, { state: 'deciding' | 'idle'; tick: number }>()
+  let assetsSeq = 1
   const store = {
     getState: () => ({ agents }) as unknown as WorldState,
     getMode: () =>
       moving ? { live: true as const } : { live: false as const, replaying: false, tick: 0 },
     timeMoving: () => moving,
     getTick: () => tick,
+    getConfig: () => null,
     latestThought: () => null,
     thoughtsLog: () => [],
     recentEvents: () => [],
     shotScene: () => scene,
     minds: () => minds,
     tension,
-    assetsSeq: () => 0,
+    // The codex has spoken and holds no atlas for these bodies, which is what the gateway's
+    // own character route exists for. At zero the layer is still waiting on the manifest.
+    assetsSeq: () => assetsSeq,
     assetRecords: () => [],
     applyServer: () => {},
     subscribe: () => () => {},
@@ -240,6 +245,9 @@ function makeStore(agents: MutableAgents): {
     },
     setTick: (t) => {
       tick = t
+    },
+    setAssetsSeq: (n) => {
+      assetsSeq = n
     },
     setMinds: (m) => {
       minds = new Map(Object.entries(m).map(([id, state]) => [id, { state, tick }]))
@@ -292,10 +300,68 @@ const placed = (scene: Scene): InstanceType<typeof MockContainer>[] => {
 }
 
 function makeBook(): { book: TextureBook; get: ReturnType<typeof vi.fn> } {
-  const get = vi.fn(() => new Promise<never>(() => {}))
+  const get = vi.fn((_url: string, _priority?: number) => new Promise<never>(() => {}))
   const book = { get, swap: vi.fn(() => new Promise<never>(() => {})) } as unknown as TextureBook
   return { book, get }
 }
+
+// ★ Measured: the codex catch-up landed about two seconds after the snapshot, and the layer's
+// first tick beat it, so twelve gateway sheets were downloaded and twelve atlases replaced them.
+describe('★ the codex is the manifest, so nothing is asked for ahead of it', () => {
+  const routeAsks = (get: ReturnType<typeof vi.fn>): string[] =>
+    get.mock.calls.map((c) => String(c[0])).filter((u) => u.startsWith('/assets/character/'))
+
+  it('★ asks for no sheet while the records are still on the wire, then asks once', () => {
+    const { store, setAssetsSeq } = makeStore({ nadia: makeAgent('nadia', 3, 4) })
+    setAssetsSeq(0)
+    const { book, get } = makeBook()
+    const layer = createCharacterLayer(makeScene(), book, store, () => {})
+    layer.tick(1000)
+    expect(routeAsks(get), 'the manifest has not arrived, so there is nothing to ask for').toEqual(
+      [],
+    )
+
+    setAssetsSeq(1)
+    layer.tick(1016)
+    layer.tick(1032)
+    expect(routeAsks(get)).toEqual(['/assets/character/nadia.png'])
+    layer.destroy()
+  })
+
+  it('★ and a town whose codex holds nothing still gets its people, once a delta has landed', () => {
+    const { store, setAssetsSeq, emit } = makeStore({ nadia: makeAgent('nadia', 3, 4) })
+    setAssetsSeq(0)
+    const { book, get } = makeBook()
+    const layer = createCharacterLayer(makeScene(), book, store, () => {})
+    layer.tick(1000)
+    expect(routeAsks(get)).toEqual([])
+
+    emit([]) // the catch-up rides the hello, so a delta with no records means there are none
+    layer.tick(1016)
+    expect(routeAsks(get)).toEqual(['/assets/character/nadia.png'])
+    layer.destroy()
+  })
+})
+
+// ★ Measured on six cold loads: twelve character atlases at 400 KB each asked with no rank at
+// all, so they held every one of the six connections before the ground asked for a byte.
+describe('★ a sheet is ranked by where its body stands in the shot', () => {
+  it('★ asks near for a body the camera can see and far for one it cannot', () => {
+    const agents = {
+      inshot: makeAgent('inshot', 3, 4),
+      offshot: makeAgent('offshot', 200, 200),
+    }
+    const { store } = makeStore(agents)
+    const { book, get } = makeBook()
+    const layer = createCharacterLayer(makeScene(), book, store, () => {})
+    layer.tick(1000)
+    const rankOf = (id: string): unknown =>
+      get.mock.calls.find((c) => String(c[0]) === `/assets/character/${id}.png`)?.[1]
+    expect(rankOf('inshot')).toBe(LOAD_PRIORITY.near)
+    expect(rankOf('offshot')).toBe(LOAD_PRIORITY.far)
+    layer.destroy()
+  })
+})
 
 describe('createCharacterLayer entry registration (F1 regression net)', () => {
   let agents: MutableAgents

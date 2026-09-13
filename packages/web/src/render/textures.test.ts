@@ -40,6 +40,8 @@ import {
   dressDelay,
   facingCellKind,
   openBoot,
+  raiseWaiting,
+  rankInView,
   resolveAssetId,
   textureUrlFor,
   whenDressed,
@@ -272,6 +274,16 @@ describe('★ the town is dressed when its art lands, never when its scene is bu
   })
 })
 
+describe('one rule for what the camera can see', () => {
+  const view = { x: 0, y: 0, w: 800, h: 600 }
+  it('ranks a point inside the shot near and one outside it far', () => {
+    expect(rankInView(view, 400, 300)).toBe(LOAD_PRIORITY.near)
+    expect(rankInView(view, 0, 0), 'the edge is in the shot').toBe(LOAD_PRIORITY.near)
+    expect(rankInView(view, 900, 300)).toBe(LOAD_PRIORITY.far)
+    expect(rankInView(view, 400, -1)).toBe(LOAD_PRIORITY.far)
+  })
+})
+
 describe('the dressing runs outward from the middle of the shot', () => {
   it('waits longer the further a thing stands from the camera, and never past one sweep', () => {
     expect(dressDelay(0, 500)).toBe(0)
@@ -397,6 +409,55 @@ describe('★ the loader serves the shot first', () => {
 
     for (const u of far.slice(1, 6)) await land(u)
     for (const u of [near, far[6]!, far[7]!]) await land(u)
+  })
+
+  // ★ Measured on six cold loads: `rig.fitToTown` had not settled when the first sync ranked
+  // the town, so the same thirteen positions read `far` at 4361 ms and `near` at 5945 ms.
+  it('★ re-ranks a url still waiting, so a camera that settles late still gets served', async () => {
+    const book = new TextureBook()
+    const busy = Array.from({ length: 6 }, (_, i) => `/assets/busy${String(i)}.png`)
+    for (const u of busy) void book.get(u, LOAD_PRIORITY.near).catch(artOptional)
+    // `other` queues FIRST, so without the re-rank the freed connection is its by seniority
+    const other = '/assets/other.png'
+    const late = '/assets/late.png'
+    for (const u of [other, late]) void book.get(u, LOAD_PRIORITY.far).catch(artOptional)
+    expect(loads.has(late), 'every connection is open, so both are waiting').toBe(false)
+
+    raiseWaiting(late, LOAD_PRIORITY.near)
+    await land(busy[0]!)
+    expect(loads.has(late), 'the camera settled and this is in the shot now').toBe(true)
+    expect(loads.has(other), 'and the one still outside it waits').toBe(false)
+
+    for (const u of busy.slice(1)) await land(u)
+    for (const u of [late, other]) await land(u)
+  })
+
+  it('★ and never a url already in flight, because an open request cannot be recalled', () => {
+    const book = new TextureBook()
+    const url = '/assets/open.png'
+    void book.get(url, LOAD_PRIORITY.far).catch(artOptional)
+    expect(loads.has(url), 'a free connection started it at once').toBe(true)
+    expect(() => {
+      raiseWaiting(url, LOAD_PRIORITY.ground)
+    }).not.toThrow()
+  })
+
+  // ★ Measured: on two cold loads of six the town downloaded all twelve character sheets from
+  // the gateway route and then all twelve codex atlases that replace them. 9.66 MB for twelve.
+  it('★ a swap away from a url that never started never downloads it', async () => {
+    const book = new TextureBook()
+    const busy = Array.from({ length: 6 }, (_, i) => `/assets/held${String(i)}.png`)
+    for (const u of busy) void book.get(u, LOAD_PRIORITY.near).catch(artOptional)
+    const guess = '/assets/guess.png'
+    void book.get(guess, LOAD_PRIORITY.near).catch(artOptional)
+    expect(loads.has(guess), 'no connection is free, so it is only queued').toBe(false)
+
+    const real = '/assets/real.png'
+    void book.swap(guess, real).catch(artOptional)
+    for (const u of busy) await land(u)
+    expect(loads.has(guess), 'the layer wants the other one, so this is never fetched').toBe(false)
+    expect(loads.has(real)).toBe(true)
+    await land(real)
   })
 
   it('★ takes every downloaded source off Pixi garbage collection', async () => {
