@@ -61,8 +61,6 @@ export type Becoming = {
   knows: { id: string; name: string; level: BondLevel; type: BondType; words: string }[]
   /** skill BANDS in words, never xp and never a level number */
   good: { words: string }[]
-  /** drives — empty until the society lane emits them, and an empty section does not render */
-  wants: { words: string }[]
   /** P22.5 — the days this person became different */
   changed: { day: number; words: string }[]
 }
@@ -74,7 +72,6 @@ export const SECTION_EMPTY: Readonly<Record<keyof Becoming, string>> = {
   done: 'They have not done anything the town wrote down yet.',
   knows: 'They have not met anyone yet.',
   good: 'They have not taken up a craft yet.',
-  wants: 'What they want is not something the town can tell yet.',
   changed: 'Nothing about them has changed yet — they have only just arrived.',
 }
 
@@ -83,25 +80,10 @@ export const SECTION_TITLE: Readonly<Record<keyof Becoming, string>> = {
   done: 'What they have done',
   knows: 'Who they know',
   good: 'What they are good at',
-  wants: 'What they seem to want',
   changed: 'The days they became different',
 }
 
-const SMALL = [
-  'No',
-  'One',
-  'Two',
-  'Three',
-  'Four',
-  'Five',
-  'Six',
-  'Seven',
-  'Eight',
-  'Nine',
-  'Ten',
-  'Eleven',
-  'Twelve',
-] as const
+const SMALL = 'No One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve'.split(' ')
 
 const inWords = (n: number): string => SMALL[n] ?? String(n)
 
@@ -256,12 +238,11 @@ export function becomingOf(input: BecomingInput): Becoming {
     done,
     knows,
     good,
-    wants: [], // the society lane's, and an empty section renders nothing at all
     changed,
   }
 }
 
-/** Which sections have something to say. `wants` is never shown while it is empty (P22.2). */
+/** Which sections have something to say. */
 export const ALWAYS_SHOWN: readonly (keyof Becoming)[] = [
   'lived',
   'done',

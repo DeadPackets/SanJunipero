@@ -64,16 +64,6 @@ const LINK_CASING_COLOR = '#241F2B'
 const NO_DASH: number[] = []
 const DASH_SCALE = 2
 const DOUBLED_DASH = new WeakMap<readonly number[], number[]>()
-/** A ring's dash is drawn at its own size, so it gets its own cache rather than the doubled one. */
-const RING_DASH = new WeakMap<readonly number[], number[]>()
-const drawnRingDash = (dash: readonly number[]): number[] => {
-  let out = RING_DASH.get(dash)
-  if (out === undefined) {
-    out = [...dash]
-    RING_DASH.set(dash, out)
-  }
-  return out
-}
 const drawnDash = (dash: readonly number[] | null): number[] => {
   if (dash === null) return NO_DASH
   let out = DOUBLED_DASH.get(dash)
@@ -304,7 +294,7 @@ export function BondsGraph({
         const ring = INSTITUTION_RING[kind]
         ctx.strokeStyle = ring.color
         ctx.lineWidth = 2
-        ctx.setLineDash(ring.dash === null ? NO_DASH : drawnRingDash(ring.dash))
+        ctx.setLineDash(ring.dash === null ? NO_DASH : (ring.dash as number[]))
         ctx.strokeRect(x - out, y - out, side + out * 2, side + out * 2)
       })
       ctx.setLineDash(NO_DASH)

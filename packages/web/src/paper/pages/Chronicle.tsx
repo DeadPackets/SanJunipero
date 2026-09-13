@@ -16,11 +16,12 @@ import { OutOfReach } from '../../ui/OutOfReach.js'
 import { PersonLink } from '../../ui/PersonLink.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
-import { bustStyle, useDressed } from '../../ui/bustStyle.js'
+import { Bust, useDressed } from '../../ui/bustStyle.js'
 import { lastVisitTick } from '../../ui/storage.js'
 import { pointPlay, type MomentPlay } from '../../ui/replayRun.js'
 import { useFeed, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
+import { PixelGlyph } from '../../stage/PixelGlyph.js'
 import type { Subject } from '../../stage/index.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
@@ -31,7 +32,6 @@ import { Standing } from './Standing.js'
 import type { PageProps } from './types.js'
 
 const FEED_MAX = 120
-const GLYPH_PX = 8
 
 const GLYPH: Record<string, string> = {
   agent_died: 'death',
@@ -43,8 +43,6 @@ const GLYPH: Record<string, string> = {
 const NO_ENTRIES: ChronicleEntry[] = []
 const NO_CAST: readonly string[] = []
 const NO_RECORDS: AssetRecord[] = []
-/** Head and shoulders at the plate's own size; the roster uses 48 and the stream frame 96. */
-const BUST_PX = 40
 const NO_EDITIONS: Edition[] = []
 
 /** How far back the Record reaches. A day count, not a name a mind could read. */
@@ -54,26 +52,6 @@ const RANGES = [
   { key: 'all', words: 'All', days: Number.POSITIVE_INFINITY },
 ] as const
 type RangeKey = (typeof RANGES)[number]['key']
-
-// Decorative: the sentence beside it carries the meaning, so the glyph stays out of the
-// accessibility tree instead of being read twice.
-function Glyph({ icon }: { icon: string }) {
-  return (
-    <svg
-      className="feed-glyph"
-      viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
-      width={GLYPH_PX * 2}
-      height={GLYPH_PX * 2}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {chronicleGlyph(icon).pixels.map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
-      ))}
-    </svg>
-  )
-}
 
 function FeedJump({
   tick,
@@ -102,7 +80,7 @@ function FeedJump({
         onPlay(pointPlay(tick, edge, label, cast))
       }}
     >
-      <Glyph icon={icon} />
+      <PixelGlyph className="feed-glyph" pixels={chronicleGlyph(icon).pixels} />
       <span className="stamp">{momentStamp(tick)}</span>
       <span className="feed-text">{label}</span>
     </button>
@@ -377,7 +355,7 @@ function FirstPlateView({
       data-current={current ? 'yes' : undefined}
     >
       <p className="first-emblem" aria-hidden="true">
-        <Glyph icon={plate.glyph} />
+        <PixelGlyph className="feed-glyph" pixels={chronicleGlyph(plate.glyph).pixels} />
       </p>
       <h4 className="first-label">{plate.label}</h4>
       <p className="first-when">{momentStamp(plate.tick)}</p>
@@ -415,29 +393,6 @@ function FirstPlateView({
         Watch
       </button>
     </li>
-  )
-}
-
-/** The head and shoulders off the town's own atlas, or the pixel token where a person has no
- *  art yet. `alt=""` on purpose: the name is printed beside it. */
-function Bust({
-  records,
-  agentId,
-  name,
-}: {
-  records: AssetRecord[]
-  agentId: string
-  name: string
-}) {
-  const style = bustStyle(records, agentId, BUST_PX)
-  return (
-    <span
-      className="first-bust"
-      data-blank={style === null ? 'yes' : undefined}
-      style={style ?? undefined}
-      role="img"
-      aria-label={name}
-    />
   )
 }
 

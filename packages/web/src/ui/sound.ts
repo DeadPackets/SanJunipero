@@ -1,5 +1,5 @@
 import { fireflyStrength } from '../render/fireflies.js'
-import { localStore } from './storage.js'
+import { localStore, pref } from './storage.js'
 
 // ★ THE TOWN, HEARD. Opt-in, diegetic and synthesized: every voice below is a source the viewer
 // can see on the stage, and every one of them also prints a cue chip — so a muted viewer, which
@@ -187,27 +187,13 @@ export function standingChips(book: readonly CueStart[], nowMs: number): CueStar
 
 const SETTINGS = ['muted', 'on'] as const
 export type SoundSetting = (typeof SETTINGS)[number]
-const SOUND_KEY = 'sj.sound'
 const LEVEL_KEY = 'sj.sound.level'
 
 /** Muted is the answer to every question this cannot answer: a browser that blocks site data,
  *  a word a later build wrote, a viewer who has never been asked. */
-export function soundSetting(storage: Pick<Storage, 'getItem'> | null): SoundSetting {
-  try {
-    const said = storage?.getItem(SOUND_KEY)
-    return SETTINGS.find((s) => s === said) ?? 'muted'
-  } catch {
-    return 'muted'
-  }
-}
-
-export function rememberSound(storage: Pick<Storage, 'setItem'> | null, v: SoundSetting): void {
-  try {
-    storage?.setItem(SOUND_KEY, v)
-  } catch {
-    /* nothing to do: the choice holds for this page and is asked again on the next */
-  }
-}
+const SOUND = pref('sj.sound', SETTINGS, 'muted')
+export const soundSetting = SOUND.read
+export const rememberSound = SOUND.write
 
 export function storedSound(): SoundSetting {
   return soundSetting(localStore())
@@ -268,14 +254,6 @@ export type Soundscape = {
   setMaster(gain: number): void
   play(cues: readonly SoundCue[]): void
   destroy(): void
-}
-
-const SILENT: Soundscape = {
-  setMuted: () => undefined,
-  setHidden: () => undefined,
-  setMaster: () => undefined,
-  play: () => undefined,
-  destroy: () => undefined,
 }
 
 /** How fast a voice comes up or goes away. Long enough that a cue flickering on a frame
@@ -523,7 +501,5 @@ function createSoundscape(): Soundscape {
 }
 
 /** A runtime with no WebAudio — a server render, a browser with it switched off — gets a handle
- *  that answers every call and makes no sound. */
-export function soundscapeOrSilence(): Soundscape {
-  return typeof AudioContext === 'undefined' ? SILENT : createSoundscape()
-}
+ *  that answers every call and makes no sound: `wake()` returns null and every method guards it. */
+export const soundscapeOrSilence = createSoundscape

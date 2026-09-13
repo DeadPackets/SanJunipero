@@ -1,5 +1,6 @@
+import { PixelGlyph } from '../../stage/PixelGlyph.js'
 import { CONDITION_WORD } from '../status.js'
-import { MOOD_GLYPH_PX, moodGlyph, type RosterRow2 } from './rosterRow.js'
+import { MOOD_GLYPH, MOOD_GLYPH_PX, type RosterRow2 } from './rosterRow.js'
 import type { Expression } from '../../render/mood.js'
 
 /** A 16-px face drawn at its own grid size read as a smudge in the corner: it needs the same 2× the
@@ -10,19 +11,12 @@ const MOOD_GLYPH_SCALE = 2
  *  accessibility tree instead of being read twice. */
 function MoodGlyph({ mood }: { mood: Expression }) {
   return (
-    <svg
+    <PixelGlyph
       className="rr-mood"
-      viewBox={`0 0 ${MOOD_GLYPH_PX} ${MOOD_GLYPH_PX}`}
-      width={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE}
-      height={MOOD_GLYPH_PX * MOOD_GLYPH_SCALE}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {moodGlyph(mood).map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
-      ))}
-    </svg>
+      pixels={MOOD_GLYPH[mood]}
+      px={MOOD_GLYPH_PX}
+      scale={MOOD_GLYPH_SCALE}
+    />
   )
 }
 

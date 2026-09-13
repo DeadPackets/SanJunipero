@@ -7,6 +7,7 @@ import {
   kindWords,
 } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import { EMBER, HONEY, INK, ROSE, SAGE, SAND, STONE, WATER, art } from './pixelArt.js'
 
 // Shares `chronicleLine` with the gateway, so a live event and a chronicle entry read as the same
 // sentence. Authored mystery prose is engine data the browser bundle does not carry, so it stays quiet.
@@ -30,140 +31,80 @@ export type ChronicleGlyph = {
   pixels: readonly (readonly [number, number, string])[]
 }
 
-const INK = '#43394A',
-  EMBER = '#E8785A',
-  HONEY = '#F2C879',
-  SAGE = '#93B573'
-const ROSE = '#C47876',
-  WATER = '#7FB0C9',
-  STONE = '#ABA198',
-  SAND = '#E8D5BC'
-
 // Every fill a glyph may use — all MASTER_PALETTE members, asserted as a set by the tests.
 export const GLYPH_PALETTE: readonly string[] = [INK, EMBER, HONEY, SAGE, ROSE, WATER, STONE, SAND]
-
-const px = (
-  fill: string,
-  ...cells: readonly (readonly [number, number])[]
-): (readonly [number, number, string])[] => cells.map(([x, y]) => [x, y, fill] as const)
 
 export const CHRONICLE_GLYPH: Record<string, ChronicleGlyph> = {
   cross: {
     label: 'a death',
-    pixels: [
-      ...px(
-        INK,
-        [3, 1],
-        [4, 1],
-        [3, 2],
-        [4, 2],
-        [3, 3],
-        [4, 3],
-        [3, 4],
-        [4, 4],
-        [3, 5],
-        [4, 5],
-        [3, 6],
-        [4, 6],
-      ),
-      ...px(INK, [1, 3], [2, 3], [5, 3], [6, 3]),
-    ],
+    pixels: art('........', '...ii...', '...ii...', '.iiiiii.', '...ii...', '...ii...', '...ii...'),
   },
   spark: {
     label: 'a first',
-    pixels: [
-      ...px(HONEY, [3, 0], [4, 0], [3, 1], [4, 1], [3, 5], [4, 5], [3, 6], [4, 6]),
-      ...px(HONEY, [0, 3], [1, 3], [6, 3], [7, 3], [0, 4], [1, 4], [6, 4], [7, 4]),
-      ...px(HONEY, [3, 3], [4, 3], [3, 4], [4, 4]),
-      ...px(SAND, [2, 2], [5, 2], [2, 5], [5, 5]),
-    ],
+    pixels: art('...hh...', '...hh...', '..a..a..', 'hh.hh.hh', 'hh.hh.hh', '..ahha..', '...hh...'),
   },
   heart: {
     label: 'a night kept together',
-    pixels: [
-      ...px(ROSE, [1, 2], [2, 1], [3, 2], [4, 2], [5, 1], [6, 2]),
-      ...px(ROSE, [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3]),
-      ...px(ROSE, [2, 4], [3, 4], [4, 4], [5, 4]),
-      ...px(ROSE, [3, 5], [4, 5]),
-    ],
+    pixels: art('........', '..r..r..', '.r.rr.r.', '.rrrrrr.', '..rrrr..', '...rr...'),
   },
   house: {
     label: 'a building finished',
-    pixels: [
-      ...px(SAGE, [3, 1], [4, 1], [2, 2], [5, 2], [1, 3], [6, 3]),
-      ...px(SAGE, [1, 4], [6, 4], [1, 5], [6, 5], [1, 6], [6, 6]),
-      ...px(SAND, [2, 4], [3, 4], [4, 4], [5, 4], [2, 5], [5, 5], [2, 6], [5, 6]),
-      ...px(INK, [3, 5], [4, 5], [3, 6], [4, 6]),
-    ],
+    pixels: art('........', '...gg...', '..g..g..', '.g....g.', '.gaaaag.', '.gaiiag.', '.gaiiag.'),
   },
   flame: {
     label: 'a fire',
+    // the honey core is painted over the ember body, so it comes second
     pixels: [
-      ...px(EMBER, [3, 0], [4, 1], [3, 1], [2, 2], [3, 2], [4, 2], [5, 2]),
-      ...px(EMBER, [2, 3], [3, 3], [4, 3], [5, 3], [2, 4], [3, 4], [4, 4], [5, 4]),
-      ...px(EMBER, [3, 5], [4, 5]),
-      ...px(HONEY, [3, 3], [4, 4]),
+      ...art('...e....', '...ee...', '..eeee..', '..eeee..', '..eeee..', '...ee...'),
+      ...art('........', '........', '........', '...h....', '....h...'),
     ],
   },
   quill: {
     label: 'words carved',
-    pixels: [
-      ...px(WATER, [6, 0], [5, 1], [6, 1], [4, 2], [5, 2], [3, 3], [4, 3]),
-      ...px(WATER, [2, 4], [3, 4], [1, 5], [2, 5]),
-      ...px(INK, [1, 6], [2, 6], [3, 6], [4, 6], [5, 6]),
-    ],
+    pixels: art('......w.', '.....ww.', '....ww..', '...ww...', '..ww....', '.ww.....', '.iiiii..'),
   },
   leaf: {
     label: 'a sickness, and the turn of it',
+    // the ink vein runs over the leaf, so it comes second
     pixels: [
-      ...px(SAGE, [5, 1], [6, 1], [4, 2], [5, 2], [6, 2], [3, 3], [4, 3], [5, 3], [6, 3]),
-      ...px(SAGE, [3, 4], [4, 4], [5, 4], [2, 5], [3, 5], [4, 5]),
-      ...px(INK, [1, 6], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]),
+      ...art('........', '.....gg.', '....ggg.', '...gggg.', '...ggg..', '..ggg...', '.i......'),
+      ...art('........', '......i.', '.....i..', '....i...', '...i....', '..i.....'),
     ],
   },
   road: {
     label: 'the ground worked',
+    // the ink ruts run over the sand, so they come second
     pixels: [
-      ...px(STONE, [0, 2], [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2]),
-      ...px(SAND, [0, 3], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3]),
-      ...px(SAND, [0, 4], [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4], [7, 4]),
-      ...px(STONE, [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5]),
-      ...px(INK, [1, 3], [2, 3], [5, 3], [6, 3]),
+      ...art('........', '........', 'ssssssss', 'aaaaaaaa', 'aaaaaaaa', 'ssssssss'),
+      ...art('........', '........', '........', '.ii..ii.'),
     ],
   },
   key: {
     label: 'a discovery',
-    pixels: [
-      // the ward, INK — the whole silhouette survives the warm pixel being removed
-      ...px(
-        INK,
-        [2, 1],
-        [3, 1],
-        [4, 1],
-        [1, 2],
-        [5, 2],
-        [1, 3],
-        [5, 3],
-        [2, 4],
-        [3, 4],
-        [4, 4],
-        [3, 5],
-        [3, 6],
-        [4, 6],
-        [3, 7],
-      ),
-      ...px(HONEY, [3, 2], [3, 3]),
-    ],
+    // the ward is honey; INK carries the whole silhouette, so the shape survives it being removed
+    pixels: art(
+      '........',
+      '..iii...',
+      '.i.h.i..',
+      '.i.h.i..',
+      '..iii...',
+      '...i....',
+      '...ii...',
+      '...i....',
+    ),
   },
   star: {
     label: 'something the town cannot explain',
-    pixels: [
-      ...px(STONE, [3, 0], [4, 0], [3, 1], [4, 1]),
-      ...px(STONE, [0, 3], [1, 3], [2, 3], [5, 3], [6, 3], [7, 3]),
-      ...px(STONE, [0, 4], [1, 4], [2, 4], [5, 4], [6, 4], [7, 4]),
-      ...px(STONE, [3, 6], [4, 6], [3, 7], [4, 7]),
-      ...px(SAND, [3, 3], [4, 3], [3, 4], [4, 4]),
-    ],
+    pixels: art(
+      '...ss...',
+      '...ss...',
+      '........',
+      'sssaasss',
+      'sssaasss',
+      '........',
+      '...ss...',
+      '...ss...',
+    ),
   },
 }
 

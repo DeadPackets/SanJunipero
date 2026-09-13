@@ -36,3 +36,29 @@ export function bustStyle(records: AssetRecord[], agentId: string, px: number): 
     backgroundPosition: `${r(px / 2 - headX)}px ${r(-topY)}px`,
   }
 }
+
+/** Head and shoulders at the plate's own size; the roster uses 48 and the stream frame 96. */
+export const BUST_PX = 40
+
+/** The head and shoulders off the town's own atlas, or the pixel token where a person has no
+ *  art yet. `alt=""` on purpose: the name is printed beside it. */
+export function Bust({
+  records,
+  agentId,
+  name,
+}: {
+  records: AssetRecord[]
+  agentId: string
+  name: string
+}) {
+  const style = bustStyle(records, agentId, BUST_PX)
+  return (
+    <span
+      className="first-bust"
+      data-blank={style === null ? 'yes' : undefined}
+      style={style ?? undefined}
+      role="img"
+      aria-label={name}
+    />
+  )
+}

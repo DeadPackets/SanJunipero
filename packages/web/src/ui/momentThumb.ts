@@ -1,6 +1,7 @@
 import { agentName } from '@sj/shared'
 import type { Moment } from '@sj/shared'
 import type { PeopleIndex } from './bondModel2.js'
+import { art } from './pixelArt.js'
 
 export const THUMB_CAST_MAX = 2
 
@@ -15,68 +16,38 @@ export function thumbLabel(m: Moment, people: PeopleIndex): ThumbLabel {
   return { day: m.day, cast, location: m.location }
 }
 
-export function thumbTitle(m: Moment): string {
-  return m.title
-}
-
 // ------------------------------------------------------------------ location motifs
 
 export type Motif = { name: string; pixels: readonly (readonly [number, number, string])[] }
 
-const INK = '#43394A',
-  EMBER = '#E8785A',
-  HONEY = '#F2C879',
-  SAGE = '#93B573'
-const WATER = '#7FB0C9',
-  STONE = '#ABA198',
-  SAND = '#E8D5BC'
-
-const px = (
-  fill: string,
-  ...cells: readonly (readonly [number, number])[]
-): (readonly [number, number, string])[] => cells.map(([x, y]) => [x, y, fill] as const)
-
 export const MOTIFS: readonly Motif[] = [
   {
     name: 'stone',
+    // the ink joints are set into the paving, so they come second
     pixels: [
-      ...px(STONE, [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2]),
-      ...px(STONE, [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3]),
-      ...px(SAND, [1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4]),
-      ...px(INK, [3, 2], [2, 4], [5, 4]),
+      ...art('........', '........', '.ssssss.', '.ssssss.', '.aaaaaa.'),
+      ...art('........', '........', '...i....', '........', '..i..i..'),
     ],
   },
   {
     name: 'water',
-    pixels: [
-      ...px(WATER, [0, 2], [1, 3], [2, 2], [3, 3], [4, 2], [5, 3], [6, 2], [7, 3]),
-      ...px(WATER, [0, 5], [1, 4], [2, 5], [3, 4], [4, 5], [5, 4], [6, 5], [7, 4]),
-    ],
+    pixels: art('........', '........', 'w.w.w.w.', '.w.w.w.w', '.w.w.w.w', 'w.w.w.w.'),
   },
   {
     name: 'field',
-    pixels: [
-      ...px(SAGE, [1, 1], [1, 2], [3, 1], [3, 2], [5, 1], [5, 2]),
-      ...px(HONEY, [1, 3], [3, 3], [5, 3]),
-      ...px(SAND, [0, 5], [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5], [7, 5]),
-    ],
+    pixels: art('........', '.g.g.g..', '.g.g.g..', '.h.h.h..', '........', 'aaaaaaaa'),
   },
   {
     name: 'hearth',
+    // the honey heart sits on the embers, so it comes second
     pixels: [
-      ...px(INK, [1, 5], [2, 5], [3, 5], [4, 5], [5, 5], [6, 5]),
-      ...px(INK, [1, 3], [1, 4], [6, 3], [6, 4]),
-      ...px(EMBER, [3, 3], [4, 3], [2, 4], [3, 4], [4, 4], [5, 4]),
-      ...px(HONEY, [3, 4]),
+      ...art('........', '........', '........', '.i.ee.i.', '.ieeeei.', '.iiiiii.'),
+      ...art('........', '........', '........', '........', '...h....'),
     ],
   },
   {
     name: 'tree',
-    pixels: [
-      ...px(SAGE, [3, 0], [4, 0], [2, 1], [3, 1], [4, 1], [5, 1]),
-      ...px(SAGE, [1, 2], [2, 2], [3, 2], [4, 2], [5, 2], [6, 2], [2, 3], [3, 3], [4, 3], [5, 3]),
-      ...px(INK, [3, 4], [4, 4], [3, 5], [4, 5]),
-    ],
+    pixels: art('...gg...', '..gggg..', '.gggggg.', '..gggg..', '...ii...', '...ii...'),
   },
 ]
 

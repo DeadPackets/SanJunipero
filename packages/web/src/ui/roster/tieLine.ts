@@ -104,7 +104,5 @@ export function familyLine(
   return said.length === 0 ? null : said.join(' ')
 }
 
-const listed = (names: readonly string[]): string =>
-  names.length <= 1
-    ? (names[0] ?? '')
-    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]!}`
+const NAME_LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' })
+const listed = (names: readonly string[]): string => NAME_LIST.format(names)

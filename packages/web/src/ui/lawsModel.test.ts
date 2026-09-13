@@ -134,14 +134,9 @@ describe('postLaw (T25c)', () => {
 
   it('202 is an accepted law, sent with the bearer token', async () => {
     const { fn, calls } = fakeFetch(202, '{"accepted":"mystery.enabled"}')
-    const r = await postLaw(fn, {
-      endpoint: 'http://127.0.0.1:8788',
-      token: 'a-token',
-      path: 'mystery.enabled',
-      value: false,
-    })
+    const r = await postLaw(fn, { token: 'a-token', path: 'mystery.enabled', value: false })
     expect(r).toEqual({ ok: true })
-    expect(calls[0]!.url).toBe('http://127.0.0.1:8788/admin/laws')
+    expect(calls[0]!.url).toBe('/admin/laws')
     expect((calls[0]!.init.headers as Record<string, string>).authorization).toBe('Bearer a-token')
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
       path: 'mystery.enabled',
@@ -151,20 +146,13 @@ describe('postLaw (T25c)', () => {
 
   it('a rejected path surfaces the gateway’s own words, verbatim', async () => {
     const { fn } = fakeFetch(400, '{"error":"needs.hungerDecayPerTick is not a world law"}')
-    const r = await postLaw(fn, {
-      endpoint: '',
-      token: 't',
-      path: 'needs.hungerDecayPerTick',
-      value: 9,
-    })
+    const r = await postLaw(fn, { token: 't', path: 'needs.hungerDecayPerTick', value: 9 })
     expect(r).toEqual({ ok: false, message: 'needs.hungerDecayPerTick is not a world law' })
   })
 
   it('a body that is not the shape we expect is still shown as it came', async () => {
     const { fn } = fakeFetch(401, 'unauthorized')
-    expect(
-      await postLaw(fn, { endpoint: '', token: 't', path: 'mystery.enabled', value: false }),
-    ).toEqual({
+    expect(await postLaw(fn, { token: 't', path: 'mystery.enabled', value: false })).toEqual({
       ok: false,
       message: 'unauthorized',
     })
@@ -174,9 +162,7 @@ describe('postLaw (T25c)', () => {
     const fn = async () => {
       throw new Error('failed to fetch')
     }
-    expect(
-      await postLaw(fn, { endpoint: '', token: 't', path: 'mystery.enabled', value: false }),
-    ).toEqual({
+    expect(await postLaw(fn, { token: 't', path: 'mystery.enabled', value: false })).toEqual({
       ok: false,
       message: 'failed to fetch',
     })
@@ -185,7 +171,7 @@ describe('postLaw (T25c)', () => {
   it('an accepted law does NOT change the panel — only the delta does', async () => {
     const laws: Record<string, unknown> = {}
     const { fn } = fakeFetch(202, '{}')
-    await postLaw(fn, { endpoint: '', token: 't', path: 'mystery.enabled', value: false })
+    await postLaw(fn, { token: 't', path: 'mystery.enabled', value: false })
 
     // Nothing was written locally: the event log is the truth, and it has not spoken yet.
     expect(lawRows(DEFAULT_CONFIG, laws, []).find((r) => r.path === 'mystery.enabled')!.value).toBe(

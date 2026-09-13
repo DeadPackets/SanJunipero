@@ -122,7 +122,6 @@ const KEY_STEP = 1
 
 // Drawn, not typed: ▶ and ❙❙ are pictographic characters whose shape belongs to the reader's
 // font. The town draws its own controls, in its own pixels.
-const GLYPH_PX = 8
 const PLAY_PIXELS: readonly (readonly [number, number])[] = [
   [2, 0],
   [2, 1],
@@ -148,24 +147,6 @@ const PLAY_PIXELS: readonly (readonly [number, number])[] = [
 const PAUSE_PIXELS: readonly (readonly [number, number])[] = [1, 2, 5, 6].flatMap((x) =>
   [0, 1, 2, 3, 4, 5, 6, 7].map((y) => [x, y] as const),
 )
-
-function TransportGlyph({ playing }: { playing: boolean }) {
-  return (
-    <svg
-      className="day-bar-glyph"
-      viewBox={`0 0 ${GLYPH_PX} ${GLYPH_PX}`}
-      width={GLYPH_PX * 2}
-      height={GLYPH_PX * 2}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {(playing ? PAUSE_PIXELS : PLAY_PIXELS).map(([x, y]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill="currentColor" />
-      ))}
-    </svg>
-  )
-}
 
 /** ★ THE ONE BAR THAT SAYS WHEN. One band owns the town's clock and its track IS the scrub, so
  *  there is one of each where five boxes and four formatters used to print the same minute. */
@@ -273,7 +254,10 @@ export function DayBar({
               playPause(handle, mode.replaying, tick)
             }}
           >
-            <TransportGlyph playing={mode.replaying} />
+            <PixelGlyph
+              className="day-bar-glyph"
+              pixels={mode.replaying ? PAUSE_PIXELS : PLAY_PIXELS}
+            />
           </button>
         )}
         <div className="day-bar-rail">

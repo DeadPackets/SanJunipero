@@ -194,15 +194,6 @@ describe('becomingOf on a day-0 person', () => {
     const all = [...Object.values(SECTION_EMPTY), ...Object.values(SECTION_TITLE)].join(' ')
     for (const gone of R3_LITERALS) expect(all).not.toContain(gone)
   })
-
-  it('`wants` is empty today and its section does not render AT ALL', () => {
-    expect(b.wants).toEqual([])
-    const html = renderToStaticMarkup(
-      createElement(RosterExpanded, { id: 'rx-t', becoming: b, onOpenFull: () => {} }),
-    )
-    expect(html).not.toContain('data-section="wants"')
-    expect(html).not.toContain(SECTION_TITLE.wants)
-  })
 })
 
 // ── DAY 5: full, and ordered so the newest is what a viewer reads first ───────────────────

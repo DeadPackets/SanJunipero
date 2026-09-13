@@ -135,14 +135,6 @@ export function conditionsOf(a: AgentView): Condition[] {
   return CONDITIONS.filter((c) => CONDITION_TEST[c](a))
 }
 
-/** DRIVE (P22 hook): what a person seems to WANT, once the society lane emits it. Empty today,
- *  and an empty set renders nothing at all — never a placeholder chip. */
-export const DRIVES = [] as const
-export type Drive = string
-export function drivesOf(_a: AgentView): Drive[] {
-  return []
-}
-
 // ── P17's mechanical guard ─────────────────────────────────────────────────────────────────
 
 /** Any of these appearing as a PRINTED literal outside this module is the synonym bug coming

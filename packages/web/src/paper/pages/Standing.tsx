@@ -15,7 +15,7 @@ import {
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import type { WorldState } from '@sj/engine/state'
 import type { Subject } from '../../stage/index.js'
-import { bustStyle, useDressed, NO_RECORDS } from '../../ui/bustStyle.js'
+import { Bust, useDressed, NO_RECORDS } from '../../ui/bustStyle.js'
 import { editions } from '../../ui/dispatches.js'
 import { bondsFeed, chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { PersonLink } from '../../ui/PersonLink.js'
@@ -36,8 +36,6 @@ const townLaws = (body: unknown): LawRow[] | null => {
   return parsed.success ? parsed.data.laws : null
 }
 
-/** Head and shoulders at the shelf's own size, so the lead's cast and a first's cast match. */
-const BUST_PX = 40
 /** Past this the band stops being what you missed and starts being the record itself. */
 const SINCE_MAX = 8
 
@@ -330,16 +328,9 @@ export function StandingView({
             <ul className="first-cast">
               {lead.cast.map((id) => {
                 const name = agentName(people, id)
-                const style = bustStyle(records, id, BUST_PX)
                 return (
                   <li key={id}>
-                    <span
-                      className="first-bust"
-                      data-blank={style === null ? 'yes' : undefined}
-                      style={style ?? undefined}
-                      role="img"
-                      aria-label={name}
-                    />
+                    <Bust records={records} agentId={id} name={name} />
                     <span className="first-cast-name">
                       <PersonLink id={id} name={name} onSubject={onSubject} />
                     </span>

@@ -12,6 +12,7 @@ import { bondLevel, bondWarmth, LEVEL_RANK, type BondLevel } from '../bondModel2
 import { placeOf, type Place } from '../place.js'
 import { bustStyle, type BustStyle } from '../bustStyle.js'
 import { STATE_WORD, conditionsOf, stateWord, type Condition } from '../status.js'
+import { EMBER, HONEY, INK, ROSE, SAGE, STONE, WATER, art, type Pixel } from '../pixelArt.js'
 
 // P22 shapes every field: on sim-day 0 a row is name + age band + status + place + a neutral mood —
 // complete, and visibly a person who has not lived yet. Nothing is authored, nothing is a placeholder.
@@ -190,42 +191,10 @@ export function sortRoster(rows: readonly RosterRow2[], by: RosterSort): RosterR
 
 export const MOOD_GLYPH_PX = 16
 
-const INK = '#43394A',
-  HONEY = '#F2C879',
-  SAGE = '#93B573',
-  WATER = '#7FB0C9'
-const ROSE = '#C47876',
-  EMBER = '#E8785A',
-  STONE = '#ABA198'
-
 /** Every fill a mood glyph may use — all MASTER_PALETTE members, asserted as a set. */
 export const MOOD_GLYPH_PALETTE: readonly string[] = [INK, HONEY, SAGE, WATER, ROSE, EMBER, STONE]
 
-const KEY: Readonly<Record<string, string>> = {
-  i: INK,
-  h: HONEY,
-  g: SAGE,
-  w: WATER,
-  r: ROSE,
-  e: EMBER,
-  s: STONE,
-}
-
-export type MoodPixel = readonly [number, number, string]
-
-/** Sixteen rows of sixteen characters: `.` is empty, every other letter is a palette key.
- *  Written as pictures, because a table of coordinates is a picture nobody can read. */
-function art(...rows: string[]): MoodPixel[] {
-  const out: MoodPixel[] = []
-  rows.forEach((row, y) => {
-    // by code unit, not code point: x is the column in a fixed-width ASCII grid
-    for (let x = 0; x < row.length; x++) {
-      const fill = KEY[row.charAt(x)]
-      if (fill !== undefined) out.push([x, y, fill] as const)
-    }
-  })
-  return out
-}
+export type MoodPixel = Pixel
 
 /** A ring, so every face reads as a face at 16 px; the brow and the mouth carry the feeling.
  *  Seven faces that look alike would be the same defect as one face, so no two are identical. */
@@ -356,10 +325,6 @@ export const MOOD_GLYPH: Readonly<Record<Expression, MoodPixel[]>> = {
     '.....gggggg.....',
     '.......rrr......',
   ),
-}
-
-export function moodGlyph(e: Expression): MoodPixel[] {
-  return MOOD_GLYPH[e]
 }
 
 /** What the icon is called out loud, describing the drawn FACE. None of these may be a synonym of a

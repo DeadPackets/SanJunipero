@@ -91,11 +91,11 @@ export type FetchLike = (url: string, init: RequestInit) => Promise<Response>
 // change, never the change itself. The value moves when the delta arrives.
 export async function postLaw(
   fetchFn: FetchLike,
-  opts: { endpoint: string; token: string; path: string; value: unknown },
+  opts: { token: string; path: string; value: unknown },
 ): Promise<PostLawResult> {
   let res: Response
   try {
-    res = await fetchFn(`${opts.endpoint}${ADMIN_LAWS_ROUTE}`, {
+    res = await fetchFn(ADMIN_LAWS_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${opts.token}` },
       body: JSON.stringify({ path: opts.path, value: opts.value }),

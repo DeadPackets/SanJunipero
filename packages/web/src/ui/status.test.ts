@@ -13,14 +13,12 @@ import {
   BANNED_STATUS_LITERALS,
   CONDITIONS,
   CONDITION_WORD,
-  DRIVES,
   MACHINE_STATUS_IDS,
   NEED_LOW,
   STATES,
   STATE_WORD,
   TALK_RECENT_TICKS,
   conditionsOf,
-  drivesOf,
   leftWords,
   stateLine,
   stateWord,
@@ -270,15 +268,6 @@ describe('conditionsOf — zero or more, and never a state', () => {
     const got = conditionsOf(wretched)
     expect(got).toEqual([...CONDITIONS])
     expect(conditionsOf(wretched)).toEqual(got)
-  })
-})
-
-describe('drivesOf — the society lane’s hook, and an empty set renders nothing', () => {
-  it('is empty today for every fixture, and the roster shows no placeholder for it', () => {
-    expect([...DRIVES]).toEqual([])
-    for (const a of [body(), body({ asleep: true }), body({ alive: false })]) {
-      expect(drivesOf(a)).toEqual([])
-    }
   })
 })
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { localStore } from './storage.js'
+import { localStore, pref } from './storage.js'
 
 // ── the three densities ────────────────────────────────────────────────────────────────────
 // Stage is the world alone, Watch adds the ribbon and the beat card, Deck adds the rail and the
@@ -16,26 +16,11 @@ export const DENSITY_IDLE_MS = 90_000
  *  anybody reads. */
 const DENSITY_STEP_MS = 1000
 
-const DENSITY_KEY = 'sj:density'
-
 /** How this browser likes the town shown. No memory at all is a first visit, and a first visit
  *  is the world alone. A word this build does not know is a word a later one wrote. */
-export function densitySetting(storage: Pick<Storage, 'getItem'> | null): Density {
-  try {
-    const said = storage?.getItem(DENSITY_KEY)
-    return DENSITIES.find((d) => d === said) ?? 'stage'
-  } catch {
-    return 'stage'
-  }
-}
-
-export function rememberDensity(storage: Pick<Storage, 'setItem'> | null, v: Density): void {
-  try {
-    storage?.setItem(DENSITY_KEY, v)
-  } catch {
-    /* nothing to do: the choice holds for this page and is asked again on the next */
-  }
-}
+const DENSITY = pref('sj:density', DENSITIES, 'stage')
+export const densitySetting = DENSITY.read
+export const rememberDensity = DENSITY.write
 
 export function nextDensity(mode: Density): Density {
   return DENSITIES[(DENSITIES.indexOf(mode) + 1) % DENSITIES.length]!

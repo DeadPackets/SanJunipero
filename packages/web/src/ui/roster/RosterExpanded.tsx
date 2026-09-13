@@ -1,7 +1,7 @@
 import { BOND_LEVEL_LABEL, SECTION_EMPTY, SECTION_TITLE, type Becoming } from './expand.js'
 
 // The list stays mounted behind the expansion, so the way back is the row the viewer just
-// clicked. An empty `wants` section does not render: an empty chip rail is a promise not kept.
+// clicked.
 
 function Section({
   name,
@@ -61,17 +61,6 @@ export function RosterExpanded({
           ))}
         </ul>
       </Section>
-
-      {/* P22.2: no placeholder rail. The section appears the day the society lane fills it. */}
-      {b.wants.length > 0 && (
-        <Section name="wants" empty={false}>
-          <ul className="rx-list">
-            {b.wants.map((w) => (
-              <li key={w.words}>{w.words}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
 
       <Section name="changed" empty={b.changed.length === 0}>
         <ul className="rx-list">

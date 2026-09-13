@@ -36,23 +36,33 @@ export function lastVisitTick(): number | null {
   return VISIT_WATERMARK
 }
 
+/** One remembered word: the same try/catch on both sides, because reading the storage property
+ *  ITSELF throws where site data is blocked. A word off this list is a word a later build wrote,
+ *  so the fallback stands. */
+export function pref<T extends string>(key: string, allowed: readonly T[], fallback: T) {
+  return {
+    read: (storage: Pick<Storage, 'getItem'> | null): T => {
+      try {
+        const said = storage?.getItem(key)
+        return allowed.find((w) => w === said) ?? fallback
+      } catch {
+        return fallback
+      }
+    },
+    write: (storage: Pick<Storage, 'setItem'> | null, v: T): void => {
+      try {
+        storage?.setItem(key, v)
+      } catch {
+        /* nothing to do: the choice holds for this page and is asked again on the next */
+      }
+    },
+  }
+}
+
 /** Where the Almanac stands: the sheet over the town, or a column beside it. Remembered, because
  *  a reader who docks it once means it. */
-const DOCK = 'sj.paperDock'
-export type PaperDock = 'sheet' | 'docked'
-
-export function paperDock(storage: Pick<Storage, 'getItem'> | null): PaperDock {
-  try {
-    return storage?.getItem(DOCK) === 'docked' ? 'docked' : 'sheet'
-  } catch {
-    return 'sheet'
-  }
-}
-
-export function rememberPaperDock(storage: Pick<Storage, 'setItem'> | null, v: PaperDock): void {
-  try {
-    storage?.setItem(DOCK, v)
-  } catch {
-    /* nothing to do: the choice holds for this page and is asked again on the next */
-  }
-}
+const DOCKS = ['sheet', 'docked'] as const
+export type PaperDock = (typeof DOCKS)[number]
+const dock = pref('sj.paperDock', DOCKS, 'sheet')
+export const paperDock = dock.read
+export const rememberPaperDock = dock.write

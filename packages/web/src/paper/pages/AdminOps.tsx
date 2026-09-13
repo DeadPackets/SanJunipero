@@ -2,9 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
 
-/** The admin channel is a loopback server the browser cannot call directly; the gateway carries
- *  `/admin/*` across from the page's own origin, so every call here is same-origin and bare. */
-export const ADMIN_ENDPOINT = ''
 /** Slow on purpose: these are numbers to watch, not to animate. */
 const READ_EVERY_MS = 5000
 /** `/admin/speed` takes anything between 0.1 and 60; these are the stops offered. */
@@ -45,7 +42,7 @@ async function ask<T>(
   init: RequestInit = {},
 ): Promise<T | { error: string }> {
   try {
-    const res = await fetchFn(`${ADMIN_ENDPOINT}${path}`, {
+    const res = await fetchFn(path, {
       ...init,
       headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     })
@@ -414,7 +411,7 @@ export function ExportLink({ token, onNotice }: { token: string; onNotice: (s: s
   const [asking, setAsking] = useState(false)
   const download = (): void => {
     setAsking(true)
-    void fetch(`${ADMIN_ENDPOINT}/admin/export`, { headers: { authorization: `Bearer ${token}` } })
+    void fetch('/admin/export', { headers: { authorization: `Bearer ${token}` } })
       .then(async (res) => {
         if (!res.ok) throw new Error(`the channel answered ${res.status}`)
         handToBrowser(document, URL.createObjectURL(await res.blob()), 'san-junipero-run.tar')

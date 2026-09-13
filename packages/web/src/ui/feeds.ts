@@ -8,6 +8,7 @@ import {
 } from '@sj/shared'
 import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { type LineageLike } from './bondModel2.js'
+import type { Chapter } from './chapterCaption.js'
 import { dispatchesFrom } from './dispatches.js'
 import { endpoint } from './useEndpoint.js'
 
@@ -62,7 +63,6 @@ export const chronicleFeed = endpoint('/api/chronicle', parseChronicle, CHRONICL
 
 /** The narrator writes a chapter once a sim-day; the Chronicle's tab and the replay caption
  *  read the same list. */
-export type Chapter = { day: number; title: string; text: string }
 const parseChapters = (body: unknown): Chapter[] | null =>
   Array.isArray(body) ? (body as Chapter[]) : null
 export const chaptersFeed = endpoint('/api/chapters', parseChapters, DISPATCHES_REFETCH_MS)

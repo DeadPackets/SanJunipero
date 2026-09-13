@@ -1,5 +1,6 @@
 import { tickToMoment } from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
+import { art } from './pixelArt.js'
 
 export type TownStats = { day: number; time: string; weather: string; alive: number; total: number }
 
@@ -75,88 +76,28 @@ export type WeatherGlyph = {
   pixels: readonly (readonly [number, number, string])[]
 }
 
-const HONEY = '#F2C879',
-  STONE = '#ABA198',
-  WATER = '#7FB0C9',
-  DEEP_WATER = '#5A8CAB',
-  ICE = '#D6EAF2'
-
-const CLOUD: readonly (readonly [number, number, string])[] = [
-  [2, 1, STONE],
-  [3, 1, STONE],
-  [4, 1, STONE],
-  [1, 2, STONE],
-  [2, 2, STONE],
-  [3, 2, STONE],
-  [4, 2, STONE],
-  [5, 2, STONE],
-  [6, 2, STONE],
-  [1, 3, STONE],
-  [2, 3, STONE],
-  [3, 3, STONE],
-  [4, 3, STONE],
-  [5, 3, STONE],
-  [6, 3, STONE],
-]
+// The one cloud four skies share. The storm swaps its stone for deep water, nothing else.
+const CLOUD = ['........', '..sss...', '.ssssss.', '.ssssss.']
 
 export const WEATHER_GLYPH: Record<string, WeatherGlyph> = {
   sunny: {
     label: 'clear sky',
-    pixels: [
-      [3, 1, HONEY],
-      [4, 1, HONEY],
-      [2, 2, HONEY],
-      [3, 2, HONEY],
-      [4, 2, HONEY],
-      [5, 2, HONEY],
-      [2, 3, HONEY],
-      [3, 3, HONEY],
-      [4, 3, HONEY],
-      [5, 3, HONEY],
-      [3, 4, HONEY],
-      [4, 4, HONEY],
-      [0, 2, HONEY],
-      [7, 2, HONEY],
-      [0, 3, HONEY],
-      [7, 3, HONEY],
-      [3, 6, HONEY],
-      [4, 6, HONEY],
-    ],
+    pixels: art('........', '...hh...', 'h.hhhh.h', 'h.hhhh.h', '...hh...', '........', '...hh...'),
   },
-  cloudy: { label: 'clouded over', pixels: CLOUD },
-  rain: {
-    label: 'rain',
-    pixels: [
-      ...CLOUD,
-      [2, 5, WATER],
-      [4, 5, WATER],
-      [6, 5, WATER],
-      [2, 6, WATER],
-      [4, 6, WATER],
-      [6, 6, WATER],
-    ],
-  },
+  cloudy: { label: 'clouded over', pixels: art(...CLOUD) },
+  rain: { label: 'rain', pixels: art(...CLOUD, '........', '..w.w.w.', '..w.w.w.') },
   storm: {
     label: 'storm',
-    pixels: [
-      ...CLOUD.map(([x, y]) => [x, y, DEEP_WATER] as const),
-      [4, 4, HONEY],
-      [3, 5, HONEY],
-      [4, 5, HONEY],
-      [3, 6, HONEY],
-    ],
+    pixels: art(
+      ...CLOUD.map((row) => row.replaceAll('s', 'b')),
+      '....h...',
+      '...hh...',
+      '...h....',
+    ),
   },
-  snow: {
-    label: 'snow',
-    pixels: [...CLOUD, [2, 5, ICE], [5, 5, ICE], [3, 6, ICE], [6, 6, ICE]],
-  },
+  snow: { label: 'snow', pixels: art(...CLOUD, '........', '..c..c..', '...c..c.') },
   [WEATHER_UNKNOWN]: {
     label: 'the sky is not read yet',
-    pixels: [
-      [2, 3, STONE],
-      [3, 3, STONE],
-      [4, 3, STONE],
-      [5, 3, STONE],
-    ],
+    pixels: art('........', '........', '........', '..ssss..'),
   },
 }

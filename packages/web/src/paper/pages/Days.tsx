@@ -21,6 +21,7 @@ import { milestonesFeed } from '../../ui/feeds.js'
 import { pointPlay } from '../../ui/replayRun.js'
 import { useFeed, usePolled } from '../../ui/useEndpoint.js'
 import { useFrameCoalesced } from '../../ui/onFrame.js'
+import { PixelGlyph } from '../../stage/PixelGlyph.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
 
@@ -28,24 +29,6 @@ const KEY_STEP_TICKS = 10
 const KEY_PAGE_TICKS = MINUTES_PER_DAY
 
 const NO_FIRSTS: MarkSources['milestones'] = []
-
-function MarkGlyph({ mark }: { mark: Mark }) {
-  return (
-    <svg
-      className="mark-glyph"
-      viewBox={`0 0 ${MARK_GLYPH_PX} ${MARK_GLYPH_PX}`}
-      width={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
-      height={MARK_GLYPH_PX * MARK_GLYPH_SCALE}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {MARK_GLYPH[mark.kind].map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
-      ))}
-    </svg>
-  )
-}
 
 function DayStripView({
   edge,
@@ -128,7 +111,12 @@ function DayStripView({
                 onMark(mk)
               }}
             >
-              <MarkGlyph mark={mk} />
+              <PixelGlyph
+                className="mark-glyph"
+                pixels={MARK_GLYPH[mk.kind]}
+                px={MARK_GLYPH_PX}
+                scale={MARK_GLYPH_SCALE}
+              />
               <span className="mark-tip" data-side={tipSide(mk.tick, span)}>
                 {mk.words}
               </span>

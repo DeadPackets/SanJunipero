@@ -1,4 +1,5 @@
 import { MINUTES_PER_DAY } from '@sj/shared'
+import { CREAM, DEEP, EMBER, HONEY, INK, ROSE, SAGE, WATER, art, type Pixel } from './pixelArt.js'
 
 /**
  * Marks come from the RECORD — the world's own event log and the narrator's tables — never from
@@ -79,15 +80,6 @@ export function tipSide(tick: number, span: number): TipSide {
   return 'center'
 }
 
-const DEEP = '#241F2B',
-  HONEY = '#F2C879',
-  SAGE = '#93B573',
-  WATER = '#7FB0C9'
-const ROSE = '#C47876',
-  EMBER = '#E8785A',
-  INK = '#43394A',
-  CREAM = '#FFF6E9'
-
 /** Every fill a mark may use — all MASTER_PALETTE members, asserted as a set. */
 export const MARK_GLYPH_PALETTE: readonly string[] = [DEEP, HONEY, SAGE, WATER, ROSE, EMBER, INK]
 
@@ -95,31 +87,7 @@ export const MARK_GLYPH_PALETTE: readonly string[] = [DEEP, HONEY, SAGE, WATER, 
  *  SHAPE; the warm hues are interior detail, and a mark is legible with them taken away. */
 export const MARK_STRUCTURE_INKS: readonly string[] = [INK, DEEP]
 
-export type MarkPixel = readonly [number, number, string]
-
-const KEY: Readonly<Record<string, string>> = {
-  d: DEEP,
-  h: HONEY,
-  g: SAGE,
-  w: WATER,
-  r: ROSE,
-  e: EMBER,
-  i: INK,
-}
-
-/** Seven rows of seven characters: `.` is empty. Written as pictures, because a table of
- *  coordinates is a picture nobody can read. */
-function art(...rows: string[]): MarkPixel[] {
-  const out: MarkPixel[] = []
-  rows.forEach((row, y) => {
-    // by code unit, not code point: x is the column in a fixed-width ASCII grid
-    for (let x = 0; x < row.length; x++) {
-      const fill = KEY[row.charAt(x)]
-      if (fill !== undefined) out.push([x, y, fill] as const)
-    }
-  })
-  return out
-}
+export type MarkPixel = Pixel
 
 /** Shape carries the kind, colour only reinforces it — two marks are told apart with the
  *  colour taken away. */

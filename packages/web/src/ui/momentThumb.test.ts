@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Moment } from '@sj/shared'
-import { MOTIFS, THUMB_CAST_MAX, thumbLabel, thumbMotif, thumbTitle } from './momentThumb.js'
+import { MOTIFS, THUMB_CAST_MAX, thumbLabel, thumbMotif } from './momentThumb.js'
 import { GLYPH_PALETTE } from './importantFeed.js'
 
 const moment = (over: Partial<Moment> = {}): Moment => ({
@@ -48,13 +48,6 @@ describe('thumbLabel', () => {
 
   it('carries a day with no place as no place', () => {
     expect(thumbLabel(moment({ location: null }), people).location).toBeNull()
-  })
-})
-
-describe('thumbTitle', () => {
-  it('passes the day’s own name through', () => {
-    expect(thumbTitle(moment())).toBe('What the Fire Took')
-    expect(thumbTitle(moment({ title: 'Day 9' }))).toBe('Day 9')
   })
 })
 

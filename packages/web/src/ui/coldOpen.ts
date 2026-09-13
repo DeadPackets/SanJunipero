@@ -26,26 +26,9 @@ const COLD_OPEN_STEP_MS = 200
  *  an instrument. Past twenty the town is bigger than the sentence and the figure is honest. */
 const NUMBER_WORDS = [
   '',
-  'One',
-  'Two',
-  'Three',
-  'Four',
-  'Five',
-  'Six',
-  'Seven',
-  'Eight',
-  'Nine',
-  'Ten',
-  'Eleven',
-  'Twelve',
-  'Thirteen',
-  'Fourteen',
-  'Fifteen',
-  'Sixteen',
-  'Seventeen',
-  'Eighteen',
-  'Nineteen',
-  'Twenty',
+  ...'One Two Three Four Five Six Seven Eight Nine Ten Eleven Twelve Thirteen Fourteen Fifteen Sixteen Seventeen Eighteen Nineteen Twenty'.split(
+    ' ',
+  ),
 ]
 
 export function peopleWords(count: number): string {

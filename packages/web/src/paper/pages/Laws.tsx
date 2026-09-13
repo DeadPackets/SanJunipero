@@ -4,13 +4,7 @@ import { editRows, formatLawValue, lawRows, postLaw, type EditRow } from '../../
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
-import {
-  ADMIN_ENDPOINT,
-  ClockSection,
-  ExportLink,
-  RulingsSection,
-  SpendSection,
-} from './AdminOps.js'
+import { ClockSection, ExportLink, RulingsSection, SpendSection } from './AdminOps.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
@@ -218,7 +212,6 @@ function Admin({ store, operatorToken, onNotice }: PageProps) {
     setPending(row.path)
     onNotice(null)
     const r = await postLaw(fetch, {
-      endpoint: ADMIN_ENDPOINT,
       token: operatorToken!,
       path: row.path,
       value: nextValue(row, raw),

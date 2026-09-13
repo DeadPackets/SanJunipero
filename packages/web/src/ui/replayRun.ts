@@ -101,12 +101,13 @@ export function dipAlpha(elapsedMs: number, reducedMotion = false): number {
   return 1 - (elapsedMs < SCENE_OUT_MS ? a.out : a.in)
 }
 
+const CAST_LIST = new Intl.ListFormat('en-GB', { type: 'conjunction' })
+
 /** The cast as the card names them, in the town's own words. */
 export function castNames(
   cast: readonly string[],
   nameOf: (id: string) => string | undefined,
 ): string {
   const named = cast.map(nameOf).filter((n): n is string => n !== undefined && n !== '')
-  if (named.length <= 1) return named[0] ?? ''
-  return `${named.slice(0, -1).join(', ')} and ${named.at(-1)!}`
+  return CAST_LIST.format(named)
 }

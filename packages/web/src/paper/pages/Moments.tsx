@@ -1,19 +1,15 @@
 import { memo, useMemo, useState, useSyncExternalStore } from 'react'
 import { MomentSchema, tickToMoment, type Moment } from '@sj/shared'
 import type { PeopleIndex } from '../../ui/bondModel2.js'
-import { chaptersFeed, dispatchesFeed, type Chapter } from '../../ui/feeds.js'
+import { chaptersFeed, dispatchesFeed } from '../../ui/feeds.js'
+import type { Chapter } from '../../ui/chapterCaption.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
-import {
-  momentDays,
-  moreFromDay,
-  thumbLabel,
-  thumbMotif,
-  thumbTitle,
-} from '../../ui/momentThumb.js'
+import { momentDays, moreFromDay, thumbLabel, thumbMotif } from '../../ui/momentThumb.js'
 import { sceneWindow, type MomentPlay } from '../../ui/replayRun.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { useEndpointFor, useFeed } from '../../ui/useEndpoint.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
+import { PixelGlyph } from '../../stage/PixelGlyph.js'
 import { Skeleton } from './Skeleton.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from './types.js'
@@ -29,7 +25,6 @@ export const momentRows = (body: unknown): Moment[] | null => {
   })
 }
 
-const MOTIF_PX = 8
 /** The gateway's card is 1080×565; the lead card draws it at a third and lets CSS cap it. */
 const CARD_W = 360
 const CARD_H = 188
@@ -46,29 +41,9 @@ export function momentPlay(moment: Moment, edge: number): MomentPlay {
   return {
     ...sceneWindow(moment.startTick, moment.endTick, edge),
     cast: moment.cast,
-    title: thumbTitle(moment),
+    title: moment.title,
     tick: moment.startTick,
   }
-}
-
-/** The pixel motif, for a card the gateway has no picture for yet — and as the ground the
- *  postcard loads over, so the row never reflows when it arrives. */
-function Motif({ moment }: { moment: Moment }) {
-  return (
-    <svg
-      className="thumb-motif"
-      viewBox={`0 0 ${MOTIF_PX} ${MOTIF_PX}`}
-      width={MOTIF_PX * 3}
-      height={MOTIF_PX * 3}
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {thumbMotif(moment).pixels.map(([x, y, fill]) => (
-        <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
-      ))}
-    </svg>
-  )
 }
 
 export function EditionView({ e }: { e: Edition }) {
@@ -116,7 +91,7 @@ const MomentCardView = memo(function MomentCardView({
         className={lead ? 'moment-card lead' : 'moment-card'}
         data-open={open ? 'yes' : undefined}
         aria-current={open ? 'true' : undefined}
-        aria-label={`${thumbTitle(moment)}. ${momentStamp(moment.startTick)}, ${label.cast}, ${where}. Watch this moment.`}
+        aria-label={`${moment.title}. ${momentStamp(moment.startTick)}, ${label.cast}, ${where}. Watch this moment.`}
         onClick={() => {
           onOpen(moment)
         }}
@@ -132,11 +107,11 @@ const MomentCardView = memo(function MomentCardView({
             height={CARD_H}
           />
         ) : (
-          <Motif moment={moment} />
+          <PixelGlyph className="thumb-motif" pixels={thumbMotif(moment).pixels} scale={3} />
         )}
         <span className="thumb-body">
           <span className="thumb-when">{momentStamp(moment.startTick)}</span>
-          <span className="thumb-title">{thumbTitle(moment)}</span>
+          <span className="thumb-title">{moment.title}</span>
           {lead && moment.summary !== null && (
             <span className="thumb-summary">{moment.summary}</span>
           )}
