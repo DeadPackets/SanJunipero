@@ -140,7 +140,7 @@ describe('a name stays with the thing it is cut into', () => {
   // to an edge and leave it there with nothing under it.
   it('is not drawn once it is off its own leash', () => {
     expect(src).toContain('leashAt')
-    expect(src).toMatch(/if \(!hits\(rect, leashAt\([\s\S]{0,80}cut\.node\.visible = false/)
+    expect(src).toMatch(/if \(!overlaps\(rect, leashAt\([\s\S]{0,80}cut\.node\.visible = false/)
   })
 
   // The glyph's own colour is the one channel this renderer is measured to drop.

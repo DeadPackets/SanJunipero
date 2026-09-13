@@ -63,6 +63,16 @@ export function toggleFullscreen(el: Element | null): void {
   void el.requestFullscreen().catch(refused)
 }
 
+const HANDLER: Readonly<Record<StageKey, keyof StageKeyHandlers>> = {
+  signpost: 'onSignpost',
+  escape: 'onEscape',
+  fullscreen: 'onFullscreen',
+  director: 'onDirector',
+  thoughts: 'onThoughts',
+  density: 'onDensity',
+  dock: 'onDock',
+}
+
 export function useStageKeys(handlers: StageKeyHandlers): void {
   const latest = useRef(handlers)
   useEffect(() => {
@@ -73,33 +83,9 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
-      const h = latest.current
-      let run: (() => void) | undefined
-      switch (stageKeyFor(e.key)) {
-        case 'signpost':
-          run = h.onSignpost
-          break
-        case 'escape':
-          run = h.onEscape
-          break
-        case 'fullscreen':
-          run = h.onFullscreen
-          break
-        case 'director':
-          run = h.onDirector
-          break
-        case 'thoughts':
-          run = h.onThoughts
-          break
-        case 'density':
-          run = h.onDensity
-          break
-        case 'dock':
-          run = h.onDock
-          break
-        case null:
-          return
-      }
+      const key = stageKeyFor(e.key)
+      if (key === null) return
+      const run = latest.current[HANDLER[key]]
       if (run === undefined) return
       e.preventDefault()
       run()

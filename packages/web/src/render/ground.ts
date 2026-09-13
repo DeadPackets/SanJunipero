@@ -1,17 +1,9 @@
 import type { TileId } from '@sj/engine/state'
-import { TILE_H, TILE_W } from './iso.js'
+import { screenToTileF } from './iso.js'
 
 // Not the cull's AABB: that is a DIAMOND's bounding box, whose corners are void by construction,
 // and its question is "does this reach the VIEW". `tileToScreen` returns a tile's TOP vertex, so
 // the painted field is exactly [0, w] × [0, h] in continuous tile space.
-
-/** The continuous inverse of `tileToScreen`. `screenToTile` rounds to a tile; this does not,
- *  because a quad's corner lands between tiles and the rounding is what hides an overhang. */
-export function screenToTileF(sx: number, sy: number): { fx: number; fy: number } {
-  const a = sx / (TILE_W / 2),
-    b = sy / (TILE_H / 2)
-  return { fx: (a + b) / 2, fy: (b - a) / 2 }
-}
 
 export type ScreenRect = { x0: number; y0: number; x1: number; y1: number }
 
@@ -29,7 +21,7 @@ export function groundOverhangTiles(
     [r.x0, r.y1],
     [r.x1, r.y1],
   ] as const) {
-    const { fx, fy } = screenToTileF(px, py)
+    const { x: fx, y: fy } = screenToTileF(px, py)
     worst = Math.max(worst, -fx, fx - w, -fy, fy - h)
   }
   return worst

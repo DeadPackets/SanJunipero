@@ -19,6 +19,7 @@ import {
   seatInBlock,
 } from './interiorMap.js'
 import { CHAR_TARGET_PX } from './charAnim.js'
+import { resolveAsset } from './textures.js'
 import { SCENE_TOTAL_MS } from '../ui/sceneTransition.js'
 
 // The vocabulary is @sj/shared's — one source, so a kind added there cannot go missing here.
@@ -97,20 +98,11 @@ export function roomFurnishings(kind: InteriorKind): RoomFurnishing[] {
 
 export type RoomItem = RoomFurnishing & { meta: InteriorMeta | null; url: string | null }
 
-function libraryRecord(records: AssetRecord[], kind: string): AssetRecord | null {
-  let best: AssetRecord | null = null
-  for (const r of records) {
-    if (r.status !== 'ready' || r.class !== 'item' || r.kind !== kind) continue
-    if (best === null || r.seq > best.seq) best = r
-  }
-  return best
-}
-
 // The room as the renderer needs it: the template's slot, the library's placement facts and the
 // sprite to draw. A furnishing with no codex record still lays out — art independence.
 export function roomPlan(kind: InteriorKind, records: AssetRecord[]): RoomItem[] {
   return roomFurnishings(kind).map((f) => {
-    const rec = libraryRecord(records, f.kind)
+    const rec = resolveAsset(records, 'item', f.kind)
     const manifest = rec === null ? null : parseLibraryItemManifest(rec.meta)
     return {
       ...f,

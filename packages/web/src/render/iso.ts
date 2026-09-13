@@ -14,12 +14,19 @@ export function feetOf(x: number, y: number, w = 1, h = 1): { sx: number; sy: nu
   return { sx: (cx - cy) * (TILE_W / 2), sy: (cx + cy) * (TILE_H / 2) + ((w + h) * TILE_H) / 4 }
 }
 
+/** The continuous inverse of `tileToScreen`'s linear part. A quad's corner lands between tiles,
+ *  and the rounding is what would hide an overhang. */
+export function screenToTileF(sx: number, sy: number): { x: number; y: number } {
+  const a = sx / (TILE_W / 2)
+  const b = sy / (TILE_H / 2)
+  return { x: (a + b) / 2, y: (b - a) / 2 }
+}
+
 /** The tile a screen point stands on. `tileToScreen` returns a tile's TOP vertex, so the
  *  containing tile is the FLOOR of the continuous coordinates, not the nearest vertex. */
 export function screenToTile(sx: number, sy: number): { x: number; y: number } {
-  const a = sx / (TILE_W / 2)
-  const b = sy / (TILE_H / 2)
-  return { x: Math.floor((a + b) / 2), y: Math.floor((b - a) / 2) }
+  const { x, y } = screenToTileF(sx, sy)
+  return { x: Math.floor(x), y: Math.floor(y) }
 }
 
 /** NOT the painter's order — depth.ts owns that. This is the before-state that `depth.test.ts`

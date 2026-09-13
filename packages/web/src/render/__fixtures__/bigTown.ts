@@ -1,4 +1,4 @@
-import { TILE_H, TILE_W } from './iso.js'
+import { TILE_H, TILE_W } from '../iso.js'
 
 // A town larger than the viewport, platted to any ring count on the grammar's own 19-tile
 // pitch. A measuring instrument for the camera and the cull; nothing but tests imports it.

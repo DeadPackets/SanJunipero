@@ -6,7 +6,7 @@ import { tileToScreen } from './iso.js'
 import { LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 import type { Scene } from './scene.js'
 import { faceFor, worldTextScale } from './textFaces.js'
-import { placeTag, type Rect } from './tooltip.js'
+import { overlaps, placeTag, type Rect } from './tooltip.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 
 // A landmark name is the viewer's legend, derived from what is standing; a toponym is what the
@@ -72,9 +72,6 @@ function drawPlate(cut: Cut): void {
   cut.plate.rect(-w / 2, -TOPONYM_PAD_Y, w, h)
   cut.plate.fill(LANDMARK_INK)
 }
-
-const hits = (a: Rect, b: Rect): boolean =>
-  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
 /** How far a carved name may wander from the thing it is cut into: its own size. A name pinned
  *  to the edge of the screen by a subject that has left it is not a name of anywhere. */
@@ -173,7 +170,7 @@ export function createToponymLayer(scene: Scene, store: WorldStore): ToponymLaye
       const rect = { x: at.sx - size.w / 2, y: at.sy, w: size.w, h: size.h }
       // `placeTag` clamps into the view, so a name whose subject has left the screen would be
       // pinned to an edge with nothing under it. Off its leash, it is not drawn.
-      if (!hits(rect, leashAt(b.sx, b.sy, size))) {
+      if (!overlaps(rect, leashAt(b.sx, b.sy, size))) {
         cut.node.visible = false
         continue
       }

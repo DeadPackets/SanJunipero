@@ -22,7 +22,7 @@ import {
 import { ZOOM_STOPS } from './camera.js'
 import { CULL_MARGIN_PX, boxInView, rectInView, type ViewRect } from './cull.js'
 import { groundField, type GroundField } from './groundField.js'
-import { bigTownTerrain } from './bigTown.js'
+import { bigTownTerrain } from './__fixtures__/bigTown.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { createGroundBaker, type GroundBaker } from './groundBake.js'
 import { TextureBook } from './textures.js'

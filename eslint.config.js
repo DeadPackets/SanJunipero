@@ -42,6 +42,21 @@ export default tseslint.config(
     extends: [reactHooks.configs.flat.recommended],
   },
   {
+    // P16: layers.ts owns the town's depth sort and interiorScene.ts a separate scene graph.
+    // A zIndex written anywhere else is a magic depth number the sort cannot see.
+    files: ['packages/web/src/**/*.{ts,tsx}'],
+    ignores: ['packages/web/src/render/layers.ts', 'packages/web/src/render/interiorScene.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'AssignmentExpression[left.property.name="zIndex"]',
+          message: 'Only render/layers.ts and render/interiorScene.ts may write a zIndex.',
+        },
+      ],
+    },
+  },
+  {
     // The project service only ever looks for tsconfig.json, and the scripts live in a sibling one.
     files: ['packages/{agents,arbiter,forge,gateway,narrator,town}/scripts/**/*.ts'],
     languageOptions: {

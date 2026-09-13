@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { genesisTerrainAt } from '@sj/engine'
 import type { TileId } from '@sj/engine/state'
-import { TILE_H, TILE_W, tileToScreen } from './iso.js'
-import { groundOverhangTiles, rectOnGround, screenToTileF, type ScreenRect } from './ground.js'
+import { TILE_H, TILE_W, screenToTileF, tileToScreen } from './iso.js'
+import { groundOverhangTiles, rectOnGround, type ScreenRect } from './ground.js'
 import {
   CANOPY_PX,
   SHIMMER_MAX,
@@ -67,10 +67,10 @@ const insideAabb = (b: ScreenRect, r: ScreenRect): boolean =>
 describe('the painted ground, as a predicate', () => {
   it('is the field geometry read back: a tile covers [x,x+1]x[y,y+1] from its TOP vertex', () => {
     const { sx, sy } = tileToScreen(3, 5)
-    expect(screenToTileF(sx, sy)).toEqual({ fx: 3, fy: 5 }) // top vertex
-    expect(screenToTileF(sx + TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 4, fy: 5 }) // right
-    expect(screenToTileF(sx, sy + TILE_H)).toEqual({ fx: 4, fy: 6 }) // bottom
-    expect(screenToTileF(sx - TILE_W / 2, sy + TILE_H / 2)).toEqual({ fx: 3, fy: 6 }) // left
+    expect(screenToTileF(sx, sy)).toEqual({ x: 3, y: 5 }) // top vertex
+    expect(screenToTileF(sx + TILE_W / 2, sy + TILE_H / 2)).toEqual({ x: 4, y: 5 }) // right
+    expect(screenToTileF(sx, sy + TILE_H)).toEqual({ x: 4, y: 6 }) // bottom
+    expect(screenToTileF(sx - TILE_W / 2, sy + TILE_H / 2)).toEqual({ x: 3, y: 6 }) // left
   })
 
   it('measures the overhang in tiles, signed, so a touch is 0 and not a pass by luck', () => {

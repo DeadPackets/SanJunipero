@@ -8,7 +8,7 @@ import {
   structureDepthBox,
   type DepthBox,
 } from './depth.js'
-import { bigTown, bigTownScreenSize, type FixtureStructure } from './bigTown.js'
+import { bigTown, bigTownScreenSize, type FixtureStructure } from './__fixtures__/bigTown.js'
 
 // ── WHAT THE CULL IS WORTH, IN NUMBERS ────────────────────────────────────────────────────
 // Every number here comes from pure functions over a synthetic world, never from a browser's

@@ -94,7 +94,7 @@ import {
   createAmbient,
   sampleDecorations,
 } from './ambient.js'
-import { bigTown } from './bigTown.js'
+import { bigTown } from './__fixtures__/bigTown.js'
 import { GROUND_SHADOW_INK } from './groundShadow.js'
 import { advanceWind } from './wind.js'
 

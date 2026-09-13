@@ -1,5 +1,6 @@
 import { interiorPieceKind, materialKind, type AssetRecord } from '@sj/shared'
 import { INTERIOR_TILE, ROOM_TILES, WALL_H_PX, WALL_KINDS, type WallKind } from './interiorMap.js'
+import { resolveAsset } from './textures.js'
 
 // Which authored strip goes where on which wall, and which patch of floor is which material.
 // Every function answers `null` when the codex holds no piece: the code-painted shell stands,
@@ -91,11 +92,7 @@ export function resolveInteriorMaterial(
 }
 
 function newestReady(records: readonly AssetRecord[], kind: string): string | null {
-  let best: AssetRecord | null = null
-  for (const r of records) {
-    if (r.status !== 'ready' || r.class !== 'terrain' || r.kind !== kind) continue
-    if (best === null || r.seq > best.seq) best = r
-  }
+  const best = resolveAsset(records, 'terrain', kind)
   return best === null ? null : `/assets/${best.id}.png`
 }
 

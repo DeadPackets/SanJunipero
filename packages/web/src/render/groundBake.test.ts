@@ -1,7 +1,7 @@
 import { materialKind, type AssetRecord } from '@sj/shared'
 import { Container, type RenderTexture, type Sprite, type Texture } from 'pixi.js'
 import { describe, expect, it } from 'vitest'
-import { bigTownTerrain } from './bigTown.js'
+import { bigTownTerrain } from './__fixtures__/bigTown.js'
 import {
   BAKES_PER_FRAME,
   createGroundBaker,

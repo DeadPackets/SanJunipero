@@ -1,4 +1,4 @@
-import { TILE_H, TILE_W } from './iso.js'
+import { screenToTileF } from './iso.js'
 
 // Occupants of a tile spread along the pure-screen-x axis (32 px per tile against 16 px in
 // depth) with an alternating half-step of depth, so `depthSeed` orders overlapping silhouettes
@@ -30,14 +30,8 @@ export function crowdOffset(i: number, n: number): CrowdOffset {
   const sx = (i - (n - 1) / 2) * pitch
   // Alternating, and centred on zero, so the rank's own middle stays on the tile it belongs to.
   const sy = (i % 2 === 0 ? -1 : 1) * (CROWD_DEPTH_PX / 2)
-  return screenToWorldOffset(sx, sy)
-}
-
-/** The inverse of `tileToScreen`'s linear part, where `sx = (dx − dy)·TILE_W/2` and `sy = (dx + dy)·TILE_H/2`. */
-export function screenToWorldOffset(sx: number, sy: number): CrowdOffset {
-  const a = (2 * sx) / TILE_W
-  const b = (2 * sy) / TILE_H
-  return { dx: (a + b) / 2, dy: (b - a) / 2 }
+  const { x, y } = screenToTileF(sx, sy)
+  return { dx: x, dy: y }
 }
 
 /** Slot offsets keyed by id. Only SETTLED bodies take a slot, so a group does not shuffle aside for somebody walking through it; a body absent from the map is drawn where the record puts it.

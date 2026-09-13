@@ -1,6 +1,3 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('pixi.js', () => {
@@ -21,32 +18,13 @@ const {
   LAYERS,
   SCREEN_LAYERS,
   SORTED_LAYER,
-  Z_AUTHORISED,
   applyDepthOrder,
   createDepthGate,
   createLayers,
   createScreenLayers,
-  literalZIndexOffenders,
 } = await import('./layers.js')
 const { bodyDepthBox, structureDepthBox } = await import('./depth.js')
-const { bigTown } = await import('./bigTown.js')
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const WEB_SRC = join(HERE, '..')
-
-function sourcesUnder(dir: string): { path: string; source: string }[] {
-  const out: { path: string; source: string }[] = []
-  for (const name of readdirSync(dir).sort()) {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) {
-      out.push(...sourcesUnder(p))
-      continue
-    }
-    if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue
-    out.push({ path: relative(WEB_SRC, p), source: readFileSync(p, 'utf8') })
-  }
-  return out
-}
+const { bigTown } = await import('./__fixtures__/bigTown.js')
 
 describe('createLayers', () => {
   it('adds exactly the eight layers, in the order they paint', () => {
@@ -372,33 +350,5 @@ describe('★ a roof that hides a body goes translucent, and holds', () => {
     expect(gate([s.house, s.body] as never, VIEW)).toBe(true) // nothing moved, the fade did
     s.at(180)
     expect(gate([s.house, s.body] as never, VIEW)).toBe(false)
-  })
-})
-
-describe('literalZIndexOffenders', () => {
-  it('finds an assignment in a file with no business making one', () => {
-    expect(
-      literalZIndexOffenders([{ path: 'render/bubbles.ts', source: 'x\nnode.zIndex = 1e9\n' }]),
-    ).toEqual(['render/bubbles.ts:2 — node.zIndex = 1e9'])
-  })
-
-  it('says nothing about the files that own a sort', () => {
-    for (const path of Z_AUTHORISED) {
-      expect(literalZIndexOffenders([{ path, source: 'sprite.zIndex = i\n' }])).toEqual([])
-    }
-  })
-
-  it('is not fooled by a read, a comparison or a comment', () => {
-    const source =
-      'const a = s.zIndex\nif (a.zIndex === b.zIndex) f()\n// b.zIndex = 3 was the bug\n'
-    expect(literalZIndexOffenders([{ path: 'render/ambient.ts', source }])).toEqual([])
-  })
-
-  it('THE REAL SCAN: no module outside the layer authority writes a zIndex', () => {
-    const offenders = literalZIndexOffenders(sourcesUnder(WEB_SRC))
-    expect(
-      offenders,
-      `magic depth numbers still in the wild:\n  ${offenders.join('\n  ')}`,
-    ).toEqual([])
   })
 })

@@ -12,6 +12,7 @@ import { Matrix } from 'pixi.js'
 import { TILE_H, TILE_W, tileToScreen } from './iso.js'
 import { TILE_COLORS } from './ground.js'
 import { TILE_KIND, roadNeighborsAt, tileKind } from './tileset.js'
+import { resolveAsset } from './textures.js'
 
 // First id wins: C11's path/sapling/channel (8/9/10) alias onto earth/forest/water, and a
 // later duplicate would hand the kind its alias's palette colour instead of its own.
@@ -135,11 +136,7 @@ export function groundArtSignature(records: AssetRecord[]): number {
 }
 
 export function resolveMaterial(records: AssetRecord[], kind: string): string | null {
-  let best: AssetRecord | null = null
-  for (const r of records) {
-    if (r.status !== 'ready' || r.class !== 'terrain' || r.kind !== materialKind(kind)) continue
-    if (best === null || r.seq > best.seq) best = r
-  }
+  const best = resolveAsset(records, 'terrain', materialKind(kind))
   return best === null ? null : `/assets/${best.id}.png`
 }
 

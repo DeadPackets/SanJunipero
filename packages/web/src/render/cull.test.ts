@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bigTown } from './bigTown.js'
+import { bigTown } from './__fixtures__/bigTown.js'
 import { bodyDepthBox, structureDepthBox, tileDepthBox, type DepthBox } from './depth.js'
 import { CULL_MARGIN_PX, boxInView, cullByBox, type ViewRect } from './cull.js'
 

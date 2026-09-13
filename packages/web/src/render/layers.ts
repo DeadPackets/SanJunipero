@@ -210,34 +210,3 @@ function applyRelief(drawn: readonly DepthEntry[], now: number): void {
     if (p < 1 || s.on !== want) reliefPending++
   }
 }
-
-// ── P16's mechanical guard ───────────────────────────────────────────────────────────────
-
-/** An assignment, not a read and not a comparison — `=` but never `==`. */
-const Z_ASSIGN = /\.zIndex\s*=(?!=)/
-
-/** The only two files allowed to write a zIndex: `layers.ts` owns the town stack, and
- *  `interiorScene.ts` owns a separate scene graph that never competes with it. */
-export const Z_AUTHORISED: readonly string[] = ['render/layers.ts', 'render/interiorScene.ts']
-
-function authorised(path: string): boolean {
-  const p = path.split('\\').join('/')
-  return Z_AUTHORISED.some((a) => p.endsWith(a))
-}
-
-/** Every line that assigns a zIndex from a file that has no business doing so, as
- *  `path:line — text`. A regression names its own call site. */
-export function literalZIndexOffenders(
-  files: readonly { path: string; source: string }[],
-): string[] {
-  const out: string[] = []
-  for (const f of files) {
-    if (authorised(f.path)) continue
-    f.source.split('\n').forEach((line, i) => {
-      const code = line.trim()
-      if (code.startsWith('//') || code.startsWith('*')) return // a comment may say the old number
-      if (Z_ASSIGN.test(code)) out.push(`${f.path}:${i + 1} — ${code}`)
-    })
-  }
-  return out
-}

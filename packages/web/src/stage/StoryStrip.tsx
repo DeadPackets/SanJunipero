@@ -3,6 +3,7 @@ import { WHY_NAMES_MAX, agentName, castWords, type ThreadRow } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { bustStyle, useDressed, NO_RECORDS } from '../ui/bustStyle.js'
 import { VALENCE_TONE, threadCapsules, type Capsule } from '../ui/threadModel.js'
+import { sharePercent } from './ShotBoard.js'
 
 /** Three capsules at 320px is 984px of a 1920px band. The sheet drops the second and the third
  *  under 900px rather than a resize listener doing it. */
@@ -28,7 +29,7 @@ export const stateWord = (c: Capsule): string =>
 /** The heat bar as the sheet reads it. A share, never the raw heat: nothing on this band is an
  *  unbounded number. */
 export const shareStyle = (share: number): CSSProperties =>
-  ({ '--share': `${(Math.min(1, Math.max(0, share)) * 100).toFixed(1)}%` }) as CSSProperties
+  ({ '--share': sharePercent(share) }) as CSSProperties
 
 /** ★ The three the strip has room for, and never without the story the camera is on. The
  *  ribbon's head agrees with the cut on 47.9% of ticks, so a strip taken off the top alone

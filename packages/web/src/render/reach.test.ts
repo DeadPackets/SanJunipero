@@ -8,7 +8,7 @@ import {
   drawnBoundsOf,
   reachableBoundsOf,
 } from './camera.js'
-import { bigTown } from './bigTown.js'
+import { bigTown } from './__fixtures__/bigTown.js'
 
 const terrainOf = (w: number, h: number): TileId[][] =>
   Array.from({ length: h }, () => Array.from({ length: w }, () => 0))

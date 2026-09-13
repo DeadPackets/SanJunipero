@@ -6,9 +6,8 @@ import {
   CROWD_SPAN_PX,
   crowdOffset,
   crowdOffsets,
-  screenToWorldOffset,
 } from './crowd.js'
-import { tileToScreen } from './iso.js'
+import { screenToTileF, tileToScreen } from './iso.js'
 import { BODY_SPRITE_W, bodyDepthBox, depthOrder, depthSeed, geometricEdge } from './depth.js'
 import { MOTION, MOTION_CEILING_MS, MOTION_FLOOR_MS } from '../ui/motion.js'
 
@@ -83,15 +82,15 @@ describe('★ four people on one tile are four people', () => {
     expect(screenOf(11, 12).sx - screenOf(0, 12).sx).toBeCloseTo(CROWD_SPAN_PX, 6)
   })
 
-  it('screenToWorldOffset inverts the projection exactly', () => {
+  it('screenToTileF inverts the projection exactly', () => {
     for (const [sx, sy] of [
       [14, 4],
       [-31, -7],
       [0, 0],
       [72, -13],
     ] as const) {
-      const o = screenToWorldOffset(sx, sy)
-      const back = tileToScreen(o.dx, o.dy)
+      const o = screenToTileF(sx, sy)
+      const back = tileToScreen(o.x, o.y)
       expect(round(back.sx)).toBe(sx)
       expect(round(back.sy)).toBe(sy)
     }

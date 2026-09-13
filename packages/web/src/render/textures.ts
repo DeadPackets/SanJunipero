@@ -11,7 +11,11 @@ import {
 } from '@sj/shared'
 
 // (controller ruling) resolution runs on the codex kind column, never on desc parsing
-function resolveAsset(records: AssetRecord[], klass: AssetClass, kind: string): AssetRecord | null {
+export function resolveAsset(
+  records: readonly AssetRecord[],
+  klass: AssetClass,
+  kind: string,
+): AssetRecord | null {
   let best: AssetRecord | null = null
   for (const r of records) {
     if (r.status !== 'ready' || r.class !== klass || r.kind !== kind) continue

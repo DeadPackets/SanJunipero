@@ -8,7 +8,7 @@ import { drawnBoundsOf, type CameraBounds } from './camera.js'
 import type { Scene } from './scene.js'
 import { createWorldLabel, type WorldLabel } from './worldLabel.js'
 import { FACE_SIZES, THOUGHT_FILL, faceFor, worldTextScale } from './textFaces.js'
-import { placeTag, type Rect } from './tooltip.js'
+import { overlaps, placeTag, type Rect } from './tooltip.js'
 import { LANDMARK_EDGE, LANDMARK_INK, LANDMARK_PLATE } from './legibility.js'
 
 // Reading aids derived from what is standing: a named centre, names for the parts you can point
@@ -190,11 +190,6 @@ export type LandmarkLayer = { rebuild(): void; place(): void; destroy(): void }
  *  a name whose anchor has just left the screen fades with its subject rather than blinking. */
 export const LANDMARK_CULL_MARGIN_PX = 120
 
-/** The one predicate two rects touch. `tooltip.ts` keeps its own copy private; a legend that
- *  must not cover the map cannot ask a module that does not export the question. */
-const hits = (a: Rect, b: Rect): boolean =>
-  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
-
 export type PlaceableMark = {
   id: string
   sx: number
@@ -250,8 +245,8 @@ export function placeLandmarks(
       avoid,
     )
     const rect = { x: at.sx - m.size.w / 2, y: at.sy, w: m.size.w, h: m.size.h }
-    if (avoid.some((p) => hits(rect, p))) continue
-    if (!hits(rect, leashOf(m.of, m.size))) continue
+    if (avoid.some((p) => overlaps(rect, p))) continue
+    if (!overlaps(rect, leashOf(m.of, m.size))) continue
     avoid.push(rect)
     out.push({ id: m.id, sx: at.sx, sy: at.sy, rect })
   }

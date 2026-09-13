@@ -42,7 +42,7 @@ import {
 import { CHUNK_PX_H, CHUNK_PX_W } from './groundChunks.js'
 import { boxInView, type ViewRect } from './cull.js'
 import { structureDepthBox, type DepthBox } from './depth.js'
-import { bigTown, bigTownScreenSize } from './bigTown.js'
+import { bigTown, bigTownScreenSize } from './__fixtures__/bigTown.js'
 
 /** The AABB the renderer will actually paint, margin excluded — the same predicate `cull.test.ts` sweeps with. */
 function drawnIntersectsView(b: DepthBox, v: ViewRect): boolean {

@@ -65,11 +65,15 @@ export function joinStageLoop(step: () => void): () => void {
 
 /** Written to the node's own style every frame: a camera moving at 60 fps through React state
  *  would re-render the whole overlay 60 times a second. */
-function useStageAnchor(
+export function useSubjectAnchor(
   scene: Scene | null,
-  point: (() => WorldPoint | null) | null,
-  reach?: Reach,
+  subject: Subject | null,
+  reach: Reach,
 ): RefObject<HTMLDivElement | null> {
+  const point =
+    scene === null || subject === null
+      ? null
+      : (): WorldPoint | null => subjectPoint(scene, subject)
   const el = useRef<HTMLDivElement | null>(null)
   const latest = useRef(point)
   const last = useRef({ x: 0, y: 0, shown: false })
@@ -89,9 +93,7 @@ function useStageAnchor(
         const view = scene.viewRect()
         const zoom = scene.getZoom()
         a = screenAnchor(view, zoom, at.sx, at.sy)
-        if (reach !== undefined && a.onScreen) {
-          a = keepOnStage(a, view.w * zoom, view.h * zoom, reach)
-        }
+        if (a.onScreen) a = keepOnStage(a, view.w * zoom, view.h * zoom, reach)
       }
       const was = last.current
       if (a.x === was.x && a.y === was.y && a.onScreen === was.shown) return
@@ -101,16 +103,4 @@ function useStageAnchor(
     })
   }, [scene, idle, reach])
   return el
-}
-
-export function useSubjectAnchor(
-  scene: Scene | null,
-  subject: Subject | null,
-  reach?: Reach,
-): RefObject<HTMLDivElement | null> {
-  return useStageAnchor(
-    scene,
-    scene === null || subject === null ? null : () => subjectPoint(scene, subject),
-    reach,
-  )
 }
