@@ -1,4 +1,5 @@
-import { Container, type RenderTexture, type Sprite } from 'pixi.js'
+import { materialKind, type AssetRecord } from '@sj/shared'
+import { Container, type RenderTexture, type Sprite, type Texture } from 'pixi.js'
 import { describe, expect, it } from 'vitest'
 import { bigTownTerrain } from './bigTown.js'
 import {
@@ -7,7 +8,7 @@ import {
   TILE_EDGE_OUTSET_PX,
   tileDiamond,
 } from './groundBake.js'
-import { groundField, SKIRT_KIND } from './groundField.js'
+import { groundField, MATERIAL_REPEAT_PX, SKIRT_KIND } from './groundField.js'
 import { TILE_H, TILE_W } from './iso.js'
 import { TextureBook } from './textures.js'
 
@@ -172,5 +173,65 @@ describe('★ D17 — the bake is metered', () => {
     for (let i = 0; i < 16; i++) d.baker.setView(viewAt(0.25, d.field))
     expect(d.baker.vram().chunks).toBe(first)
     expect(first).toBeGreaterThan(1)
+  })
+})
+
+describe('★ a material the codex cannot serve', () => {
+  const material = (kind: string): AssetRecord => ({
+    id: `mat-${kind}`,
+    seq: 1,
+    class: 'terrain',
+    kind: materialKind(kind),
+    status: 'ready',
+    desc: kind,
+    meta: null,
+    footprint: { w: 1, h: 1 },
+    widthPx: MATERIAL_REPEAT_PX,
+    heightPx: MATERIAL_REPEAT_PX,
+    score: 10,
+    attempts: 1,
+    costUsd: 0,
+    createdAt: '2026-08-17T00:00:00Z',
+  })
+  const RECORDS = ['grass', 'water', 'earth', 'sand', 'rock', 'forest', 'road'].map(material)
+  const DEAD = '/assets/mat-water.png'
+
+  const stage = (dead: string) => {
+    const renders: Bake[] = []
+    const renderer = {
+      render: (o: { container: Container; target: RenderTexture; clear: boolean }) => {
+        renders.push({
+          at: { x: o.container.position.x, y: o.container.position.y },
+          kids: [...o.container.children],
+        })
+      },
+    }
+    const book = {
+      peek: () => null,
+      get: (url: string) =>
+        url === dead
+          ? Promise.reject(new Error('no such asset'))
+          : Promise.resolve({ source: { addressMode: '' } } as unknown as Texture),
+      swap: () => new Promise<never>(() => {}),
+    } as unknown as TextureBook
+    const baker = createGroundBaker(renderer, new Container(), book)
+    const terrain = bigTownTerrain(1) as never
+    baker.setView(viewAt(0.25, groundField(terrain, RECORDS)))
+    baker.rebake(terrain, RECORDS)
+    return { renders }
+  }
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 8; i++) await Promise.resolve()
+    await new Promise((r) => {
+      setTimeout(r, 0)
+    })
+  }
+
+  it('★ one material the codex cannot serve still repaints the chunks whose art arrived', async () => {
+    const s = stage(DEAD)
+    const flat = s.renders.length
+    expect(flat).toBeGreaterThan(0)
+    await flush()
+    expect(s.renders.length).toBe(flat * 2)
   })
 })

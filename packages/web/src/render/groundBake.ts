@@ -265,7 +265,9 @@ export function createGroundBaker(
       )
       if (urls.length === 0) return
       const gen = ++generation
-      void Promise.all(
+      // allSettled, never all: one material the codex cannot serve would leave every chunk on
+      // its flat fallback for the life of the bake, not just the layer that failed.
+      void Promise.allSettled(
         urls.map(async (u) => {
           loaded.set(u, await book.get(u))
         }),
