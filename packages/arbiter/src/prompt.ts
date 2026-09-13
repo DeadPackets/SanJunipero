@@ -33,7 +33,6 @@ export type AdjudicationBlocks = {
 export type AssembledAdjudicationPrompt = {
   system: string
   messages: LlmMessage[]
-  estTokens: number
 }
 
 // The town's routines, with what each one asks for. Authored rather than read off the registry
@@ -189,10 +188,6 @@ function renderFrontier(frontier: string[]): string {
     : `Within reach, though nobody here has done it yet: ${frontier.join(', ')}`
 }
 
-function estTokens(text: string): number {
-  return Math.ceil(text.length / 4)
-}
-
 function renderMaterials(m: AdjudicationBlocks['materials']): string {
   if (m === undefined) return ''
   return [
@@ -218,5 +213,5 @@ export function assembleAdjudicationPrompt(
   const system = `${blocks.canon}\n${renderFrontier(blocks.frontier)}${renderMaterials(blocks.materials)}\n\n${ADJUDICATION_INSTRUCTION}${renderLearned(blocks.learned)}`
   const user = renderUser(blocks)
   const messages: LlmMessage[] = [{ role: 'user', content: user }]
-  return { system, messages, estTokens: estTokens(`${system}${user}`) }
+  return { system, messages }
 }

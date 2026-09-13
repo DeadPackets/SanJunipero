@@ -436,22 +436,6 @@ describe('framing-free outputs contract', () => {
   })
 })
 
-describe('token estimate', () => {
-  it('is ceil(totalChars/4) and monotonic in block size', () => {
-    const base = assembleAdjudicationPrompt(fixtureBlocks())
-    const totalChars = base.system.length + base.messages[0]!.content.length
-    expect(base.estTokens).toBe(Math.ceil(totalChars / 4))
-
-    const longerIntent = assembleAdjudicationPrompt(
-      fixtureBlocks({ intent: 'I try to boil river water for salt. '.repeat(10) }),
-    )
-    expect(longerIntent.estTokens).toBeGreaterThan(base.estTokens)
-
-    const longerCanon = assembleAdjudicationPrompt(fixtureBlocks({ canon: 'C'.repeat(2000) }))
-    expect(longerCanon.estTokens).toBeGreaterThan(base.estTokens)
-  })
-})
-
 describe('the people beside the asker', () => {
   it('★ names them with the id a targetId takes, and says nothing when the caller sent no list', () => {
     const with_ = fixtureBlocks({

@@ -17,9 +17,9 @@ import { fold } from '../fold.js'
 import { genesisTerrainAt } from '../geography.js'
 import { findPath } from '../path.js'
 import { RngStreams } from '../rng.js'
-import { genesisState, type TileId, type WorldState } from '../state.js'
+import { authoredOrigin, genesisState, type TileId, type WorldState } from '../state.js'
 import { createWorldTick } from '../worldTick.js'
-import { GROWABLE_FLOOR, authoredOrigin, builtBox, grownStrip, growthsSoFar } from './mapGrowth.js'
+import { GROWABLE_FLOOR, builtBox, grownStrip, growthsSoFar } from './mapGrowth.js'
 import { ev, grid, roundTrips } from '../testutil/world.js'
 
 // A 32x32 world on a config whose world.size says 128 — the ordinary shape of a fixture, and

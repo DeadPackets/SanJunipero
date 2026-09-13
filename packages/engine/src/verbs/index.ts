@@ -96,48 +96,6 @@ import {
   type Pace,
 } from '@sj/shared'
 
-export type VerbKind =
-  | 'walk'
-  | 'sleep'
-  | 'wake'
-  | 'stop'
-  | 'enter'
-  | 'exit'
-  | 'eat'
-  | 'tend'
-  | 'till'
-  | 'plant'
-  | 'harvest'
-  | 'fish'
-  | 'forage'
-  | 'build'
-  | 'craft'
-  | 'extinguish'
-  | 'drink'
-  | 'fill'
-  | 'hunt'
-  | 'wear'
-  | 'doff'
-  | 'kindle'
-  | 'snuff'
-  | 'stoke'
-  | 'chop'
-  | 'speak'
-  | 'give'
-  | 'take'
-  | 'drop'
-  | 'stow'
-  | 'write'
-  | 'read'
-  | 'inscribe'
-  | 'teach'
-  | 'attack'
-  | 'court'
-  | 'propose'
-  | 'lie_with'
-  | 'leave_partner'
-  | 'leave_town'
-
 export type VerbDef = {
   kind: string
   validate(
@@ -569,9 +527,6 @@ export const bodyAt = (state: WorldState, agentId: string, at: Point): WorldStat
   agents: { ...state.agents, [agentId]: { ...state.agents[agentId]!, x: at.x, y: at.y } },
 })
 
-/** Where this body would have to stand for an act it is only too far off to do — and null when
- *  distance is not the whole of what is wrong. The verb's own validate, asked from the spot, is
- *  the judge, so nothing here has to know what any verb measures or how far its arms reach. */
 /** True when four walls are the only thing between this body and the act it named: from its own
  *  doorway it would be doing that act, or walking to it. */
 export function steppingOutWouldHelp(
@@ -598,6 +553,9 @@ export function steppingOutWouldHelp(
   )
 }
 
+/** Where this body would have to stand for an act it is only too far off to do — and null when
+ *  distance is not the whole of what is wrong. The verb's own validate, asked from the spot, is
+ *  the judge, so nothing here has to know what any verb measures or how far its arms reach. */
 export function approachFor(
   state: WorldState,
   config: SimConfig,
@@ -2136,10 +2094,6 @@ function burningAt(state: WorldState, x: number, y: number) {
   return null
 }
 
-function heldBuckets(state: WorldState, agentId: string) {
-  return heldStacks(state, agentId, BUCKET_KIND)
-}
-
 // One bucket, one dose, one tile of wall. Anything bigger than that is a bucket line, and a
 // bucket line is a thing the town has to organise for itself.
 const douse: VerbDef = makeVerb({
@@ -2152,7 +2106,7 @@ const douse: VerbDef = makeVerb({
     const s = burningAt(state, p.data.x, p.data.y)
     if (!s) return 'nothing is burning there'
     if (!nearRect(state, agentId, s.x, s.y, s.w, s.h)) return 'not close enough to the fire'
-    const buckets = heldBuckets(state, agentId)
+    const buckets = heldStacks(state, agentId, BUCKET_KIND)
     if (buckets.length === 0) return 'you have nothing to carry water in'
     if (!buckets.some((i) => (i.charges ?? 0) > 0)) return 'the bucket is empty'
     return null
@@ -2160,7 +2114,7 @@ const douse: VerbDef = makeVerb({
   onComplete(state, _config, agentId, params) {
     const p = DouseParams.parse(params)
     const s = burningAt(state, p.x, p.y)
-    const bucket = heldBuckets(state, agentId).find((i) => (i.charges ?? 0) > 0)
+    const bucket = heldStacks(state, agentId, BUCKET_KIND).find((i) => (i.charges ?? 0) > 0)
     if (!s || bucket === undefined) return []
     return [
       {

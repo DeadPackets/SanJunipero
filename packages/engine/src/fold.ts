@@ -1520,15 +1520,6 @@ export function fold(
                 { ...f, x: f.x + dx, y: f.y + dy },
               ]),
             )
-      // Saplings are stamped by coordinate, so they move with everything else — in this same
-      // fold, or a replay would find the wood growing back in the wrong place.
-      const shiftSaplings = (m: Record<string, number>): Record<string, number> =>
-        Object.fromEntries(
-          Object.entries(m).map(([k, v]) => {
-            const at = fromTileKey(k)
-            return [tileKey(at.x + dx, at.y + dy), v]
-          }),
-        )
       // The array's origin walked with everything else, so the AUTHORED frame is now that much
       // further back — which is what lets the next strip continue the same river.
       const origin = { x: (state.origin?.x ?? 0) - dx, y: (state.origin?.y ?? 0) - dy }
@@ -1545,7 +1536,9 @@ export function fold(
         ...(forageables === undefined ? {} : { forageables }),
         ...(state.traffic === undefined ? {} : { traffic: relayTraffic(state.traffic) }),
         ...(state.quietSince === undefined ? {} : { quietSince: shiftKeys(state.quietSince) }),
-        ...(state.saplings === undefined ? {} : { saplings: shiftSaplings(state.saplings) }),
+        // Saplings are stamped by coordinate, so they move with everything else — in this same
+        // fold, or a replay would find the wood growing back in the wrong place.
+        ...(state.saplings === undefined ? {} : { saplings: shiftKeys(state.saplings) }),
       }
     }
     // One night's worth of grass growing back through the ruts, and a fresh stamp on every

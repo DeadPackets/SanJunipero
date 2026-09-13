@@ -28,8 +28,6 @@ export function growthsSoFar(state: WorldState): number {
   return state.growths ?? 0
 }
 
-export { authoredOrigin }
-
 /** The tile box of everything built, in array coordinates; null when nothing stands. Structures
  *  only — a world that widened because somebody wandered to the edge would widen forever. */
 export function builtBox(
