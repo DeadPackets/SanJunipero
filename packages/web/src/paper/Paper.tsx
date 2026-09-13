@@ -7,11 +7,13 @@ import { PageBoundary } from './PageBoundary.js'
 import { PageBody } from './pages/index.js'
 import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
+import { localStore, paperDock, rememberPaperDock } from '../ui/storage.js'
 import {
   PAGE_TABS,
   PAGE_TITLE,
   gripDismiss,
   hasTab,
+  isArm,
   tabFromKey,
   type PageKey,
 } from './pageModel.js'
@@ -74,6 +76,8 @@ export function Paper({
   const tabs = PAGE_TABS[key] as readonly string[]
   const current = hasTab(key, tab) ? tab : tabs[0]!
   const [notice, setNotice] = useState<PaperNotice | null>(null)
+  const [docked, setDocked] = useState(() => paperDock(localStore()) === 'docked')
+  const dock = docked ? 'on' : 'off'
 
   // The opener is whatever was pressed to raise the sheet, and it gets the focus back on the way
   // down. Its own effect, so a tab change does not bounce focus through it and announce twice.
@@ -130,6 +134,7 @@ export function Paper({
       <div
         className="town-dim"
         data-open={open ? 'yes' : 'no'}
+        data-dock={dock}
         onClick={onClose}
         aria-hidden="true"
         ref={dimRef}
@@ -138,6 +143,8 @@ export function Paper({
         className="paper"
         id="paper"
         data-open={open ? 'yes' : 'no'}
+        data-dock={dock}
+        data-book={isArm(key) ? key : undefined}
         role="dialog"
         aria-modal="false"
         aria-hidden={!open}
@@ -237,6 +244,17 @@ export function Paper({
             </p>
             {/* The narrow dateline lifts this flank to row 1, off the tabs' own row. */}
             <div className="paper-marginalia">
+              <button
+                type="button"
+                className="paper-dock"
+                aria-pressed={docked}
+                onClick={() => {
+                  setDocked(!docked)
+                  rememberPaperDock(localStore(), docked ? 'sheet' : 'docked')
+                }}
+              >
+                dock
+              </button>
               <button type="button" className="paper-close" onClick={onClose}>
                 close<span className="paper-close-key"> · Esc</span>
               </button>

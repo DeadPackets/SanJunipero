@@ -1471,7 +1471,9 @@ body:has(.cold-open) .scene-card { display: none; }
   grid-template-columns:
     [edge-start] max(var(--mark-inset), env(safe-area-inset-left))
     [frame-start] auto minmax(0, 1fr) auto [frame-end]
-    max(var(--mark-inset), env(safe-area-inset-right)) [edge-end];
+    max(var(--mark-inset), env(safe-area-inset-right)) [edge-end]
+    /* the Almanac's column, 0 until it is docked, so the band and the strip reflow off it */
+    var(--dock-w, 0px) [dock-end];
   grid-template-rows:
     max(var(--mark-inset), env(safe-area-inset-top))
     auto auto
@@ -2952,3 +2954,82 @@ body:has(.cold-open) .dossier-rail { opacity: 0; }
   content: ''; position: absolute; inset-block: 0; inset-inline-start: 0;
   width: 2px; background: var(--operator);
 }
+
+/* ── THE ALMANAC: four books, three type levels, and the column the town is read in ──────────
+   A book colour is drawn hard against the masthead's own ink rule, because on parchment --honey
+   is 1.31:1, --sage 1.91 and --rose 2.77, all under the 3:1 floor a hairline needs. */
+.paper[data-book='folk'] { --book: var(--rose); }
+.paper[data-book='chronicle'] { --book: var(--honey); }
+.paper[data-book='found'] { --book: var(--sage); }
+.paper[data-book='laws'] { --book: var(--sky); }
+.paper[data-book] .paper-dateline { box-shadow: inset 0 4px 0 0 var(--book); }
+.paper[data-book] .paper-tab.on { box-shadow: inset 0 -6px 0 0 var(--book); }
+
+/* Three levels, and no head under the text it heads: the masthead at --f-7, the section head at
+   --f-5 in the town's own face, the body at --f-3. One rule dressed 23 heads at 12px caps. */
+.paper .block h3, .paper .feed-head, .paper .ops-sub {
+  font-family: var(--font-title); font-size: var(--f-5); font-weight: 500;
+  text-transform: none; letter-spacing: 0; color: var(--ink);
+}
+.record-day-n {
+  margin-right: var(--s-4);
+  font-family: var(--font-data); font-size: var(--f-1); letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums; color: var(--ink-quiet);
+}
+
+/* The range the Record reaches over, in the tab strip's own grammar. */
+.record-range { display: flex; flex-wrap: wrap; gap: var(--s-1); margin: 0 0 var(--s-5); }
+.record-range-pick {
+  min-height: 44px; padding: 0 var(--s-4);
+  font: inherit; font-size: var(--f-2); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--ink-quiet);
+  background: transparent; border: 0; border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.record-range-pick:hover { color: var(--ink); }
+.record-range-pick[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
+
+.paper-dock {
+  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-2); display: none;
+  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
+  color: var(--ink-quiet); background: none; cursor: pointer;
+  border: 0; border-bottom: 2px solid transparent;
+}
+.paper-dock:hover { color: var(--ink); }
+.paper-dock[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
+
+/* ── THE DOCK: the Almanac as a column beside the town rather than a sheet over it ───────────
+   The frame grows a sixth track outside its own right gutter, so the band, the strip and the
+   three deck surfaces reflow off the column instead of being covered by it. The world is not
+   dimmed here: reading and watching stop being exclusive. A phone has the drawer instead. */
+@media (min-width: 1000px) {
+  .paper-dock { display: block; }
+  .app:has(> .paper[data-dock='on'][data-open='yes']) { --dock-w: 380px; }
+  .town-dim[data-open='yes'][data-dock='on'] { opacity: 0; pointer-events: none; }
+  .paper[data-dock='on'] {
+    grid-column: edge-end / dock-end; grid-row: head-start / strip-start;
+    justify-self: stretch; align-self: stretch;
+    width: auto; height: auto;
+    border-bottom-width: 24px;
+    transform: translateX(102%);
+  }
+  .paper[data-dock='on'][data-open='yes'] { transform: translateX(0); }
+  /* The grip pulls a sheet DOWN, and a column has nowhere down to go. */
+  .paper[data-dock='on'] .paper-grip { display: none; }
+}
+
+/* ── every name is a door: the one link the paper opens a person with ──────────────────────
+   `font: inherit` on purpose. The same component sits in a title, in a heading and in a line
+   of body text, and a size of its own would make a name louder than the sentence holding it. */
+.person-link {
+  font: inherit; color: inherit; background: none; border: 0; border-radius: 0;
+  padding: 0; margin: 0; cursor: pointer; text-align: inherit;
+  text-decoration: underline; text-decoration-thickness: 2px;
+  text-underline-offset: 3px; text-decoration-color: var(--ink-quiet);
+}
+.person-link:hover { text-decoration-color: var(--ink); }
+
+/* The bonds row names the other person once as its own line, so the sentence under it stays
+   the sentence the rest of the product prints. */
+.edge-who { margin: 0; font-family: var(--font-title); font-size: var(--f-4); }

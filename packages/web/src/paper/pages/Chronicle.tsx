@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import {
   agentName,
   tickToMoment,
@@ -10,13 +10,7 @@ import type { MilestoneRead } from '@sj/shared/narratorSchema'
 import { describeEvent } from '../../ui/chronicleFormat.js'
 import { chronicleGlyph } from '../../ui/importantFeed.js'
 import { editions, type Edition } from '../../ui/dispatches.js'
-import {
-  chaptersFeed,
-  chronicleFeed,
-  dispatchesFeed,
-  milestonesFeed,
-  type Chapter,
-} from '../../ui/feeds.js'
+import { chronicleFeed, dispatchesFeed, milestonesFeed } from '../../ui/feeds.js'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { firstsByTier } from '../../ui/firsts.js'
 import { firstPlate, type FirstPlate } from '../../ui/firstPlate.js'
@@ -27,7 +21,7 @@ import { useFeed, type Read } from '../../ui/useEndpoint.js'
 import { EMPTY_COPY } from '../../ui/townStats.js'
 import { momentStamp } from '../stamp.js'
 import { Days } from './Days.js'
-import { Moments } from './Moments.js'
+import { EditionView, Moments } from './Moments.js'
 import { Skeleton } from './Skeleton.js'
 import type { PageProps } from './types.js'
 
@@ -48,7 +42,13 @@ const NO_RECORDS: AssetRecord[] = []
 const BUST_PX = 40
 const NO_EDITIONS: Edition[] = []
 
-const NO_CHAPTERS: Chapter[] = []
+/** How far back the Record reaches. A day count, not a name a mind could read. */
+const RANGES = [
+  { key: 'today', words: 'Today', days: 1 },
+  { key: 'week', words: 'This week', days: 7 },
+  { key: 'all', words: 'All', days: Number.POSITIVE_INFINITY },
+] as const
+type RangeKey = (typeof RANGES)[number]['key']
 
 // Decorative: the sentence beside it carries the meaning, so the glyph stays out of the
 // accessibility tree instead of being read twice.
@@ -106,33 +106,7 @@ function FeedJump({
 
 export function ChroniclePage(props: PageProps) {
   if (props.tab === 'Firsts') return <Firsts {...props} />
-  if (props.tab === 'Chapters') return <Chapters />
-  if (props.tab === 'Moments') return <Moments {...props} />
-  if (props.tab === 'Days') return <Days {...props} />
-  return <Today {...props} />
-}
-
-function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
-  return (
-    <article className={lead ? 'edition lead' : 'edition'}>
-      <p className="edition-head">
-        <span className="edition-day">Day {e.day}</span>
-        {e.temper !== null && <span className="edition-temper">{e.temper}</span>}
-      </p>
-      <h3 className="edition-title">{e.title}</h3>
-      <p className="edition-body">{e.body}</p>
-      {e.formed.length > 0 && (
-        <ul className="edition-formed">
-          {e.formed.map((f) => (
-            <li key={f.name}>
-              <b>{f.name}</b> — {f.description}
-            </li>
-          ))}
-        </ul>
-      )}
-      {e.caption !== null && <p className="edition-caption">{e.caption}</p>}
-    </article>
-  )
+  return <Record {...props} />
 }
 
 /** The lead before the chronicler has written one: the newest beat as the headline and the two
@@ -163,7 +137,12 @@ function DaySoFar({ entries }: { entries: readonly ChronicleEntry[] }) {
   )
 }
 
-function Today({ store, gapTicks, onPlay }: PageProps) {
+/** ★ ONE LOG. Today, Chapters, Moments and Days were four names for the same record, and Today
+ *  had no day bound at all: the newest 200 weighted rows, whatever day they fell on. The range
+ *  control is what bounds it, and the day heads under it are the chapters. */
+function Record(props: PageProps) {
+  const { store, gapTicks, onPlay } = props
+  const [range, setRange] = useState<RangeKey>('today')
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
   const events = useSyncExternalStore(store.subscribe, store.recentEvents, store.recentEvents)
@@ -178,6 +157,9 @@ function Today({ store, gapTicks, onPlay }: PageProps) {
   const daysAway = gapTicks === null ? 0 : Math.floor(gapTicks / 1440)
   const viewTick = mode.live ? null : mode.tick
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
+  const span = RANGES.find((r) => r.key === range)!.days
+  const fromDay = Math.max(0, tickToMoment(Math.max(edge, store.getTick())).day - span + 1)
+  const shown = entries.filter((e) => tickToMoment(e.tick).day >= fromDay)
 
   // A poll landing, a scrub, or the gap notice re-renders this page; the fold behind the feed
   // only changes when the events or the world do.
@@ -199,6 +181,22 @@ function Today({ store, gapTicks, onPlay }: PageProps) {
           {daysAway === 1 ? 'A day passed' : `${daysAway} days passed`} while you were away.
         </p>
       )}
+
+      <div className="record-range" role="group" aria-label="How far back the record reaches">
+        {RANGES.map((r) => (
+          <button
+            key={r.key}
+            type="button"
+            className="record-range-pick"
+            aria-pressed={r.key === range}
+            onClick={() => {
+              setRange(r.key)
+            }}
+          >
+            {r.words}
+          </button>
+        ))}
+      </div>
 
       {/* THE FRONT PAGE: the day's own paper is the lead story and the live feed is the column
           beside it. Below the sheet's own 40rem the two stack, which is what a narrow broadsheet
@@ -228,9 +226,13 @@ function Today({ store, gapTicks, onPlay }: PageProps) {
               <OutOfReach onRetry={chronicleFeed.retry} />
             ) : entries.length === 0 ? (
               <p className="feed-empty">{EMPTY_COPY.chronicle}</p>
+            ) : shown.length === 0 ? (
+              <p className="feed-empty">
+                Nothing in this range. Widen it to reach the days before.
+              </p>
             ) : (
               <ol className="feed important">
-                {[...entries].reverse().map((e) => (
+                {[...shown].reverse().map((e) => (
                   <li key={`${e.type}:${e.seq}`} className="feed-line">
                     <FeedJump
                       tick={e.tick}
@@ -268,6 +270,9 @@ function Today({ store, gapTicks, onPlay }: PageProps) {
           </section>
         </div>
       </div>
+
+      <Days {...props} />
+      <Moments {...props} fromDay={fromDay} />
     </>
   )
 }
@@ -418,53 +423,5 @@ function Firsts({ store, onPlay }: PageProps) {
       records={records}
       onPlay={onPlay}
     />
-  )
-}
-
-function Chapters() {
-  const chapters = useFeed(chaptersFeed).data ?? NO_CHAPTERS
-  const paper = useFeed(dispatchesFeed)
-  const days = useMemo(
-    () => (paper.data === null ? NO_EDITIONS : editions(paper.data)),
-    [paper.data],
-  )
-
-  return (
-    <>
-      {chapters.length > 0 && (
-        <section className="block">
-          {[...chapters]
-            .sort((a, b) => b.day - a.day)
-            .map((c) => (
-              <article key={c.day} className="chapter">
-                <p className="chapter-head">
-                  <span className="stamp">Day {c.day}</span> {c.title}
-                </p>
-                <p className="chapter-text">{c.text}</p>
-              </article>
-            ))}
-        </section>
-      )}
-      {days.length === 0 && paper.failed ? (
-        <OutOfReach onRetry={dispatchesFeed.retry} />
-      ) : days.length === 0 ? (
-        <p className="feed-empty">{EMPTY_COPY.paper}</p>
-      ) : (
-        <ol className="paper-run">
-          {days.map((e) => (
-            <li key={e.day} className="edition-slot">
-              {e.era !== null && (
-                <aside className="era-band">
-                  <p className="era-label">The week that turned</p>
-                  <h3 className="era-title">{e.era.title}</h3>
-                  <p className="era-text">{e.era.text}</p>
-                </aside>
-              )}
-              <EditionView e={e} />
-            </li>
-          ))}
-        </ol>
-      )}
-    </>
   )
 }

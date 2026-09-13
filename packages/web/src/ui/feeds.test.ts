@@ -42,7 +42,7 @@ describe('one feed per endpoint', () => {
   // ★ BOTH readers, or there are two: the beat is part of a reader's identity, so a page that
   // asks for the same URL without one is a second reader that never re-reads.
   it('★ the chapters are read through that one feed, not fetched by the page', () => {
-    for (const f of ['../paper/pages/Chronicle.tsx', '../stage/ReplayScene.tsx']) {
+    for (const f of ['../paper/pages/Moments.tsx', '../stage/ReplayScene.tsx']) {
       const src = readFileSync(new URL(f, import.meta.url), 'utf8')
       expect(src, f).toContain('useFeed(chaptersFeed)')
       expect(src, f).not.toContain("'/api/chapters'")

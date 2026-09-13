@@ -1,6 +1,8 @@
 import { memo, useMemo, useState, useSyncExternalStore } from 'react'
 import { MomentSchema, tickToMoment, type Moment } from '@sj/shared'
 import type { PeopleIndex } from '../../ui/bondModel2.js'
+import { chaptersFeed, dispatchesFeed, type Chapter } from '../../ui/feeds.js'
+import { editions, type Edition } from '../../ui/dispatches.js'
 import {
   momentDays,
   moreFromDay,
@@ -31,6 +33,8 @@ const MOTIF_PX = 8
 /** The gateway's card is 1080×565; the lead card draws it at a third and lets CSS cap it. */
 const CARD_W = 360
 const CARD_H = 188
+const NO_CHAPTERS: Chapter[] = []
+const NO_EDITIONS: Edition[] = []
 /** The postcard the gateway composes for this minute — the same picture a shared link opens
  *  with, so the grid and the og card can never show two different things. */
 const postcard = (m: Moment): string => {
@@ -64,6 +68,29 @@ function Motif({ moment }: { moment: Moment }) {
         <rect key={`${x},${y}`} x={x} y={y} width={1} height={1} fill={fill} />
       ))}
     </svg>
+  )
+}
+
+export function EditionView({ e, lead = false }: { e: Edition; lead?: boolean }) {
+  return (
+    <article className={lead ? 'edition lead' : 'edition'}>
+      <p className="edition-head">
+        <span className="edition-day">Day {e.day}</span>
+        {e.temper !== null && <span className="edition-temper">{e.temper}</span>}
+      </p>
+      <h3 className="edition-title">{e.title}</h3>
+      <p className="edition-body">{e.body}</p>
+      {e.formed.length > 0 && (
+        <ul className="edition-formed">
+          {e.formed.map((f) => (
+            <li key={f.name}>
+              <b>{f.name}</b>, {f.description}
+            </li>
+          ))}
+        </ul>
+      )}
+      {e.caption !== null && <p className="edition-caption">{e.caption}</p>}
+    </article>
   )
 }
 
@@ -123,14 +150,60 @@ const MomentCardView = memo(function MomentCardView({
   )
 })
 
-/** The cards alone: the sheet CLOSES on play, so a control inside it could never be seen. */
-export function Moments({ store, momentId, onPlay, onMoment }: PageProps) {
+/** One day of the record: what the narrator called it, what the town printed about it, and the
+ *  minutes it kept. */
+type RecordDay = {
+  day: number
+  chapter: Chapter | null
+  edition: Edition | null
+  lead: Moment | null
+  rest: Moment[]
+}
+
+function recordDays(
+  moments: readonly Moment[],
+  chapters: readonly Chapter[],
+  written: readonly Edition[],
+): RecordDay[] {
+  const byDay = new Map<number, RecordDay>()
+  const at = (day: number): RecordDay => {
+    const seen = byDay.get(day)
+    if (seen !== undefined) return seen
+    const made: RecordDay = { day, chapter: null, edition: null, lead: null, rest: [] }
+    byDay.set(day, made)
+    return made
+  }
+  for (const d of momentDays(moments)) {
+    const row = at(d.day)
+    row.lead = d.lead
+    row.rest = [...d.rest]
+  }
+  for (const c of chapters) at(c.day).chapter = c
+  for (const e of written) at(e.day).edition = e
+  return [...byDay.values()].sort((a, b) => b.day - a.day)
+}
+
+/** The log the Record is: one section a day, newest first, the chapter as the day's own head and
+ *  the filmstrip under it. The sheet CLOSES on play, so a control inside it could never be seen. */
+export function Moments({
+  store,
+  momentId,
+  fromDay,
+  onPlay,
+  onMoment,
+}: PageProps & { fromDay: number }) {
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   const edge = useSyncExternalStore(store.subscribe, store.liveEdge, store.liveEdge)
   // The town is still watchable without its record, so a refused read stays `null`.
   const record = useEndpointFor('/api/moments', momentRows)
   const read = useFeed(record)
   const moments = read.data
+  const chapters = useFeed(chaptersFeed).data ?? NO_CHAPTERS
+  const paper = useFeed(dispatchesFeed)
+  const written = useMemo(
+    () => (paper.data === null ? NO_EDITIONS : editions(paper.data)),
+    [paper.data],
+  )
   const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set())
 
   const people: PeopleIndex = useMemo(() => {
@@ -139,13 +212,20 @@ export function Moments({ store, momentId, onPlay, onMoment }: PageProps) {
     return out
   }, [state])
 
-  const days = useMemo(() => momentDays(moments ?? []), [moments])
+  const all = useMemo(
+    () => recordDays(moments ?? [], chapters, written),
+    [moments, chapters, written],
+  )
+  const days = all.filter((d) => d.day >= fromDay)
 
-  if (read.failed && moments === null) return <OutOfReach onRetry={record.retry} />
+  if (read.failed && moments === null && all.length === 0)
+    return <OutOfReach onRetry={record.retry} />
   // An empty shelf is a town with no kept days; the read is still out, and the two are not the
   // same sentence.
-  if (moments === null) return <Skeleton rows={3} />
-  if (moments.length === 0) return <p className="feed-empty">{EMPTY_COPY.moments}</p>
+  if (moments === null && all.length === 0) return <Skeleton rows={3} />
+  if (all.length === 0) return <p className="feed-empty">{EMPTY_COPY.moments}</p>
+  if (days.length === 0)
+    return <p className="feed-empty">Nothing in this range. Widen it to reach the days before.</p>
 
   const watch = (picked: Moment): void => {
     onMoment(picked.id)
@@ -155,27 +235,41 @@ export function Moments({ store, momentId, onPlay, onMoment }: PageProps) {
   return (
     <div className="moment-run">
       {days.map((d) => (
-        <section key={d.day} className="block moment-day">
-          <h3 className="feed-head">Day {d.day}</h3>
-          <ol className="strip-list" aria-label={`What the town kept from day ${d.day}`}>
-            <MomentCardView
-              moment={d.lead}
-              people={people}
-              open={d.lead.id === momentId}
-              lead
-              onOpen={watch}
-            />
-            {opened.has(d.day) &&
-              d.rest.map((m) => (
-                <MomentCardView
-                  key={m.id}
-                  moment={m}
-                  people={people}
-                  open={m.id === momentId}
-                  onOpen={watch}
-                />
-              ))}
-          </ol>
+        <section key={d.day} className="block record-day">
+          <h3 className="feed-head">
+            <span className="record-day-n">Day {d.day}</span>
+            {d.chapter?.title}
+          </h3>
+          {d.chapter !== null && <p className="chapter-text">{d.chapter.text}</p>}
+          {d.edition?.era != null && (
+            <aside className="era-band">
+              <p className="era-label">The week that turned</p>
+              <h4 className="era-title">{d.edition.era.title}</h4>
+              <p className="era-text">{d.edition.era.text}</p>
+            </aside>
+          )}
+          {d.edition !== null && <EditionView e={d.edition} />}
+          {d.lead !== null && (
+            <ol className="strip-list" aria-label={`What the town kept from day ${d.day}`}>
+              <MomentCardView
+                moment={d.lead}
+                people={people}
+                open={d.lead.id === momentId}
+                lead
+                onOpen={watch}
+              />
+              {opened.has(d.day) &&
+                d.rest.map((m) => (
+                  <MomentCardView
+                    key={m.id}
+                    moment={m}
+                    people={people}
+                    open={m.id === momentId}
+                    onOpen={watch}
+                  />
+                ))}
+            </ol>
+          )}
           {d.rest.length > 0 && (
             <button
               type="button"

@@ -1,6 +1,6 @@
 export const PAGE_TABS = {
   folk: ['People', 'Bonds', 'Families', 'Customs'],
-  chronicle: ['Today', 'Firsts', 'Chapters', 'Moments', 'Days'],
+  chronicle: ['Record', 'Firsts'],
   found: ['Things', 'Places'],
   laws: ['World', 'Admin'],
   person: ['Story', 'Bonds', 'Ledger'],
@@ -15,13 +15,16 @@ export type Arm = (typeof ARMS)[number]
 export const PAGE_TITLE: Readonly<Record<PageKey, string>> = {
   folk: 'Folk',
   chronicle: 'Chronicle',
-  found: 'Found',
-  laws: 'Laws',
+  found: 'Land',
+  laws: 'Rule',
   person: 'Story',
   building: 'Place',
 }
 
 export const firstTab = (page: PageKey): string => PAGE_TABS[page][0]
+
+/** The four books have a colour on the masthead. A person's page and a place's do not. */
+export const isArm = (page: PageKey): page is Arm => (ARMS as readonly string[]).includes(page)
 
 export function hasTab(page: PageKey, tab: string): boolean {
   return (PAGE_TABS[page] as readonly string[]).includes(tab)

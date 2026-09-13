@@ -25,6 +25,7 @@ import {
   type PageKey,
 } from './pageModel.js'
 
+import { paperDock, rememberPaperDock } from '../ui/storage.js'
 import { stamp } from './stamp.js'
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
@@ -304,15 +305,15 @@ describe('the paper', () => {
   })
 
   it('carries a tablist with ONE tab stop, walked by the arrows', () => {
-    const html = paper({ page: 'chronicle', tab: 'Chapters' })
+    const html = paper({ page: 'chronicle', tab: 'Firsts' })
     expect(html).toContain('role="tablist"')
     expect(html.match(/role="tab"/g)).toHaveLength(PAGE_TABS.chronicle.length)
     expect(html.match(/tabindex="0"/g)).toHaveLength(1)
-    expect(html).toMatch(/id="paper-tab-Chapters"[^>]*aria-selected="true"/)
+    expect(html).toMatch(/id="paper-tab-Firsts"[^>]*aria-selected="true"/)
   })
 
   it('falls back to the first tab when handed one the page does not have', () => {
-    const html = paper({ page: 'found', tab: 'Chapters' })
+    const html = paper({ page: 'found', tab: 'Firsts' })
     expect(html).toMatch(/id="paper-tab-Things"[^>]*aria-selected="true"/)
   })
 
@@ -336,7 +337,7 @@ describe('the paper', () => {
   // ★ 4A — the head dated itself off the town's clock until phase 4 gave the Day Bar the one
   // band that says when: a second date is the same minute in a second type face.
   it('★ prints a masthead over the section rule, and dates it nowhere', () => {
-    const html = paper({ page: 'chronicle', tab: 'Today' })
+    const html = paper({ page: 'chronicle', tab: 'Record' })
     const head = headOf(html)
     expect(head).toContain('class="paper-dateline"')
     expect(head).toMatch(/class="paper-title" id="paper-title">Chronicle</)
@@ -344,7 +345,7 @@ describe('the paper', () => {
   })
 
   it('★ runs the section line INSIDE the dateline, with the keyboard path untouched', () => {
-    const html = paper({ page: 'chronicle', tab: 'Today' })
+    const html = paper({ page: 'chronicle', tab: 'Record' })
     const line = html.slice(html.indexOf('paper-dateline'), html.indexOf('</header>'))
     expect(line).toContain('role="tablist"')
     expect(line).toContain('aria-describedby="paper-tabs-keys"')
@@ -371,7 +372,7 @@ describe('the paper', () => {
   // The lead story and the live feed, one beside the other — and the lead keeps a real heading
   // for a reader who cannot see that the headline is one.
   it('★ lays the Chronicle out as a front page: a lead story and a column beside it', () => {
-    const html = paper({ page: 'chronicle', tab: 'Today' })
+    const html = paper({ page: 'chronicle', tab: 'Record' })
     expect(html).toContain('class="bs-front"')
     expect(html).toContain('class="block bs-lead"')
     expect(html).toContain('class="bs-column"')
@@ -692,5 +693,61 @@ describe('households', () => {
 
   it('answers a childless town with nothing at all', () => {
     expect(households({ parentOf: [] })).toEqual([])
+  })
+})
+
+// ★ THE ALMANAC. Thirteen tabs were four names for one log plus the rest; the four arms became
+// four books with a colour each, and the sheet gained a place to stand that does not cover the
+// town it is about.
+describe('★ the Almanac shell', () => {
+  it('★ folds four names for one log into the Record, and keeps the old links landing on it', () => {
+    expect([...PAGE_TABS.chronicle]).toEqual(['Record', 'Firsts'])
+    for (const old of ['Today', 'Chapters', 'Moments', 'Days']) {
+      expect(hasTab('chronicle', old), old).toBe(false)
+      expect(paper({ page: 'chronicle', tab: old }), old).toMatch(
+        /id="paper-tab-Record"[^>]*aria-selected="true"/,
+      )
+    }
+    expect(ARMS.reduce((n, a) => n + PAGE_TABS[a].length, 0)).toBe(10)
+  })
+
+  it('★ names the four books on the arms, Land and Rule among them', () => {
+    expect(ARMS.map((a) => PAGE_TITLE[a])).toEqual(['Folk', 'Chronicle', 'Land', 'Rule'])
+    const html = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    expect(html).toContain('>Land<')
+    expect(html).toContain('>Rule<')
+  })
+
+  it('★ carries the open arm’s book on the sheet, and none on a page that is not an arm', () => {
+    for (const arm of ARMS)
+      expect(paper({ page: arm, tab: firstTab(arm) }), arm).toMatch(
+        new RegExp(`class="paper"[^>]*data-book="${arm}"`),
+      )
+    expect(
+      paper({ page: 'person', tab: 'Story', subject: { id: 'a', kind: 'agent', name: 'Amara' } }),
+    ).not.toContain('data-book')
+  })
+
+  // Today was the newest 200 weighted rows with no day bound at all, so a nine-day town read
+  // the same as a one-day town. The range is what bounds it.
+  it('★ bounds the Record with a range instead of printing rows of no day at all', () => {
+    const html = paper({ page: 'chronicle', tab: 'Record' })
+    expect(html).toContain('class="record-range"')
+    for (const words of ['Today', 'This week', 'All']) expect(html).toContain(`>${words}<`)
+    expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
+  })
+
+  it('★ docks as a column, stops dimming the town, and remembers it', async () => {
+    const p = await live({ page: 'chronicle', tab: 'Record' })
+    expect(p.el('.paper')?.dataset.dock).toBe('off')
+    expect(p.el('.town-dim')?.dataset.dock).toBe('off')
+    await act(async () => {
+      p.el('.paper-dock')?.click()
+    })
+    expect(p.el('.paper')?.dataset.dock).toBe('on')
+    expect(p.el('.town-dim')?.dataset.dock).toBe('on')
+    expect(p.el('.paper-dock')?.getAttribute('aria-pressed')).toBe('true')
+    expect(paperDock(localStorage)).toBe('docked')
+    rememberPaperDock(localStorage, 'sheet')
   })
 })

@@ -35,3 +35,24 @@ const VISIT_WATERMARK: number | null = (() => {
 export function lastVisitTick(): number | null {
   return VISIT_WATERMARK
 }
+
+/** Where the Almanac stands: the sheet over the town, or a column beside it. Remembered, because
+ *  a reader who docks it once means it. */
+const DOCK = 'sj.paperDock'
+export type PaperDock = 'sheet' | 'docked'
+
+export function paperDock(storage: Pick<Storage, 'getItem'> | null): PaperDock {
+  try {
+    return storage?.getItem(DOCK) === 'docked' ? 'docked' : 'sheet'
+  } catch {
+    return 'sheet'
+  }
+}
+
+export function rememberPaperDock(storage: Pick<Storage, 'setItem'> | null, v: PaperDock): void {
+  try {
+    storage?.setItem(DOCK, v)
+  } catch {
+    /* nothing to do: the choice holds for this page and is asked again on the next */
+  }
+}

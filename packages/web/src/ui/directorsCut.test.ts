@@ -270,7 +270,7 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
       host.querySelector<HTMLElement>('.signpost-arm[data-arm="chronicle"]')!.click()
     })
     await act(async () => {
-      host.querySelector<HTMLElement>('#paper-tab-Days')!.click()
+      host.querySelector<HTMLElement>('#paper-tab-Record')!.click()
     })
     expect(host.querySelector('.day-strip'), 'the day strip never opened').not.toBeNull()
     const back = [...host.querySelectorAll('button')].filter((b) =>

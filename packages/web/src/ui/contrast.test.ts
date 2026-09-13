@@ -456,3 +456,51 @@ describe('the week band is read on the honey it is printed on', () => {
     expect(contrast(T[fg!]!, T[bg!]!)).toBeGreaterThanOrEqual(AA)
   })
 })
+
+// ── ★ THE FOUR BOOKS ──────────────────────────────────────────────────────────────────────
+// One colour each, on the masthead rule and the active tab. On the parchment they are drawn on,
+// --honey is 1.31:1, --sage 1.91 and --rose 2.77, all under the 3:1 a mark needs — so the band
+// is laid hard against the masthead's own ink rule, and each book has to clear the floor on one
+// of the two edges it touches.
+const BOOKS: Readonly<Record<string, string>> = {
+  folk: 'rose',
+  chronicle: 'honey',
+  found: 'sage',
+  laws: 'sky',
+}
+
+describe('★ the four books, and the edge that makes each one visible', () => {
+  it('gives every arm a colour of its own', () => {
+    for (const [book, token] of Object.entries(BOOKS))
+      expect(ruleBody(CSS, `.paper[data-book='${book}']`), book).toContain(
+        `--book: var(--${token})`,
+      )
+    expect(new Set(Object.values(BOOKS)).size).toBe(4)
+  })
+
+  it('★ clears 3:1 against the ink rule above it or the parchment below it', () => {
+    for (const [book, token] of Object.entries(BOOKS)) {
+      const best = Math.max(contrast(T[token]!, T.ink!), contrast(T[token]!, T.parchment!))
+      expect(best, `${book} (--${token}) can be seen on neither edge`).toBeGreaterThanOrEqual(3)
+    }
+  })
+
+  it('★ keeps the four far enough apart on the wheel to be told apart', () => {
+    const hues = Object.values(BOOKS).map((t) => hue(T[t]!))
+    for (let i = 0; i < hues.length; i++)
+      for (let j = i + 1; j < hues.length; j++) {
+        const gap = Math.abs(hues[i]! - hues[j]!)
+        expect(Math.min(gap, 360 - gap), `${i} against ${j}`).toBeGreaterThanOrEqual(30)
+      }
+  })
+
+  it('records the hairlines it rejected, so they cannot come back', () => {
+    expect(contrast(T.honey!, T.parchment!)).toBeCloseTo(1.31, 2)
+    expect(contrast(T.sage!, T.parchment!)).toBeCloseTo(1.91, 2)
+    expect(contrast(T.rose!, T.parchment!)).toBeCloseTo(2.77, 2)
+    expect(
+      contrast(T.sky!, T.ink!),
+      'and --sky, which is the one that vanishes on ink',
+    ).toBeCloseTo(1.81, 2)
+  })
+})

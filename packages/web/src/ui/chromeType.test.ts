@@ -186,3 +186,44 @@ describe('every page heading is the sheet\u2019s own face', () => {
     }
   })
 })
+
+// ★ THREE LEVELS ON THE PAPER. One rule dressed every section head at 12px pixel-face caps over
+// a 14px body: a head smaller than the text it heads, 23 times over. The masthead is --f-7, a
+// section head --f-5 in the town's own face, the body --f-3.
+describe('★ no head on the paper is set below the body under it', () => {
+  const HERE = new URL('../paper/pages/', import.meta.url)
+  const views = readdirSync(HERE).filter((f) => f.endsWith('.tsx') && !f.endsWith('.test.tsx'))
+
+  /** Every class the pages hang an `<h3>` or an `<h4>` on. */
+  const heads = new Set<string>()
+  for (const file of views)
+    for (const [, list] of readFileSync(new URL(file, HERE), 'utf8').matchAll(
+      /<h[34][^>]*className="([^"]+)"/g,
+    ))
+      for (const one of list!.split(/\s+/)) if (one !== '') heads.add(one)
+
+  /** What the cascade lands on: the last rule in the sheet whose selector ends in `.name`. */
+  const sizeOf = (name: string): number | null =>
+    DECLS.filter((d) => d.selectors.split(',').some((s) => s.trim().endsWith(`.${name}`))).at(-1)
+      ?.px ?? null
+
+  // A head with no rule of its own inherits the sheet's body size, which is the bar itself.
+  const BODY = sizeOf('paper-sheet')!
+
+  it('finds the heads and the body it is meant to be checking', () => {
+    expect(heads.size).toBeGreaterThan(4)
+    expect(BODY).toBe(BODY_MIN_PX)
+  })
+
+  it.each([...heads])('.%s is set at or above the body it heads', (name) => {
+    expect(sizeOf(name) ?? BODY, `.${name}`).toBeGreaterThanOrEqual(BODY)
+  })
+
+  it('★ sets the section head in the town’s own face, a step above the body', () => {
+    const head = DECLS.filter((d) =>
+      d.selectors.split(',').some((s) => s.trim() === '.paper .feed-head'),
+    )
+    expect(head.length, 'the paper sets no section head of its own').toBeGreaterThan(0)
+    expect(head.at(-1)!.px).toBeGreaterThan(BODY)
+  })
+})
