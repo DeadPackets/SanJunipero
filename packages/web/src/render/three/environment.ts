@@ -42,6 +42,7 @@ export function createEnvironment(scene: Scene) {
   const day = new Color(0xffecd0)
   const moon = new Color(0x91b5ef)
   const background = new Color()
+  let lightTick = -1
   return {
     flash(strength: number) {
       sky.intensity += strength
@@ -57,21 +58,24 @@ export function createEnvironment(scene: Scene) {
       seconds: number,
       dt: number,
       heightOf: (id: string) => number,
+      moving = true,
     ) {
-      const token = skyToken(state.tick)
-      const light = sunLight(state.tick)
+      if (lightTick < 0 || Math.abs(state.tick - lightTick) > 5 || !moving) lightTick = state.tick
+      else lightTick += (state.tick - lightTick) * (1 - Math.exp(-dt * 5))
+      const token = skyToken(lightTick)
+      const light = sunLight(lightTick)
       const wet = state.weather.kind === 'rain' || state.weather.kind === 'storm'
       const daylight = token.kind === 'sun' ? Math.min(1, light.elevation * 5) : 0
       const golden = token.kind === 'sun' ? 1 - MathUtils.smoothstep(light.elevation, 0.25, 0.8) : 0
-      const moonlight = moonAltitude(state.tick)
+      const moonlight = moonAltitude(lightTick)
       sun.intensity = daylight * (wet ? 0.85 : 3.1 + golden * 0.7) + moonlight * (wet ? 0.35 : 0.65)
       sun.shadow.intensity = wet ? 0.35 : 0.7
       sun.shadow.radius = wet ? 3 : 2
       sun.color.copy(token.kind === 'sun' ? day : moon).lerp(warm, golden)
       sun.position.set(
-        center.x - 14 + (token.kind === 'sun' ? token.along * 2 : -4),
-        token.kind === 'sun' ? 20 - golden * 11 : 12 + moonlight * 12,
-        center.z + (token.kind === 'sun' ? 8 + golden * 8 : -16),
+        center.x - Math.cos(token.along * Math.PI) * 22,
+        center.y + 4 + Math.sin(token.along * Math.PI) * 26,
+        center.z - 12,
       )
       sun.target.position.copy(center)
       const extent = Math.min(110, Math.max(18, span * 0.7))
@@ -131,7 +135,7 @@ export function createEnvironment(scene: Scene) {
         slot.light.intensity =
           slot.strength * slot.power * (0.96 + Math.sin(seconds * 7 + slot.light.id) * 0.04)
       }
-      return { active, wet, daylight }
+      return { active, wet, daylight, sun, sky }
     },
     destroy() {
       sun.shadow.map?.dispose()

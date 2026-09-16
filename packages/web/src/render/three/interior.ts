@@ -1,16 +1,17 @@
 import { createMaterialLibrary } from './materials.js'
-import { DEFAULT_CONFIG, isRoofedKind, simTimeFromTick } from '@sj/shared'
+import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
 import { effectiveConfig } from '@sj/engine/laws'
 import type { AgentBody } from '@sj/engine/state'
 import { Sprite, type FederatedPointerEvent } from 'pixi.js'
 import {
   Box3,
   BoxGeometry,
-  Color,
   DirectionalLight,
   HemisphereLight,
   Mesh,
   MeshStandardMaterial,
+  MeshBasicMaterial,
+  PlaneGeometry,
   OrthographicCamera,
   PointLight,
   Raycaster,
@@ -48,9 +49,27 @@ export function createThreeInterior(
   store: WorldStore,
   renderer: WebGLRenderer,
   select: (id: string) => void,
-): InteriorScene & { render(dt: number): boolean } {
+): InteriorScene & {
+  render(
+    dt: number,
+    light: { sun: DirectionalLight; sky: HemisphereLight; daylight: number },
+  ): boolean
+} {
   const stage = new ThreeScene()
-  stage.background = new Color(0x353e36)
+  const backdrop = new ThreeScene()
+  const backdropCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1)
+  const veil = new Mesh(
+    new PlaneGeometry(2, 2),
+    new MeshBasicMaterial({
+      color: 0x15221d,
+      transparent: true,
+      opacity: 0.48,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    }),
+  )
+  backdrop.add(veil)
   const camera = new OrthographicCamera(-8, 8, 8, -8, 0.1, 120)
   const ambient = new HemisphereLight(0xfff0d0, 0x6e7661, 2.1)
   const sun = new DirectionalLight(0xffe3b1, 2.2)
@@ -203,7 +222,7 @@ export function createThreeInterior(
         listeners.delete(cb)
       }
     },
-    render(dt) {
+    render(dt, light) {
       if (active === null || destroyed) return false
       const state = store.getState(),
         s = state?.structures[active]
@@ -346,27 +365,27 @@ export function createThreeInterior(
       room.bedrolls.forEach((roll, index) => {
         roll.visible = occupants.some((a) => a.asleep && bodies.get(a.id)?.slot === index + 1)
       })
-      const time = simTimeFromTick(state.tick),
-        hour = time.hour + time.minute / 60
-      const daylight = Math.max(0, Math.sin(((hour - 6) / 12) * Math.PI))
+      const { daylight } = light
       const awake = occupants.some((a) => !a.asleep)
       const lit = (s.fueledUntilTick ?? 0) > state.tick
-      ambient.intensity = 1.05 + daylight * 1.6 + (awake ? 0.55 : 0)
-      ambient.color.setHex(daylight > 0.1 ? 0xffedd0 : 0xb4c2db)
-      sun.intensity =
-        0.7 +
-        daylight *
-          2.1 *
-          (state.weather.kind === 'storm'
-            ? 0.3
-            : state.weather.kind === 'rain' || state.weather.kind === 'snow'
-              ? 0.55
-              : state.weather.kind === 'cloudy'
-                ? 0.7
-                : 1)
-      sun.color.setHex(daylight > 0.1 ? 0xffe1ac : 0x9eb6dc)
-      room.glass.emissiveIntensity = 0.25 + daylight * 0.5
+      ambient.intensity = 0.38 + light.sky.intensity * 0.85 + (awake ? 0.35 : 0)
+      ambient.color.copy(light.sky.color)
+      ambient.groundColor.copy(light.sky.groundColor)
+      sun.position
+        .copy(light.sun.position)
+        .sub(light.sun.target.position)
+        .normalize()
+        .multiplyScalar(18)
+      sun.target.position.set(0, 0, 0)
+      sun.color.copy(light.sun.color)
+      sun.intensity = light.sun.intensity
+      sun.shadow.intensity = light.sun.shadow.intensity
+      sun.shadow.radius = light.sun.shadow.radius + 1
+      room.glass.color.copy(light.sky.color)
+      room.glass.emissive.copy(light.sun.color)
+      room.glass.emissiveIntensity = daylight * 0.3
       room.flames.visible = lit
+      fire.castShadow = lit
       room.flames.children.forEach((flame, i) => {
         flame.scale.y = 1 + (moving ? Math.sin(seconds * 7 + i) * 0.13 : 0)
       })
@@ -437,8 +456,13 @@ export function createThreeInterior(
       camera.bottom = cy - (span * height) / width / 2
       camera.updateProjectionMatrix()
       renderer.setRenderTarget(null)
-      renderer.info.reset()
+      const autoClear = renderer.autoClear
+      renderer.autoClear = false
+      renderer.clearDepth()
+      renderer.render(backdrop, backdropCamera)
+      renderer.clearDepth()
       renderer.render(stage, camera)
+      renderer.autoClear = autoClear
       return true
     },
     destroy() {
@@ -448,6 +472,7 @@ export function createThreeInterior(
       setActive(null)
       people.destroy()
       materials.destroy()
+      disposeGroup(veil)
       sun.shadow.dispose()
       fire.shadow.dispose()
       listeners.clear()

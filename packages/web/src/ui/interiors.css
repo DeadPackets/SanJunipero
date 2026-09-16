@@ -29,3 +29,21 @@
 
 @media(min-width:900px){.interior-heading{grid-template-columns:auto minmax(180px,1fr) minmax(0,auto) auto;gap:18px}.interior-residents{padding:0;max-width:38vw}.interior-residents>button{min-height:44px}.interior-empty{margin:0 8px}.interior-contents{top:60px}}
 @media(max-width:899px){.interior-residents{grid-column:1/-1;grid-row:2}.interior-contents-button{grid-column:3;grid-row:1}.interior-heading{row-gap:2px}.interior-contents{top:65px}}
+
+.interior-hud{background:#303b32f2;border:1px solid #9aa18888;border-radius:6px;padding:12px 14px 0;box-shadow:0 3px 0 #1c281f66}
+.interior-heading{border-bottom:0}
+.interior-contents{top:calc(100% + 8px);width:min(360px,calc(100vw - 32px));max-height:min(58vh,480px);padding:14px;background:#fff3e2;border:2px solid #8d7156;box-shadow:inset 0 0 0 3px #fffaf1,0 4px 0 #59473566;z-index:2}
+.interior-contents-title h3{display:flex;align-items:center;gap:8px;color:#654f3b;font-size:18px}
+.interior-contents-title h3 .sj-icon{width:28px;height:28px}
+.interior-contents .interior-contents-summary{margin:0 0 14px;color:#786957;font-size:12px}
+.interior-contents ul{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0}
+.interior-contents li{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 5px 10px;border:1px solid #c5ac83;border-radius:4px;background:#f5e8d0;min-width:0;box-shadow:inset 0 0 0 2px #fff7e7}
+.interior-contents li[data-family='provisions']{background:#e5ebd0;border-color:#a0ad7f}
+.interior-contents li[data-family='tools']{background:#e1e6ea;border-color:#9da7ae}
+.interior-item-art{display:grid;place-items:center;width:68px;height:64px}
+.interior-item-art img{width:64px;height:64px;object-fit:contain;image-rendering:pixelated}
+.interior-item-art .sj-icon{width:42px;height:42px;opacity:.65}
+.interior-item-name{font-size:12px;line-height:1.3;text-align:center;overflow-wrap:anywhere;text-transform:capitalize;color:#554b40}
+.interior-contents li .interior-item-qty{position:absolute;top:5px;right:5px;background:#fff8e9;border:1px solid #b59b72;border-radius:3px;padding:1px 4px;color:#685238;font-size:11px;font-weight:600}
+.interior-contents .interior-contents-empty{display:flex;align-items:center;gap:12px;font-size:13px;margin:12px 0}.interior-contents-empty .sj-icon{width:38px;height:38px;opacity:.55}
+@media(max-width:700px){.interior-hud{padding:8px 9px 0}.interior-contents{right:-1px;top:calc(100% + 8px)}.interior-heading{gap:8px}.interior-contents ul{gap:8px}.interior-title h2{font-size:14px}}

@@ -49,3 +49,14 @@ The copied history contains no fueled indoor hearth event. Hearth state is wired
 This branch is not merged into the approved town. To reject the design, keep using port 8773; its source and database were not replaced. The preview service can be stopped with `launchctl bootout gui/$(id -u)/local.sanjunipero.interiors`.
 
 The original working tree had uncommitted approved work. A temporary Git index captured that complete tracked/untracked source state in the baseline commit without changing the original index or branch. The redesign is committed on top of that baseline. Before later integration, inspect the original working tree and checkpoint its current approved changes. Apply only redesign commits after the baseline; do not blindly merge over the dirty original tree or overwrite subsequent work.
+
+
+## Town backdrop and room polish — 2026-09-16
+
+Applied the owner's six follow-up requests on the same isolated branch. The live town now renders behind a dimmed cutaway. Both views consume the same exterior sun/sky lighting state, including weather and lightning. The light follows an east-to-west arc; fractional render time smooths movement between simulation minutes and snaps to paused/replay positions. This is visual interpolation only and does not change the event log.
+
+Interiors reuse the exterior's plaster/board surface generator and personal-home palette. Floors have staggered planks, grain, fasteners and subtle bump detail; rugs and bedding have woven texture. Personal details now cover storage cupboards, workshop tools, plants, apothecary jars, books and a reading chair, textile spools/loom and smithing tools. Reading/textile homes use a different bed and desk arrangement. Storehouses omit dining benches, and farmhouses have a larger table and timber bracing. Furniture remains decorative presentation of existing activities, not new simulation inventory or agent affordances.
+
+Belongings uses the registered item icon assets, exact quantities and a responsive inventory grid with material/provision/tool colors. Unknown kinds retain a labeled fallback. Exterior cast rails are hidden indoors; the mobile Town control has an accessible label. Unlit interior hearths skip their six point-light shadow views.
+
+Manual review covered Amara at dawn and rainy midday, Nadia and Farida in morning light, Yusuf asleep under moonlight, 390px mobile framing, item pictures/counts and closing inventory with Escape. The shared direction and interpolation were reviewed in source. Web build completed; no tests, typecheck, lint or gates ran. The browser reported an existing Pixi addChild deprecation warning but no JavaScript errors during the visual review. No AI minds, production actions or paid art generation were used.

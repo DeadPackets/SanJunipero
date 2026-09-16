@@ -9,6 +9,7 @@ import {
 } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { GameIcon, Portrait } from '../paper/game/shared.js'
+import { resolveAssetId } from '../render/textures.js'
 
 export function InteriorHUD({
   store,
@@ -22,6 +23,7 @@ export function InteriorHUD({
   onPerson: (id: string) => void
 }) {
   const state = useSyncExternalStore(store.subscribe, store.getState)
+  useSyncExternalStore(store.subscribe, store.assetsSeq)
   const [contents, setContents] = useState(false)
   const contentsButton = useRef<HTMLButtonElement>(null)
   const building = state?.structures[id]
@@ -47,7 +49,7 @@ export function InteriorHUD({
       }}
     >
       <div className="interior-heading">
-        <button type="button" className="interior-back" onClick={onExit}>
+        <button type="button" className="interior-back" aria-label="Back to town" onClick={onExit}>
           <span aria-hidden="true">←</span>
           <span>Town</span>
         </button>
@@ -106,24 +108,54 @@ export function InteriorHUD({
       </div>
       {contents && (
         <div id="interior-contents" className="interior-contents">
-          <div>
-            <h3>Kept here</h3>
+          <div className="interior-contents-title">
+            <h3>
+              <GameIcon kind="note" /> Belongings
+            </h3>
             <button type="button" aria-label="Close belongings" onClick={() => setContents(false)}>
               ×
             </button>
           </div>
+          <p className="interior-contents-summary">
+            {stacks.size} kinds · {items.reduce((sum, item) => sum + item.qty, 0)} items kept here
+          </p>
           {stacks.size === 0 ? (
-            <p>Nothing is stored here yet.</p>
+            <p className="interior-contents-empty">
+              <GameIcon kind="note" />
+              Nothing is stored here yet.
+            </p>
           ) : (
             <ul>
               {[...stacks]
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([kind, qty]) => (
-                  <li key={kind}>
-                    <span>{kindWords(kind)}</span>
-                    <span>× {qty}</span>
-                  </li>
-                ))}
+                .map(([kind, qty]) => {
+                  const asset = resolveAssetId(store.assetRecords(), 'item', `${kind}#icon`)
+                  const family = /wood|stone|iron|ore|clay|plank|fiber/.test(kind)
+                    ? 'materials'
+                    : /bread|berry|fruit|fish|grain|wheat|herb|water|food/.test(kind)
+                      ? 'provisions'
+                      : /axe|pick|hoe|knife|hammer|tool/.test(kind)
+                        ? 'tools'
+                        : 'other'
+                  return (
+                    <li key={kind} data-family={family}>
+                      <span className="interior-item-art" aria-hidden="true">
+                        {asset ? (
+                          <img src={`/assets/${asset}.png`} alt="" />
+                        ) : (
+                          <GameIcon kind={family === 'tools' ? 'hammer' : 'note'} />
+                        )}
+                      </span>
+                      <span className="interior-item-name">{kindWords(kind)}</span>
+                      <span
+                        className="interior-item-qty"
+                        aria-label={`${qty} ${qty === 1 ? 'item' : 'items'}`}
+                      >
+                        ×{qty}
+                      </span>
+                    </li>
+                  )
+                })}
             </ul>
           )}
         </div>

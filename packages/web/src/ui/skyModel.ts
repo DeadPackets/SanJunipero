@@ -13,7 +13,7 @@ export type SkyToken = { kind: 'sun' | 'moon'; along: number }
 
 /** Which body is up, and how far along its own hours it has got — 0 at its rise, 1 at its set. */
 export function skyToken(tick: number): SkyToken {
-  const m = ((Math.floor(tick) % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
+  const m = ((tick % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY
   const lit = SUN_DOWN_MIN - SUN_UP_MIN
   if (m >= SUN_UP_MIN && m < SUN_DOWN_MIN) return { kind: 'sun', along: (m - SUN_UP_MIN) / lit }
   const dark = MINUTES_PER_DAY - lit

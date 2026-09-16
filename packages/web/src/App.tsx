@@ -524,7 +524,7 @@ export function App() {
       {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
       {/* Below 1000px the frame has no room for the three, so the drawer is their room. Above
           it the drawer is `display: contents` and they stand in their own areas. */}
-      {!route.broadcast && (
+      {!route.broadcast && insideId === null && (
         <Drawer>
           <BeatCard store={store} />
           <ShotBoard store={store} />

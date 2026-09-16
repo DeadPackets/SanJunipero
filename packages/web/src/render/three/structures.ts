@@ -15,7 +15,7 @@ const C = {
 }
 type Point = [number, number, number]
 
-function woodMaps(plaster = false): { color: THREE.DataTexture; height: THREE.DataTexture } {
+export function woodMaps(plaster = false): { color: THREE.DataTexture; height: THREE.DataTexture } {
   const size = 128
   const color = new Uint8Array(size * size * 4)
   const height = new Uint8Array(size * size * 4)

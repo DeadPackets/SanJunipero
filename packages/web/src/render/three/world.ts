@@ -288,8 +288,15 @@ export function createThreeWorld(
         view.world.scale.x,
       )
       const span = Math.max(width, height) / (WORLD_PX * view.world.scale.x)
-      const climate = environment.update(state, config, center, span, seconds, dt, (id) =>
-        Number(structures.get(id)?.group.userData.lightHeight ?? 0.85),
+      const climate = environment.update(
+        state,
+        config,
+        center,
+        span,
+        seconds,
+        dt,
+        (id) => Number(structures.get(id)?.group.userData.lightHeight ?? 0.85),
+        view.wantsMotion() && store.timeMoving() && !store.getPaused(),
       )
       for (const [id, entry] of structures) {
         const lit = climate.active.has(id)
@@ -356,13 +363,6 @@ export function createThreeWorld(
           })
         }
       }
-      if (interior.render(dt)) {
-        renderer.domElement.style.opacity = String(view.app.stage.alpha)
-        root.dataset.renderer = 'three-interior'
-        root.dataset.drawCalls = String(renderer.info.render.calls)
-        store.setDressed()
-        return
-      }
       terrain.tick(seconds, climate.wet, view.wantsMotion())
       const targets = people.sync(
         Object.values(state.agents)
@@ -378,7 +378,8 @@ export function createThreeWorld(
       renderer.domElement.style.opacity = String(view.app.stage.alpha)
       renderer.info.reset()
       composer.render()
-      root.dataset.renderer = 'three'
+      const indoors = interior.render(dt, climate)
+      root.dataset.renderer = indoors ? 'three-interior' : 'three'
       root.dataset.structures = String(structures.size)
       root.dataset.faded = String(faded)
       root.dataset.drawCalls = String(renderer.info.render.calls)
