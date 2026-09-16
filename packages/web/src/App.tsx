@@ -1,3 +1,4 @@
+import { InteriorHUD } from './stage/InteriorHUD.js'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, structureTitle, tickToMoment } from '@sj/shared'
 import { createWorldStore, onFirstSnapshot } from './state/worldStore.js'
@@ -88,6 +89,15 @@ export function App() {
   const [gapTicks, setGapTicks] = useState<number | null>(null)
   // which interior the camera is inside; the Pixi sub-scene owns the truth, this mirrors it
   const [insideId, setInsideId] = useState<string | null>(null)
+  const roomCastKey = useSyncExternalStore(store.subscribe, () =>
+    insideId === null
+      ? ''
+      : Object.values(store.getState()?.agents ?? {})
+          .filter((a) => a.alive && a.insideId === insideId)
+          .map((a) => a.id)
+          .sort()
+          .join(' '),
+  )
   const [subject, setSubject] = useState<Subject | null>(null)
   const [focus, setFocus] = useState<Subject | null>(null)
   const [thing, setThing] = useState<Thing | null>(null)
@@ -109,6 +119,9 @@ export function App() {
   // Where the Almanac stands. It lives here, not in the sheet, because Watch has to ask.
   const [dock, setDock] = useState(() => paperDock(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
+  useEffect(() => {
+    scene?.interior?.setFollowed(following)
+  }, [scene, following])
   // Operator-only: absent for every viewer who did not put a token in this session.
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
@@ -166,6 +179,8 @@ export function App() {
     const onPop = (): void => {
       routeRef.current = parseRoute(location.pathname, location.search)
       setRoute(routeRef.current)
+      if (routeRef.current.insideId && routeRef.current.agentId)
+        setSheet({ page: 'person', tab: 'Now' })
     }
     window.addEventListener('popstate', onPop)
     return () => {
@@ -205,9 +220,12 @@ export function App() {
     return onFirstSnapshot(store, () => {
       const name = store.getState()?.agents[agentId]?.name
       // eslint-disable-next-line react-hooks/set-state-in-effect -- the address bar is the canvas's only way to name a pick; this mirrors it into the ring.
-      if (name !== undefined) setSubject({ id: agentId, kind: 'agent', name })
+      if (name !== undefined) {
+        setSubject({ id: agentId, kind: 'agent', name })
+        if (route.insideId) setSheet({ page: 'person', tab: 'Now' })
+      }
     })
-  }, [agentId, store])
+  }, [agentId, store, route.insideId])
 
   const closePaper = useCallback(() => {
     setSheet(null)
@@ -262,6 +280,19 @@ export function App() {
   )
   useMomentEnd(store, play, onMomentEnd)
 
+  useEffect(() => {
+    if (!scene) return
+    const id = route.insideId ?? null
+    let applied = false
+    const apply = () => {
+      if (applied || !store.getState()) return
+      applied = true
+      scene.interior?.setActive(id)
+    }
+    apply()
+    return applied ? undefined : store.subscribe(apply)
+  }, [scene, store, route.insideId])
+
   const onMoment = useCallback((id: number | null) => {
     const next: Route = { ...routeRef.current, momentId: id }
     routeRef.current = next
@@ -284,6 +315,11 @@ export function App() {
   }
 
   const enterInterior = (structureId: string | null): void => {
+    if (structureId !== null) {
+      holdDirector()
+      setSubject(null)
+      closePaper()
+    } else setFollowing(null)
     scene?.interior?.setActive(structureId)
   }
 
@@ -388,6 +424,7 @@ export function App() {
       ref={appRef}
       data-broadcast={route.broadcast ? 'on' : undefined}
       data-density={density.mode}
+      data-interior={insideId === null ? undefined : 'on'}
       data-paper={sheet === null ? undefined : 'on'}
       data-replay={play === null || route.broadcast ? undefined : 'on'}
     >
@@ -399,7 +436,13 @@ export function App() {
         <StageMount
           store={store}
           onScene={setScene}
-          onInterior={setInsideId}
+          onInterior={(id) => {
+            setInsideId(id)
+            const next = { ...routeRef.current, insideId: id }
+            routeRef.current = next
+            writeAddress(next, true)
+            setRoute(next)
+          }}
           onPick={(pick) => {
             if (pick.kind === 'structure') {
               const s = store.getState()?.structures[pick.id]
@@ -418,37 +461,45 @@ export function App() {
         />
       </main>
       {insideId !== null && (
-        <button
-          type="button"
-          className="stage-exit"
-          onClick={() => {
+        <InteriorHUD
+          key={insideId}
+          store={store}
+          id={insideId}
+          onExit={() => {
             enterInterior(null)
-            // the button goes with the room, so the focus it held has to be handed somewhere
             appRef.current?.querySelector<HTMLElement>('.stage-mount')?.focus()
           }}
-        >
-          <span aria-hidden="true">← </span>Back to town
-        </button>
+          onPerson={(id) => {
+            const a = store.getState()?.agents[id]
+            if (a) pickSubject({ kind: 'agent', id, name: a.name })
+          }}
+        />
       )}
-      {wayBack(mode.live, route.broadcast) && (
+      {insideId === null && wayBack(mode.live, route.broadcast) && (
         <button type="button" className="stage-live" onClick={onLive}>
           Return to now<span aria-hidden="true"> →</span>
         </button>
       )}
       {!route.broadcast && <ReplayScene store={store} play={play} />}
       <SpeechLive store={store} />
-      <Figures
-        scene={scene}
-        store={store}
-        paperOpen={sheet !== null}
-        onFocus={setFocus}
-        onOpen={(next) => {
-          setSubject(next)
-          density.show('deck')
-        }}
-      />
-      <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
-      <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
+      {insideId === null && (
+        <Figures
+          scene={scene}
+          store={store}
+          paperOpen={sheet !== null}
+          onFocus={setFocus}
+          onOpen={(next) => {
+            setSubject(next)
+            density.show('deck')
+          }}
+        />
+      )}
+      {insideId === null && (
+        <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
+      )}
+      {insideId === null && (
+        <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />
+      )}
       <DayBar
         store={store}
         link={link}
@@ -467,7 +518,7 @@ export function App() {
         handbackAt={handbackAt}
         broadcast={route.broadcast}
       />
-      <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
+      {insideId === null && <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />}
       {/* The stream is its own composition and keeps the card it has captions for. Everywhere
           else the beat card is the one card, and Stage has neither. */}
       {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
@@ -481,7 +532,11 @@ export function App() {
         </Drawer>
       )}
       <StoryStrip store={store} />
-      <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
+      <LowerThird
+        store={store}
+        shot={insideId === null ? shot.cast : roomCastKey.split(' ').filter(Boolean)}
+        broadcast={route.broadcast}
+      />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
         store={store}
@@ -502,7 +557,7 @@ export function App() {
         }}
       />
       <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
-      <Soundscape store={store} scene={scene} />
+      <Soundscape store={store} scene={scene} insideId={insideId} />
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}

@@ -39,6 +39,10 @@ type LiveLine = SpokenLine & { bornMs: number }
  *  camera moves off them: a caption over somebody else's face is a lie about who spoke. */
 function useSpokenInShot(store: WorldStore, shot: readonly string[]): LiveLine | null {
   const [spoken, setSpoken] = useState<LiveLine | null>(null)
+  const shotRef = useRef(shot)
+  useEffect(() => {
+    shotRef.current = shot
+  }, [shot])
 
   useEffect(() => {
     let timer = 0
@@ -46,6 +50,7 @@ function useSpokenInShot(store: WorldStore, shot: readonly string[]): LiveLine |
       for (const ev of evts) {
         if (ev.type !== 'agent_spoke') continue
         const p = ev.payload as { agentId: string; text: string }
+        if (!shotRef.current.includes(p.agentId)) continue
         const name = agentName(store.getState()?.agents, p.agentId)
         setSpoken({ agentId: p.agentId, name, words: p.text, bornMs: performance.now() })
         clearTimeout(timer)

@@ -1,3 +1,4 @@
+import { hears } from '../earshot.js'
 import { isBeddedKind, simTimeFromTick, type SimConfig } from '@sj/shared'
 import type { AgentBody, WorldState } from '../state.js'
 import type { TickCtx } from '../tickCtx.js'
@@ -42,16 +43,16 @@ function socialRegenActive(ctx: TickCtx, id: string): boolean {
   const window = ctx.config.needs.socialRegenRecencyTicks
   const a = ctx.state().agents[id]!
   const aSpoke = a.lastSpokeTick !== undefined && tick - a.lastSpokeTick <= window
-  const earshotSq = ctx.config.movement.earshotRadius * ctx.config.movement.earshotRadius
   for (const otherId of Object.keys(ctx.state().agents)) {
     if (otherId === id) continue
     const o = ctx.state().agents[otherId]!
     if (!o.alive) continue
-    const dx = o.x - a.x
-    const dy = o.y - a.y
-    if (dx * dx + dy * dy > earshotSq) continue
     const oSpoke = o.lastSpokeTick !== undefined && tick - o.lastSpokeTick <= window
-    if (aSpoke || oSpoke) return true
+    if (
+      (aSpoke && hears(ctx.state(), ctx.config, a, otherId)) ||
+      (oSpoke && hears(ctx.state(), ctx.config, o, id))
+    )
+      return true
   }
   return false
 }

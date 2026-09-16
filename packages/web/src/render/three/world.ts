@@ -1,3 +1,4 @@
+import { createThreeInterior } from './interior.js'
 import { createOrchardGardens } from './orchard.js'
 import { effectiveConfig } from '@sj/engine/laws'
 import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
@@ -73,6 +74,7 @@ export function createThreeWorld(
   })
   root.prepend(renderer.domElement)
   view.app.canvas.style.position = 'relative'
+  const interior = createThreeInterior(view, store, renderer, callbacks.select)
   const scene = new ThreeScene()
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 1000)
   const terrain = createTerrain(scene)
@@ -228,6 +230,7 @@ export function createThreeWorld(
   view.app.stage.on('pointertap', pick)
   return {
     weather: weather.controls,
+    interior,
     tick(dtMs: number) {
       if (destroyed) return
       const state = store.getState()
@@ -353,6 +356,13 @@ export function createThreeWorld(
           })
         }
       }
+      if (interior.render(dt)) {
+        renderer.domElement.style.opacity = String(view.app.stage.alpha)
+        root.dataset.renderer = 'three-interior'
+        root.dataset.drawCalls = String(renderer.info.render.calls)
+        store.setDressed()
+        return
+      }
       terrain.tick(seconds, climate.wet, view.wantsMotion())
       const targets = people.sync(
         Object.values(state.agents)
@@ -377,6 +387,7 @@ export function createThreeWorld(
     destroy() {
       if (destroyed) return
       destroyed = true
+      interior.destroy()
       delete view.capturePlace
       off()
       view.app.stage.off('pointertap', pick)

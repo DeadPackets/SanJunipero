@@ -25,7 +25,12 @@ type Person = {
 export function createPeople(scene: Scene) {
   const people = new Map<string, Person>()
   return {
-    sync(ids: string[], spriteOf: (id: string) => Sprite | null, daylight = 1) {
+    sync(
+      ids: string[],
+      spriteOf: (id: string) => Sprite | null,
+      daylight = 1,
+      elevationOf: (id: string) => number = () => 0,
+    ) {
       const live = new Set(ids)
       const targets: Vector3[] = []
       for (const [id, person] of people)
@@ -85,14 +90,14 @@ export function createPeople(scene: Scene) {
         const shift = ((0.5 - sprite.anchor.x) * w) / Math.SQRT2
         person.mesh.position.set(
           ground.x + shift,
-          0.025 + (sprite.anchor.y - 0.5) * h,
+          0.025 + elevationOf(id) + (sprite.anchor.y - 0.5) * h,
           ground.y - shift,
         )
         person.mesh.scale.set(w, h, 1)
         person.mesh.material.color.setHex(sprite.tint)
         person.mesh.material.emissive.setHex(sprite.tint)
         person.mesh.material.emissiveIntensity = 0.1 + daylight * 0.1
-        person.hitBody.position.set(ground.x, 0.92, ground.y)
+        person.hitBody.position.set(ground.x, 0.92 + elevationOf(id), ground.y)
         person.mesh.updateMatrixWorld()
         targets.push(new Vector3(ground.x, 1.55, ground.y), new Vector3(ground.x, 0.85, ground.y))
       }

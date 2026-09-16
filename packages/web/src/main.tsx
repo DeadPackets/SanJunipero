@@ -1,3 +1,4 @@
+import './ui/interiors.css'
 import { createRoot } from 'react-dom/client'
 import { App } from './App.js'
 import { PageBoundary } from './paper/PageBoundary.js'

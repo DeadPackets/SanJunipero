@@ -4,7 +4,13 @@ import type { Scene } from '../render/scene.js'
 /** The chrome that stands over the canvas at its top edge and at its bottom edge. The arms are
  *  a top mark on a short or a narrow window and a bottom-right corner mark otherwise, and
  *  `insetsOf` reads which edge they actually reached rather than being told. */
-export const TOP_BAND: readonly string[] = ['.day-bar', '.signpost', '.stage-exit', '.stage-live']
+export const TOP_BAND: readonly string[] = [
+  '.day-bar',
+  '.signpost',
+  '.stage-exit',
+  '.stage-live',
+  '.interior-hud',
+]
 export const BOTTOM_BAND: readonly string[] = ['.stage-cue', '.lower-third']
 
 type Box = { top: number; bottom: number; height: number }

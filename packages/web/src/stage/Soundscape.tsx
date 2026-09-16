@@ -71,7 +71,15 @@ const LEVEL_CSS = `
  *  plays it, so the signal survives a viewer who never unmutes — which is every viewer by
  *  default. The stack is column-reverse, so a bell arriving on top leaves the rest where they
  *  were rather than shoving the whole corner up a row. */
-export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene | null }) {
+export function Soundscape({
+  store,
+  scene,
+  insideId = null,
+}: {
+  store: WorldStore
+  scene: Scene | null
+  insideId?: string | null
+}) {
   const [setting, setSetting] = useState(storedSound)
   const [level, setLevel] = useState(storedLevel)
   const synth = useRef<Synth | null>(null)
@@ -145,6 +153,10 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
     let fires = 0,
       firePan = 0
     for (const f of flamesAt(state, tick, store.getConfig() ?? DEFAULT_CONFIG)) {
+      if (insideId !== null) {
+        if (f.source === 'structure' && f.id === insideId) fires++
+        continue
+      }
       const at = poolCentre(f)
       if (!inView(view, at.sx, at.sy)) continue
       const from = heard(view, at.sx, at.sy)
@@ -152,7 +164,7 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
       firePan += from.near * from.pan
     }
     let firefliesInView = 0
-    if (fireflyStrength(state.weather.kind, minuteOfDay) > 0)
+    if (insideId === null && fireflyStrength(state.weather.kind, minuteOfDay) > 0)
       for (const s of seeds) {
         const at = feetOf(s.x, s.y)
         if (inView(view, at.sx, at.sy)) firefliesInView++
@@ -163,6 +175,10 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
       for (const id of held.participants) {
         const a = state.agents[id]
         if (a === undefined) continue
+        if (insideId !== null) {
+          if (a.insideId === insideId) mouths++
+          continue
+        }
         const at = feetOf(a.x, a.y)
         if (!inView(view, at.sx, at.sy)) continue
         const from = heard(view, at.sx, at.sy)
@@ -182,8 +198,15 @@ export function Soundscape({ store, scene }: { store: WorldStore; scene: Scene |
       bellAgeMs: bell === null ? null : 0,
       bellStrike: bell?.strike ?? 0,
     }
-    return soundCues(world)
-  }, [state, scene, store, seeds, bell, tick, minuteOfDay, gust])
+    const cues = soundCues(world)
+    return insideId === null
+      ? cues
+      : cues
+          .filter((c) => c.source !== 'crickets' && c.source !== 'bell')
+          .map((c) =>
+            c.source === 'wind' || c.source === 'rain' ? { ...c, gain: c.gain * 0.3 } : c,
+          )
+  }, [state, scene, store, seeds, bell, tick, minuteOfDay, gust, insideId])
 
   // ★ EVERY SNAPSHOT, NOT EVERY CHANGE. A still night moves no gain for eight sim-hours, and a
   // synth written only when the numbers move plays that whole night in one go at dawn.

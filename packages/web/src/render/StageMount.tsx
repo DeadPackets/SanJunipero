@@ -129,7 +129,7 @@ export function StageMount({
       three?.destroy()
       landmarks?.destroy()
       toponyms?.destroy()
-      interior?.destroy()
+      if (!three) interior?.destroy()
       chars?.destroy()
       bubbles?.destroy()
       acts?.destroy()
@@ -211,13 +211,6 @@ export function StageMount({
           const sp = charLayer.getSprite(agentId)
           return sp === null ? null : { x: sp.x, y: sp.y }
         }
-        interior = createInteriorScene(s, store, book, selectAgent)
-        s.interior = interior
-        interiorRef.current = interior
-        offInterior = interior.onChange((id) => {
-          s.tags.hideAll()
-          onInteriorRef.current?.(id)
-        })
         offEvents = store.onEvents((evts) => {
           for (const ev of evts) {
             if (ev.type === 'agent_spoke') {
@@ -238,6 +231,13 @@ export function StageMount({
             pick,
             ground: () => onGroundRef.current?.(),
           })
+        interior = three?.interior ?? createInteriorScene(s, store, book, selectAgent)
+        s.interior = interior
+        interiorRef.current = interior
+        offInterior = interior.onChange((id) => {
+          s.tags.hideAll()
+          onInteriorRef.current?.(id)
+        })
         if (three) weather = three.weather
         if (weather) ambient = createAmbient(s, store, { weather, bubbles, chars })
         let seenThoughts = store.thoughtsSeq()

@@ -2,6 +2,7 @@ import { momentToTick } from '@sj/shared'
 import { BROADCAST_PARAM, broadcastFromSearch } from './broadcast.js'
 
 export type Route = {
+  insideId?: string | null
   /** the minute being watched, `null` while the view is live */
   moment: { day: number; time: string } | null
   /** the recorded day the filmstrip has open, by the id the record gave it */
@@ -61,7 +62,13 @@ export function parseRoute(pathname: string, search: string): Route {
 
   // A broadcast IS the town televised, so nothing a stream has no reader for is addressable.
   if (broadcastFromSearch(search)) return { moment, momentId, agentId: null, broadcast: true }
-  return { moment, momentId, agentId, broadcast: false }
+  return {
+    moment,
+    momentId,
+    agentId,
+    broadcast: false,
+    ...(params.get('inside') ? { insideId: params.get('inside') } : {}),
+  }
 }
 
 // An open recorded day outranks the minute inside it, and both outrank the person: the player
@@ -81,6 +88,7 @@ export function routeToPath(r: Route): string {
   // Every scrub rewrites the address bar in place. Drop the flag here and the first minute
   // that passes takes the stream frame away with it.
   if (r.broadcast) params.set(BROADCAST_PARAM, '1')
+  if (r.insideId && !r.broadcast) params.set('inside', r.insideId)
   const q = params.toString()
   return q === '' ? path : `${path}?${q}`
 }

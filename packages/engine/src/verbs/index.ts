@@ -2309,14 +2309,27 @@ const drop: VerbDef = makeVerb({
     const p = DropParams.safeParse(params)
     const loc = p.success ? state.items[p.data.itemId]?.loc : undefined
     const a = state.agents[agentId]!
-    return loc?.t === 'tile' && loc.x === a.x && loc.y === a.y
+    return a.insideId !== undefined
+      ? loc?.t === 'structure' && loc.id === a.insideId
+      : loc?.t === 'tile' && loc.x === a.x && loc.y === a.y
   },
   onComplete(state, _config, agentId, params) {
     const p = DropParams.parse(params)
     const item = state.items[p.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
     const a = state.agents[agentId]!
-    return [{ type: 'item_moved', payload: { id: p.itemId, loc: { t: 'tile', x: a.x, y: a.y } } }]
+    return [
+      {
+        type: 'item_moved',
+        payload: {
+          id: p.itemId,
+          loc:
+            a.insideId !== undefined
+              ? { t: 'structure', id: a.insideId }
+              : { t: 'tile', x: a.x, y: a.y },
+        },
+      },
+    ]
   },
 })
 
