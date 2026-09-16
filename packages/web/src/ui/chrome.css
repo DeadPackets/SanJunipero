@@ -2181,130 +2181,87 @@ body {
 }
 .moment-card.lead { flex-direction: column; }
 
-/* ── THE STORY STRIP: the band that says what has been running here without you ───────────── */
-/* Three capsules over the foot of the picture, in every mode. The one the camera is on wears the
-   paper and the lift; the rest stand in the band's own night. Nothing here prints a raw score. */
+/* Town stories shares the almanac's paper and category colors. */
 .story-strip {
-  grid-area: strip; grid-column: edge; z-index: 21;
-  min-height: 84px;
-  display: flex; align-items: center; justify-content: center;
-  padding-inline: var(--s-5);
-  /* The same 92% the band at the top is drawn on: the town keeps moving behind it. */
-  background: color-mix(in srgb, var(--deep) 92%, transparent);
-  box-shadow: inset 0 2px 0 0 var(--ink);
-  pointer-events: none; overflow: hidden;
+  --story-paper: #fff6e9; --story-card: #f8eedc; --story-ink: #43394a;
+  --story-muted: #766b62; --story-edge: #b9ac93; --story-gold: #f8e7bf;
+  --story-active: #e5ecd8; --story-active-ink: #466037;
+  grid-area: strip; grid-column: edge; z-index: 21; min-width: 0; container: stories / inline-size;
+  display: flex; align-items: center; gap: 18px;
+  padding: 12px max(20px, env(safe-area-inset-right)) 12px max(20px, env(safe-area-inset-left));
+  background: var(--story-paper); color: var(--story-ink); border-top: 2px solid var(--story-edge);
+  font: 13px/1.5 Manrope, sans-serif;
 }
-.story-quiet {
-  margin: 0;
-  font-family: var(--font-body); font-size: var(--f-3); font-weight: 600;
-  letter-spacing: 0.08em; color: var(--cream-quiet);
+.app:not([data-broadcast='on']) .story-strip {
+  grid-row: strip-start / -1; padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
-.story-row {
-  display: flex; align-items: center; gap: var(--s-5);
-  margin: 0; padding: 0; list-style: none; min-width: 0;
+.app:has(.almanac[data-theme='dark']) .story-strip {
+  --story-paper: #2b2c32; --story-card: #36363a; --story-ink: #f3e7d5;
+  --story-muted: #c0b8ac; --story-edge: #817766; --story-gold: #514938;
+  --story-active: #3a4c3e; --story-active-ink: #e0edce;
 }
-/* Four rows in 64px: the cast beside a label row, the town's own sentence, and the heat. */
+.story-heading { display: flex; align-items: center; gap: 10px; flex: none; }
+.story-heading > .sj-icon { width: 34px; height: 34px; }
+.story-heading h2 { margin: 0; font: 12px/1.5 var(--font-px); }
+.story-heading small { color: var(--story-muted); font-size: 11px; }
+.story-quiet { flex: 1; min-width: 0; padding-left: 18px; border-left: 1px solid var(--story-edge); }
+.story-quiet strong { font-size: 13px; font-weight: 600; }
+.story-quiet p { margin: 0; font-size: 11px; color: var(--story-muted); }
+.story-open {
+  flex: none; min-height: 44px; padding: 8px 12px; border: 1px solid var(--story-edge);
+  border-radius: 5px; background: var(--story-gold); color: var(--story-ink);
+  box-shadow: 0 2px var(--story-edge); font: 600 12px/1.5 Manrope, sans-serif; cursor: pointer;
+}
+.story-open span { margin-left: 8px; }
+.story-open:hover { filter: brightness(.96); }
+.story-open:active { translate: 0 2px; box-shadow: none; }
+.story-open:focus-visible { outline: 3px solid #7194b3; outline-offset: 3px; }
+.story-row { flex: 1; display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; min-width: 0; }
 .story-capsule {
-  /* 76, not 64: two lines of the sentence at --f-3 need 36px and 64 left them 27. */
-  flex: 0 1 320px; min-width: 0; height: 76px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) 3px;
-  column-gap: var(--s-4); row-gap: var(--s-1);
-  padding: var(--s-3) var(--s-4);
-  border-left: var(--s-3) solid var(--ink-quiet);
-  background: var(--night);
-  box-shadow: var(--frame-tight);
+  flex: 1; min-width: 0; min-height: 76px;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto 1fr 3px;
+  column-gap: 10px; row-gap: 4px; padding: 8px 10px; border: 1px solid var(--story-edge);
+  border-radius: 6px; background: var(--story-card);
 }
-/* The same stripe the beat card wears, off the same sign: a courtship and a quarrel came off the
-   wire opposite and rendered identically. Neutral takes no accent and reads at 1.55:1 on purpose. */
-.story-capsule[data-tone='cost'] { border-left-color: var(--rose); }
-.story-capsule[data-tone='gain'] { border-left-color: var(--sage); }
-/* ★ The camera agrees with the top capsule on under half of all ticks, so being ON SCREEN is a
-   change of paper and a lift off the band, never an outline somebody has to hunt for. */
-.story-capsule.lit { background: var(--cream); box-shadow: var(--frame); }
-.story-cast {
-  grid-column: 1; grid-row: 1 / -1; align-self: center;
-  display: flex; align-items: center;
-}
-.story-bust {
-  flex: none; width: 26px; height: 26px;
-  background-repeat: no-repeat;
-  image-rendering: pixelated;   /* the bust IS world art */
-  box-shadow: var(--frame-tight);
-}
-.story-bust + .story-bust { margin-left: -8px; }
-.story-bust.none { background-color: var(--sand); }
-.story-meta {
-  grid-column: 2; grid-row: 1;
-  display: flex; align-items: baseline; gap: var(--s-3);
-  margin: 0; min-width: 0;
-  font-family: var(--font-body); font-size: var(--f-1); font-weight: 600;
-  letter-spacing: 0.18em; white-space: nowrap;
-  color: var(--cream-quiet);
-}
-.story-capsule.lit .story-meta { color: var(--ink-quiet); }
-/* Ours, not the town's: the one mark on this band that says where the picture is pointed. */
-.story-here {
-  flex: none; padding: 0 var(--s-2);
-  background: var(--current); color: var(--deep);
-}
-.story-state { flex: none; }
-.story-became {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  letter-spacing: 0.04em; text-transform: none;
-}
-.story-days {
-  margin-left: auto; flex: none;
-  font-family: var(--font-data); letter-spacing: 0.04em; font-variant-numeric: tabular-nums;
-}
-/* The town's own sentence, or the cast when it has written none. Two lines, then it stops. */
-.story-line {
-  grid-column: 2; grid-row: 2; margin: 0; min-width: 0;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  font-family: var(--font-title); font-size: var(--f-3); font-weight: 500; line-height: 1.3;
-  color: var(--cream);
-}
-.story-capsule.lit .story-line { color: var(--ink); }
-/* A sim-day old and still the town's own words, so it is kept and marked rather than dropped:
-   the sheet's own de-emphasis, which is a colour and never an opacity. */
-.story-line[data-stale='yes'] { color: var(--cream-quiet); }
-.story-capsule.lit .story-line[data-stale='yes'] { color: var(--ink-quiet); }
-/* Heat over the story's own peak. The share arrives as a width and there is no other bar. */
-/* No `align-self`: the track is 3px of a fixed row and anything but stretch gave it its own
-   content height, which is zero. Measured at 0px tall at every width before this line. */
-/* The track is the capsule's other paper: ink on night read at 1.25:1 and sand on cream at
-   1.34:1, so the denominator was invisible and a share could only be read against a neighbour. */
-.story-heat { grid-column: 2; grid-row: 3; background: var(--sand); }
-.story-heat-fill { display: block; height: 100%; width: var(--share); background: var(--ember); }
-.story-capsule.lit .story-heat { background: var(--night); }
-.story-capsule.lit .story-heat-fill { background: var(--ember-ink); }
+.story-capsule.lit { background: var(--story-gold); border-color: #ad8a47; }
+.story-cast { grid-column: 1; grid-row: 1 / -1; align-self: center; display: flex; flex-wrap: wrap; width: 44px; gap: 2px; }
+.story-bust { flex: none; width: 26px; height: 26px; background-repeat: no-repeat; image-rendering: pixelated; border-radius: 3px; box-shadow: 0 0 0 1px var(--story-edge); background-color: var(--story-paper); }
+.story-bust + .story-bust { margin-left: -10px; }
+.story-bust.none { background-color: var(--story-edge); }
+.story-meta { grid-column: 2; grid-row: 1; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 0; min-width: 0; color: var(--story-muted); font: 600 10px/1.4 Manrope, sans-serif; }
+.story-here { padding: 2px 5px; border-radius: 3px; background: var(--story-active); color: var(--story-active-ink); }
+.story-state { text-transform: lowercase; }
+.story-state::first-letter { text-transform: uppercase; }
+.story-became { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.story-days { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.story-line { grid-column: 2; grid-row: 2; margin: 0; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font: 600 12px/1.5 Manrope, sans-serif; color: var(--story-ink); }
+.story-line[data-stale='yes'] { color: var(--story-muted); }
+.story-heat { grid-column: 2; grid-row: 3; background: var(--story-edge); border-radius: 2px; overflow: hidden; }
+.story-heat-fill { display: block; height: 100%; width: var(--share); background: #a7813e; }
+.story-capsule[data-tone='cost'] .story-heat-fill { background: #b76665; }
+.story-capsule[data-tone='gain'] .story-heat-fill { background: #789859; }
 @media (prefers-reduced-motion: no-preference) {
-  .story-capsule {
-    animation: story-capsule-in var(--t-med) var(--ease-enter) backwards;
-    animation-delay: calc(var(--step) * var(--stagger));
-  }
-  .story-heat-fill { transition: width var(--t-med) var(--ease-move); }
+  .story-strip { transition: background-color 200ms, color 200ms; }
+  .story-capsule { animation: story-capsule-in 200ms ease-out backwards; animation-delay: calc(var(--step) * 40ms); }
+  .story-heat-fill { transition: width 300ms ease; }
 }
-@keyframes story-capsule-in {
-  from { opacity: 0; translate: 0 var(--s-4); }
-  to { opacity: 1; translate: 0 0; }
+@keyframes story-capsule-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+@container stories (max-width: 1200px) { .story-capsule:nth-child(n + 3) { display: none; } }
+@container stories (max-width: 1000px) { .story-capsule:nth-child(n + 2) { display: none; } }
+@media (max-width: 700px) {
+  .story-strip { gap: 10px; padding: 10px 12px; flex-wrap: wrap; }
+  .story-heading { flex: 1; }
+  .story-heading > .sj-icon { width: 28px; height: 28px; }
+  .story-heading h2 { font-size: 11px; }
+  .story-heading small { display: none; }
+  .story-quiet { order: 3; flex-basis: 100%; border-left: 0; padding: 0; display: flex; gap: 8px; align-items: baseline; }
+  .story-quiet strong { font-size: 12px; }
+  .story-quiet p { font-size: 10px; }
+  .story-row { order: 3; flex-basis: 100%; }
+  .story-capsule { min-height: 70px; }
+  .story-open { padding: 7px 10px; font-size: 11px; }
 }
-/* Three capsules are 984px plus two gutters: under 1096px the third squeezed to 284px and the
-   sentence clamped from four lines to two. Two capsules keep the 320px the band was drawn at. */
-@media (max-width: 1099.98px) {
-  .story-capsule:nth-child(n + 3) { display: none; }
-}
-/* One capsule on a phone. The band has a row of its own now, so no slab stands in it. */
-@media (max-width: 900px) {
-  .story-strip { min-height: 76px; }
-  .story-capsule { flex: 1 1 auto; }
-  .story-capsule:nth-child(n + 2) { display: none; }
-}
-/* The slab is a box-shadow, and forced colours drop it. */
-@media (forced-colors: active) {
-  .story-capsule, .story-bust { border: 2px solid CanvasText; }
-}
+@media (forced-colors: active) { .story-capsule, .story-bust, .story-open { border: 1px solid CanvasText; } }
 
 /* ── the beat card: what the room wants, what it is trying, and where it turned ─────────────
    Every row is a source the town already wrote. A row with no source is left out, so the card
@@ -2578,7 +2535,10 @@ body {
 [data-broadcast='on'] .story-capsule { flex: 0 1 640px; height: 128px; }
 [data-broadcast='on'] .story-meta { font-size: var(--f-bcast); letter-spacing: 0.08em; }
 [data-broadcast='on'] .story-line { font-size: var(--f-bcast); }
-[data-broadcast='on'] .story-quiet { font-size: var(--f-bcast); }
+[data-broadcast='on'] .story-quiet strong,
+[data-broadcast='on'] .story-quiet p { font-size: var(--f-bcast); }
+[data-broadcast='on'] .story-open,
+[data-broadcast='on'] .story-heading { display: none; }
 
 /* ── the phone drawer: everything else behind a swipe ────────────────────────────────────────
    Above 1000px the drawer is `display: contents`, so the three panels are grid items of the

@@ -531,7 +531,7 @@ export function App() {
           <DossierRail store={store} />
         </Drawer>
       )}
-      <StoryStrip store={store} />
+      <StoryStrip store={store} onChronicle={() => openPage('chronicle')} />
       <LowerThird
         store={store}
         shot={insideId === null ? shot.cast : roomCastKey.split(' ').filter(Boolean)}

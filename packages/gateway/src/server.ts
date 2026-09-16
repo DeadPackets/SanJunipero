@@ -638,7 +638,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           `${t.id}:${t.state}:${t.valence}:${t.members.join('+')}:${t.terms.join('+')}:${t.beat ?? ''}:${t.summary ?? ''}:${t.proseTick ?? ''}:${share(t.heat, t.peak)}`,
       )
       .join(' ')
-    if (storyNow !== threadsMark) {
+    if (threadsJson === null || storyNow !== threadsMark) {
       threadsMark = storyNow
       threadsJson = JSON.stringify(story)
       hub.broadcast(threadsJson)

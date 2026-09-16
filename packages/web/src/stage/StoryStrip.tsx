@@ -3,10 +3,10 @@ import { WHY_NAMES_MAX, agentName, castWords, type ThreadRow } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import { bustStyle, useDressed, NO_RECORDS } from '../ui/bustStyle.js'
 import { VALENCE_TONE, threadCapsules, type Capsule } from '../ui/threadModel.js'
+import { GameIcon } from '../paper/game/shared.js'
 import { sharePercent } from './ShotBoard.js'
 
-/** Three capsules at 320px is 984px of a 1920px band. The sheet drops the second and the third
- *  under 900px rather than a resize listener doing it. */
+// Narrow views keep the on-screen story first.
 export const STRIP_ROOM = 3
 
 /** The bust the strip overlaps, in CSS pixels of the source frame. */
@@ -14,7 +14,7 @@ export const STRIP_BUST_PX = 26
 
 /** What the strip says when the town holds no running story. True of the frame it came in and
  *  of nothing else: the gateway ships an empty list when nothing is above the thread floor. */
-export const STRIP_QUIET = 'No story is running.'
+export const STRIP_QUIET = 'No active stories right now.'
 
 /** Sim-days with the unit on them. The one figure the strip prints. */
 export function daysWord(days: number): string {
@@ -63,7 +63,7 @@ export function castLabel(c: Capsule, nameOf: (agentId: string) => string): stri
 
 /** ★ THE STORY STRIP. The one band that says what has been running here without you. Present in
  *  every mode, and honest in a quiet town: it never writes a sentence the town did not. */
-export function StoryStrip({ store }: { store: WorldStore }) {
+export function StoryStrip({ store, onChronicle }: { store: WorldStore; onChronicle: () => void }) {
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
   const director = useSyncExternalStore(store.subscribe, store.getDirector, store.getDirector)
   const dressed = useDressed(store)
@@ -94,50 +94,74 @@ export function StoryStrip({ store }: { store: WorldStore }) {
   const records = dressed ? store.assetRecords() : NO_RECORDS
 
   return (
-    <div className="story-strip">
+    <section className="story-strip" aria-label="Town stories" data-quiet={shown.length === 0}>
+      <div className="story-heading">
+        <GameIcon kind="chronicle" />
+        <div>
+          <h2>Town stories</h2>
+          <small>
+            {shown.length === 0 ? 'Life around town' : `${threads.threads.length} unfolding`}
+          </small>
+        </div>
+      </div>
       {shown.length === 0 ? (
-        <p className="story-quiet">{STRIP_QUIET}</p>
+        <div className="story-quiet">
+          <strong>A quiet chapter</strong>
+          <p>{STRIP_QUIET}</p>
+        </div>
       ) : (
         <ol className="story-row">
-          {shown.map((c, i) => {
-            const became = becameWords(threads.threads, c.handover, nameOf)
-            const names = castLabel(c, nameOf)
-            return (
-              <li
-                key={c.id}
-                className={c.onScreen ? 'story-capsule lit' : 'story-capsule'}
-                data-tone={VALENCE_TONE[`${c.valence}`]}
-                style={{ '--step': i } as CSSProperties}
-              >
-                <span className="story-cast" role="img" aria-label={names}>
-                  {c.cast.map((id) => {
-                    const bust = bustStyle(records, id, STRIP_BUST_PX)
-                    return (
-                      <span
-                        key={id}
-                        className={bust === null ? 'story-bust none' : 'story-bust'}
-                        style={bust ?? undefined}
-                      />
-                    )
-                  })}
-                </span>
-                <p className="story-meta">
-                  {c.onScreen && <span className="story-here">ON SCREEN</span>}
-                  <span className="story-state">{stateWord(c)}</span>
-                  {became !== null && <span className="story-became">to {became}</span>}
-                  <span className="story-days">{daysWord(c.days)}</span>
-                </p>
-                <p className="story-line" data-stale={c.line?.stale === true ? 'yes' : undefined}>
-                  {c.line?.text ?? names}
-                </p>
-                <span className="story-heat" aria-hidden="true">
-                  <span className="story-heat-fill" style={shareStyle(c.heatShare)} />
-                </span>
-              </li>
-            )
-          })}
+          {[...shown]
+            .sort((a, b) => Number(b.onScreen) - Number(a.onScreen))
+            .map((c, i) => {
+              const became = becameWords(threads.threads, c.handover, nameOf)
+              const names = castLabel(c, nameOf)
+              return (
+                <li
+                  key={c.id}
+                  className={c.onScreen ? 'story-capsule lit' : 'story-capsule'}
+                  data-tone={VALENCE_TONE[`${c.valence}`]}
+                  style={{ '--step': i } as CSSProperties}
+                >
+                  <span className="story-cast" role="img" aria-label={names}>
+                    {c.cast.map((id) => {
+                      const bust = bustStyle(records, id, STRIP_BUST_PX)
+                      return (
+                        <span
+                          key={id}
+                          className={bust === null ? 'story-bust none' : 'story-bust'}
+                          style={bust ?? undefined}
+                        />
+                      )
+                    })}
+                  </span>
+                  <p className="story-meta">
+                    {c.onScreen && <span className="story-here">On screen</span>}
+                    <span className="story-state">{stateWord(c)}</span>
+                    {became !== null && <span className="story-became">to {became}</span>}
+                    <span className="story-days">{daysWord(c.days)}</span>
+                  </p>
+                  <p className="story-line" data-stale={c.line?.stale === true ? 'yes' : undefined}>
+                    {c.line?.text ?? names}
+                  </p>
+                  <span
+                    className="story-heat"
+                    role="meter"
+                    aria-label="Story activity relative to its peak"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(c.heatShare * 100)}
+                  >
+                    <span className="story-heat-fill" style={shareStyle(c.heatShare)} />
+                  </span>
+                </li>
+              )
+            })}
         </ol>
       )}
-    </div>
+      <button type="button" className="story-open" onClick={onChronicle}>
+        Chronicle <span aria-hidden="true">→</span>
+      </button>
+    </section>
   )
 }

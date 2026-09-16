@@ -38,3 +38,8 @@ The owner found a color shift in the northeast/northwest repair frames. The init
 ## Nadia rear direction mapping — 2026-09-16
 
 The approved atlas's third row faces screen-left (NW) and fourth row faces screen-right (NE). Its manifest had those directions reversed. The current `cast/nadia/manifest.json` swaps NE/NW references for idle and the four walking poses. Sleep cells, image bytes, palette, dimensions and anchors are unchanged. Previous repair filenames refer to the old row labels; do not infer screen-facing direction from those filenames.
+
+
+## Amara and Yusuf rear direction mapping — 2026-09-17
+
+Both approved atlases use row 512 for screen-left NW and row 768 for screen-right NE. Their manifests now swap idle and all four walking cells between those directions, matching the Nadia correction. Sleep cells, image bytes, dimensions, palette and anchors are unchanged. The local review service registered both corrected manifests; isolated direction previews use those actual registered assets.

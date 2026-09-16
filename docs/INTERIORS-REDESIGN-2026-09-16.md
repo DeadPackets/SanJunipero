@@ -69,3 +69,16 @@ Added two wall lanterns and real warm point lights to rooms. Lights fade with th
 The exterior composer now applies two pairs of separable Gaussian blur passes only while a room is active. The room and UI render afterward and remain sharp. Returning to town disables all blur passes. Local build completed, with no test suite or release gates. Visual review at day 7, 00:15 showed Amara awake, both lanterns casting warm light and a heavily blurred city; the later empty-room frame showed the lanterns off. Browser error log was empty.
 
 Nadia's approved atlas had its NE/NW standing/walk rows mislabeled. Corrected only her manifest references for idle, contact-a, passing-a, contact-b and passing-b. No pixel art was regenerated or altered. Sleep, SE/SW poses, proportions and anchors are unchanged. The preview's newest registered manifest matches the committed source. All four walk poses were stepped through in a temporary `/nadia-facing/` study on 8772, using the actual served atlas. This correction is shared by indoor and outdoor rendering through the existing manifest reader.
+
+
+## Street lights, directions and story ribbon — 2026-09-17
+
+Corrected Amara/Yusuf's reversed rear direction references without altering sprite pixels. Each has ten corrected manifest entries (idle and four walk poses in NE/NW); sleep is unchanged.
+
+Street lamps previously competed with higher-priority fire/torch sources for eight camera-nearest point lights. All twelve orchard lamp posts now have persistent point lights controlled by existing fuel state, independent of residents and camera selection. Lamp lights do not add point-shadow passes; the existing sun and four pooled fire shadow lights remain. New and removed lamp structures create/dispose their lights. No fuel rules or AI behavior changed.
+
+Replaced the old dark story strip with a compact journal ribbon: approved Chronicle icon, pixel title, warm paper, quiet chapter state, portrait story cards, on-screen badge, activity meter and a real Chronicle button. The ribbon follows the almanac's theme, fills the bottom safe area, and uses its own available width to reduce cards when docked. The on-screen story is ordered first so narrow layouts keep it visible. Replay and interior views retain their existing hide behavior.
+
+The gateway now sends its initial empty story frame. Previously an empty initial signature matched the cache sentinel and no message was sent, leaving the strip absent after a fresh service restart.
+
+Checks: web build successful; actual registered Amara/Yusuf direction previews inspected; live ribbon, Chronicle action and docked layout inspected; 390x844 dark layout fits with 390px document width and footer bottom at 844px; night replay at day 11 03:03 shows pools of light throughout the town when zoomed out. Active story styling reviewed with explicitly labeled sample content in an isolated HTML fixture because this scripted town currently has no active story threads. No tests, typecheck, lint or release gates ran, per owner instruction. AI minds remain off.

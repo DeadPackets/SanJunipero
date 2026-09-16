@@ -36,6 +36,7 @@ export function createEnvironment(scene: Scene) {
     scene.add(light)
     return { light, id: '', strength: 0, power: 0 }
   })
+  const streetLights = new Map<string, PointLight>()
   scene.background = new Color(0x99ac98)
   scene.fog = new FogExp2(0x99ac98, 0.0018)
   const warm = new Color(0xffc178)
@@ -100,18 +101,43 @@ export function createEnvironment(scene: Scene) {
             : 0.0008
       const flames = flamesAt(state, state.tick, config)
       const active = new Set(flames.map((f) => f.id))
+      const lampIds = new Set<string>()
+      for (const structure of Object.values(state.structures)) {
+        if (structure.kind !== 'lamp_post' || structure.stage !== 'complete') continue
+        lampIds.add(structure.id)
+        let lamp = streetLights.get(structure.id)
+        if (!lamp) {
+          lamp = new PointLight(0xffb35a, 0, 8, 2)
+          streetLights.set(structure.id, lamp)
+          scene.add(lamp)
+        }
+        lamp.position.set(
+          structure.x + structure.w / 2,
+          heightOf(structure.id),
+          structure.y + structure.h / 2,
+        )
+        const power = active.has(structure.id) ? 8 : 0
+        lamp.intensity += (power - lamp.intensity) * (moving ? Math.min(1, dt * 4) : 1)
+      }
+      for (const [id, lamp] of streetLights) {
+        if (lampIds.has(id)) continue
+        scene.remove(lamp)
+        lamp.dispose()
+        streetLights.delete(id)
+      }
       const nearby = flames
         .filter(
           (f) =>
-            f.source !== 'structure' || !isRoofedKind(config, state.structures[f.id]?.kind ?? ''),
+            f.source !== 'structure' ||
+            (!isRoofedKind(config, state.structures[f.id]?.kind ?? '') &&
+              state.structures[f.id]?.kind !== 'lamp_post'),
         )
         .map((f) => ({
           f,
           distance: Math.hypot(f.x + f.w / 2 - center.x, f.y + f.h / 2 - center.z),
-          priority: state.structures[f.id]?.kind === 'lamp_post' ? 1 : 0,
         }))
         .filter((f) => f.distance < span + 12)
-        .sort((a, b) => a.priority - b.priority || a.distance - b.distance)
+        .sort((a, b) => a.distance - b.distance)
         .slice(0, lights.length)
       const wanted = new Map(nearby.map(({ f }) => [f.id, f]))
       const assigned = new Set(lights.map((l) => l.id))
@@ -129,8 +155,8 @@ export function createEnvironment(scene: Scene) {
         if (f) {
           slot.light.position.set(f.x + f.w / 2, heightOf(f.id), f.y + f.h / 2)
           slot.light.distance = Math.min(8, f.radius * 2)
-          slot.light.color.set(state.structures[f.id]?.kind === 'lamp_post' ? 0xffb35a : 0xff832e)
-          slot.power = state.structures[f.id]?.kind === 'lamp_post' ? 8 : 12
+          slot.light.color.set(0xff832e)
+          slot.power = 12
         }
         slot.light.intensity =
           slot.strength * slot.power * (0.96 + Math.sin(seconds * 7 + slot.light.id) * 0.04)
@@ -138,6 +164,11 @@ export function createEnvironment(scene: Scene) {
       return { active, wet, daylight, sun, sky }
     },
     destroy() {
+      for (const lamp of streetLights.values()) {
+        scene.remove(lamp)
+        lamp.dispose()
+      }
+      streetLights.clear()
       sun.shadow.map?.dispose()
       sun.dispose()
       scene.remove(sun, sun.target, sky, ...lights.map((l) => l.light))
