@@ -170,17 +170,17 @@ const ConstructionSchema = z
     // The valley has only so much room, so the town opens ground for one new roof every ten
     // days and no faster (owner, 2026-09-09). Work already standing is never held up by it.
     plotOpensEveryTicks: z.number().int().default(14400),
-    houseTicks: z.number().default(2880),
+    houseTicks: z.number().default(6480),
     houseMaterials: z
       .object({
-        wood: z.number().default(10),
+        wood: z.number().default(22.5),
       })
       .strict()
       .prefault({}),
     houseSize: z
       .object({
-        w: z.number().int().default(2),
-        h: z.number().int().default(2),
+        w: z.number().int().default(3),
+        h: z.number().int().default(3),
       })
       .strict()
       .prefault({}),
@@ -244,12 +244,12 @@ const StructuresSchema = z
     // a row here: a kind with no row is a kind nothing can say roofed about.
     recipes: z.record(z.string(), StructureRecipeSchema).default({
       house: {
-        inputs: { wood: 10 },
-        w: 2,
-        h: 2,
+        inputs: { wood: 22.5 },
+        w: 3,
+        h: 3,
         maxHp: 50,
         flammable: true,
-        durationTicks: 2880,
+        durationTicks: 6480,
         roofed: true,
         hearth: true,
         bed: true,
@@ -292,11 +292,11 @@ const StructuresSchema = z
         sited: false,
       },
       // Every BUILDABLE dwelling is priced at one rate — 2.5 wood and 720 ticks a tile; config.test.ts holds it.
-      // The cabin and the storehouse have empty inputs on purpose: 2x2 is a house's mass, so a buildable one is a second name for house.
+      // The cabin and storehouse remain authored shelters with no construction recipe.
       storehouse: {
         inputs: {},
-        w: 2,
-        h: 2,
+        w: 3,
+        h: 3,
         maxHp: 40,
         flammable: true,
         durationTicks: 1,
@@ -307,7 +307,7 @@ const StructuresSchema = z
       },
       cabin: {
         inputs: {},
-        w: 2,
+        w: 3,
         h: 2,
         maxHp: 50,
         flammable: true,
@@ -318,24 +318,24 @@ const StructuresSchema = z
         sited: false,
       },
       cottage: {
-        inputs: { wood: 15 },
+        inputs: { wood: 22.5 },
         w: 3,
-        h: 2,
+        h: 3,
         maxHp: 60,
         flammable: true,
-        durationTicks: 4320,
+        durationTicks: 6480,
         roofed: true,
         hearth: true,
         bed: true,
         sited: false,
       },
       farmhouse: {
-        inputs: { wood: 20 },
+        inputs: { wood: 30 },
         w: 4,
-        h: 2,
+        h: 3,
         maxHp: 80,
         flammable: true,
-        durationTicks: 5760,
+        durationTicks: 8640,
         roofed: true,
         hearth: true,
         bed: true,
@@ -692,6 +692,8 @@ const ConstructsSchema = z
 // A genesis input, not a dial. The map grows by world_grown, never by an operator edit.
 const WorldSchema = z
   .object({
+    layout: z.literal('orchard').optional(),
+    origin: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
     size: z
       .object({
         w: z.number().int().positive().default(128),

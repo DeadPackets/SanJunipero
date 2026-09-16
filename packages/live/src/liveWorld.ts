@@ -617,6 +617,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           log(`stream: no art for ${kind} — ${String(err)}`)
         },
       })
+      for (const [path, value] of Object.entries(loop.state.laws ?? {})) {
+        const kind = path.match(/^structures\.recipes\.([a-z][a-z0-9_]*)$/)?.[1]
+        if (!kind || config.structures.recipes[kind] || !value || typeof value !== 'object')
+          continue
+        const recipe = value as { w?: number; h?: number }
+        if (typeof recipe.w === 'number' && typeof recipe.h === 'number')
+          art.onDiscovery({ name: kind, makes: [], raises: [{ kind, w: recipe.w, h: recipe.h }] })
+      }
       // A face for anybody the town makes. Same wallet as the objects, its own day's share.
       const faces = createCastArt({
         codex: new AssetCodex(db),

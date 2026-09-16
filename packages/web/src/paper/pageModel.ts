@@ -1,10 +1,10 @@
 export const PAGE_TABS = {
-  folk: ['People', 'Bonds', 'Families', 'Customs'],
-  chronicle: ['Record', 'Firsts'],
-  found: ['Things', 'Places'],
-  laws: ['World', 'Admin'],
-  person: ['Story', 'Bonds', 'Ledger'],
-  building: ['Provenance', 'Inside'],
+  folk: ['Everyone', 'Following', 'Bonds', 'Families', 'Customs'],
+  chronicle: ['Catch up', 'Timeline', 'Firsts', 'Record'],
+  found: ['Places', 'Discoveries'],
+  laws: ['Agreements', 'Milestones', 'How it works', 'Admin'],
+  person: ['Now', 'Relationships', 'History', 'Story', 'Bonds', 'Ledger'],
+  building: ['About', 'Inside'],
 } as const
 
 export type PageKey = keyof typeof PAGE_TABS

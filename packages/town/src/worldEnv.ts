@@ -57,7 +57,12 @@ const boolEnv = (name: string, fallback: boolean): boolean => {
 
 export function parseWorldEnv(): WorldEnv {
   return {
-    map: process.env.SJ_MAP === 'scripted' ? 'scripted' : DEV_MAP_HUMAN,
+    map:
+      process.env.SJ_MAP === 'orchard'
+        ? 'orchard'
+        : process.env.SJ_MAP === 'scripted'
+          ? 'scripted'
+          : DEV_MAP_HUMAN,
     rings: intEnv('SJ_RINGS', TOWN_RINGS_GENESIS, 1),
     interiors: boolEnv('SJ_INTERIORS', DEFAULTS.interiors),
     builders: boolEnv('SJ_BUILDERS', DEFAULTS.builders),

@@ -24,6 +24,8 @@ const CFG: SimConfig = SimConfigSchema.parse({
 })
 const BUILDER = 'b1'
 
+const HOUSE_NEED = { along: CFG.construction.houseSize.w, deep: CFG.construction.houseSize.h }
+
 let seq = 50_000
 const ev = (type: string, payload: unknown) => ({ seq: seq++, tick: 1, type, payload })
 const apply = (s: WorldState, events: { type: string; payload: unknown }[]): WorldState =>
@@ -59,7 +61,7 @@ const idle = (s: WorldState): WorldState => ({
 function raiseUntilFacing(want: TownFacing): { state: WorldState; claim: TownClaim } | null {
   let s = world()
   for (let i = 0; i < 40; i++) {
-    const claim = claimInWorld(s, { along: 2, deep: 2 })
+    const claim = claimInWorld(s, HOUSE_NEED)
     if (claim === null) return null
     if (claim.facing === want) return { state: s, claim }
     s = { ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } } }
@@ -80,7 +82,7 @@ function raiseUntilFacing(want: TownFacing): { state: WorldState; claim: TownCla
 function raiseUntilTurned(): { state: WorldState; built: Structure; facing: TownFacing } | null {
   let s = world()
   for (let i = 0; i < 40; i++) {
-    const claim = claimInWorld(s, { along: 2, deep: 2 })
+    const claim = claimInWorld(s, HOUSE_NEED)
     if (claim === null) break
     // Stand at the door, then build with `{kind}` and nothing else — the real seam.
     s = { ...s, agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } } }
@@ -103,7 +105,7 @@ describe('★ an agent-built house knows which way it faces', () => {
   it('the town does turn houses, so this question is not hypothetical', () => {
     expect(turned, 'no plot in forty builds seated a house any way but sw').not.toBeNull()
     expect(turned!.facing).toBe('se')
-    // and the footprint cannot tell you: a turned 2x2 is byte-identical to an unturned one
+    // and the footprint cannot tell you: a turned 3×3 is byte-identical to an unturned one
     expect(turned!.built.w).toBe(turned!.built.h)
   })
 
@@ -147,7 +149,7 @@ describe('★ an agent-built house knows which way it faces', () => {
 
   it('★ and NE and NW stay unrepresentable — the schema knows two facings and no more', () => {
     const s = world()
-    const claim = claimInWorld(s, { along: 2, deep: 2 })!
+    const claim = claimInWorld(s, HOUSE_NEED)!
     const at = {
       ...s,
       agents: { ...s.agents, [BUILDER]: { ...s.agents[BUILDER]!, ...claim.door } },

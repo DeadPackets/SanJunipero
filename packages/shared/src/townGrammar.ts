@@ -8,11 +8,10 @@ export const STREET = 3
 export const PITCH = BLOCK + STREET
 
 /** Where the two plots start along each built edge — a 7-tile plot pitch. */
-export const PLOT_OFFSETS = [2, 9] as const
-/** Along the street, and into the block. Depth is capped at 2: a 4×4 at a block corner
- *  physically overlapped its neighbour. */
+export const PLOT_OFFSETS = [1, 8] as const
+/** Depth stops before the neighbouring corner plot. */
 export const MAX_ALONG = 4
-export const MAX_DEEP = 2
+export const MAX_DEEP = 3
 /** The screen-pixel floor two building centres may never come closer than. */
 export const MIN_SEP = 72
 

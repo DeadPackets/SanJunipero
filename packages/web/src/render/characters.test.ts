@@ -672,6 +672,24 @@ describe("★ the layer walks each body at the record's pace, not a stopwatch's"
   const moved = (id: string, x: number, y: number, tick: number): SimEvent =>
     ({ type: 'agent_moved', tick, payload: { id, x, y } }) as unknown as SimEvent
 
+  it('faces the visible motion when leaving a settled crowd', async () => {
+    const agents: MutableAgents = {
+      amara: makeBodyAgent('amara', 0, 0),
+      kamal: makeBodyAgent('kamal', 0, 0),
+      nadia: makeBodyAgent('nadia', 0, 0),
+    }
+    const { layer, at } = await rig(agents)
+    at(180)
+    agents.nadia!.x = 1
+    at(400, [moved('nadia', 1, 0, 1)])
+    const before = layer.getSprite('nadia')!.position.x
+    at(430)
+    const sprite = layer.getSprite('nadia')!
+    const texture = sprite.texture as unknown as { frame: { x: number } }
+    expect(sprite.position.x).toBeLessThan(before)
+    expect(FACINGS[texture.frame.x / CELL]).toBe('sw')
+  })
+
   // ★ The guard used to ask "is this live?". A replay is not live and its bodies must still walk;
   // only a STILL scrub is a fact to be drawn where the record put it.
   it('★ a replay walks a body, and only a still scrub drops it on the record tile', () => {

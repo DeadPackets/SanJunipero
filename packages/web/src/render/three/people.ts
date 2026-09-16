@@ -18,20 +18,20 @@ import { disposeGroup } from './dispose.js'
 
 type Person = {
   mesh: Mesh<PlaneGeometry, MeshStandardMaterial>
-  shadow: Mesh
+  hitBody: Mesh
   texture: Texture
   source: unknown
 }
 export function createPeople(scene: Scene) {
   const people = new Map<string, Person>()
   return {
-    sync(ids: string[], spriteOf: (id: string) => Sprite | null) {
+    sync(ids: string[], spriteOf: (id: string) => Sprite | null, daylight = 1) {
       const live = new Set(ids)
       const targets: Vector3[] = []
       for (const [id, person] of people)
         if (!live.has(id) || spriteOf(id) === null) {
           disposeGroup(person.mesh)
-          disposeGroup(person.shadow)
+          disposeGroup(person.hitBody)
           people.delete(id)
         }
       for (const id of ids) {
@@ -49,6 +49,9 @@ export function createPeople(scene: Scene) {
             new PlaneGeometry(1, 1),
             new MeshStandardMaterial({
               map: texture,
+              emissiveMap: texture,
+              emissive: 0xffffff,
+              emissiveIntensity: 0.2,
               alphaTest: 0.45,
               side: DoubleSide,
               roughness: 1,
@@ -56,14 +59,15 @@ export function createPeople(scene: Scene) {
           )
           mesh.userData.pick = { kind: 'agent', id }
           mesh.rotation.y = Math.PI / 4
-          const shadow = new Mesh(
+          mesh.castShadow = true
+          mesh.receiveShadow = true
+          const hitBody = new Mesh(
             new CapsuleGeometry(0.2, 1.45, 4, 8),
             new MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
           )
-          shadow.castShadow = true
-          shadow.userData.pick = { kind: 'agent', id }
-          scene.add(mesh, shadow)
-          person = { mesh, shadow, texture, source: null }
+          hitBody.userData.pick = { kind: 'agent', id }
+          scene.add(mesh, hitBody)
+          person = { mesh, hitBody, texture, source: null }
           people.set(id, person)
         }
         if (person.source !== resource) {
@@ -86,17 +90,19 @@ export function createPeople(scene: Scene) {
         )
         person.mesh.scale.set(w, h, 1)
         person.mesh.material.color.setHex(sprite.tint)
-        person.shadow.position.set(ground.x, 0.92, ground.y)
+        person.mesh.material.emissive.setHex(sprite.tint)
+        person.mesh.material.emissiveIntensity = 0.1 + daylight * 0.1
+        person.hitBody.position.set(ground.x, 0.92, ground.y)
         person.mesh.updateMatrixWorld()
         targets.push(new Vector3(ground.x, 1.55, ground.y), new Vector3(ground.x, 0.85, ground.y))
       }
       return targets
     },
-    pickables: () => [...people.values()].map((p) => p.shadow),
+    pickables: () => [...people.values()].map((p) => p.hitBody),
     destroy() {
       for (const p of people.values()) {
         disposeGroup(p.mesh)
-        disposeGroup(p.shadow)
+        disposeGroup(p.hitBody)
       }
       people.clear()
     },

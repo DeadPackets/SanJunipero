@@ -17,9 +17,15 @@ export function perimeter(s: { x: number; y: number; w: number; h: number }): Po
   return ring
 }
 
-// Road ring preferred, passable ring as fallback, so a turned building's door is not a side wall
-// onto grass. Read off the terrain: world state carries no facing and does not need one here.
+// Older structures without facing retain the terrain-based perimeter search.
 export function doorTile(state: WorldState, s: Structure): Point | null {
+  if (s.facing) {
+    const door =
+      s.facing === 'se'
+        ? { x: s.x + s.w, y: s.y + Math.floor((s.h - 1) / 2) }
+        : { x: s.x + Math.floor((s.w - 1) / 2), y: s.y + s.h }
+    if (isPassable(state, door.x, door.y)) return door
+  }
   const ring = perimeter(s)
   const start = ring.findIndex((p) => p.x === s.x + Math.floor((s.w - 1) / 2) && p.y === s.y + s.h)
   let passable: Point | null = null

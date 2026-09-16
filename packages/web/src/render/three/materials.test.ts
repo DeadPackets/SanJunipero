@@ -28,9 +28,16 @@ const record = (meta: string | null, seq = 1): AssetRecord => ({
   costUsd: 0,
   createdAt: '',
 })
-afterEach(() => vi.restoreAllMocks())
-it('separates color spaces, enables authored emission, and clears removed optional maps', () => {
-  vi.spyOn(TextureLoader.prototype, 'load').mockImplementation(() => new Texture())
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
+it('separates color spaces, enables authored emission, and clears removed optional maps', async () => {
+  vi.spyOn(TextureLoader.prototype, 'load').mockImplementation((_url, loaded) => {
+    const texture = new Texture<HTMLImageElement>()
+    loaded?.(texture)
+    return texture
+  })
   const library = createMaterialLibrary()
   const group = new Group()
   const material = new MeshStandardMaterial()
@@ -48,18 +55,128 @@ it('separates color spaces, enables authored emission, and clears removed option
       emissive: { assetId: id, colorSpace: 'srgb' },
     },
   }
-  library.apply(group, 'house', [record(JSON.stringify(manifest))])
+  await library.apply(group, 'house', [record(JSON.stringify(manifest))])
   expect(material.map?.colorSpace).toBe(SRGBColorSpace)
   expect(material.roughnessMap?.colorSpace).toBe(NoColorSpace)
   expect(material.map).not.toBe(material.roughnessMap)
   expect(material.emissive.getHex()).toBe(0xffffff)
   expect(group.userData.windows).toContain(material)
-  library.apply(group, 'house', [
+  await library.apply(group, 'house', [
     record(JSON.stringify(manifest)),
     record(JSON.stringify({ ...manifest, maps: { baseColor: manifest.maps.baseColor } }), 2),
   ])
   expect(material.roughnessMap).toBeNull()
   expect(material.emissiveMap).toBeNull()
   expect(group.userData.windows).not.toContain(material)
+  library.destroy()
+})
+
+it('keeps fallback through an incomplete or failed download and can retry', async () => {
+  vi.useFakeTimers()
+  const pending: { loaded: (texture: Texture<HTMLImageElement>) => void; failed: () => void }[] = []
+  vi.spyOn(TextureLoader.prototype, 'load').mockImplementation(
+    (_url, loaded, _progress, failed) => {
+      pending.push({ loaded: loaded!, failed: () => failed?.(new Error('offline')) })
+      return new Texture<HTMLImageElement>()
+    },
+  )
+  const library = createMaterialLibrary()
+  const fallback = new Texture<HTMLImageElement>()
+  const material = new MeshStandardMaterial({ map: fallback })
+  const mesh = new Mesh(undefined, material)
+  mesh.userData.materialSlot = 'wood'
+  const group = new Group().add(mesh)
+  const records = [
+    record(
+      JSON.stringify({
+        version: 'v1-material-set',
+        kind: 'wood',
+        widthPx: 2,
+        heightPx: 2,
+        maps: { baseColor: { assetId: id, colorSpace: 'srgb' } },
+      }),
+    ),
+  ]
+  const first = library.apply(group, 'house', records)
+  expect(material.map).toBe(fallback)
+  pending[0]!.failed()
+  await vi.advanceTimersByTimeAsync(1000)
+  pending[1]!.failed()
+  await vi.advanceTimersByTimeAsync(4000)
+  pending[2]!.failed()
+  await first
+  expect(material.map).toBe(fallback)
+  const retry = library.apply(group, 'house', records)
+  const replacement = new Texture<HTMLImageElement>()
+  pending[3]!.loaded(replacement)
+  await retry
+  expect(material.map).toBe(replacement)
+  library.destroy()
+})
+
+it('applies a complete set together and ignores late images after disposal', async () => {
+  const pending: ((texture: Texture<HTMLImageElement>) => void)[] = []
+  vi.spyOn(TextureLoader.prototype, 'load').mockImplementation((_url, loaded) => {
+    pending.push(loaded!)
+    return new Texture<HTMLImageElement>()
+  })
+  const library = createMaterialLibrary()
+  const fallback = new Texture<HTMLImageElement>()
+  const material = new MeshStandardMaterial({ map: fallback })
+  const mesh = new Mesh(undefined, material)
+  mesh.userData.materialSlot = 'wood'
+  const group = new Group().add(mesh)
+  const records = [
+    record(
+      JSON.stringify({
+        version: 'v1-material-set',
+        kind: 'wood',
+        widthPx: 2,
+        heightPx: 2,
+        maps: {
+          baseColor: { assetId: id, colorSpace: 'srgb' },
+          roughness: { assetId: id, colorSpace: 'linear', channel: 'g' },
+        },
+      }),
+    ),
+  ]
+  const applied = library.apply(group, 'house', records)
+  pending[0]!(new Texture<HTMLImageElement>())
+  await Promise.resolve()
+  expect(material.map).toBe(fallback)
+  material.dispose()
+  pending[1]!(new Texture<HTMLImageElement>())
+  await applied
+  expect(material.map).toBe(fallback)
+  expect(material.roughnessMap).toBeNull()
+  library.destroy()
+})
+
+it('ignores a pending material set when a later snapshot removes it', async () => {
+  let loaded: ((texture: Texture<HTMLImageElement>) => void) | undefined
+  vi.spyOn(TextureLoader.prototype, 'load').mockImplementation((_url, callback) => {
+    loaded = callback
+    return new Texture<HTMLImageElement>()
+  })
+  const library = createMaterialLibrary()
+  const material = new MeshStandardMaterial()
+  const mesh = new Mesh(undefined, material)
+  mesh.userData.materialSlot = 'wood'
+  const group = new Group().add(mesh)
+  const applied = library.apply(group, 'house', [
+    record(
+      JSON.stringify({
+        version: 'v1-material-set',
+        kind: 'wood',
+        widthPx: 2,
+        heightPx: 2,
+        maps: { baseColor: { assetId: id, colorSpace: 'srgb' } },
+      }),
+    ),
+  ])
+  await library.apply(group, 'house', [])
+  loaded!(new Texture<HTMLImageElement>())
+  await applied
+  expect(material.map).toBeNull()
   library.destroy()
 })

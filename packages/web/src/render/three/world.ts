@@ -1,4 +1,6 @@
-import { DEFAULT_CONFIG } from '@sj/shared'
+import { createOrchardGardens } from './orchard.js'
+import { effectiveConfig } from '@sj/engine/laws'
+import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
 import type { FederatedPointerEvent } from 'pixi.js'
 import {
   ACESFilmicToneMapping,
@@ -15,6 +17,9 @@ import {
   SRGBColorSpace,
   Vector2,
   WebGLRenderer,
+  WebGLRenderTarget,
+  Material,
+  Vector3,
 } from 'three'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
@@ -24,11 +29,12 @@ import type { WorldStore } from '../../state/worldStore.js'
 import type { Scene } from '../scene.js'
 import { entersOnClick, type WorldPick } from '../entities.js'
 import { rendersOnMap, type CharacterLayer } from '../characters.js'
-import { buildStructure } from './structures.js'
+import { buildStructure, structureKey } from './structures.js'
 import { createTerrain } from './terrain.js'
 import { createOcclusionFader } from './occlusion.js'
 import { createEnvironment } from './environment.js'
 import { createPeople } from './people.js'
+import { createThreeWeather } from './weather.js'
 import { createResources } from './resources.js'
 import { createMaterialLibrary } from './materials.js'
 import { disposeGroup } from './dispose.js'
@@ -70,15 +76,18 @@ export function createThreeWorld(
   const scene = new ThreeScene()
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 1000)
   const terrain = createTerrain(scene)
+  const gardens = createOrchardGardens(scene)
   const environment = createEnvironment(scene)
+  const weather = createThreeWeather(scene, view)
   const people = createPeople(scene)
   const resources = createResources(scene)
   const library = createMaterialLibrary()
   const fader = createOcclusionFader(camera)
   const structures = new Map<string, { key: string; group: Group }>()
+  const awakeBuildings = new Set<string>()
   const composer = new EffectComposer(renderer)
   const renderPass = new RenderPass(scene, camera)
-  const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.24, 0.6, 1.05)
+  const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.08, 0.5, 1.6)
   const output = new OutputPass()
   composer.addPass(renderPass)
   composer.addPass(bloom)
@@ -92,6 +101,59 @@ export function createThreeWorld(
   const off = store.subscribe(() => {
     dirty = true
   })
+  view.capturePlace = (id) => {
+    const structure = store.getState()?.structures[id]
+    if (destroyed || !structure || !structures.has(id)) return null
+    const w = 480
+    const h = 300
+    const target = new WebGLRenderTarget(w, h, { colorSpace: SRGBColorSpace })
+    const previous = renderer.getRenderTarget()
+    const span = Math.max(5.2, Math.max(structure.w, structure.h) * 1.9)
+    const photoCamera = new OrthographicCamera(
+      (-span * w) / h / 2,
+      (span * w) / h / 2,
+      span / 2,
+      -span / 2,
+      0.1,
+      1000,
+    )
+    const center = new Vector3(structure.x + structure.w / 2, 0.65, structure.y + structure.h / 2)
+    photoCamera.position.set(center.x + 120, center.y + 120 * Math.sqrt(2 / 3), center.z + 120)
+    photoCamera.lookAt(center)
+    photoCamera.updateProjectionMatrix()
+    const buffer = new Uint8Array(w * h * 4)
+    const faded = new Map<Material, number>()
+    for (const entry of structures.values())
+      entry.group.traverse((object) => {
+        if (!(object instanceof Mesh)) return
+        for (const material of Array.isArray(object.material)
+          ? object.material
+          : [object.material]) {
+          if (!material.userData.solidOccluder || faded.has(material)) continue
+          faded.set(material, material.opacity)
+          material.opacity = 1
+        }
+      })
+    try {
+      renderer.setRenderTarget(target)
+      renderer.render(scene, photoCamera)
+      renderer.readRenderTargetPixels(target, 0, 0, w, h, buffer)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const context = canvas.getContext('2d')
+      if (!context) return null
+      const pixels = context.createImageData(w, h)
+      for (let row = 0; row < h; row++)
+        pixels.data.set(buffer.subarray(row * w * 4, (row + 1) * w * 4), (h - row - 1) * w * 4)
+      context.putImageData(pixels, 0, 0)
+      return canvas.toDataURL('image/webp', 0.88)
+    } finally {
+      for (const [material, opacity] of faded) material.opacity = opacity
+      renderer.setRenderTarget(previous)
+      target.dispose()
+    }
+  }
   const ray = new Raycaster()
   const hitAt = (
     x: number,
@@ -123,7 +185,11 @@ export function createThreeWorld(
     else if (chosen.kind === 'agent') callbacks.select(chosen.id)
     else if (
       chosen.kind === 'structure' &&
-      entersOnClick(store.getConfig(), store.getState(), chosen.id)
+      entersOnClick(
+        effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, store.getState()?.laws),
+        store.getState(),
+        chosen.id,
+      )
     )
       callbacks.door(chosen.id)
     else
@@ -161,11 +227,12 @@ export function createThreeWorld(
   view.app.canvas.addEventListener('pointerleave', leave)
   view.app.stage.on('pointertap', pick)
   return {
+    weather: weather.controls,
     tick(dtMs: number) {
       if (destroyed) return
       const state = store.getState()
       if (!state) return
-      const config = store.getConfig() ?? DEFAULT_CONFIG
+      const config = effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, state.laws)
       const dt = Math.min(0.1, Math.max(0, dtMs / 1000))
       if (view.wantsMotion() && store.timeMoving() && !store.getPaused()) seconds += dt
       const w = view.app.screen.width,
@@ -179,10 +246,14 @@ export function createThreeWorld(
       }
       if (dirty) {
         dirty = false
+        awakeBuildings.clear()
+        for (const agent of Object.values(state.agents))
+          if (agent.alive && !agent.asleep && agent.insideId) awakeBuildings.add(agent.insideId)
         const records = store.assetRecords()
         const changedArt = artSeq !== store.assetsSeq()
         artSeq = store.assetsSeq()
         terrain.sync(state, records)
+        gardens.sync(state)
         resources.sync(state, records)
         for (const [id, entry] of structures)
           if (!state.structures[id]) {
@@ -190,7 +261,7 @@ export function createThreeWorld(
             structures.delete(id)
           }
         for (const s of Object.values(state.structures)) {
-          const key = `${s.kind}:${s.x}:${s.y}:${s.w}:${s.h}:${s.facing}:${s.stage}:${Math.floor(s.progressTicks / 120)}`
+          const key = structureKey(s, config)
           let entry = structures.get(s.id)
           if (entry?.key !== key) {
             if (entry) disposeGroup(entry.group)
@@ -198,9 +269,10 @@ export function createThreeWorld(
             scene.add(group)
             entry = { key, group }
             structures.set(s.id, entry)
-            library.apply(group, s.kind, records)
-          } else if (changedArt) library.apply(entry.group, s.kind, records)
+            void library.apply(group, s.kind, records)
+          } else if (changedArt) void library.apply(entry.group, s.kind, records)
         }
+        weather.sync([...structures.values()].map((e) => e.group))
         fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
       }
       fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
@@ -218,13 +290,19 @@ export function createThreeWorld(
       )
       for (const [id, entry] of structures) {
         const lit = climate.active.has(id)
+        const kind = state.structures[id]?.kind ?? ''
+        const roofed = isRoofedKind(config, kind)
+        const windowsLit = roofed ? awakeBuildings.has(id) : lit
         const windows = entry.group.userData.windows as MeshStandardMaterial[] | undefined
+        const windowIntensity = windowsLit
+          ? kind === 'lamp_post'
+            ? 1.4
+            : 0.45 + (1 - climate.daylight) * 1.8
+          : 0
         for (const material of windows ?? [])
-          material.emissiveIntensity = lit
-            ? state.structures[id]?.kind === 'lamp_post'
-              ? 4
-              : 0.45 + (1 - climate.daylight) * 1.8
-            : 0
+          material.emissiveIntensity +=
+            (windowIntensity - material.emissiveIntensity) *
+            (roofed && view.wantsMotion() ? Math.min(1, dt * 6) : 1)
         if (state.structures[id]?.burning && !entry.group.userData.fire) {
           const fire = new Group()
           entry.group.updateWorldMatrix(true, true)
@@ -281,7 +359,10 @@ export function createThreeWorld(
           .filter(rendersOnMap)
           .map((a) => a.id),
         (id) => chars.getSprite(id),
+        climate.daylight,
       )
+      const flash = weather.update(state, center, span, dt)
+      environment.flash(flash)
       scene.updateMatrixWorld()
       const faded = fader.update(targets, dt)
       renderer.domElement.style.opacity = String(view.app.stage.alpha)
@@ -296,6 +377,7 @@ export function createThreeWorld(
     destroy() {
       if (destroyed) return
       destroyed = true
+      delete view.capturePlace
       off()
       view.app.stage.off('pointertap', pick)
       view.app.stage.off('pointermove', hover)
@@ -304,7 +386,9 @@ export function createThreeWorld(
       people.destroy()
       resources.destroy()
       terrain.destroy()
+      gardens.destroy()
       environment.destroy()
+      weather.destroy()
       for (const entry of structures.values()) disposeGroup(entry.group)
       structures.clear()
       library.destroy()

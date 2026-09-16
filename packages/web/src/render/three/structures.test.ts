@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import { SimConfigSchema, makeCityTemplate } from '@sj/shared'
 import type { Structure } from '@sj/engine/state'
-import { buildStructure } from './structures.js'
+import { buildStructure, structureKey } from './structures.js'
+import { effectiveConfig } from '@sj/engine/laws'
 
 const config = SimConfigSchema.parse({})
 function structure(kind: string, overrides: Partial<Structure> = {}): Structure {
@@ -64,6 +65,15 @@ describe('town structure geometry', () => {
     expect(position.x).toBeGreaterThan(s.x + s.w - 0.6)
     expect(position.z).toBeGreaterThan(s.y + 0.4)
     expect(position.z).toBeLessThan(s.y + s.h - 0.4)
+  })
+
+  it('aligns a turned farmhouse door with the simulation doorstep', () => {
+    const s = structure('farmhouse', { facing: 'se', w: 3, h: 4 })
+    const group = buildStructure(s, config)
+    const door = group.getObjectByName('door')!
+    const position = door.getWorldPosition(new THREE.Vector3())
+    expect(position.z).toBeCloseTo(s.y + Math.floor((s.h - 1) / 2) + 0.5)
+    expectInside(group, s)
   })
 
   it('fills the occupied plot without putting walls beyond it', () => {
@@ -151,4 +161,27 @@ describe('town structure geometry', () => {
       expectInside(group, s)
     }
   })
+})
+
+it('refreshes an invented building when its displayed recipe changes', () => {
+  const s = structure('tea_house', { w: 3, h: 3 })
+  const invented = effectiveConfig(config, {
+    'structures.recipes.tea_house': { ...config.structures.recipes.house!, roofed: true },
+  })
+  expect(structureKey(s, invented)).not.toBe(structureKey(s, config))
+  const group = buildStructure(s, invented)
+  expect(group.getObjectByName('wall-shell')).toBeDefined()
+  expect(group.getObjectByName('door')).toBeDefined()
+  expectInside(group, s)
+  const older = buildStructure(s, config)
+  expect(older.getObjectByName('wall-shell')).toBeUndefined()
+  const slower = effectiveConfig(config, {
+    'structures.recipes.tea_house': {
+      ...invented.structures.recipes.tea_house!,
+      durationTicks: 12000,
+    },
+  })
+  expect(structureKey({ ...s, stage: 'construction' }, slower)).not.toBe(
+    structureKey({ ...s, stage: 'construction' }, invented),
+  )
 })

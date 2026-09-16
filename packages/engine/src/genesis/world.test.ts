@@ -171,7 +171,7 @@ describe('makeGenesisWorld: the town', () => {
   it('takes footprint from the template and durability from the one table that knows', () => {
     const s = foldAll()
     const house = Object.values(s.structures).find((x) => x.kind === 'house')!
-    expect({ w: house.w, h: house.h }).toEqual({ w: 2, h: 2 })
+    expect({ w: house.w, h: house.h }).toEqual({ w: 3, h: 3 })
     expect(house.maxHp).toBe(DEFAULT_CONFIG.structures.recipes.house!.maxHp)
     expect(house.flammable).toBe(true)
     const well = Object.values(s.structures).find((x) => x.kind === 'well')!

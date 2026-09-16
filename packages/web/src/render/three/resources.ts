@@ -128,36 +128,6 @@ export function createResources(scene: Scene) {
           return group
         })
       }
-      for (const [key, animal] of Object.entries(state.fauna ?? {})) {
-        if (!animal.alive) continue
-        const id = `fauna:${key}`
-        live.add(id)
-        put(id, animal.kind, animal.x, animal.y, () => {
-          const group = new Group()
-          if (animal.kind === 'fish') {
-            const fish = new Mesh(new SphereGeometry(0.12, 6, 4), material(0x8babad))
-            fish.scale.set(1, 0.35, 2)
-            fish.position.y = 0.01
-            group.add(fish)
-          } else {
-            const deer = animal.kind === 'deer'
-            box(
-              group,
-              0,
-              deer ? 0.42 : 0.12,
-              0,
-              deer ? 0.25 : 0.17,
-              deer ? 0.3 : 0.17,
-              deer ? 0.55 : 0.24,
-              0xa38a6b,
-            )
-            box(group, 0, deer ? 0.66 : 0.22, -0.24, 0.17, 0.23, 0.2, 0xb6a38e)
-            for (const x of [-0.09, 0.09])
-              for (const z of [-0.17, 0.17]) box(group, x, 0.16, z, 0.04, 0.28, 0.04, 0x786550)
-          }
-          return group
-        })
-      }
       for (const [key, resource] of Object.entries(state.forageables ?? {})) {
         if (resource.stock <= 0) continue
         const id = `forage:${key}`

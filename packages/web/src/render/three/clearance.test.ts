@@ -12,3 +12,10 @@ it('keeps all lane centers unchanged and crowds outside solid walls', () => {
   expect(clearBody(5.5, 9.5, [house])).toEqual({ x: 5.5, y: 9.5 })
   expect(clearBody(5.5, 6.5, [{ ...house, kind: 'bridge' }])).toEqual({ x: 5.5, y: 6.5 })
 })
+
+it('keeps bodies outside the extra ground occupied by a 3 × 3 house', () => {
+  const wider = { ...house, w: 3, h: 3 }
+  const body = clearBody(7.5, 6.5, [wider])
+  expect(body.x).toBeCloseTo(8.48)
+  expect(clearBody(6.5, 8.5, [wider])).toEqual({ x: 6.5, y: 8.5 })
+})

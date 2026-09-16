@@ -39,11 +39,8 @@ import { useAutoCut } from './ui/autoCut.js'
 import { playClosesPaper, pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
-import { firstWorryLine, stripReady, useColdOpen } from './ui/coldOpen.js'
 import { useDressed } from './ui/bustStyle.js'
 import { useDensity } from './ui/density.js'
-import { aimsFeed } from './ui/feeds.js'
-import { useFeed } from './ui/useEndpoint.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
 import { localStore, paperDock, rememberPaperDock, sessionStore } from './ui/storage.js'
@@ -70,10 +67,6 @@ function waitingNote(link: LinkStatus): string {
   return link === 'online' ? DRESSING_NOTE : FIRST_FRAME_COPY.looking
 }
 
-/** How many minds are alive to be watched — what the cold open's first line counts. */
-const livingCount = (agents: Record<string, { alive: boolean }> | undefined): number =>
-  Object.values(agents ?? {}).filter((a) => a.alive).length
-
 /** Safari throttles history writes to 100 per 30 s, and 8x playback asks for sixteen a second. */
 const ADDRESS_BAR_MS = 500
 let addressAt = 0
@@ -99,7 +92,7 @@ export function App() {
   const [focus, setFocus] = useState<Subject | null>(null)
   const [thing, setThing] = useState<Thing | null>(null)
   const [sheet, setSheet] = useState<Sheet | null>(() =>
-    route.momentId === null ? null : { page: 'chronicle', tab: 'Moments' },
+    route.momentId === null ? null : { page: 'chronicle', tab: 'Record' },
   )
   // The moment being replayed, or null for a town at the live edge or held on one still.
   const [play, setPlay] = useState<MomentPlay | null>(null)
@@ -120,7 +113,7 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, handbackAt, toggle: toggleDirector } = useAutoCut()
+  const { autoCut, handbackAt, toggle: toggleDirector, hold: holdDirector } = useAutoCut()
   // How much of the chrome is up: Stage, Watch or Deck. One owner, and the sheet does the rest.
   const density = useDensity()
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -164,7 +157,7 @@ export function App() {
         ? null
         : onFirstSnapshot(store, () => {
             if (store.getState()?.agents[linked] === undefined) return
-            setSheet({ page: 'person', tab: 'Story' })
+            setSheet({ page: 'person', tab: 'Now' })
             setFollowing(linked)
           })
 
@@ -183,44 +176,21 @@ export function App() {
     }
   }, [store])
 
-  // The worries ride the aims feed, a beat behind the town, so the second line is added when
-  // they land rather than waited for.
-  const aims = useFeed(aimsFeed).data
   // The card leaves when the town is DRESSED, never when the scene object exists: art in hand
   // is the only thing that makes the reveal a town rather than an empty field.
   const dressed = useDressed(store)
   useEffect(() => {
     void whenDressed().then(store.setDressed)
   }, [store])
-  // A primitive, never the folded state: `getState()` is a fresh object every tick and would
-  // re-render the whole app sixty times for a count that has not moved.
-  const readLiving = (): number => livingCount(store.getState()?.agents)
-  const living = useSyncExternalStore(store.subscribe, readLiving, readLiving)
-  const cold = useColdOpen(dressed && scene !== null && link === 'online', living)
-  const worry =
-    cold.frame.line === null || aims === null
-      ? null
-      : firstWorryLine(
-          aims.aims,
-          (id) => store.getState()?.agents[id]?.name,
-          tickToMoment(store.getTick()).day,
-        )
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
     if (scene !== null && link === 'online' && dressed) dismissFirstFrame()
     else firstFrameNote(waitingNote(link))
   }, [scene, link, dressed])
 
-  // The first cut is the first thing worth watching, so the line gets out of its way. A quiet
-  // round turn is not one: it happens the instant the town arrives, before anybody has read it.
-  const coldDismiss = cold.dismiss
-  const onShot = useCallback(
-    (cast: readonly string[], sceneId: string | null, cut: boolean) => {
-      if (cut) coldDismiss()
-      setShot({ cast, sceneId })
-    },
-    [coldDismiss],
-  )
+  const onShot = useCallback((cast: readonly string[], sceneId: string | null) => {
+    setShot({ cast, sceneId })
+  }, [])
 
   // The address bar moves without a page load, so nothing else would ever rename the tab.
   const named = subject?.kind === 'agent' && subject.id === route.agentId ? subject.name : null
@@ -268,7 +238,8 @@ export function App() {
     (next: MomentPlay) => {
       // As a sheet the paper takes 66% of the screen and dims the town, and a replay behind it
       // is invisible. Docked it takes 380px and dims nothing, so it stays up.
-      if (playClosesPaper(dock)) closePaper()
+      if (playClosesPaper(dock) || !window.matchMedia('(min-width: 1000px)').matches) closePaper()
+      setFollowing(null)
       setPlay(next)
       handle?.replay(next.from)
       address(next.from)
@@ -320,7 +291,7 @@ export function App() {
     if (subject === null) return
     if (subject.kind === 'structure') {
       if (verb === 'inside') enterInterior(insideId === subject.id ? null : subject.id)
-      else openPage('building', 'Provenance')
+      else openPage('building', 'About')
       return
     }
     switch (verb) {
@@ -328,10 +299,10 @@ export function App() {
         setFollowing((prev) => (prev === subject.id ? null : subject.id))
         return
       case 'story':
-        openPage('person', 'Story')
+        openPage('person', 'Now')
         return
       case 'bonds':
-        openPage('person', 'Bonds')
+        openPage('person', 'Relationships')
         return
       case 'home': {
         // A person's home is the building they own — the world records ownership, never an
@@ -341,7 +312,7 @@ export function App() {
         )
         if (home === undefined) return
         setSubject({ id: home.id, kind: 'structure', name: structureTitle(home) })
-        openPage('building', 'Provenance')
+        openPage('building', 'About')
         scene?.centerOn(home.x, home.y)
       }
     }
@@ -386,7 +357,7 @@ export function App() {
 
   useStageKeys({
     onSignpost: () => {
-      signpostRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
+      signpostRef.current?.querySelector<HTMLButtonElement>('.journal-toggle')?.focus()
     },
     onEscape: () => {
       const rung = escapeStep({
@@ -422,7 +393,7 @@ export function App() {
     >
       <h1 className="stage-sr">San Junipero</h1>
       <a className="skip" href="#signpost">
-        Skip to the signpost
+        Skip to the town journal
       </a>
       <main>
         <StageMount
@@ -438,7 +409,7 @@ export function App() {
             }
             // A thing on the ground has no ring; the record it came out of is its surface.
             setThing({ kind: pick.kind, id: pick.id })
-            openPage('found', 'Things')
+            openPage('found', 'Discoveries')
           }}
           onGround={() => {
             setSubject(null)
@@ -482,18 +453,21 @@ export function App() {
         store={store}
         link={link}
         handle={handle}
-        onAt={address}
+        onAt={onScrub}
+        onWatch={(tick) => {
+          setPlay(null)
+          setFollowing(null)
+          if (playClosesPaper(dock) || !window.matchMedia('(min-width: 1000px)').matches)
+            closePaper()
+          handle?.replay(tick)
+          address(tick)
+        }}
+        onLive={onLive}
         autoCut={autoCut}
         handbackAt={handbackAt}
         broadcast={route.broadcast}
       />
       <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
-      {cold.frame.line !== null && (
-        <div className="cold-open" data-gone={cold.frame.gone ? 'yes' : undefined}>
-          <p className="cold-open-line">{cold.frame.line}</p>
-          {worry !== null && <p className="cold-open-worry">{worry}</p>}
-        </div>
-      )}
       {/* The stream is its own composition and keeps the card it has captions for. Everywhere
           else the beat card is the one card, and Stage has neither. */}
       {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
@@ -506,7 +480,7 @@ export function App() {
           <DossierRail store={store} />
         </Drawer>
       )}
-      {stripReady(cold.frame) && <StoryStrip store={store} />}
+      <StoryStrip store={store} />
       <LowerThird store={store} shot={shot.cast} broadcast={route.broadcast} />
       {route.broadcast && <Ticker scene={scene} />}
       <DirectorMode
@@ -515,7 +489,7 @@ export function App() {
         autoCut={autoCut}
         pinned={following}
         moment={play?.cast ?? NO_CAST}
-        opening={!cold.frame.spent}
+        opening
         onCue={setCue}
         onWhy={setWhy}
         onShot={onShot}
@@ -546,6 +520,23 @@ export function App() {
           setSheet((prev) => (prev === null ? prev : { ...prev, tab }))
         }}
         onClose={closePaper}
+        onBrowse={openPage}
+        onWatch={(next) => {
+          setSubject(next)
+          if (next.kind === 'agent') {
+            setFollowing(next.id)
+            const a = store.getState()?.agents[next.id]
+            if (a) scene?.centerOn(a.x, a.y)
+          } else {
+            setFollowing(null)
+            setPlay(null)
+            holdDirector()
+            scene?.setFollow(null)
+            const place = store.getState()?.structures[next.id]
+            if (place) scene?.centerOn(place.x + place.w / 2, place.y + place.h / 2)
+          }
+          closePaper()
+        }}
         onSubject={pickSubject}
         onInside={enterInterior}
         onScrub={onScrub}

@@ -12,6 +12,9 @@ import '@fontsource/fraunces/latin-700.css'
 import '@fontsource/manrope/latin-400.css'
 import '@fontsource/manrope/latin-600.css'
 import './ui/chrome.css'
+import './paper/game/game.css'
+import './ui/corner-controls.css'
+import './ui/almanac.css'
 
 detachFirstFrame()
 

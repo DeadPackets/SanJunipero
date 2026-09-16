@@ -59,6 +59,8 @@ const props = (store: WorldStore, link: LinkState, broadcast: boolean) => ({
   link,
   handle: null,
   onAt: () => undefined,
+  onWatch: () => undefined,
+  onLive: () => undefined,
   autoCut: true,
   handbackAt: () => null,
   broadcast,

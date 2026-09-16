@@ -1,0 +1,3 @@
+volumes:
+  town-data:
+    name: ${SJ_TOWN_DATA_VOLUME:?Set the new town data volume name}

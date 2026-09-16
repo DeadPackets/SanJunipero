@@ -22,6 +22,7 @@ const inputSchema = z
 export async function registerMaterialSet(
   codex: AssetCodex,
   input: z.infer<typeof inputSchema>,
+  generation: { costUsd: number; attempts: number } = { costUsd: 0, attempts: 1 },
 ): Promise<AssetRecord> {
   const v = inputSchema.parse(input)
   let width = 0,
@@ -90,6 +91,8 @@ export async function registerMaterialSet(
   return codex.register({
     ...common,
     kind: `material:${v.kind}`,
+    costUsd: generation.costUsd,
+    attempts: generation.attempts,
     desc: `${v.kind} material set`,
     meta: JSON.stringify(manifest),
     png: v.maps.baseColor,

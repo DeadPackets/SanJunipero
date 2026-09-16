@@ -386,11 +386,8 @@ describe('★ the signpost and the paper hold their own shape', () => {
   /** Every mark that stands over the town: in the app's stack, and not one of the eight above. */
   const MARKS = OVER_TOWN.filter((m) => !(m in NOT_PLACED))
 
-  // ★ The policy was enforced over twelve names typed by hand, and the cold open was not one of
-  // them: put back to `position: fixed; inset: 0; place-content: center`, the exact thing this
-  // phase exists to kill, it stayed green through 1305 tests.
   it('★ reads the marks over the town off the sheet, never off a list', () => {
-    for (const moved of ['.day-bar', '.cold-open', '.paper', '.fps-overlay', '.stage-ticker'])
+    for (const moved of ['.day-bar', '.paper', '.fps-overlay', '.stage-ticker'])
       expect(MARKS, `${moved} is a mark the frame places`).toContain(moved)
     expect(MARKS.length, 'the derivation found nothing').toBeGreaterThan(12)
     expect(
@@ -522,10 +519,6 @@ describe('★ the two rows over the picture that may not move each other', () =>
     expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.app \{ --cue-floor:/)
     expect(floors).toHaveLength(2)
     expect(Math.min(...floors)).toBeGreaterThanOrEqual(2)
-  })
-
-  it('★ takes the scene card down while the town’s first sentence stands over it', () => {
-    expect(rulesFor(BARE, 'body:has(.cold-open) .scene-card')).toMatch(/display:\s*none/)
   })
 })
 

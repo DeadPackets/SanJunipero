@@ -1,4 +1,4 @@
-import type { AssetCodex, Forge } from '@sj/forge'
+import { buildingMaterialPrompt, type AssetCodex, type Forge } from '@sj/forge'
 
 // Commissioning writes the `assets` table — not the event log, not folded — so it runs off the
 // tick and cannot move a golden. `commission()` never rejects, so art never blocks a discovery.
@@ -12,12 +12,6 @@ export function artNeededFor(makes: readonly string[], known: ReadonlySet<string
 export function itemCommissionText(kind: string, discoveryName: string): string {
   const words = kind.replace(/_/g, ' ')
   return `A single ${words}, the object itself, lying still — the thing a townsperson gets when they ${discoveryName}.`
-}
-
-/** A building is the same commission with a footprint and a different class. The court gives
- *  the town's own word for it, so the prose says a building of that name and nothing else. */
-export function buildingCommissionText(kind: string): string {
-  return `A single ${kind.replace(/_/g, ' ')}, the whole building seen from outside, standing alone.`
 }
 
 export type DiscoveryArtWatcher = {
@@ -37,30 +31,41 @@ export function watchDiscoveryArt(deps: {
   onError?: (kind: string, err: unknown) => void
 }): DiscoveryArtWatcher {
   const known = new Set<string>()
-  for (const rec of deps.codex.listSince(0)) if (rec.kind !== null) known.add(rec.kind)
+  for (const rec of deps.codex.listSince(0))
+    if (rec.kind !== null && rec.status === 'ready') known.add(rec.kind)
   deps.codex.onAssetReady((rec) => {
-    if (rec.kind !== null) known.add(rec.kind)
+    if (rec.kind !== null && rec.status === 'ready') known.add(rec.kind)
   })
 
   const inFlight = new Set<Promise<unknown>>()
 
   return {
     onDiscovery(d) {
-      // A roof the town worked out for itself is a kind the codex has never heard of, so
-      // without this the world raises it and the screen falls back to a coloured block.
       for (const b of d.raises ?? []) {
-        if (known.has(b.kind)) continue
-        known.add(b.kind)
-        const q: Promise<unknown> = deps.forge
-          .commission(buildingCommissionText(b.kind), { w: b.w, h: b.h }, 'building', b.kind)
-          .catch((err: unknown) => {
-            known.delete(b.kind)
-            deps.onError?.(b.kind, err)
-          })
-          .finally(() => {
-            inFlight.delete(q)
-          })
-        inFlight.add(q)
+        for (const slot of ['wood', 'roof'] as const) {
+          const kind = `material:${b.kind}:${slot}`
+          if (known.has(kind)) continue
+          known.add(kind)
+          const q: Promise<unknown> = deps.forge
+            .commission(buildingMaterialPrompt(b.kind, slot), { w: b.w, h: b.h }, 'building', kind)
+            .then((record) => {
+              if (record.status !== 'ready') {
+                known.delete(kind)
+                deps.onError?.(
+                  kind,
+                  new Error('material generation left the existing surface in place'),
+                )
+              }
+            })
+            .catch((err: unknown) => {
+              known.delete(kind)
+              deps.onError?.(kind, err)
+            })
+            .finally(() => {
+              inFlight.delete(q)
+            })
+          inFlight.add(q)
+        }
       }
       for (const kind of artNeededFor(d.makes, known)) {
         // Claimed BEFORE the await, so a second discovery naming the same kind in the same
@@ -68,6 +73,9 @@ export function watchDiscoveryArt(deps: {
         known.add(kind)
         const p: Promise<unknown> = deps.forge
           .commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item', kind)
+          .then((record) => {
+            if (record.status !== 'ready') known.delete(kind)
+          })
           .catch((err: unknown) => {
             // commission() contracts never to reject; if it somehow does, the kind goes back
             // so a later discovery can try again, and the run does not stop for a picture.

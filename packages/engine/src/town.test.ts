@@ -195,6 +195,6 @@ describe('★ the plat rule reads the world s water too, not only the grammar s'
             expect(tile === undefined || !WET.has(tile), `${t.dx},${t.dy}`).toBe(true)
             checked++
           }
-    expect(checked).toBe(plots.length * 30)
+    expect(checked).toBe(plots.length * 60)
   })
 })

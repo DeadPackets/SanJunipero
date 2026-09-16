@@ -395,8 +395,13 @@ describe('the four dwelling kinds', () => {
     expect(isDwellingKind('hut')).toBe(false)
   })
 
-  // The UNTURNED footprint: the same farmhouse is 4x2 on a south plot and 2x4 on an east one,
+  // The UNTURNED footprint: a farmhouse is 4×3 on a south plot and 3×4 on an east one,
   // and footprintFor is the only correct way to ask which.
+  it('gives houses the accepted 3 × 3 occupied footprint', () => {
+    expect(DWELLING_FOOTPRINTS.house).toEqual({ w: 3, h: 3 })
+    expect(DWELLING_FOOTPRINTS.farmhouse).toEqual({ w: 4, h: 3 })
+  })
+
   it('measures each kind along the street and into the block', () => {
     const areas = CITY_DWELLING_KINDS.map((k) => {
       const f = DWELLING_FOOTPRINTS[k]
@@ -405,13 +410,13 @@ describe('the four dwelling kinds', () => {
       expect(f.h, k).toBeLessThanOrEqual(MAX_DEEP)
       return f.w * f.h
     })
-    expect(areas.sort((a, b) => a - b)).toEqual([4, 4, 6, 8])
+    expect(areas.sort((a, b) => a - b)).toEqual([6, 9, 9, 12])
     expect(new Set(areas).size, 'the town has fewer than three house masses').toBe(3)
   })
 
   it('turns the footprint with the building, and only then', () => {
-    expect(footprintFor(DWELLING_FOOTPRINTS.farmhouse, 'sw')).toEqual({ w: 4, h: 2 })
-    expect(footprintFor(DWELLING_FOOTPRINTS.farmhouse, 'se')).toEqual({ w: 2, h: 4 })
+    expect(footprintFor(DWELLING_FOOTPRINTS.farmhouse, 'sw')).toEqual({ w: 4, h: 3 })
+    expect(footprintFor(DWELLING_FOOTPRINTS.farmhouse, 'se')).toEqual({ w: 3, h: 4 })
   })
 
   it('is the one place that answers "is this a dwelling"', () => {
@@ -604,9 +609,8 @@ describe('city structures', () => {
 // ★ THE SPACING INVARIANT, AS THE TOWN ACTUALLY STANDS. The exhaustive proof is in
 // `townGrammar.test.ts`; this is the instance of it, measured.
 describe('★ the town this grammar builds, measured', () => {
-  // 125.2198 with nine roofs; the two couples' houses bring the pair in, still over the floor.
   it('holds its closest pair at the reference ring-1 distance', () => {
-    expect(closestPair(cityPlacements())).toBeCloseTo(107.3313, 3)
+    expect(closestPair(cityPlacements())).toBeCloseTo(116.2755, 3)
   })
 
   it('has no error of any kind in it', () => {

@@ -1,3 +1,4 @@
+import { GameIcon, BOOK_ICON } from './game/shared.js'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flingFrom, trackDrag, type DragTrack } from '../render/fling.js'
 import type { Scene } from '../render/scene.js'
@@ -8,18 +9,11 @@ import { PageBody } from './pages/index.js'
 import type { PaperNotice, Thing } from './pages/types.js'
 import type { MomentPlay } from '../ui/replayRun.js'
 import type { PaperDock } from '../ui/storage.js'
-import {
-  PAGE_TABS,
-  PAGE_TITLE,
-  gripDismiss,
-  hasTab,
-  isArm,
-  tabFromKey,
-  type PageKey,
-} from './pageModel.js'
+import { PAGE_TITLE, gripDismiss, hasTab, type PageKey } from './pageModel.js'
 
 /** Upward, the sheet is already at the top of its travel, so it gives a third of the throw. */
 const RUBBER_BAND = 3
+const tabId = (tab: string) => `paper-tab-${tab.toLowerCase().replaceAll(' ', '-')}`
 
 type Drag = { from: number; dim: number; tall: number; at: number; track: DragTrack }
 
@@ -37,6 +31,8 @@ export function Paper({
   gapTicks,
   dock,
   onTab,
+  onBrowse,
+  onWatch,
   onDock,
   onClose,
   onSubject,
@@ -57,6 +53,8 @@ export function Paper({
   insideId: string | null
   gapTicks: number | null
   dock: PaperDock
+  onBrowse: (page: PageKey, tab?: string) => void
+  onWatch: (subject: Subject) => void
   onTab: (tab: string) => void
   onDock: () => void
   onClose: () => void
@@ -77,7 +75,16 @@ export function Paper({
   if (page !== null && page !== shown) setShown(page)
 
   const key = shown ?? 'folk'
-  const tabs = PAGE_TABS[key] as readonly string[]
+  const primary = {
+    folk: ['Everyone', 'Following'],
+    chronicle: ['Catch up', 'Timeline', 'Firsts'],
+    found: ['Places', 'Discoveries'],
+    laws: ['Agreements', 'Milestones', 'How it works'],
+    person: ['Now', 'Relationships', 'History'],
+    building: ['About', 'Inside'],
+  }
+  const tabs: readonly string[] =
+    primary[key].includes(tab) || !hasTab(key, tab) ? primary[key] : [...primary[key], tab]
   const current = hasTab(key, tab) ? tab : tabs[0]!
   const [notice, setNotice] = useState<PaperNotice | null>(null)
   const docked = dock === 'docked'
@@ -97,15 +104,15 @@ export function Paper({
   useEffect(() => {
     if (!open) return
     tabsRef.current
-      ?.querySelector<HTMLButtonElement>(`#paper-tab-${current}`)
+      ?.querySelector<HTMLButtonElement>(`#${tabId(current)}`)
       ?.focus({ preventScroll: true })
-  }, [open, key, current])
+  }, [open, key, current, subject?.id])
 
   // A layout effect, not a passive one: Found runs its own scroll-to-row in a child passive
   // effect, which is later, so this returns the box to the top without undoing that.
   useLayoutEffect(() => {
     if (sheetBoxRef.current !== null) sheetBoxRef.current.scrollTop = 0
-  }, [open, key, current])
+  }, [open, key, current, subject?.id])
 
   const release = (): void => {
     if (sheetRef.current !== null) sheetRef.current.style.cssText = ''
@@ -143,11 +150,11 @@ export function Paper({
         ref={dimRef}
       />
       <section
-        className="paper"
+        className="paper sj-paper"
         id="paper"
         data-open={open ? 'yes' : 'no'}
         data-dock={docked ? 'on' : 'off'}
-        data-book={isArm(key) ? key : undefined}
+        data-book={key === 'person' ? 'folk' : key === 'building' ? 'found' : key}
         role="dialog"
         aria-modal="false"
         aria-hidden={!open}
@@ -205,9 +212,40 @@ export function Paper({
           }}
         />
         <header className="paper-head">
+          <nav className="sj-books" aria-label="Browse the town">
+            {(['folk', 'chronicle', 'found', 'laws'] as const).map((book) => (
+              <button
+                type="button"
+                key={book}
+                data-book={book}
+                aria-current={
+                  (key === 'person' ? 'folk' : key === 'building' ? 'found' : key) === book
+                    ? 'page'
+                    : undefined
+                }
+                onClick={() => onBrowse(book)}
+              >
+                <GameIcon kind={BOOK_ICON[book]} />
+                {PAGE_TITLE[book]}
+              </button>
+            ))}
+          </nav>
           <h2 className="paper-title" id="paper-title">
+            <GameIcon kind={BOOK_ICON[key]} />
             {title}
           </h2>
+          <p className="sj-book-intro">
+            {
+              {
+                folk: 'Get to know the people who make this place.',
+                person: 'A small window into a life.',
+                chronicle: 'The moments that make a town.',
+                found: 'Explore what they build and discover.',
+                building: 'A place in the life of the town.',
+                laws: 'How a town learns to live together.',
+              }[key]
+            }
+          </p>
           <div className="paper-dateline">
             <div
               className="paper-tabs"
@@ -216,11 +254,21 @@ export function Paper({
               aria-describedby="paper-tabs-keys"
               ref={tabsRef}
               onKeyDown={(e) => {
-                const next = tabFromKey(key, e.key, current)
-                if (next === null) return
+                const index = tabs.indexOf(current)
+                const next =
+                  e.key === 'ArrowRight'
+                    ? tabs[(index + 1) % tabs.length]
+                    : e.key === 'ArrowLeft'
+                      ? tabs[(index - 1 + tabs.length) % tabs.length]
+                      : e.key === 'Home'
+                        ? tabs[0]
+                        : e.key === 'End'
+                          ? tabs[tabs.length - 1]
+                          : null
+                if (next == null) return
                 e.preventDefault()
                 onTab(next)
-                e.currentTarget.querySelector<HTMLButtonElement>(`#paper-tab-${next}`)?.focus()
+                e.currentTarget.querySelector<HTMLButtonElement>(`#${tabId(next)}`)?.focus()
               }}
             >
               {tabs.map((t) => (
@@ -228,7 +276,7 @@ export function Paper({
                   key={t}
                   type="button"
                   role="tab"
-                  id={`paper-tab-${t}`}
+                  id={tabId(t)}
                   aria-selected={t === current}
                   aria-controls="paper-sheet"
                   tabIndex={t === current ? 0 : -1}
@@ -248,10 +296,10 @@ export function Paper({
             {/* The narrow dateline lifts this flank to row 1, off the tabs' own row. */}
             <div className="paper-marginalia">
               <button type="button" className="paper-dock" aria-pressed={docked} onClick={onDock}>
-                dock
+                {docked ? 'Undock' : 'Dock'}
               </button>
               <button type="button" className="paper-close" onClick={onClose}>
-                close<span className="paper-close-key"> · Esc</span>
+                Close<span className="paper-close-key"> · Esc</span>
               </button>
             </div>
           </div>
@@ -265,7 +313,7 @@ export function Paper({
           className="paper-sheet"
           id="paper-sheet"
           role="tabpanel"
-          aria-labelledby={`paper-tab-${current}`}
+          aria-labelledby={tabId(current)}
           tabIndex={-1}
           ref={sheetBoxRef}
         >
@@ -291,10 +339,20 @@ export function Paper({
                 onLive={onLive}
                 onMoment={onMoment}
                 onNotice={setNotice}
+                onBrowse={onBrowse}
               />
             </PageBoundary>
           ) : null}
         </div>
+        {open && subject !== null && (key === 'person' || key === 'building') && (
+          <footer className="sj-watch-footer">
+            <button type="button" className="sj-primary" onClick={() => onWatch(subject)}>
+              <GameIcon kind="compass" />
+              {key === 'person' ? `Watch ${subject.name}` : 'Find this place in town'} →
+            </button>
+            <p>Move your view. The town keeps making its own choices.</p>
+          </footer>
+        )}
       </section>
     </>
   )

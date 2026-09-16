@@ -105,6 +105,7 @@ export type Director = {
   subscribe: (cb: () => void) => () => void
   /** the D key, and the only thing that arms or disarms the director for good */
   toggle: () => void
+  hold: () => void
 }
 
 /** A store rather than hook state, with the listeners on the first subscriber: App holds the
@@ -126,8 +127,8 @@ export function director(target: EventTarget): Director {
     timer = null
     handback = null
   }
-  const hold = (e: Event): void => {
-    if (!armed || !onCamera(e)) return
+  const pause = (): void => {
+    if (!armed) return
     publish(false)
     stopTimer()
     handback = Date.now() + IDLE_HANDBACK_MS
@@ -137,8 +138,13 @@ export function director(target: EventTarget): Director {
     }, IDLE_HANDBACK_MS)
   }
 
+  const hold = (e: Event): void => {
+    if (onCamera(e)) pause()
+  }
+
   return {
     get: () => cutting,
+    hold: pause,
     handbackAt: () => handback,
     subscribe(cb) {
       subs.add(cb)
@@ -166,11 +172,13 @@ export function useAutoCut(): {
   autoCut: boolean
   handbackAt: () => number | null
   toggle: () => void
+  hold: () => void
 } {
   const [d] = useState(() => director(window))
   return {
     autoCut: useSyncExternalStore(d.subscribe, d.get),
     handbackAt: d.handbackAt,
     toggle: d.toggle,
+    hold: d.hold,
   }
 }

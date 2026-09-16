@@ -275,12 +275,10 @@ export const isDwellingKind = (kind: string): kind is DwellingKind =>
 // The UNTURNED footprint: w runs along the street, h into the block. footprintFor is the only
 // correct way to ask what ground a placed building covers — an SE building stands on it turned.
 export const DWELLING_FOOTPRINTS: Readonly<Record<DwellingKind, { w: number; h: number }>> = {
-  cabin: { w: 2, h: 2 },
-  cottage: { w: 3, h: 2 },
-  farmhouse: { w: 4, h: 2 },
-  // 2×2 is the footprint every landed gate measured a founder's home at, and `houseSize` in
-  // SimConfigSchema still says so; this row and that dial must not drift apart.
-  house: { w: 2, h: 2 },
+  cabin: { w: 3, h: 2 },
+  cottage: { w: 3, h: 3 },
+  farmhouse: { w: 4, h: 3 },
+  house: { w: 3, h: 3 },
 }
 
 // Two tiles of floor per body — physics, not ownership. Read by both sides: the engine caps a
