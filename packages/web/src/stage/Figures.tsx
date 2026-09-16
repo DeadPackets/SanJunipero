@@ -54,7 +54,16 @@ export function Figures({
   const state = useSyncExternalStore(store.subscribe, store.getState, store.getState)
   // The order is read once a world snapshot, not once a frame: a tab order that re-sorted
   // under the finger would move the next stop between two presses.
-  const figures = useMemo(() => (scene === null ? [] : figuresInView(scene, state)), [scene, state])
+  const figures = useMemo(() => {
+    if (scene === null || state === null) return []
+    const visible = figuresInView(scene, state)
+    const ids = new Set(visible.map((f) => f.id))
+    return visible.concat(
+      Object.values(state.agents)
+        .filter((a) => a.alive && !ids.has(a.id))
+        .map((a) => ({ id: a.id, kind: 'agent' as const, name: a.name })),
+    )
+  }, [scene, state])
   const layer = useRef<HTMLDivElement>(null)
   const nodes = useRef(new Map<string, HTMLButtonElement>())
   const placed = useRef(new Map<string, Placed>())

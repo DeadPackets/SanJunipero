@@ -165,7 +165,10 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
   const endpoint = useEndpointFor('/api/discoveries', parseDiscoveries, DISCOVERY_REFETCH_MS)
   const read = useFeed(endpoint)
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<number | null>(null)
+  const [selection, setSelection] = useState<{ thing: PageProps['thing']; seq: number } | null>(
+    null,
+  )
+  const selected = selection?.thing === thing ? selection.seq : null
   const leaves = leavesOf(
     (read.data ?? []).filter((r) => r.tick <= (state?.tick ?? 0)),
     assets,
@@ -177,7 +180,7 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
   if (leaf)
     return (
       <>
-        <button type="button" className="sj-back" onClick={() => setSelected(-1)}>
+        <button type="button" className="sj-back" onClick={() => setSelection({ thing, seq: -1 })}>
           ← All discoveries
         </button>
         <header className="sj-event-head">
@@ -242,7 +245,7 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
             className="sj-discovery"
             type="button"
             key={l.record.seq}
-            onClick={() => setSelected(l.record.seq)}
+            onClick={() => setSelection({ thing, seq: l.record.seq })}
           >
             <span className="sj-discovery-icon">
               {l.assetId ? (

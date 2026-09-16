@@ -587,6 +587,7 @@ export function App() {
             setPlay(null)
             holdDirector()
             scene?.setFollow(null)
+            enterInterior(null)
             const place = store.getState()?.structures[next.id]
             if (place) scene?.centerOn(place.x + place.w / 2, place.y + place.h / 2)
           }

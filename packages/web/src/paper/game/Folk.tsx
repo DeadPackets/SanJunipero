@@ -161,7 +161,7 @@ export function GamePerson(props: PageProps) {
     )
   const skill = skillOf(a)
   const aim = mode.live ? aims.data?.aims.find((x) => x.agentId === a.id) : null
-  const thought = store.latestThought(a.id)
+  const thought = mode.live ? store.latestThought(a.id) : null
   return (
     <div className="sj-person">
       <button className="sj-back" type="button" onClick={() => props.onBrowse?.('folk')}>
@@ -280,7 +280,11 @@ export function GamePerson(props: PageProps) {
             {thought ? (
               <blockquote>{thought.text}</blockquote>
             ) : (
-              <p>No thought recorded at this moment.</p>
+              <p>
+                {mode.live
+                  ? 'No thought recorded at this moment.'
+                  : 'Live thoughts are hidden while viewing the past.'}
+              </p>
             )}
             {aim?.mood && (
               <p>

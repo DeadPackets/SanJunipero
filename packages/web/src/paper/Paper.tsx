@@ -130,7 +130,7 @@ export function Paper({
     const y = Math.round(down > 0 ? down : down / RUBBER_BAND)
     if (sheet === null || y === d.at) return
     d.at = y
-    sheet.style.transform = `translate(-50%, ${y}px)`
+    sheet.style.transform = `translateY(${y}px)`
     if (dimRef.current !== null) {
       dimRef.current.style.opacity = `${d.dim * (1 - Math.min(1, y / d.tall))}`
     }
@@ -202,7 +202,7 @@ export function Paper({
             release()
             if (!gripDismiss(e.clientY - d.from, thrown?.vy ?? 0)) return
             // the CSS owns the way down again, and its own rule makes it instant under reduce
-            sheet.style.transform = 'translate(-50%, 102%)'
+            sheet.style.transform = 'translateY(102%)'
             if (dimRef.current !== null) dimRef.current.style.opacity = '0'
             onClose()
           }}

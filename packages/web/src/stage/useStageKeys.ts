@@ -82,8 +82,9 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
     const onKey = (e: KeyboardEvent): void => {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
-      if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
       const key = stageKeyFor(e.key)
+      if (key !== 'escape' && !stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false))
+        return
       if (key === null) return
       const run = latest.current[HANDLER[key]]
       if (run === undefined) return
