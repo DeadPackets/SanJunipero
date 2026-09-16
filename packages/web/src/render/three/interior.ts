@@ -90,7 +90,18 @@ export function createThreeInterior(
   fire.shadow.bias = -0.001
   fire.shadow.normalBias = 0.035
   fire.shadow.radius = 4
-  stage.add(ambient, sun, sun.target, fire)
+  const lamps = [0, 1].map((i) => {
+    const lamp = new PointLight(0xffce8e, 0, 14, 1.5)
+    lamp.castShadow = i === 0
+    lamp.shadow.mapSize.set(512, 512)
+    lamp.shadow.normalBias = 0.035
+    lamp.shadow.bias = -0.001
+    lamp.shadow.radius = 3
+    lamp.shadow.intensity = 0.55
+    return lamp
+  })
+  let lampLevel = 0
+  stage.add(ambient, sun, sun.target, fire, ...lamps)
   const people = createPeople(stage)
   const book = new TextureBook()
   const materials = createMaterialLibrary()
@@ -368,6 +379,17 @@ export function createThreeInterior(
       const { daylight } = light
       const awake = occupants.some((a) => !a.asleep)
       const lit = (s.fueledUntilTick ?? 0) > state.tick
+      const lampTarget = awake ? 1 : 0
+      lampLevel =
+        fresh || !view.wantsMotion() || !moving
+          ? lampTarget
+          : lampLevel + (lampTarget - lampLevel) * (1 - Math.exp(-dt * 5))
+      room.lampGlass.emissiveIntensity = lampLevel * 0.8
+      lamps.forEach((lamp, i) => {
+        lamp.position.copy(room.lampPositions[i]!)
+        lamp.intensity = lampLevel * (9 - daylight * 4)
+        lamp.castShadow = i === 0 && lampLevel > 0.01
+      })
       ambient.intensity = 0.38 + light.sky.intensity * 0.85 + (awake ? 0.35 : 0)
       ambient.color.copy(light.sky.color)
       ambient.groundColor.copy(light.sky.groundColor)
@@ -475,6 +497,7 @@ export function createThreeInterior(
       disposeGroup(veil)
       sun.shadow.dispose()
       fire.shadow.dispose()
+      for (const lamp of lamps) lamp.shadow.dispose()
       listeners.clear()
     },
   }

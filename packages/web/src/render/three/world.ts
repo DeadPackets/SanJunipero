@@ -26,6 +26,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js'
+import { HorizontalBlurShader } from 'three/addons/shaders/HorizontalBlurShader.js'
+import { VerticalBlurShader } from 'three/addons/shaders/VerticalBlurShader.js'
 import type { WorldStore } from '../../state/worldStore.js'
 import type { Scene } from '../scene.js'
 import { entersOnClick, type WorldPick } from '../entities.js'
@@ -93,6 +96,13 @@ export function createThreeWorld(
   const output = new OutputPass()
   composer.addPass(renderPass)
   composer.addPass(bloom)
+  const backdropBlur = [6, 12].map((radius) => {
+    const horizontal = new ShaderPass(HorizontalBlurShader)
+    const vertical = new ShaderPass(VerticalBlurShader)
+    composer.addPass(horizontal)
+    composer.addPass(vertical)
+    return { radius, horizontal, vertical }
+  })
   composer.addPass(output)
   let dirty = true
   let artSeq = -1
@@ -377,6 +387,11 @@ export function createThreeWorld(
       const faded = fader.update(targets, dt)
       renderer.domElement.style.opacity = String(view.app.stage.alpha)
       renderer.info.reset()
+      for (const { radius, horizontal, vertical } of backdropBlur) {
+        horizontal.enabled = vertical.enabled = interior.isActive()
+        horizontal.uniforms.h!.value = radius / width
+        vertical.uniforms.v!.value = radius / height
+      }
       composer.render()
       const indoors = interior.render(dt, climate)
       root.dataset.renderer = indoors ? 'three-interior' : 'three'
@@ -405,6 +420,10 @@ export function createThreeWorld(
       structures.clear()
       library.destroy()
       bloom.dispose()
+      for (const { horizontal, vertical } of backdropBlur) {
+        horizontal.dispose()
+        vertical.dispose()
+      }
       output.dispose()
       renderPass.dispose()
       composer.dispose()

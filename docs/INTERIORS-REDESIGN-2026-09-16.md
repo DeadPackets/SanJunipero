@@ -60,3 +60,12 @@ Interiors reuse the exterior's plaster/board surface generator and personal-home
 Belongings uses the registered item icon assets, exact quantities and a responsive inventory grid with material/provision/tool colors. Unknown kinds retain a labeled fallback. Exterior cast rails are hidden indoors; the mobile Town control has an accessible label. Unlit interior hearths skip their six point-light shadow views.
 
 Manual review covered Amara at dawn and rainy midday, Nadia and Farida in morning light, Yusuf asleep under moonlight, 390px mobile framing, item pictures/counts and closing inventory with Escape. The shared direction and interpolation were reviewed in source. Web build completed; no tests, typecheck, lint or gates ran. The browser reported an existing Pixi addChild deprecation warning but no JavaScript errors during the visual review. No AI minds, production actions or paid art generation were used.
+
+
+## Indoor lanterns, heavy blur and Nadia direction correction — 2026-09-16
+
+Added two wall lanterns and real warm point lights to rooms. Lights fade with the same living-awake occupancy rule as exterior window emission, and snap to recorded state on seeks or pauses. Daylight reduces their strength. One lantern casts softened shadows; fixtures do not cast self-blocking shadows. Hearth lighting remains fuel-dependent. This adds presentation only, not new fuel consumption or mind choices.
+
+The exterior composer now applies two pairs of separable Gaussian blur passes only while a room is active. The room and UI render afterward and remain sharp. Returning to town disables all blur passes. Local build completed, with no test suite or release gates. Visual review at day 7, 00:15 showed Amara awake, both lanterns casting warm light and a heavily blurred city; the later empty-room frame showed the lanterns off. Browser error log was empty.
+
+Nadia's approved atlas had its NE/NW standing/walk rows mislabeled. Corrected only her manifest references for idle, contact-a, passing-a, contact-b and passing-b. No pixel art was regenerated or altered. Sleep, SE/SW poses, proportions and anchors are unchanged. The preview's newest registered manifest matches the committed source. All four walk poses were stepped through in a temporary `/nadia-facing/` study on 8772, using the actual served atlas. This correction is shared by indoor and outdoor rendering through the existing manifest reader.

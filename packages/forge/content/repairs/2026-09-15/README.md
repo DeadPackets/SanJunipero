@@ -33,3 +33,8 @@ Review: http://127.0.0.1:8772/homes/ contains the original and repaired walk cyc
 ## Palette correction
 
 The owner found a color shift in the northeast/northwest repair frames. The initial importer used the generic town palette; original character atlases contain their own colors. The corrected import keys the original generation, cleans the matte, then quantizes against representative colors sampled from that resident's original northeast idle, first contact and passing frames. There are 45 selected colors for Nadia and 53 for Yusuf. Height, anchor, repaired pose and mirror derivation are unchanged. The packed files and live cast now contain this correction. Do not rerun the initial generic-palette packer.
+
+
+## Nadia rear direction mapping — 2026-09-16
+
+The approved atlas's third row faces screen-left (NW) and fourth row faces screen-right (NE). Its manifest had those directions reversed. The current `cast/nadia/manifest.json` swaps NE/NW references for idle and the four walking poses. Sleep cells, image bytes, palette, dimensions and anchors are unchanged. Previous repair filenames refer to the old row labels; do not infer screen-facing direction from those filenames.

@@ -486,6 +486,38 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
       box(-w / 2 + 0.245, 1.9, d * 0.15, 0.015, 0.3, 0.46, trim)
     }
   }
+  const lampGlass = new MeshStandardMaterial({
+    color: 0xe7cca0,
+    emissive: 0xffcc83,
+    emissiveIntensity: 0,
+    roughness: 0.65,
+  })
+  const lampPositions: Vector3[] = []
+  for (const side of [false, true]) {
+    const x = side ? -w / 2 + 0.25 : -w * 0.39
+    const z = side ? d * 0.32 : -d / 2 + 0.25
+    const y = 2.02
+    const fixture = new Group()
+    box(x, y, z, 0.24, 0.34, 0.24, lampGlass, fixture)
+    for (const dy of [-0.22, 0.22]) box(x, y + dy, z, 0.32, 0.075, 0.32, metal, fixture)
+    for (const dx of [-0.13, 0.13])
+      for (const dz of [-0.13, 0.13]) box(x + dx, y, z + dz, 0.027, 0.4, 0.027, metal, fixture)
+    box(
+      x - (side ? 0.16 : 0),
+      y,
+      z - (side ? 0 : 0.16),
+      side ? 0.14 : 0.25,
+      0.5,
+      side ? 0.25 : 0.14,
+      darkWood,
+      fixture,
+    )
+    fixture.traverse((part) => {
+      if (part instanceof Mesh) part.castShadow = false
+    })
+    group.add(fixture)
+    lampPositions.push(new Vector3(x + (side ? 0.45 : 0), y, z + (side ? 0 : 0.45)))
+  }
   const stored = new Group()
   group.add(stored)
   const entry = new Vector3(
@@ -514,6 +546,8 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
     hearth,
     flames,
     glass,
+    lampGlass,
+    lampPositions,
     entry,
     obstacles,
   }
