@@ -86,6 +86,26 @@ export function Signpost({
           </button>
         </div>
       )}
+      <button
+        type="button"
+        className="pocket-toggle"
+        ref={pocketToggle}
+        aria-label={storiesLabel}
+        title={storiesLabel}
+        aria-expanded={pocket}
+        aria-controls="journal-pocket"
+        onClick={() => {
+          setPocket((v) => !v)
+          setExpanded(false)
+        }}
+      >
+        <GameIcon kind="chronicle" />
+        {storyCount > 0 && (
+          <span className="pocket-count" aria-hidden="true">
+            {storyCount > 99 ? '99+' : storyCount}
+          </span>
+        )}
+      </button>
       <div className="journal-frame" data-expanded={expanded}>
         <div
           className="journal-sections"
@@ -131,30 +151,10 @@ export function Signpost({
             }}
           >
             <GameIcon kind="note" />
-            Town journal
+            Journal
             <span className="journal-chevron" aria-hidden="true">
               ⌃
             </span>
-          </button>
-          <button
-            type="button"
-            className="pocket-toggle"
-            ref={pocketToggle}
-            aria-label={storiesLabel}
-            title={storiesLabel}
-            aria-expanded={pocket}
-            aria-controls="journal-pocket"
-            onClick={() => {
-              setPocket((v) => !v)
-              setExpanded(false)
-            }}
-          >
-            <GameIcon kind="chronicle" />
-            {storyCount > 0 && (
-              <span className="pocket-count" aria-hidden="true">
-                {storyCount > 99 ? '99+' : storyCount}
-              </span>
-            )}
           </button>
         </div>
       </div>
