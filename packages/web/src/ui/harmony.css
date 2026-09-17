@@ -112,3 +112,8 @@
 .transcript-note { margin:0; padding:16px 20px; color:#746653; font:12px/1.6 var(--font-body); }
 @media(max-width:800px) { .living-scene { left:76px; bottom:76px; max-width:calc(100% - 92px); } .living-scene > span { display:none; } }
 .app .signpost { grid-area:auto; }
+
+@media (min-width:1000px) and (prefers-reduced-motion:no-preference) {
+  .app { transition:grid-template-columns var(--t-slow) var(--ease-enter); }
+  .app .signpost { transition:right var(--t-slow) var(--ease-enter); }
+}

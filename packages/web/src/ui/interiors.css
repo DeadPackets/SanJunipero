@@ -20,10 +20,8 @@
 @media(max-width:700px){.interior-hud{margin-top:8px}.interior-heading{gap:9px;padding-bottom:10px}.interior-title h2{font-size:15px}.interior-title p{font-size:10px}.interior-back{min-width:40px;padding:0 9px}.interior-back span:last-child{display:none}.interior-contents-button{padding:0 9px;gap:5px}.interior-contents-button>span:nth-child(2){display:none}.interior-residents{padding-top:8px}.interior-residents>button{padding:4px 7px;min-height:44px}.interior-residents strong{font-size:12px}.interior-residents .sj-icon{display:none}.interior-title p>span{display:block}.interior-contents{top:62px}}
 @media(prefers-reduced-motion:reduce){.interior-hud button{transition:none}}
 
-.app[data-interior='on'] .paper[data-open='no']{visibility:hidden}
 .app[data-interior='on'] .camera-chip{visibility:hidden}
 
-.app[data-interior='on']>.paper[data-open='no']{display:none}
 @media(prefers-reduced-motion:no-preference){.interior-hud{animation:room-arrival 180ms ease-out}.stage-mount[data-room='on'] .town-three-canvas{animation:room-arrival 180ms ease-out}}
 @keyframes room-arrival{from{opacity:.6}to{opacity:1}}
 
