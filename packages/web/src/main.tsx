@@ -16,6 +16,7 @@ import './ui/chrome.css'
 import './paper/game/game.css'
 import './ui/corner-controls.css'
 import './ui/almanac.css'
+import './ui/harmony.css'
 
 detachFirstFrame()
 

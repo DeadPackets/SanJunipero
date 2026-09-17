@@ -227,6 +227,20 @@ export function createThreeInterior(
     },
     isActive: () => active !== null,
     activeId: () => active,
+    speechAnchor(id) {
+      const body = bodies.get(id)
+      if (active === null || !body) return null
+      const head = body.at
+        .clone()
+        .add(new Vector3(0, 1.9, 0))
+        .project(camera)
+      const feet = body.at.clone().project(camera)
+      return {
+        x: ((head.x + 1) * view.app.screen.width) / 2,
+        y: ((1 - head.y) * view.app.screen.height) / 2,
+        footY: ((1 - feet.y) * view.app.screen.height) / 2,
+      }
+    },
     onChange(cb) {
       listeners.add(cb)
       return () => {

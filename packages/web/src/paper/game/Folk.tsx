@@ -80,7 +80,7 @@ export function GameFolk({ tab, store, onSubject, onBrowse }: PageProps) {
                 }}
               >
                 <span className="sj-villager-art">
-                  <Portrait store={store} id={a.id} />
+                  <Portrait store={store} id={a.id} size={76} />
                   <span className="sj-crest">
                     <GameIcon kind={skill.icon} />
                   </span>
@@ -169,7 +169,7 @@ export function GamePerson(props: PageProps) {
       </button>
       <header className="sj-character" data-tint={tintOf(a.id)}>
         <span className="sj-villager-art">
-          <Portrait store={store} id={a.id} />
+          <Portrait store={store} id={a.id} size={76} />
           <span className="sj-crest">
             <GameIcon kind={skill.icon} />
           </span>

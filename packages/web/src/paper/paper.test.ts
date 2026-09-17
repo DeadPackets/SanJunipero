@@ -118,7 +118,9 @@ afterEach(async () => {
 
 describe('the signpost', () => {
   const post = (open: PageKey | null): string =>
-    renderToStaticMarkup(createElement(Signpost, { open, onOpen: () => {} }))
+    renderToStaticMarkup(
+      createElement(Signpost, { open, onOpen: () => {}, store: createWorldStore(), stories: null }),
+    )
 
   it('hangs four arms, in the order the direction picked', () => {
     expect([...ARMS]).toEqual(['folk', 'chronicle', 'found', 'laws'])
@@ -715,7 +717,14 @@ describe('★ the Almanac shell', () => {
 
   it('★ names the four books on the arms, Land and Rule among them', () => {
     expect(ARMS.map((a) => PAGE_TITLE[a])).toEqual(['Folk', 'Chronicle', 'Land', 'Rule'])
-    const html = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    const html = renderToStaticMarkup(
+      createElement(Signpost, {
+        open: null,
+        onOpen: () => {},
+        store: createWorldStore(),
+        stories: null,
+      }),
+    )
     expect(html).toContain('>Land<')
     expect(html).toContain('>Rule<')
   })

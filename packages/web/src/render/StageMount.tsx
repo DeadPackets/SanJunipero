@@ -9,6 +9,7 @@ import { installFaces } from './textFaces.js'
 import { TextureBook } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
+import { createPixelBubbles } from './pixelBubbles.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
 import { createMomentEmotes, type MomentEmoteLayer } from './momentEmotes.js'
@@ -193,7 +194,7 @@ export function StageMount({
           window.dispatchEvent(new PopStateEvent('popstate'))
         }
         chars = createCharacterLayer(s, book, store, selectAgent)
-        bubbles = createBubbleLayer(s, store)
+        bubbles = spatial ? createPixelBubbles(s, store) : createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
         moments = createMomentEmotes(s, store, book)

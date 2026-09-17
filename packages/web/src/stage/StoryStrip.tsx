@@ -86,9 +86,18 @@ export function StoryStrip({ store, onChronicle }: { store: WorldStore; onChroni
     [threads, cut],
   )
 
-  // Null is a scrub or a replay: the frame does not exist off the live edge, so the band claims
-  // nothing at all rather than standing empty.
-  if (threads === null) return null
+  if (threads === null)
+    return (
+      <section className="story-strip" aria-label="Town stories">
+        <div className="story-quiet">
+          <strong>Stories live in the journal</strong>
+          <p>Return to now for unfolding stories, or browse the Chronicle.</p>
+        </div>
+        <button type="button" className="story-open" onClick={onChronicle}>
+          Open Chronicle →
+        </button>
+      </section>
+    )
 
   const nameOf = (id: string): string => agentName(store.getState()?.agents, id)
   const records = dressed ? store.assetRecords() : NO_RECORDS

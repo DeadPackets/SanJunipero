@@ -706,7 +706,7 @@ export function createCharacterLayer(
       const fade = wantsMotion ? progress('reveal', e.ringSinceMs, nowMs) : 1
       e.ringA = e.ringFrom + (hasFloor - e.ringFrom) * fade
       e.ring.alpha = e.ringA
-      e.ring.visible = e.ringA > 0
+      e.ring.visible = !scene.spatial && e.ringA > 0
       const drain = store.tension.desaturate(a.id, nowMs)
       if (drain > 0 || e.sprite.tint !== 0xffffff) e.sprite.tint = drainTint(drain)
       e.sprite.scale.y = e.sprite.scale.x * e.mulY * e.breath
@@ -715,7 +715,8 @@ export function createCharacterLayer(
         e.ghost.alpha = Math.max(0, 1 - p)
         e.ghost.visible = p < 1
       }
-      const row = emotesHidden ? null : overheadRow(a, nowTick)
+      const status = emotesHidden ? null : overheadRow(a, nowTick)
+      const row = scene.spatial && status?.id === 'talking' ? null : status
       e.overhead.node.position.set(sx, sy - targetPx - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
       setGlyph(e, row?.glyph ?? null)
       e.overhead.setRow(row)

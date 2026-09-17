@@ -115,6 +115,7 @@ export type InteriorScene = {
   setActive(structureId: string | null): void
   setFollowed(agentId: string | null): void
   isActive(): boolean
+  speechAnchor?(agentId: string): { x: number; y: number; footY: number } | null
   activeId(): string | null
   onChange(cb: (structureId: string | null) => void): () => void
   destroy(): void

@@ -293,7 +293,10 @@ export function DayBar({
             aria-label={running ? 'Stop here' : 'Run this day forward'}
             onClick={() => (running ? goTo(tick) : onWatch(tick))}
           >
-            <PixelGlyph pixels={running ? PAUSE_PIXELS : PLAY_PIXELS} />
+            <PixelGlyph
+              className="almanac-play-glyph"
+              pixels={running ? PAUSE_PIXELS : PLAY_PIXELS}
+            />
           </button>
           <div className="almanac-rail">
             <AlmanacMoments key={from} marks={marks} onWatch={onWatch} />

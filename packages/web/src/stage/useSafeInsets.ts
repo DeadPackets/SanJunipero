@@ -11,7 +11,12 @@ export const TOP_BAND: readonly string[] = [
   '.stage-live',
   '.interior-hud',
 ]
-export const BOTTOM_BAND: readonly string[] = ['.stage-cue', '.lower-third']
+export const BOTTOM_BAND: readonly string[] = [
+  '.stage-cue',
+  '.lower-third',
+  '.signpost',
+  '.keepsake',
+]
 
 type Box = { top: number; bottom: number; height: number }
 

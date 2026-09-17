@@ -1,3 +1,5 @@
+import { LivingScene } from './stage/LivingScene.js'
+import { Keepsake } from './stage/Keepsake.js'
 import { InteriorHUD } from './stage/InteriorHUD.js'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { momentToTick, structureTitle, tickToMoment } from '@sj/shared'
@@ -9,14 +11,10 @@ import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
 import { whenDressed } from './render/textures.js'
 import type { Scene } from './render/scene.js'
 import {
-  BeatCard,
   DirectorCue,
-  DossierRail,
-  Drawer,
   Figures,
   LowerThird,
   Nameplate,
-  ShotBoard,
   StoryStrip,
   Ticker,
   SpeechLive,
@@ -518,20 +516,18 @@ export function App() {
         handbackAt={handbackAt}
         broadcast={route.broadcast}
       />
-      {insideId === null && <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />}
-      {/* The stream is its own composition and keeps the card it has captions for. Everywhere
-          else the beat card is the one card, and Stage has neither. */}
-      {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
-      {/* Below 1000px the frame has no room for the three, so the drawer is their room. Above
-          it the drawer is `display: contents` and they stand in their own areas. */}
-      {!route.broadcast && insideId === null && (
-        <Drawer>
-          <BeatCard store={store} />
-          <ShotBoard store={store} />
-          <DossierRail store={store} />
-        </Drawer>
+      {route.broadcast && insideId === null && (
+        <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />
       )}
-      <StoryStrip store={store} onChronicle={() => openPage('chronicle')} />
+      {!route.broadcast && <LivingScene store={store} stage={stage} />}
+      {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
+      {route.broadcast && <StoryStrip store={store} onChronicle={() => openPage('chronicle')} />}
+      {!route.broadcast && (
+        <Keepsake
+          store={store}
+          onOpen={(first) => openPage('chronicle', first ? 'Firsts' : 'Timeline')}
+        />
+      )}
       <LowerThird
         store={store}
         shot={insideId === null ? shot.cast : roomCastKey.split(' ').filter(Boolean)}
@@ -549,15 +545,23 @@ export function App() {
         onWhy={setWhy}
         onShot={onShot}
       />
-      <Signpost open={sheet?.page ?? null} onOpen={onArm} ref={signpostRef} />
-      <HelpButton
-        open={keysOpen}
-        onToggle={() => {
-          setKeysOpen((v) => !v)
-        }}
+      <Signpost
+        open={sheet?.page ?? null}
+        onOpen={onArm}
+        ref={signpostRef}
+        stories={<StoryStrip store={store} onChronicle={() => openPage('chronicle')} />}
+        store={store}
       />
-      <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
-      <Soundscape store={store} scene={scene} insideId={insideId} />
+      <div className="control-pod" aria-label="Viewing controls">
+        <Soundscape store={store} scene={scene} insideId={insideId} />
+        <ThoughtsButton thoughts={thoughts} onToggle={toggleThoughts} />
+        <HelpButton
+          open={keysOpen}
+          onToggle={() => {
+            setKeysOpen((v) => !v)
+          }}
+        />
+      </div>
       <Paper
         page={sheet?.page ?? null}
         tab={sheet?.tab ?? ''}

@@ -246,7 +246,14 @@ describe('the thoughts button', () => {
 
   // The post's four arms are the town's four sections; how the town is SHOWN is not a fifth.
   it('★ stands in the corner cluster, off the signpost', () => {
-    const post = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    const post = renderToStaticMarkup(
+      createElement(Signpost, {
+        open: null,
+        onOpen: () => {},
+        store: createWorldStore(),
+        stories: null,
+      }),
+    )
     expect(post).not.toContain('thoughts')
     expect(post).not.toContain('Thought')
     expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')

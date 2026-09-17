@@ -1,3 +1,4 @@
+import { createWorldStore } from '../state/worldStore.js'
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -410,7 +411,14 @@ describe('★ the ♪ toggle', () => {
   })
 
   it('★ stands in the corner cluster with the other two, off the signpost', () => {
-    const post = renderToStaticMarkup(createElement(Signpost, { open: null, onOpen: () => {} }))
+    const post = renderToStaticMarkup(
+      createElement(Signpost, {
+        open: null,
+        onOpen: () => {},
+        store: createWorldStore(),
+        stories: null,
+      }),
+    )
     expect(post).not.toContain('sound')
     expect(post).not.toContain('Sound')
     expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')

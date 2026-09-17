@@ -334,6 +334,7 @@ export async function createScene(
     overlay: layers.overlay,
     ring: createSceneRing(
       {
+        spatial,
         layers: spatial ? { ...layers, groundDecal: layers.overlay } : layers,
         pointOf: (kind, id) => scene.pointOf(kind, id),
       },

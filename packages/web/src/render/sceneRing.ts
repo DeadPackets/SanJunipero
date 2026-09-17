@@ -44,6 +44,7 @@ export type SceneRing = {
 
 /** What the ring asks of the scene handle. `Scene` satisfies it; a test does not need a canvas. */
 type RingStage = {
+  spatial?: boolean
   layers: { groundDecal: Container }
   pointOf: (kind: 'agent' | 'structure', id: string) => { sx: number; sy: number } | null
 }
@@ -133,7 +134,7 @@ export function createSceneRing(stage: RingStage, store: Pick<WorldStore, 'shotS
       }
       paint(box, RING_INK[held.kind])
       g.alpha = k
-      g.visible = true
+      g.visible = !stage.spatial
     },
     bounds: () => box,
     alpha: () => (g.visible ? k * FILL_ALPHA : 0),
