@@ -1,7 +1,15 @@
 import type { Candidate, ImageClient } from './imageClient.js'
 import { mechanicalGate } from './gate.js'
 import { postProcessRaw } from './post/postProcess.js'
-import { decodePng, encodePng, type RawImage } from './post/raw.js'
+import {
+  centerCropToAspect,
+  downscaleNearest,
+  decodePng,
+  encodePng,
+  type RawImage,
+} from './post/raw.js'
+import { buildingSurfaceMaps } from './buildingMaterials.js'
+import { registerMaterialSet } from './materialIngest.js'
 import { makePlaceholder } from './placeholder.js'
 import { assetPromptParts, targetSize } from './styleBible.js'
 import { loadForgeConfig, type ForgeConfig } from './forgeConfig.js'
@@ -42,14 +50,18 @@ export function createForge(deps: {
     klass: AssetClass,
     kind: string,
   ): Promise<AssetRecord> {
-    const target = targetSize(klass, footprint)
-    const requireAlpha = klass !== 'terrain' && klass !== 'portrait'
+    const material = klass === 'building' && /^material:[a-z][a-z0-9_]*:(wood|roof)$/.test(kind)
+    const target = material ? { w: 256, h: 256 } : targetSize(klass, footprint)
+    const requireAlpha = !material && klass !== 'terrain' && klass !== 'portrait'
     const assetId = `${klass}:${kind}`
     const ledger = new SpendLedger(null)
 
     function cut(gen: RawImage): RawImage | null {
       try {
-        const sprite = postProcessRaw(gen, klass, target)
+        const sprite = material
+          ? downscaleNearest(centerCropToAspect(gen, target.w, target.h), target.w, target.h)
+          : postProcessRaw(gen, klass, target)
+        if (material) for (let i = 3; i < sprite.data.length; i += 4) sprite.data[i] = 255
         return mechanicalGate(sprite, { w: target.w, h: target.h, requireAlpha }).ok ? sprite : null
       } catch {
         return null
@@ -84,9 +96,15 @@ export function createForge(deps: {
     // A spend stop is not a generation failure: it is the alarm, and it leaves by the caller.
     const res = await runVisionGate({
       assetId,
-      klass,
+      klass: material ? 'terrain' : klass,
       commission: desc,
-      basePrompt: assetPromptParts(desc, footprint, klass),
+      basePrompt: material
+        ? {
+            boilerplate:
+              'A seamless square surface texture for a cozy 3D town. Full frame, opaque, evenly lit, repeating at all four edges. No perspective, no ground plane, no magenta, no border. The first reference supplies palette only, never copy a building from it.',
+            commissionText: desc,
+          }
+        : assetPromptParts(desc, footprint, klass),
       judge: deps.judge,
       ledger,
       config,
@@ -97,6 +115,17 @@ export function createForge(deps: {
       return null
     })
 
+    if (material && res?.status === 'pass') {
+      return registerMaterialSet(
+        deps.codex,
+        {
+          class: 'building',
+          kind: kind.slice('material:'.length),
+          maps: await buildingSurfaceMaps(res.sprite),
+        },
+        { costUsd: ledger.totalFor(assetId), attempts: res.attempts },
+      )
+    }
     const last = res?.verdicts.at(-1)
     const png =
       res?.status === 'pass'

@@ -199,8 +199,7 @@ export function StageMount({
         moments = createMomentEmotes(s, store, book)
         if (!spatial) atmosphere = createAtmosphere(s)
         if (atmosphere) s.atmosphere = atmosphere
-        weather = createWeatherLayer(s, store)
-        ambient = createAmbient(s, store, { weather, bubbles, chars })
+        if (!spatial) weather = createWeatherLayer(s, store)
         if (!spatial) lightPools = createLightPools(s, store)
         if (!spatial) fireflies = createFireflies(s, store)
         if (!spatial) smoke = createSmoke(s, store)
@@ -239,6 +238,8 @@ export function StageMount({
             pick,
             ground: () => onGroundRef.current?.(),
           })
+        if (three) weather = three.weather
+        if (weather) ambient = createAmbient(s, store, { weather, bubbles, chars })
         let seenThoughts = store.thoughtsSeq()
         let lastMs = performance.now()
         tickFn = () => {

@@ -85,6 +85,9 @@ export function createTerrain(scene: THREE.Scene): {
   const requested = new Set<string>()
   const pending = new Set<HTMLImageElement>()
   const wind = { value: 0 }
+  const waterTime = { value: 0 }
+  const terrainOrigin = { value: new THREE.Vector2() }
+  let lastWaterAt = performance.now()
   const windStrength = { value: 0 }
   const cloudCover = { value: 0 }
   const trunkGeo = new THREE.CylinderGeometry(0.038, 0.075, 1, 6)
@@ -226,7 +229,20 @@ export function createTerrain(scene: THREE.Scene): {
       height = h * pp
     const pixels = new Uint8Array(width * height * 4)
     function color(tile: number, px: number, py: number, channel: number): number {
-      const kind = KINDS[tile] ?? 'grass'
+      if (tile === 7 && state.townLayout === 'orchard') {
+        const row = Math.floor(py / 6)
+        const shiftedX = px + (row % 2) * 4
+        const col = Math.floor(shiftedX / 8)
+        const joint = shiftedX % 8 === 0 || py % 6 === 0
+        if (map === 'normal') return channel === 2 ? 255 : 128
+        if (map === 'roughness') return joint ? 250 : 226
+        const base = joint ? [157, 153, 135] : [208, 202, 179]
+        const variation = (noise(col, row, 31) - 0.5) * 17
+        const grain = (noise(px, py, 32) - 0.5) * 5
+        return base[channel]! + variation + grain
+      }
+      const kind =
+        tile === 8 && state.townLayout === 'orchard' ? 'road-calm' : (KINDS[tile] ?? 'grass')
       const sample = sampleFor(kind, map)
       const grain = map === 'baseColor' ? (noise(px, py) - 0.5) * (tile === 7 ? 15 : 23) : 0
       if (sample) {
@@ -382,6 +398,25 @@ export function createTerrain(scene: THREE.Scene): {
         1,
       ),
     )
+    geometry.setAttribute(
+      'terrainShore',
+      new THREE.Float32BufferAttribute(
+        positions
+          .filter((_, i) => i % 3 === 0)
+          .map((x, i) => {
+            const y = positions[i * 3 + 2]!
+            return [
+              [-1, -1],
+              [-1, 0],
+              [0, -1],
+              [0, 0],
+            ].some(([dx, dy]) => !wetTile(state.terrain[y + dy!]?.[x + dx!] ?? 2))
+              ? 1
+              : 0
+          }),
+        1,
+      ),
+    )
     geometry.computeVertexNormals()
     const material = new THREE.MeshStandardMaterial({
       roughness: raining ? 0.74 : 0.96,
@@ -390,16 +425,54 @@ export function createTerrain(scene: THREE.Scene): {
     const textures = applyMaps(state, x0, y0, w, h, kinds, material)
     material.onBeforeCompile = (shader) => {
       shader.uniforms.terrainWind = wind
+      shader.uniforms.terrainWaterTime = waterTime
+      shader.uniforms.terrainOrigin = terrainOrigin
       shader.uniforms.terrainCloudCover = cloudCover
-      shader.vertexShader = `attribute float terrainWater;\nvarying float vTerrainWater;\nvarying vec2 vTerrainWorld;\n${shader.vertexShader}`
+      shader.vertexShader = `attribute float terrainWater;\nattribute float terrainShore;\nvarying float vTerrainShore;\nuniform vec2 terrainOrigin;\nvarying float vTerrainWater;\nvarying vec2 vTerrainWorld;\n${shader.vertexShader}`
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
-        '#include <begin_vertex>\nvTerrainWater = terrainWater;\nvTerrainWorld = (modelMatrix * vec4(transformed, 1.0)).xz;',
+        '#include <begin_vertex>\nvTerrainWater = terrainWater;\nvTerrainShore = terrainShore;\nvTerrainWorld = (modelMatrix * vec4(transformed, 1.0)).xz + terrainOrigin;',
       )
-      shader.fragmentShader = `varying float vTerrainWater;\nvarying vec2 vTerrainWorld;\nuniform float terrainWind;\nuniform float terrainCloudCover;\n${shader.fragmentShader}`
+      shader.fragmentShader = `
+      float riverHash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+      float riverNoise(vec2 p) {
+        vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+        return mix(mix(riverHash(i),riverHash(i+vec2(1.0,0.0)),f.x),mix(riverHash(i+vec2(0.0,1.0)),riverHash(i+vec2(1.0)),f.x),f.y);
+      }
+      uniform float terrainWaterTime;
+      varying float vTerrainShore;
+      varying float vTerrainWater;\nvarying vec2 vTerrainWorld;\nuniform float terrainWind;\nuniform float terrainCloudCover;\n${shader.fragmentShader}`
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <roughnessmap_fragment>',
-        '#include <roughnessmap_fragment>\nroughnessFactor *= mix(1.0, 0.26 / max(roughness, 0.001), vTerrainWater);',
+        '#include <roughnessmap_fragment>\nroughnessFactor *= mix(1.0, 0.44 / max(roughness, 0.001), vTerrainWater);',
+      )
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+        if(vTerrainWater > 0.0) {
+          vec2 flow = vTerrainWorld - vec2(0.0, terrainWaterTime * 0.38);
+          float broad = riverNoise(flow * vec2(1.8,0.65));
+          float fine = riverNoise(flow * vec2(5.5,2.5) + broad * 0.7);
+          float ripple = sin(flow.y * 8.0 + sin(flow.x * 3.0) * 1.6 + broad * 2.0);
+          float lace = smoothstep(0.64,0.83,fine) * (0.35 + 0.65 * smoothstep(0.2,0.9,ripple));
+          vec3 riverColor = mix(vec3(0.055,0.16,0.18),vec3(0.12,0.27,0.28),broad * 0.7 + vTerrainShore * 0.3);
+          riverColor += lace * vec3(0.11,0.16,0.15);
+          float bankFoam = smoothstep(0.65,1.0,vTerrainShore) * smoothstep(0.43,0.72,fine);
+          riverColor = mix(riverColor, vec3(0.40,0.48,0.40),bankFoam * 0.28);
+          diffuseColor.rgb = mix(diffuseColor.rgb,riverColor,vTerrainWater);
+        }`,
+      )
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+        if(vTerrainWater > 0.0) {
+          vec2 flow = vTerrainWorld - vec2(0.0,terrainWaterTime * 0.38);
+          float rippleBase = riverNoise(flow * vec2(2.4,1.5));
+          float rippleX = (riverNoise((flow + vec2(0.12,0.0)) * vec2(2.4,1.5)) - rippleBase) * 0.32;
+          float rippleY = (riverNoise((flow + vec2(0.0,0.12)) * vec2(2.4,1.5)) - rippleBase) * 0.32;
+          vec3 riverNormal = normalize(mat3(viewMatrix) * vec3(rippleX,1.0,rippleY));
+          normal = normalize(mix(normal,riverNormal,vTerrainWater));
+        }`,
       )
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <opaque_fragment>',
@@ -411,7 +484,7 @@ export function createTerrain(scene: THREE.Scene): {
         #include <opaque_fragment>`,
       )
     }
-    material.customProgramCacheKey = () => 'town-ground-water'
+    material.customProgramCacheKey = () => 'town-ground-flowing-water'
     const ground = new THREE.Mesh(geometry, material)
     ground.receiveShadow = true
     root.add(ground)
@@ -551,6 +624,7 @@ export function createTerrain(scene: THREE.Scene): {
   function sync(state: WorldState, records: AssetRecord[]): void {
     if (!alive) return
     latest = state
+    terrainOrigin.value.set(state.origin?.x ?? 0, state.origin?.y ?? 0)
     cloudCover.value = ['cloudy', 'rain', 'storm'].includes(state.weather.kind) ? 1 : 0
     latestRecords = records
     loadSamples(records)
@@ -601,6 +675,9 @@ export function createTerrain(scene: THREE.Scene): {
   return {
     sync,
     tick(seconds, wet, motion) {
+      const now = performance.now()
+      if (motion) waterTime.value += Math.min(0.1, Math.max(0, (now - lastWaterAt) / 1000))
+      lastWaterAt = now
       if (motion) wind.value = seconds
       windStrength.value = motion ? 1 : 0
       if (raining === wet) return

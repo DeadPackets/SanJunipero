@@ -113,8 +113,8 @@ describe('the town, seen from the world', () => {
           }
         }
     }
-    // Non-vacuity: 76 plots at ring 2, eight legal masses each, 12 tiles per plot's worth.
-    expect(checked).toBe(76 * (1 * 1 + 1 * 2 + 2 * 1 + 2 * 2 + 3 * 1 + 3 * 2 + 4 * 1 + 4 * 2))
+    // Non-vacuity: 76 plots at ring 2 and twelve legal masses per plot.
+    expect(checked).toBe(76 * (1 + 2 + 3 + 4) * (1 + 2 + 3))
   })
 })
 
@@ -181,7 +181,7 @@ describe('★ a build takes a plot, and the plot is never the asker s', () => {
       claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 5, deep: 1 } }),
     ).toBeNull()
     expect(
-      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 1, deep: 3 } }),
+      claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 1, deep: 4 } }),
     ).toBeNull()
     expect(
       claimTownPlot({ square: TOWN_SQUARE, standing: [], need: { along: 0, deep: 1 } }),
@@ -300,7 +300,7 @@ describe('a block is laid out when its first building is raised', () => {
             checked++
           }
     }
-    expect(checked).toBe(3 * 4 * 8)
+    expect(checked).toBe(3 * 4 * 12)
   })
 
   it('never paves the channel', () => {

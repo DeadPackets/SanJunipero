@@ -59,3 +59,5 @@ export * from './castArt.js'
 export * from './castLooks.js'
 export * from './characterCommission.js'
 export * from './artCoverage.js'
+
+export { buildingMaterialPrompt } from './buildingMaterials.js'

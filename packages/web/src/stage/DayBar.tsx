@@ -1,5 +1,5 @@
-import { useMemo, useRef, useSyncExternalStore, type CSSProperties } from 'react'
-import { MINUTES_PER_DAY } from '@sj/shared'
+import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { MINUTES_PER_DAY, dayPhaseFromTick } from '@sj/shared'
 import type { ObservatoryHandle } from '../net/socket.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { stamp } from '../paper/stamp.js'
@@ -14,14 +14,14 @@ import {
   EMPTY_SOURCES,
   MARKS_POLL_MS,
   MARKS_URL,
-  coalesceMarks,
-  markInk,
   markSources,
-  markWindow,
   marksFrom,
   type Mark,
   type MarkSources,
 } from '../ui/timelineMarks.js'
+import { GameIcon } from '../paper/game/shared.js'
+import { localStore, pref } from '../ui/storage.js'
+import { AlmanacMoments } from './AlmanacMoments.js'
 import { CameraChip } from './CameraChip.js'
 import { PixelGlyph } from './PixelGlyph.js'
 
@@ -113,6 +113,8 @@ export function marksOfDay(marks: readonly Mark[], tick: number): Mark[] {
 const at = (frac: number): CSSProperties =>
   ({ '--at': `${(Math.min(1, Math.max(0, frac)) * 100).toFixed(3)}%` }) as CSSProperties
 
+const almanacTheme = pref('sj.almanacTheme', ['light', 'dark'] as const, 'light')
+
 const NO_FIRSTS: MarkSources['milestones'] = []
 /** A stream frame has no track to draw a mark on, so it reads neither list. A reader with no
  *  url fetches nothing and times nothing, which is what a frame that runs for days is owed. */
@@ -155,6 +157,8 @@ export function DayBar({
   link,
   handle,
   onAt,
+  onWatch,
+  onLive,
   autoCut,
   handbackAt,
   broadcast = false,
@@ -163,6 +167,8 @@ export function DayBar({
   link: LinkState
   handle: ObservatoryHandle | null
   onAt: (tick: number) => void
+  onWatch: (tick: number) => void
+  onLive: () => void
   autoCut: boolean
   handbackAt: () => number | null
   broadcast?: boolean
@@ -177,12 +183,10 @@ export function DayBar({
   const readWeather = (): string => skyWord(store.getState())
   const readAsleep = (): string | null => sleepField(store.getState()?.agents)
   const isAwake = (): boolean => store.getState() !== null
-  const actNow = (): ActMark | null => store.getDirector()?.act ?? null
   const kind = useSyncExternalStore(store.subscribe, readKind, readKind)
   const weather = useSyncExternalStore(store.subscribe, readWeather, readWeather)
   const asleep = useSyncExternalStore(store.subscribe, readAsleep, readAsleep)
   const awake = useSyncExternalStore(store.subscribe, isAwake, isAwake)
-  const act = useSyncExternalStore(store.subscribe, actNow, actNow)
 
   // The strip still scrubs without its marks, so a missing answer is EMPTY_SOURCES.
   const sources =
@@ -191,12 +195,12 @@ export function DayBar({
   const from = dayStart(tick)
   const marks = useMemo(
     () =>
-      coalesceMarks(
-        marksOfDay(marksFrom({ ...sources, milestones: firsts }), from),
-        markWindow(MINUTES_PER_DAY),
-      ),
-    [sources, firsts, from],
+      marksOfDay(marksFrom({ ...sources, milestones: firsts }), from).filter((m) => m.tick <= edge),
+    [sources, firsts, from, edge],
   )
+  const [theme, setTheme] = useState(() => almanacTheme.read(localStore()))
+  const running = mode.live || mode.replaying
+  const phase = dayPhaseFromTick(tick)
 
   const word = stampWord(mode.live, awake, link, paused)
   const dead = deadFrom(from, edge)
@@ -205,7 +209,6 @@ export function DayBar({
   const track = useRef<HTMLDivElement>(null)
 
   const goTo = (next: number): void => {
-    handle?.scrub(next)
     onAt(next)
   }
   const pick = (clientX: number): void => {
@@ -235,81 +238,124 @@ export function DayBar({
   }
 
   return (
-    <div className="day-bar">
-      <div className="day-bar-left">
-        <p className="day-bar-day">DAY {when.day}</p>
-        <p className="day-bar-when">
-          {when.season} {when.weekday}
-          {act !== null && ` · ACT ${act}`}
-        </p>
-      </div>
-      <div className="day-bar-mid">
-        {!mode.live && (
-          <button
-            type="button"
-            className="day-bar-play"
-            aria-pressed={mode.replaying}
-            aria-label={mode.replaying ? 'Stop here' : 'Run this day forward'}
-            onClick={() => {
-              playPause(handle, mode.replaying, tick)
-            }}
-          >
-            <PixelGlyph
-              className="day-bar-glyph"
-              pixels={mode.replaying ? PAUSE_PIXELS : PLAY_PIXELS}
-            />
-          </button>
-        )}
-        <div className="day-bar-rail">
-          <p className="day-bar-stamp" style={at(frac)}>
-            {when.time}
+    <div className="day-bar almanac" data-theme={theme}>
+      <div className="almanac-date">
+        <div className="almanac-day">
+          <span>DAY</span>
+          <b>{when.day}</b>
+        </div>
+        <div>
+          <p className="almanac-season">
+            <GameIcon kind="leaf" />
+            {when.season.toLowerCase()}
           </p>
-          <div
-            ref={track}
-            className="day-bar-track"
-            role="slider"
-            tabIndex={0}
-            aria-label="Minute of this day"
-            aria-valuemin={from}
-            aria-valuemax={Math.min(from + MINUTES_PER_DAY - 1, edge)}
-            aria-valuenow={tick}
-            aria-valuetext={when.time}
-            onKeyDown={onKey}
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId)
-              pick(e.clientX)
-            }}
-            onPointerMove={(e) => {
-              if (e.buttons === 1) drag(e.clientX)
-            }}
-          >
-            <span className="day-bar-line">
-              {dead !== null && <span className="day-bar-dead" style={at(dead)} />}
-            </span>
-            {marks.map((m) => (
-              <span
-                key={`${m.tick}-${m.kind}`}
-                className="day-bar-mark"
-                style={{ ...at(dayFrac(m.tick)), background: markInk(m.kind) }}
-                title={m.words}
-              />
-            ))}
-            <span className="day-bar-cursor" style={at(frac)} />
-          </div>
+          <small>{when.weekday.toLowerCase()}</small>
         </div>
       </div>
-      <div className="day-bar-right">
-        <p className="day-bar-weather">
-          <PixelGlyph
-            className="day-bar-sky"
-            pixels={(WEATHER_GLYPH[kind] ?? WEATHER_GLYPH['—']!).pixels}
-          />
-          {weather}
-        </p>
-        <p className="day-bar-state">{word}</p>
-        {asleep !== null && <p className="day-bar-state">{asleep}</p>}
-        <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
+      <div className="almanac-center">
+        {phase === 'night' ? (
+          <GameIcon kind="moon" />
+        ) : (
+          <i className="almanac-sun" aria-hidden="true" />
+        )}
+        <div className="almanac-clock">
+          <strong>{awake ? when.time : '—'}</strong>
+          <span>
+            {asleep
+              ? 'Town asleep'
+              : phase === 'day'
+                ? dayFrac(tick) < 0.5
+                  ? 'Morning'
+                  : 'Afternoon'
+                : phase}
+          </span>
+        </div>
       </div>
+      <div className="almanac-weather">
+        <PixelGlyph
+          className="almanac-sky"
+          pixels={(WEATHER_GLYPH[kind] ?? WEATHER_GLYPH['—']!).pixels}
+        />
+        <div>
+          <p>{weather.toLowerCase()}</p>
+          <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
+        </div>
+        <span className="almanac-status" data-live={word === 'LIVE'}>
+          {!mode.live && !mode.replaying && word === 'REPLAY' ? 'Paused' : word.toLowerCase()}
+        </span>
+      </div>
+      {!broadcast && (
+        <div className="almanac-timeline">
+          <button
+            type="button"
+            className="almanac-control"
+            disabled={!handle || !awake}
+            aria-label={running ? 'Stop here' : 'Run this day forward'}
+            onClick={() => (running ? goTo(tick) : onWatch(tick))}
+          >
+            <PixelGlyph pixels={running ? PAUSE_PIXELS : PLAY_PIXELS} />
+          </button>
+          <div className="almanac-rail">
+            <AlmanacMoments key={from} marks={marks} onWatch={onWatch} />
+            <div
+              ref={track}
+              className="almanac-track"
+              role="slider"
+              tabIndex={0}
+              aria-label="Minute of this day"
+              aria-valuemin={from}
+              aria-valuemax={Math.max(from, Math.min(from + MINUTES_PER_DAY - 1, edge))}
+              aria-valuenow={tick}
+              aria-valuetext={when.time}
+              onKeyDown={onKey}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId)
+                pick(e.clientX)
+              }}
+              onPointerMove={(e) => {
+                if (e.buttons === 1) drag(e.clientX)
+              }}
+            >
+              <span className="almanac-line">
+                {dead !== null && <span className="almanac-future" style={at(dead)} />}
+              </span>
+              <span className="almanac-cursor" style={at(frac)} />
+            </div>
+            <div className="almanac-times" aria-hidden="true">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>Noon</span>
+              <span>18:00</span>
+              <span>24:00</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="almanac-live"
+            disabled={mode.live || !handle}
+            onClick={onLive}
+          >
+            Go live
+          </button>
+          <button
+            type="button"
+            className="almanac-theme almanac-control"
+            aria-label={theme === 'light' ? 'Use dark almanac' : 'Use light almanac'}
+            title={theme === 'light' ? 'Use dark almanac' : 'Use light almanac'}
+            onClick={() => {
+              const next = theme === 'light' ? 'dark' : 'light'
+              setTheme(next)
+              almanacTheme.write(localStore(), next)
+            }}
+          >
+            {theme === 'light' ? (
+              <GameIcon kind="moon" />
+            ) : (
+              <i className="almanac-sun" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

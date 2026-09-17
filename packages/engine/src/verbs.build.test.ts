@@ -17,7 +17,7 @@ const FAST: SimConfig = SimConfigSchema.parse({
 // Noon: work started in the dark takes half again as long, and nothing here is about the dark.
 const NOON = 720
 
-function makeWorld(config = CFG, wood = 10): WorldState {
+function makeWorld(config = CFG, wood = config.construction.houseMaterials.wood): WorldState {
   let s = genesisState(config)
   s = fold(
     s,
@@ -56,7 +56,11 @@ describe('verb: build', () => {
       submitIntent(makeWorld(CFG, 0), CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 }).ok,
     ).toBe(false) // no wood
     expect(
-      submitIntent(makeWorld(CFG, 9), CFG, 'a1', 'build', { kind: 'house', x: 1, y: 1 }).ok,
+      submitIntent(makeWorld(CFG, CFG.construction.houseMaterials.wood - 1), CFG, 'a1', 'build', {
+        kind: 'house',
+        x: 1,
+        y: 1,
+      }).ok,
     ).toBe(false) // short on wood
     expect(submitIntent(makeWorld(), CFG, 'a1', 'build', { kind: 'castle', x: 1, y: 1 }).ok).toBe(
       false,
@@ -87,7 +91,7 @@ describe('verb: build', () => {
     })
     expect(r.events).toContainEqual({
       type: 'item_qty_changed',
-      payload: { id: 'item_1', delta: -10 },
+      payload: { id: 'item_1', delta: -22.5 },
     })
     expect(r.events).toContainEqual({
       type: 'structure_planned',
@@ -96,8 +100,8 @@ describe('verb: build', () => {
         kind: 'house',
         x: 1,
         y: 1,
-        w: 2,
-        h: 2,
+        w: 3,
+        h: 3,
         maxHp: 50,
         flammable: true,
         builderId: 'a1',
@@ -117,7 +121,12 @@ describe('verb: build', () => {
     const w = startBuild(makeWorld())
     const s = fold(
       w,
-      ev('item_spawned', { id: 'item_9', kind: 'wood', qty: 10, loc: { t: 'agent', id: 'a1' } }),
+      ev('item_spawned', {
+        id: 'item_9',
+        kind: 'wood',
+        qty: CFG.construction.houseMaterials.wood,
+        loc: { t: 'agent', id: 'a1' },
+      }),
       CFG,
     )
     const idle = fold(s, ev('action_interrupted', { agentId: 'a1', reason: 'test' }), CFG)
@@ -251,7 +260,7 @@ describe('verb: build reads structures.recipes', () => {
     if (!r.ok) expect(r.reason).toBe('cannot build a grave')
   })
 
-  it('leaves the house byte-identical to C9: same row, same dials, same number', () => {
+  it('keeps house construction dimensions and material dials aligned with its recipe', () => {
     const house = CFG.structures.recipes.house!
     expect(house.inputs).toEqual(CFG.construction.houseMaterials)
     expect({ w: house.w, h: house.h }).toEqual(CFG.construction.houseSize)

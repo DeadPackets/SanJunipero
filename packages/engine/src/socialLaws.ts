@@ -100,7 +100,9 @@ function standingWhere(
     const square = townSquareOf(state)
     return (
       square !== null &&
-      Math.max(Math.abs(a.x - square.x), Math.abs(a.y - square.y)) <= SQUARE_RADIUS
+      (state.townLayout === 'orchard'
+        ? a.x >= square.x && a.x < square.x + 9 && a.y >= square.y && a.y < square.y + 9
+        : Math.max(Math.abs(a.x - square.x), Math.abs(a.y - square.y)) <= SQUARE_RADIUS)
     )
   }
   if (where === 'house') {

@@ -1,3 +1,4 @@
+import { orchardTown, ORCHARD_DEV_ORIGIN } from './orchardTown.js'
 import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -10,6 +11,9 @@ import {
   simTimeFromTick,
   type SimConfig,
   MINUTES_PER_DAY,
+  stoneRoadTiles,
+  T_PATH,
+  T_ROAD,
 } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import {
@@ -64,7 +68,7 @@ export const DEV_RETAIN: Retain = {
   short: { keepTicks: 2 * MINUTES_PER_DAY, types: ['needs_ticked', 'needs_changed'] },
 }
 
-// `construction.houseTicks` defaults to two sim days — 96 REAL MINUTES at the dev world's tick.
+// Scripted construction is accelerated; the simulation default uses its full per-tile rate.
 // `config.test.ts` requires this dial and the recipe's `durationTicks` to stay equal.
 export const DEV_HOUSE_TICKS = 240
 
@@ -145,7 +149,7 @@ function wipeAgentMemory(agentDbDir: string | undefined): number {
 }
 
 /** `scripted` is a FROZEN TEST FIXTURE: the gates hash the world it folds, so it may never change. */
-export type DevMapKind = 'scripted' | 'showcase'
+export type DevMapKind = 'scripted' | 'showcase' | 'orchard'
 /** For `startDevWorld()` called as a library, i.e. by the gates. Never by a person. */
 export const DEV_MAP_DEFAULT: DevMapKind = 'scripted'
 
@@ -153,7 +157,11 @@ export function devTerrain(
   map: DevMapKind = DEV_MAP_DEFAULT,
   rings: number = TOWN_RINGS_GENESIS,
 ): ReturnType<typeof makeFixtureMap> {
-  return map === 'showcase' ? showcaseTerrain(undefined, rings) : makeFixtureMap()
+  return map === 'orchard'
+    ? orchardTown().terrain
+    : map === 'showcase'
+      ? showcaseTerrain(undefined, rings)
+      : makeFixtureMap()
 }
 
 /** `state.origin` is where the array's (0, 0) sits in the AUTHORED frame. The frozen fixture
@@ -205,8 +213,26 @@ export async function startDevWorld(
     )
   }
 
-  const config = SHOWCASE_CONFIG
   const map = world.map ?? DEV_MAP_DEFAULT
+  const config: SimConfig =
+    map === 'orchard'
+      ? {
+          ...SHOWCASE_CONFIG,
+          world: {
+            ...SHOWCASE_CONFIG.world,
+            layout: 'orchard',
+            origin: ORCHARD_DEV_ORIGIN,
+            size: { w: 112, h: 112 },
+          },
+          structures: {
+            ...SHOWCASE_CONFIG.structures,
+            recipes: {
+              ...SHOWCASE_CONFIG.structures.recipes,
+              bridge: { ...SHOWCASE_CONFIG.structures.recipes.bridge!, w: 3, h: 1 },
+            },
+          },
+        }
+      : SHOWCASE_CONFIG
   const rings = world.rings ?? TOWN_RINGS_GENESIS
   const seed = opts.seed ?? DEV_SEED
   // The frozen fixture has no grammar to grow, so its ring count is not part of its identity.
@@ -257,18 +283,17 @@ export async function startDevWorld(
   // Same map kind AND the same ring count as the terrain, or the town is an overlay of two layouts.
   // Whole households, and only on the showcase: the frozen fixture has its own five bodies.
   const founding =
-    map === 'showcase' ? foundingIds(world.founders ?? FOUNDER_IDS.length) : undefined
+    map !== 'scripted' ? foundingIds(world.founders ?? FOUNDER_IDS.length) : undefined
   const structures = townStructuresFor(map, rings, founding)
 
-  // `WorldState.terrain` rides in the snapshot, so the gateway must be handed THIS array and
-  // not `devTerrain(map, rings)` recomputed from the environment.
+  // Resume from the snapshot; historical replay still needs the original terrain.
   const store = new EventStore(db)
   const resumed = store.lastSeq() > 0 ? replayLatest(store, config, genesisTerrain, seed) : null
   const terrain = resumed ? resumed.state.terrain : genesisTerrain
   const rng = resumed ? resumed.rng : new RngStreams(seed)
 
   console.log(
-    `dev world: map=${map} rings=${map === 'showcase' ? rings : 'n/a (frozen fixture)'} ` +
+    `dev world: map=${map} rings=${map === 'orchard' ? 'orchard courts' : map === 'showcase' ? rings : 'n/a (frozen fixture)'} ` +
       `terrain=${terrain[0]?.length ?? 0}x${terrain.length} structures=${structures.length}` +
       (map === 'scripted' ? '  ← THE FROZEN G6 TEST FIXTURE, not the product town' : ''),
   )
@@ -288,6 +313,7 @@ export async function startDevWorld(
   // The handler is an indirection because a bridge and a loop each need the other first: the
   // bridge is constructed around `loop`, and `loop` runs the handler that bridge returns.
   let handler: TickHandler | null = null
+  let surfaced = false
   const loop: TickLoop = new TickLoop({
     store,
     state: resumed ? resumed.state : devGenesisState(config, terrain, map, rings),
@@ -296,6 +322,13 @@ export async function startDevWorld(
     snapshotEveryTicks: DEV_SNAPSHOT_EVERY_TICKS,
     retain: opts.retain ?? DEV_RETAIN,
     onTick: (ctx) => {
+      if (map === 'orchard' && !surfaced) {
+        if (loop.state.laws?.['desirePaths.enabled'] !== false)
+          ctx.emit('config_changed', { path: 'desirePaths.enabled', value: false })
+        for (const p of stoneRoadTiles(loop.state.terrain))
+          ctx.emit('tile_changed', { ...p, from: T_PATH, to: T_ROAD, reason: 'surfaced' })
+        surfaced = true
+      }
       handler?.(ctx)
     },
   })
@@ -306,11 +339,11 @@ export async function startDevWorld(
     interiors: world.interiors === true,
     structures,
     founders: foundersFor(structures, founding),
-    holdings: map === 'showcase',
-    builders: world.builders === true && map === 'showcase',
-    jointBuild: world.jointBuild === true && map === 'showcase',
-    ...(opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase'
-      ? { lamps: opts.lamps }
+    holdings: map !== 'scripted',
+    builders: world.builders === true && map !== 'scripted',
+    jointBuild: world.jointBuild === true && map !== 'scripted',
+    ...(map === 'orchard' || (opts.lamps !== undefined && opts.lamps > 0 && map === 'showcase')
+      ? { lamps: opts.lamps ?? 12 }
       : {}),
     // the crossing: derived from the ford the map lays, so the two cannot disagree
     ...(world.bridge === true && map === 'showcase'
@@ -332,7 +365,7 @@ export async function startDevWorld(
     gateway = await createGateway({
       dbPath,
       port: opts.port ?? DEV_PORT,
-      terrain,
+      terrain: genesisTerrain,
       config,
       db,
       paused: () => loop.paused,

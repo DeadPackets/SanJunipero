@@ -296,7 +296,7 @@ export function createAmbient(
   const applyTone = (v: boolean): void => {
     grave = v
     settleBounces()
-    layers.weather.setSuppressed(v)
+    if (!scene.spatial) layers.weather.setSuppressed(v)
     layers.bubbles.setSuppressed(v)
     layers.chars?.setEmotesHidden(v)
   }

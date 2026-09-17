@@ -45,8 +45,8 @@ describe('the constants are rulings, not dials', () => {
   it('names the lattice the reference implementation proved', () => {
     expect([BLOCK, STREET]).toEqual([16, 3])
     expect(PITCH).toBe(19)
-    expect([...PLOT_OFFSETS]).toEqual([2, 9])
-    expect([MAX_ALONG, MAX_DEEP]).toEqual([4, 2])
+    expect([...PLOT_OFFSETS]).toEqual([1, 8])
+    expect([MAX_ALONG, MAX_DEEP]).toEqual([4, 3])
     expect(MIN_SEP).toBe(72)
   })
 
@@ -153,15 +153,15 @@ describe('★ THE SPACING INVARIANT, PROVEN OVER THE WHOLE LATTICE', () => {
     expect(floor.pairings).toBeGreaterThan(2000)
   })
 
-  it('puts the closest any two buildings can EVER be at 86.2 px, over a 72 px floor', () => {
+  it('puts the closest any two buildings can EVER be at 76.4 px, over a 72 px floor', () => {
     expect(floor.closest).toBeGreaterThan(MIN_SEP)
-    expect(floor.closest).toBeCloseTo(86.1626, 3)
-    expect(floor.worst).toBe('(0,0) s0 1×2  ↔  (-1,0) e1 4×1')
+    expect(floor.closest).toBeCloseTo(76.4199, 3)
+    expect(floor.worst).toBe('(0,0) s0 1×3  ↔  (-1,0) e1 4×1')
   })
 
   it('is not vacuous: a plot pitch the lattice does not use overlaps', () => {
     // The same survey with the two plots moved to offsets (2, 5) — a 3-tile pitch instead of
-    // 7 — puts one building's tiles inside another's. The 7 is doing work.
+    // 7 — puts one building's tiles inside another's. The gap is doing work.
     expect(latticeFloor([2, 5]).overlaps).toBeGreaterThan(0)
   })
 })
@@ -223,7 +223,7 @@ describe('★ NO BUILDING CAN EVER STAND ON WATER', () => {
         expect(RIVER_GROUND(t.dx, t.dy), `a building at ${t.dx},${t.dy}`).toBe('dry')
         checked++
       }
-    expect(checked).toBe(8520)
+    expect(checked).toBe(17040)
   })
 
   // The lemma is what makes this hold at every ring: a block is platted only if every one of its
@@ -272,8 +272,8 @@ describe('★ EVERY DOOR FRONTS A ROAD', () => {
 
   it('puts the door on the +y face when SW and the +x face when SE', () => {
     const [s0, , e0] = plotsOf(0, 0) as [Plot, Plot, Plot, Plot]
-    expect(doorFrontOf(place(s0, 'x', 3, 2, null))).toEqual({ dx: 3, dy: 16 })
-    expect(doorFrontOf(place(e0, 'x', 3, 2, null))).toEqual({ dx: 16, dy: 3 })
+    expect(doorFrontOf(place(s0, 'x', 3, 2, null))).toEqual({ dx: 2, dy: 16 })
+    expect(doorFrontOf(place(e0, 'x', 3, 2, null))).toEqual({ dx: 16, dy: 2 })
   })
 
   // A special case that widened the main street once ran a phantom road row at y = -3 through the
@@ -300,20 +300,20 @@ describe('the town is as large as it has grown', () => {
       place(plotsOf(1, 1)[2]!, 'house', 2, 2, null),
     ]
     const e = townExtent(built)
-    expect(e.tiles).toEqual({ dx0: 2, dy0: -5, dx1: 34, dy1: 22 })
+    expect(e.tiles).toEqual({ dx0: 1, dy0: -5, dx1: 34, dy1: 21 })
     expect(e.screen).toEqual({
-      sx0: screenOf(2, 22).sx,
-      sy0: screenOf(2, -5).sy,
+      sx0: screenOf(1, 21).sx,
+      sy0: screenOf(1, -5).sy,
       sx1: screenOf(34, -5).sx,
-      sy1: screenOf(34, 22).sy,
+      sy1: screenOf(34, 21).sy,
     })
-    expect(centreOf(built[0]!)).toEqual(screenOf(3, -4))
+    expect(centreOf(built[0]!)).toEqual(screenOf(2, -4))
     expect(townExtent([]).tiles).toBeNull()
   })
 
   it('spaces the reference towns exactly as the reference measured them', () => {
     expect(closestPair(referenceTown(1))).toBeCloseTo(125.2198, 3)
-    expect(closestPair(referenceTown(3, 30))).toBeCloseTo(100.2397, 3)
+    expect(closestPair(referenceTown(3, 30))).toBeCloseTo(89.4427, 3)
   })
 
   it('finds no error at all in either reference town', () => {

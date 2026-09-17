@@ -57,3 +57,11 @@ Map records use the existing asset class with kinds `material-map:<kind>:<channe
 ```
 
 Check the printed material record ID and map IDs after the command completes. Each record books zero cost. The command imports image assets only and does not change town events.
+
+## Buildings discovered by the town
+
+Discovery commissions two surface sets: `material:<building-kind>:wood` and `material:<building-kind>:roof`. The live Forge queue generates full square surface textures, reviews them as repeating materials, and registers their maps through this importer. It no longer requests a whole-building sprite for this path.
+
+The generated base color supplies conservative derived normal and roughness maps. These provide fine surface relief, not recovered building geometry. The building keeps its simulation footprint and procedural form. Windows and hearths retain their explicit light sources. Authored emissive maps can still be imported with `--emissive`; generated wall textures do not automatically glow.
+
+Generation uses the existing serialized queue, spending limits, and operations ledger. Only ready records count as completed commissions. Failed material commissions can be attempted again on a later discovery or restart. Startup also requests missing materials for previously coined building recipes. Renderer downloads retry after 1 and 4 seconds, then retain the existing material if the images remain unavailable.

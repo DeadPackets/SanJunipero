@@ -13,6 +13,7 @@ export type Thing = { kind: 'item' | 'crop'; id: string }
 /** A leaf on purpose: `index.tsx` imports every page, so the props cannot live there without
  *  every page importing it back. */
 export type PageProps = {
+  onBrowse?: (page: import('../pageModel.js').PageKey, tab?: string) => void
   tab: string
   subject: Subject | null
   /** the item or crop the viewer last clicked on the town, for Found › Things to open at */

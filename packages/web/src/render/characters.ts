@@ -51,6 +51,7 @@ import {
   FEET_Y,
   SHEET_COLS,
   SHEET_ROWS,
+  WALK_LOOP,
   WALK_LEAD_TICKS,
   cellRowLadder,
   charPose,
@@ -114,11 +115,14 @@ type CharEntry = {
   /** asleep or collapsed: the same body, lying across its ground point rather than standing on it */
   lying: boolean
   facing: Facing
+  ground: { x: number; y: number } | null
   path: Waypoint[]
   /** this body's own phase and stride, derived once from its id and never again */
   gait: Gait
   /** what the record says the leg in flight costs, so the legs can match the ground */
   legMs: number
+  walkCycles: number
+  lastPoseAtMs: number
   /** the tile the body is standing on RIGHT NOW — interpolated, never rounded (F-3c), held in
    *  the one entry this body publishes every frame rather than rebuilt into a fresh pair */
   depth: DepthEntry
@@ -452,8 +456,11 @@ export function createCharacterLayer(
       ranked: false,
       lying: false,
       facing: 'sw',
+      ground: null,
       gait: gaitOf(agentId),
       legMs: clock.periodMs / MOVEMENT_FALLBACK.base,
+      walkCycles: 0,
+      lastPoseAtMs: now,
       path: [{ x, y, atMs: now }],
       depth: { box: bodyDepthBox(agentId, x, y), node: sprite, overhead: overhead.node },
       crowd: NO_OFFSET,
@@ -566,7 +573,7 @@ export function createCharacterLayer(
       a: AgentBody
       e: CharEntry
       pos: { x: number; y: number }
-      bobY: number
+      walking: boolean
     }[] = []
     for (const a of Object.values(state.agents)) {
       if (!rendersOnMap(a)) continue
@@ -600,41 +607,8 @@ export function createCharacterLayer(
         const at = activityTarget(state, a)
         if (at !== null) e.facing = facingFrom(at.x - pos.x, at.y - pos.y) ?? e.facing
       }
-      const sheet = sheets.get(a.id)
-      const pose = charPose(
-        {
-          asleep: a.asleep,
-          collapsed: a.collapsedSinceTick !== null,
-          walking,
-          facing: e.facing,
-          nowMs,
-        },
-        strideFrameMs(e.legMs, e.gait.stride),
-        { phase: e.gait.phase, bob: scene.wantsMotion() },
-      )
-      e.breath = pose.breathY
-      if (sheet !== undefined && sheet.texture !== null) {
-        const cell = characterCell(sheet.texture, sheet.art, pose.row, pose.facing)
-        if (cell !== null) {
-          if (pose.facing !== e.drawn) {
-            if (e.drawn !== null && wantsMotion) startTurn(e, nowMs)
-            e.drawn = pose.facing
-          }
-          e.sprite.texture = cell.texture
-          e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
-          e.sprite.scale.set((cell.scale * targetPx) / CHAR_TARGET_PX) // smooth downscale to world footprint
-          // the row the SHEET had: a sheet with no sleep row draws a standing body
-          setHitScale(
-            e,
-            (cell.scale * targetPx) / CHAR_TARGET_PX,
-            cell.figureH,
-            e.ranked,
-            cell.row === 'sleep',
-          )
-        }
-      }
       standing.push({ id: a.id, x: pos.x, y: pos.y, settled: !walking })
-      drawing.push({ a, e, pos, bobY: pose.bobY })
+      drawing.push({ a, e, pos, walking })
     }
 
     // ── pass two: the rank, then everything that hangs off a body's position ────────────────
@@ -642,7 +616,7 @@ export function createCharacterLayer(
     // once a frame for every body: the sun's height is a function of the minute, not of who
     const sun = shadowCast(nowTick)
     const solid = scene.spatial ? Object.values(state.structures) : []
-    for (const { a, e, pos, bobY } of drawing) {
+    for (const { a, e, pos, walking } of drawing) {
       // A slot change is a glide, not a jump: a group re-forms as somebody joins it. Reduced
       // motion gets the destination, which is the point of the arrangement.
       const want = ranks.get(a.id) ?? NO_OFFSET
@@ -667,8 +641,53 @@ export function createCharacterLayer(
       const px = pos.x + e.crowd.dx
       const py = pos.y + e.crowd.dy
       const ground = scene.spatial ? clearBody(px + 0.5, py + 0.5, solid) : null
+      const visible = ground ?? { x: px, y: py }
+      if (walking && e.ground) {
+        const dx = visible.x - e.ground.x
+        const dy = visible.y - e.ground.y
+        if (Math.hypot(dx, dy) > 0.0001) e.facing = facingFrom(dx, dy) ?? e.facing
+      }
+      e.ground = visible
+      const sheet = sheets.get(a.id)
+      const frameMs = strideFrameMs(e.legMs, e.gait.stride)
+      const elapsed = Math.min(100, Math.max(0, nowMs - e.lastPoseAtMs))
+      e.lastPoseAtMs = nowMs
+      // Cadence changes must not rewind the pose already in flight.
+      if (walking) e.walkCycles = (e.walkCycles + elapsed / (frameMs * WALK_LOOP.length)) % 1
+      const pose = charPose(
+        {
+          asleep: a.asleep,
+          collapsed: a.collapsedSinceTick !== null,
+          walking,
+          facing: e.facing,
+          nowMs: walking ? 0 : nowMs,
+        },
+        frameMs,
+        { phase: e.gait.phase + (walking ? e.walkCycles : 0), bob: scene.wantsMotion() },
+      )
+      e.breath = pose.breathY
+      if (sheet !== undefined && sheet.texture !== null) {
+        const cell = characterCell(sheet.texture, sheet.art, pose.row, pose.facing)
+        if (cell !== null) {
+          if (pose.facing !== e.drawn) {
+            if (e.drawn !== null && wantsMotion) startTurn(e, nowMs)
+            e.drawn = pose.facing
+          }
+          e.sprite.texture = cell.texture
+          e.sprite.anchor.set(cell.anchor.x, cell.anchor.y) // feet-anchor law
+          e.sprite.scale.set((cell.scale * targetPx) / CHAR_TARGET_PX) // smooth downscale to world footprint
+          // the row the SHEET had: a sheet with no sleep row draws a standing body
+          setHitScale(
+            e,
+            (cell.scale * targetPx) / CHAR_TARGET_PX,
+            cell.figureH,
+            e.ranked,
+            cell.row === 'sleep',
+          )
+        }
+      }
       const { sx, sy } = ground ? tileToScreen(ground.x, ground.y) : feetOf(px, py)
-      e.sprite.position.set(sx, sy + bobY)
+      e.sprite.position.set(sx, sy + pose.bobY)
       e.depth.box = bodyDepthBox(a.id, px, py)
       // ★ The sun's own height, off the same token the arc draws: a low sun draws the blob
       // out and lays it away from the light, and noon puts it back under the feet.

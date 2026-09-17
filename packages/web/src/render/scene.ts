@@ -63,6 +63,7 @@ export function sceneClock(app: { ticker: { start(): void; stop(): void } | null
 export type Scene = {
   app: Application
   spatial?: boolean
+  capturePlace?: (id: string) => string | null
   /** Run or pause the scene's own clock. The ONLY way to do it: `app.ticker` is null on a
    *  destroyed scene, and a caller upstream of the teardown cannot know which it is holding. */
   setTicking(on: boolean): void

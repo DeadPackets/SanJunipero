@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, type SimEvent } from '@sj/shared'
+import { ADULT_AGE_DAYS, DEFAULT_CONFIG, SimConfigSchema, T_ROAD, type SimEvent } from '@sj/shared'
 import { genesisState, type TileId, type WorldState } from './state.js'
 import { fold } from './fold.js'
 import { submitIntent } from './intent.js'
@@ -55,6 +55,14 @@ function withAgent(s: WorldState, id: string, x: number, y: number): WorldState 
 }
 
 describe('doorTile', () => {
+  it('uses the centre of the recorded east-facing door on a wider house', () => {
+    const s = withHouse(world())
+    const house = s.structures.structure_1!
+    Object.assign(house, { w: 3, h: 3, facing: 'se' })
+    for (let y = 1; y < 4; y++) s.terrain[y]![5] = T_ROAD
+    expect(doorTile(s, house)).toEqual({ x: 5, y: 2 })
+  })
+
   it('is the tile south of the footprint centre', () => {
     const s = withHouse(world())
     expect(doorTile(s, s.structures.structure_1!)).toEqual({ x: 2, y: 3 })

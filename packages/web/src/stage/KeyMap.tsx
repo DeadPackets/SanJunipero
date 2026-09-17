@@ -12,7 +12,7 @@ export const KEY_MAP_ID = 'key-map-sheet'
 /** Every key the town answers to, in the order a hand finds them. Read off the bindings, not off
  *  a document: `useStageKeys` owns S/F/D/T/A/[/Esc, `render/cameraNav.ts` owns the camera. */
 export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
-  { keys: ['S'], says: 'the signpost' },
+  { keys: ['S'], says: 'the town journal' },
   { keys: ['Tab'], says: 'step through the chrome' },
   { keys: ['Enter'], says: 'open what is focused' },
   { keys: ['Esc'], says: 'put down what is up' },

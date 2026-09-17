@@ -156,12 +156,10 @@ const VIEW: Record<AuthoredFacing, string> = {
 const VIEW_REF = 'the reference image'
 type WalkPose = Exclude<StripPoseV4, 'idle'>
 const WALK_POSES: readonly WalkPose[] = ['contact-a', 'passing', 'contact-b']
-// From behind you cannot tell one foot from the other, so "the OTHER foot planted forward"
-// renders as a body standing still. The stride has to be stated as a geometry, not an identity.
 const STRIDE_CLAUSE =
-  ' THE FEET ARE WIDE APART: the gap between the two feet is at least as wide as the ' +
-  'shoulders, with clear background visible between the legs. This is the WIDEST frame of ' +
-  'the walk cycle. It is NOT a standing pose and the feet are NOT together.'
+  ' Separate the feet along the direction of travel, with the forward foot farther along ' +
+  'that ground diagonal and the trailing heel lifting. Preserve perspective foreshortening. ' +
+  'Do not spread the legs sideways or spread both arms into a star pose.'
 const POSE_V4: Record<WalkPose, string> = {
   'contact-a':
     'walk cycle CONTACT pose A: legs at full stride spread, one foot planted forward, the other back with heel lifting, opposite arm swung forward.' +
@@ -235,6 +233,8 @@ function framePrompt(m: CastLook, f: AuthoredFacing, p: WalkPose): string {
     'same chunky pixel look: the visible square pixels must be the SAME SIZE relative to the ' +
     'body as in the reference figure. Draw EXACTLY ONE figure: the reference shows one figure ' +
     `and the answer must show one figure. Pose: ${POSE_V4[p]}. ${NO_SCENERY} ` +
+    'Keep the head, shoulders and pelvis aligned to the reference viewing direction. Keep ' +
+    'the head size and torso proportions stable; do not turn the torso flat toward the camera. ' +
     `Subject: ${m.desc}. ${m.featureCap} ${PERIOD} ${BIG_PIXEL} ` +
     'The figure stands about four fifths of the frame height tall, with clear magenta margin on ' +
     'all sides; the figure must NOT touch the edges of the image.'

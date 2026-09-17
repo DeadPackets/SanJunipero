@@ -1,8 +1,10 @@
+import { claimOrchardPlot, orchardGroundBox, orchardSquare } from './orchardTown.js'
 import {
   CITY_GROUND,
   T_CHANNEL,
   T_FARMLAND,
   T_GRASS,
+  T_PATH,
   T_ROAD,
   T_WATER,
   TOWN_SQUARE,
@@ -50,6 +52,7 @@ const PLAZA_PAVED: readonly { dx: number; dy: number }[] = (() => {
 /** The square's array coordinate, or null for a world with no town. Asks about the whole
  *  254-tile plaza: one road crossing cannot pass that, nor a lattice shifted by less than a block. */
 export function townSquareOf(state: WorldState): WorldXY | null {
+  if (state.townLayout === 'orchard') return orchardSquare(state)
   const o = authoredOrigin(state)
   const at = { x: TOWN_SQUARE.x - o.x, y: TOWN_SQUARE.y - o.y }
   for (const p of PLAZA_PAVED) {
@@ -101,6 +104,7 @@ export function claimInWorld(
   state: WorldState,
   need: { along: number; deep: number },
 ): TownClaim | null {
+  if (state.townLayout === 'orchard') return claimOrchardPlot(state, need)
   const square = townSquareOf(state)
   return square === null
     ? null
@@ -116,6 +120,7 @@ export function claimInWorld(
 /** How many rings of the town are standing, and the ground it has laid to hold them. `null`
  *  for a world with no town — which owes nothing, because there is no town to owe it to. */
 export function townGroundBox(state: WorldState): WorldBox | null {
+  if (state.townLayout === 'orchard') return orchardGroundBox(state)
   const square = townSquareOf(state)
   return square === null
     ? null
@@ -136,7 +141,33 @@ export function layBlock(
   state: WorldState,
   square: WorldXY,
   block: { i: number; j: number },
+  claim?: TownClaim,
 ): TileChange[] | 'off the map' {
+  if (state.townLayout === 'orchard' && claim?.ground) {
+    const planned = new Map<
+      string,
+      { x: number; y: number; to: number; reason: TileChange['reason'] }
+    >()
+    for (const p of claim.ground.cleared)
+      planned.set(`${p.x},${p.y}`, { ...p, to: T_GRASS, reason: 'levelled' })
+    for (const p of claim.ground.paved)
+      planned.set(`${p.x},${p.y}`, { ...p, to: T_ROAD, reason: 'surfaced' })
+    const changes: TileChange[] = []
+    for (const p of planned.values()) {
+      const from = state.terrain[p.y]?.[p.x]
+      if (from === undefined) return 'off the map'
+      if (
+        from === T_WATER ||
+        from === T_CHANNEL ||
+        from === T_ROAD ||
+        (from === T_PATH && p.to !== T_ROAD) ||
+        from === T_FARMLAND
+      )
+        continue
+      if (from !== p.to) changes.push({ ...p, from })
+    }
+    return changes
+  }
   const { cleared, paved } = blockGroundOf(square, block, townGroundOf(state, square))
   const out: TileChange[] = []
   for (const [tiles, to, reason] of [

@@ -114,6 +114,7 @@ export function reachOnFoot(rings: number, walk: Walk): Reach {
 }
 
 export type TownClaim = {
+  ground?: { cleared: WorldXY[]; paved: WorldXY[] }
   /** The ground the building covers, in world tiles, already turned to its facing. */
   site: WorldRect
   /** The road tile its door opens onto. */

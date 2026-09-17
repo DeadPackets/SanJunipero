@@ -1,3 +1,4 @@
+import { orchardTown } from './orchardTown.js'
 // Deterministic: no Math.random, policies are pure functions of perception, timeline tick-keyed.
 // A body decides only while `activity` is unset — `submitIntent` discards an intent taken during one.
 import {
@@ -12,6 +13,8 @@ import {
 } from '@sj/shared'
 import {
   BRIDGE_KIND,
+  GENESIS_BUILDER_ID,
+  ticksUntilNewGround,
   awakeEnergyDecay,
   bridgeAt,
   buildSiteOf,
@@ -196,7 +199,12 @@ export function townStructuresFor(
   rings?: number,
   cast?: readonly string[],
 ): readonly DevStructure[] {
-  const built = map === 'showcase' ? devTown(undefined, rings).structures : SCRIPTED_STRUCTURES
+  const built =
+    map === 'orchard'
+      ? orchardTown().structures
+      : map === 'showcase'
+        ? devTown(undefined, rings).structures
+        : SCRIPTED_STRUCTURES
   if (cast === undefined) return built
   // A roof waiting on somebody who never founded the valley is nobody's roof and has no name:
   // it stands empty and unowned until whoever walks up the road takes it.
@@ -240,7 +248,7 @@ const SHED_STOCK: readonly (readonly [string, number])[] = [
   ['wood', 4],
 ]
 /** `composePerception` shows a building's shelves only to somebody inside it or against its
- *  wall, so the public store's wood might as well not be there. Ten wood is one house. */
+ *  wall, so the public store's wood might as well not be there. */
 const HOUSE_STOCK: readonly (readonly [string, number])[] = [
   ['bread', 2],
   ['waterskin', 1],
@@ -346,8 +354,6 @@ function workEnergyCost(
 // `PlottedBuildParams`, a strict `{ kind }` with no x and no y; the site is `claimInWorld`'s answer.
 
 export const MASON_KIND = 'house'
-/** `claimInWorld` answers for a rectangle, not for a kind. */
-const MASON_NEED = { along: 2, deep: 2 }
 /** Scripted supply: a demo town has no economy, so a mason out of wood is handed more. */
 export const MASON_WOOD_KIND = 'wood'
 
@@ -367,8 +373,22 @@ export function masonIntent(
 ): Intent | null {
   const a = state.agents[agentId]
   if (a === undefined || a.insideId !== undefined) return null
-  const join = lendHands ? buildSiteOf(state, config, agentId, { kind: MASON_KIND }).resume : null
+  const pending =
+    lendHands || state.townLayout === 'orchard'
+      ? buildSiteOf(state, config, agentId, { kind: MASON_KIND }).resume
+      : null
+  const join =
+    pending !== null && (lendHands || state.structures[pending.id]?.builtBy === agentId)
+      ? pending
+      : null
   if (join !== null) {
+    const site = state.structures[join.id]!
+    if (state.townLayout === 'orchard' && !isAdjacentToRect(a.x, a.y, site)) {
+      const door = doorTile(state, site)
+      return door !== null && arrivesStanding(state, config, agentId, door)
+        ? { verb: 'walk', params: door }
+        : null
+    }
     // Only the work that is LEFT: a joiner has no walk to pay for and no fresh house to raise.
     const left = workEnergyCost(
       state,
@@ -380,7 +400,10 @@ export function masonIntent(
       ? { verb: 'build', params: { kind: MASON_KIND } }
       : null
   }
-  const claim = claimInWorld(state, MASON_NEED)
+  if (state.townLayout === 'orchard' && ticksUntilNewGround(state, config) > 0) return null
+  const recipe = config.structures.recipes[MASON_KIND]
+  if (!recipe) return null
+  const claim = claimInWorld(state, { along: recipe.w, deep: recipe.h })
   if (claim === null) return null
   const out = walkEnergyCost(state, config, agentId, claim.door)
   const work = workEnergyCost(state, config, agentId, config.construction.houseTicks)
@@ -678,7 +701,7 @@ export function makeFoundersOnTick(
           h: s.h,
           maxHp: 20,
           flammable: s.flammable,
-          builderId: 'script',
+          builderId: config.world.layout === 'orchard' ? GENESIS_BUILDER_ID : 'script',
           ...(s.owner === null ? {} : { owner: s.owner }),
           // Absent is `sw`, so the frozen fixture — all six of whose buildings face sw — folds
           // the payload it always folded.
@@ -686,6 +709,8 @@ export function makeFoundersOnTick(
           ...(s.name === undefined ? {} : { name: s.name }),
         })
         emit('structure_completed', { id: s.id })
+        if (config.world.layout === 'orchard' && ['lamp_post', 'fire_pit'].includes(s.kind))
+          emit('structure_fueled', { structureId: s.id, burnsUntilTick: nextDawnTick(tick) })
       }
       for (const e of foundersKnowTheVillage(
         cast.map((f) => f.id),

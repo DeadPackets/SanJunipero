@@ -8,7 +8,12 @@ import {
   SPAWN_AGE_YEARS,
   thirstDecayPerTick,
 } from './config.js'
-import { CITY_BED_KIND, CITY_HEARTH_KIND, cityStructures } from './cityTemplate.js'
+import {
+  CITY_BED_KIND,
+  CITY_HEARTH_KIND,
+  DWELLING_FOOTPRINTS,
+  cityStructures,
+} from './cityTemplate.js'
 import { DURATION_TICKS } from './duration.js'
 import { MINUTES_PER_DAY } from './time.js'
 
@@ -41,7 +46,7 @@ describe('SimConfigSchema', () => {
     expect(c.weather.seasonTemps.winter).toBe(-4)
     expect(c.crops.wheat!.growthDays).toBe(8)
     expect(c.fire.burnTicksToDestroy).toBe(120)
-    expect(c.construction.houseMaterials.wood).toBe(10)
+    expect(c.construction.houseMaterials.wood).toBe(22.5)
   })
 
   it('rejects unknown keys at the top level', () => {
@@ -335,12 +340,12 @@ describe('SimConfigSchema: C9 living-world sections', () => {
   it('structures.recipes is the one table that knows what a building costs and measures', () => {
     const r = SimConfigSchema.parse({}).structures.recipes
     expect(r.house).toEqual({
-      inputs: { wood: 10 },
-      w: 2,
-      h: 2,
+      inputs: { wood: 22.5 },
+      w: 3,
+      h: 3,
       maxHp: 50,
       flammable: true,
-      durationTicks: 2880,
+      durationTicks: 6480,
       roofed: true,
       hearth: true,
       bed: true,
@@ -382,12 +387,10 @@ describe('SimConfigSchema: C9 living-world sections', () => {
       bed: false,
       sited: false,
     })
-    // Only the two 2x2 kinds keep empty inputs: a buildable cabin or storehouse is a second name for house.
     for (const k of ['storehouse', 'cabin', 'cottage', 'farmhouse'])
       expect(r[k]!.roofed, k).toBe(true)
     expect(r.storehouse!.inputs).toEqual({})
     expect(r.cabin!.inputs).toEqual({})
-    // One rate, not three authored numbers: a house is 4 tiles for 10 wood and 2 880 ticks.
     const perTileWood = r.house!.inputs.wood! / (r.house!.w * r.house!.h)
     const perTileTicks = r.house!.durationTicks / (r.house!.w * r.house!.h)
     expect([perTileWood, perTileTicks]).toEqual([2.5, 720])
@@ -422,6 +425,9 @@ describe('SimConfigSchema: C9 living-world sections', () => {
     // The house row must agree with the dials it replaces, or the generalisation drifts.
     expect(r.house!.inputs).toEqual(DEFAULT_CONFIG.construction.houseMaterials)
     expect(r.house!.durationTicks).toBe(DEFAULT_CONFIG.construction.houseTicks)
+    expect({ w: r.house!.w, h: r.house!.h }).toEqual(DEFAULT_CONFIG.construction.houseSize)
+    for (const [kind, footprint] of Object.entries(DWELLING_FOOTPRINTS))
+      expect({ w: r[kind]!.w, h: r[kind]!.h }, kind).toEqual(footprint)
     // Enterability is `roofed` on this row, and there is nowhere else to say it.
     expect(r.house).not.toHaveProperty('enterable')
   })

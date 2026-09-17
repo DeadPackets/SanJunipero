@@ -1,3 +1,4 @@
+import { orchardSiteReserved } from '../orchardTown.js'
 import { doorTile } from '../interiors.js'
 import { BRIDGE_KIND, bridgeAt, isPassable } from '../path.js'
 import { type Structure, type WorldState } from '../state.js'
@@ -103,6 +104,12 @@ function footprintRefusal(
     if (d.x < s.x + s.w && s.x < d.x + w && d.y < s.y + s.h && s.y < d.y + h)
       return 'that spot is taken'
   }
+  if (
+    state.townLayout === 'orchard' &&
+    d.kind !== BRIDGE_KIND &&
+    orchardSiteReserved(state, d.x, d.y, w, h)
+  )
+    return 'that ground keeps a garden, a walking route or room for a building entrance'
   const ground =
     d.kind === BRIDGE_KIND
       ? bridgeSiteRefusal(state, d.x, d.y, w, h)
@@ -264,7 +271,7 @@ function computeBuildSite(
   }
   // A refusal rather than a silent skip: a plot withheld for want of a bigger world would look
   // to a mind like no plot at all.
-  const lay = layBlock(state, townSquareOf(state)!, claim.block)
+  const lay = layBlock(state, townSquareOf(state)!, claim.block, claim)
   if (lay === 'off the map') {
     return {
       site,

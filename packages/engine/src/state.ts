@@ -224,6 +224,7 @@ export type Forageable = {
 }
 
 export type WorldState = {
+  townLayout?: 'orchard'
   tick: number
   terrain: TileId[][] // [y][x]
   weather: { kind: string; temperatureC: number }
@@ -283,6 +284,8 @@ export function fromTileKey(key: string): { x: number; y: number } {
 export function genesisState(config: SimConfig, terrain?: TileId[][]): WorldState {
   return {
     tick: 0,
+    ...(config.world.layout === undefined ? {} : { townLayout: config.world.layout }),
+    ...(config.world.origin === undefined ? {} : { origin: { ...config.world.origin } }),
     terrain:
       terrain ?? Array.from({ length: 32 }, () => Array.from({ length: 32 }, (): TileId => 0)),
     weather: { kind: 'sunny', temperatureC: config.weather.seasonTemps.spring },

@@ -1,5 +1,11 @@
 import {
   CITY_ANCHOR_DEFAULT,
+  ORCHARD_ANCHOR,
+  makeOrchardTemplate,
+  stoneRoadTiles,
+  T_PATH,
+  T_ROAD,
+  nextDawnTick,
   FOUNDER_IDS,
   FOUNDER_SEATS,
   expandItemKinds,
@@ -43,7 +49,10 @@ function makeTerrain(config: SimConfig, anchor: { x: number; y: number }): TileI
     Array.from({ length: w }, (_, x) => genesisTerrainAt(x, y)),
   )
   // The template is part of the ground, not a change to it: no tile_changed at genesis.
-  for (const t of makeCityTemplate(anchor).tiles) {
+  for (const t of (config.world.layout === 'orchard'
+    ? makeOrchardTemplate(anchor)
+    : makeCityTemplate(anchor)
+  ).tiles) {
     const row = terrain[anchor.y + t.dy]
     if (row !== undefined && anchor.x + t.dx < w) row[anchor.x + t.dx] = t.to as TileId
   }
@@ -53,12 +62,11 @@ function makeTerrain(config: SimConfig, anchor: { x: number; y: number }): TileI
 export type GenesisWorld = { terrain: TileId[][]; events: PendingEvent[] }
 
 // Forced, not chosen: roofFell throws on a roofed kind that is unbuildable and not sound, and
-// those are exactly these two. Holds shelterLedger().per at 0.8 — 4 slots against 5 bodies.
+// those are exactly these two.
 export const GENESIS_SOUND_ROOFS: ReadonlySet<string> = new Set(['storehouse', 'cabin'])
 
-/** Three quarters. A farmhouse leaves 1 440 ticks of roof to raise — one night for two pairs
- *  of hands, and the village's first shared project. */
-export const GENESIS_ROOF_STOOD = 3 / 4
+/** A farmhouse leaves 1 440 ticks of roof work, one night for two pairs of hands. */
+export const GENESIS_ROOF_STOOD = 5 / 6
 
 /** The one roof the village left unfinished: the farmhouse nobody is seated under. Every
  *  founder wakes under a whole one — the elder and the two singles in the cottage too — and a
@@ -128,6 +136,7 @@ function plannedPayload(
     maxHp: durability.maxHp,
     flammable: durability.flammable,
     builderId: GENESIS_BUILDER_ID,
+    ...(s.facing === 'sw' ? {} : { facing: s.facing }),
     // Absent, never null: an unowned building is the hash-stable shape.
     ...(s.owner === null ? {} : { owner: s.owner }),
     ...(s.name === undefined ? {} : { name: s.name }),
@@ -148,10 +157,20 @@ export function makeGenesisWorld(
   config: SimConfig,
   opts: { anchor?: { x: number; y: number } } = {},
 ): GenesisWorld {
-  const anchor = opts.anchor ?? CITY_ANCHOR_DEFAULT
+  const anchor =
+    opts.anchor ?? (config.world.layout === 'orchard' ? ORCHARD_ANCHOR : CITY_ANCHOR_DEFAULT)
   const terrain = makeTerrain(config, anchor)
-  const template = makeCityTemplate(anchor)
+  const template =
+    config.world.layout === 'orchard' ? makeOrchardTemplate(anchor) : makeCityTemplate(anchor)
   const events: PendingEvent[] = []
+  if (config.world.layout === 'orchard') {
+    events.push({ type: 'config_changed', payload: { path: 'desirePaths.enabled', value: false } })
+    for (const p of stoneRoadTiles(terrain))
+      events.push({
+        type: 'tile_changed',
+        payload: { ...p, from: T_PATH, to: T_ROAD, reason: 'surfaced' },
+      })
+  }
 
   // Only ever read for the spoilage day, which is 0 — but read through the one function that
   // knows how a kind spoils, so genesis food and foraged food are stamped by the same law.
@@ -167,6 +186,11 @@ export function makeGenesisWorld(
     events.push({ type: 'structure_planned', payload: plannedPayload(config, s, id, anchor) })
     if (!roofFell(config, s.kind)) {
       events.push({ type: 'structure_completed', payload: { id } })
+      if (config.world.layout === 'orchard' && ['lamp_post', 'fire_pit'].includes(s.kind))
+        events.push({
+          type: 'structure_fueled',
+          payload: { structureId: id, burnsUntilTick: nextDawnTick(0) },
+        })
       return
     }
     // structure_progressed is the same event a builder's own hands emit, so finishing one costs
