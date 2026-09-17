@@ -76,7 +76,7 @@ const town = (
 })
 
 const draw = (store: WorldStore): string =>
-  renderToStaticMarkup(createElement(StoryStrip, { store }))
+  renderToStaticMarkup(createElement(StoryStrip, { store, onChronicle: () => {} }))
 
 /** Every word the strip actually prints, with the markup and its attributes taken away. */
 const words = (html: string): string =>

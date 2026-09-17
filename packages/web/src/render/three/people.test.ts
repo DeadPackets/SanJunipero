@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Sprite } from 'pixi.js'
-import { Mesh, MeshStandardMaterial, Scene } from 'three'
+import { Mesh, MeshStandardMaterial, Raycaster, Scene, Vector3 } from 'three'
 import { createPeople } from './people.js'
 
 it('casts the visible character cutout, not the invisible picking capsule', () => {
@@ -26,6 +26,11 @@ it('casts the visible character cutout, not the invisible picking capsule', () =
   expect(material.map).not.toBeNull()
   expect(material.alphaTest).toBeGreaterThan(0)
   expect(people.pickables().every((object) => !object.castShadow)).toBe(true)
+  const capsule = people.pickables()[0]
+  scene.updateMatrixWorld(true)
+  const ray = new Raycaster(new Vector3(0, 0.92, 5), new Vector3(0, 0, -1))
+  expect(ray.intersectObjects(people.pickables()).length).toBeGreaterThan(0)
+  expect(capsule?.material).toMatchObject({ visible: false })
   people.destroy()
   expect(scene.children).toHaveLength(0)
 })

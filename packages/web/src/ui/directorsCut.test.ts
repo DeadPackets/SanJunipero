@@ -221,6 +221,8 @@ const bar = (store: WorldStore): string =>
       link: 'online' as const,
       handle: null,
       onAt: () => undefined,
+      onWatch: () => undefined,
+      onLive: () => undefined,
       autoCut: true,
       handbackAt: () => null,
     }),

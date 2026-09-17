@@ -56,6 +56,8 @@ const sheetOf = (over: Partial<Parameters<typeof Paper>[0]> = {}): ReactElement 
     onTab: () => {},
     onDock: () => {},
     onClose: () => {},
+    onBrowse: () => {},
+    onWatch: () => {},
     onSubject: () => {},
     onInside: () => {},
     onScrub: () => {},

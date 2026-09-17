@@ -68,7 +68,7 @@ export function createPeople(scene: Scene) {
           mesh.receiveShadow = true
           const hitBody = new Mesh(
             new CapsuleGeometry(0.2, 1.45, 4, 8),
-            new MeshBasicMaterial({ colorWrite: false, depthWrite: false }),
+            new MeshBasicMaterial({ visible: false, colorWrite: false, depthWrite: false }),
           )
           hitBody.userData.pick = { kind: 'agent', id }
           scene.add(mesh, hitBody)

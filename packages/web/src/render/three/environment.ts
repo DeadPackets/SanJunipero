@@ -27,6 +27,8 @@ export function createEnvironment(scene: Scene) {
   const lights = Array.from({ length: 8 }, (_, i) => {
     const light = new PointLight(0xffb45e, 0, 9, 2)
     light.castShadow = i < 4
+    // Allocate each shadow map once, even when its light starts dark.
+    light.shadow.needsUpdate = light.castShadow
     light.shadow.mapSize.set(512, 512)
     light.shadow.radius = 3
     light.shadow.intensity = 0.6
@@ -160,6 +162,7 @@ export function createEnvironment(scene: Scene) {
         }
         slot.light.intensity =
           slot.strength * slot.power * (0.96 + Math.sin(seconds * 7 + slot.light.id) * 0.04)
+        slot.light.shadow.autoUpdate = slot.light.intensity > 0
       }
       return { active, wet, daylight, sun, sky }
     },

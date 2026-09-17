@@ -123,15 +123,17 @@ const town = (t: Town = {}): WorldStore => {
 }
 
 /** The five in the order the plan stacks them. The strip is in every mode, the rest in Deck. */
-const SURFACES: readonly (readonly [string, ComponentType<{ store: WorldStore }>])[] = [
+const SURFACES: readonly (readonly [string, ComponentType<Parameters<typeof StoryStrip>[0]>])[] = [
   ['story strip', StoryStrip],
   ['beat card', BeatCard],
   ['shot board', ShotBoard],
   ['dossier rail', DossierRail],
 ]
 
-const draw = (Surface: ComponentType<{ store: WorldStore }>, store: WorldStore): string =>
-  renderToStaticMarkup(createElement(Surface, { store }))
+const draw = (
+  Surface: ComponentType<Parameters<typeof StoryStrip>[0]>,
+  store: WorldStore,
+): string => renderToStaticMarkup(createElement(Surface, { store, onChronicle: () => {} }))
 
 /** Everything a reader actually sees: the markup and its attributes taken away. */
 const words = (html: string): string =>
@@ -267,7 +269,7 @@ describe('★ the strip does not read its own last frame as the town repeating i
     host.push(el)
     const root = createRoot(el)
     act(() => {
-      root.render(createElement(StoryStrip, { store }))
+      root.render(createElement(StoryStrip, { store, onChronicle: () => {} }))
     })
     expect(el.textContent).toContain('The well ran dry between them.')
     act(() => {
