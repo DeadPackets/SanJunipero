@@ -37,6 +37,7 @@ import { buildStructure, structureKey } from './structures.js'
 import { createTerrain } from './terrain.js'
 import { createOcclusionFader } from './occlusion.js'
 import { createEnvironment } from './environment.js'
+import { createNightBackdrop } from './nightBackdrop.js'
 import { createPeople } from './people.js'
 import { createThreeWeather } from './weather.js'
 import { createResources } from './resources.js'
@@ -83,6 +84,7 @@ export function createThreeWorld(
   const terrain = createTerrain(scene)
   const gardens = createOrchardGardens(scene)
   const environment = createEnvironment(scene)
+  const nightBackdrop = createNightBackdrop(scene)
   const weather = createThreeWeather(scene, view)
   const people = createPeople(scene)
   const resources = createResources(scene)
@@ -382,6 +384,14 @@ export function createThreeWorld(
         climate.daylight,
       )
       const flash = weather.update(state, center, span, dt)
+      nightBackdrop.update(
+        state.tick,
+        climate.daylight,
+        state.weather.kind,
+        dt,
+        view.wantsMotion() && store.timeMoving() && !store.getPaused(),
+        width / height,
+      )
       environment.flash(flash)
       scene.updateMatrixWorld()
       const faded = fader.update(targets, dt)
@@ -415,6 +425,7 @@ export function createThreeWorld(
       terrain.destroy()
       gardens.destroy()
       environment.destroy()
+      nightBackdrop.destroy()
       weather.destroy()
       for (const entry of structures.values()) disposeGroup(entry.group)
       structures.clear()

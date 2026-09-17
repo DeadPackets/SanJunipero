@@ -78,3 +78,7 @@ The local scripted town was gracefully restarted and remains without AI minds. E
 - Review source: `packages/web/daylight-review.html`.
 - Review service: `local.sanjunipero.daylight-review`, port 8776; launcher `/tmp/sj-daylight-check/service.plist`.
 - Original rehearsal evidence remained read-only throughout.
+
+## Owner decision: A integrated
+
+The owner selected the overhead perspective. A's star backdrop is now in the local town, with no new camera mode. It renders behind terrain, fades through day and weather changes, and uses one static texture and one draw when visible. A focused transition test, the web typecheck and build passed. Browser inspection confirmed the shader renders behind the map and the rebuilt town has no runtime errors. The comparison page now defaults to A.
