@@ -140,6 +140,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
         balloon.dataset.kind = active.isThought ? 'thought' : 'speech'
         ring.hidden = active.isThought
         reserved.textContent = active.text
+        written.textContent = ''
         balloon.dataset.tint = tintOf(active.agentId)
         ring.dataset.tint = tintOf(active.agentId)
         balloon.getAnimations().forEach((animation) => animation.cancel())
