@@ -1404,6 +1404,144 @@ describe('★ one unified call discipline, the arbiter included', () => {
   })
 })
 
+describe('shutdown cancellation', () => {
+  it.each(['text', 'response_format', 'tool'] as const)(
+    'aborts an active %s call through a child and settles its ledger before rejecting',
+    async (transport) => {
+      const db = openDb()
+      let started!: () => void
+      const entered = new Promise<void>((resolve) => {
+        started = resolve
+      })
+      const model = new MockLanguageModelV4({
+        doGenerate: async ({ abortSignal }) => {
+          started()
+          await new Promise((_resolve, reject) => {
+            abortSignal!.addEventListener(
+              'abort',
+              () => {
+                reject(abortSignal!.reason as Error)
+              },
+              { once: true },
+            )
+          })
+          throw new Error('unreachable')
+        },
+      })
+      const root = new LlmClient({
+        model,
+        db,
+        caller: 'test',
+        budgetUsd: 1,
+        ...(transport === 'text' ? {} : { transport }),
+      })
+      const child = root.forCaller('test.child')
+      const messages = [{ role: 'user' as const, content: 'Hello' }]
+      const call = (
+        transport === 'text'
+          ? child.text({ messages })
+          : child.object({ system: 'Answer the question.', messages, schema: SCHEMA })
+      ).catch((err: unknown) => err)
+      await entered
+      expect(sumReserved(db, 'test.child')).toBeGreaterThan(0)
+      root.abort()
+      expect(await call).toMatchObject({ name: 'AbortError' })
+      expect(model.doGenerateCalls).toHaveLength(1)
+      expect(rows(db)).toMatchObject([{ caller: 'test.child', ok: 0 }])
+      expect(sumReserved(db, 'test.child')).toBe(0)
+      expect(limiterFor(PROVIDER_ORDER.join(',')).state().inFlight).toBe(0)
+      db.close()
+    },
+  )
+
+  it('rejects new calls on the root and its children before touching a closed ledger', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'unused' }])
+    const root = new LlmClient({ model, db, caller: 'test', budgetUsd: 1 })
+    const child = root.forCaller('test.child')
+    child.abort()
+    db.close()
+    for (const client of [root, child]) {
+      await expect(
+        client.text({ messages: [{ role: 'user', content: 'Hello' }] }),
+      ).rejects.toMatchObject({ name: 'AbortError' })
+      await expect(
+        client.object({ system: 'Answer.', messages: [], schema: SCHEMA }),
+      ).rejects.toMatchObject({ name: 'AbortError' })
+    }
+    expect(model.doGenerateCalls).toHaveLength(0)
+  })
+
+  it('cancels a queued call without sending it or retaining its reservation', async () => {
+    const db = openDb()
+    const model = mockModel([{ text: 'unused' }])
+    const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 1 })
+    const gate = limiterFor(PROVIDER_ORDER.join(','))
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const occupied = Array.from({ length: DEFAULT_MAX_CONCURRENCY }, () =>
+      gate.run(() => held, 10_000),
+    )
+    try {
+      const call = client
+        .text({ messages: [{ role: 'user', content: 'Hello' }] })
+        .catch((err: unknown) => err)
+      expect(gate.state().queued).toBe(1)
+      client.abort()
+      expect(await call).toMatchObject({ name: 'AbortError' })
+      expect(gate.state().queued).toBe(0)
+      expect(rows(db)).toHaveLength(0)
+      expect(sumReserved(db, 'test')).toBe(0)
+      expect(model.doGenerateCalls).toHaveLength(0)
+    } finally {
+      release()
+      await Promise.all(occupied)
+      db.close()
+    }
+  })
+
+  it('cancels retry backoff without another attempt or a retained reservation', async () => {
+    vi.useFakeTimers()
+    try {
+      const db = openDb()
+      const answer = mockModel([{ text: 'unused' }])
+      let attempts = 0
+      const model = new MockLanguageModelV4({
+        doGenerate: (opts) => {
+          if (attempts++ === 0) throw refused
+          return answer.doGenerate(opts)
+        },
+      })
+      const client = new LlmClient({ model, db, caller: 'test', budgetUsd: 1 })
+      let outcome: unknown
+      const call = client
+        .text({ messages: [{ role: 'user', content: 'Hello' }] })
+        .catch((err: unknown) => {
+          outcome = err
+        })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(rows(db)).toHaveLength(1)
+      expect(limiterFor(PROVIDER_ORDER.join(',')).state()).toMatchObject({
+        inFlight: 0,
+        queued: 0,
+      })
+      expect(sumReserved(db, 'test')).toBeGreaterThan(0)
+      client.abort()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(outcome).toMatchObject({ name: 'AbortError' })
+      await call
+      expect(model.doGenerateCalls).toHaveLength(1)
+      expect(sumReserved(db, 'test')).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('a stalled request is bounded (T37b)', () => {
   it('aborts a call that outlives the timeout, and logs it as a failed attempt', async () => {
     const db = openDb()

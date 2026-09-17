@@ -64,6 +64,7 @@ type TownOpts = {
   startDay?: (gap: number, lastArrival: number) => number
   /** An embedder that never answers: what a walker mid-boot looks like from outside. */
   hangSeeding?: boolean
+  beforeEmbed?: () => Promise<void>
 }
 
 async function town(opts: TownOpts = {}) {
@@ -148,21 +149,40 @@ async function town(opts: TownOpts = {}) {
     }),
   })
   const real = await FakeEmbedder.create()
+  let releaseSeeding!: () => void
+  const seeding = new Promise<void>((resolve) => {
+    releaseSeeding = resolve
+  })
   const embedder = {
-    embed: async (t: string): Promise<Float32Array> =>
-      opts.hangSeeding === true ? new Promise<Float32Array>(() => {}) : real.embed(t),
+    embed: async (t: string): Promise<Float32Array> => {
+      await opts.beforeEmbed?.()
+      if (opts.hangSeeding === true) await seeding
+      return real.embed(t)
+    },
   }
   const maxMinds = opts.maxMinds ?? 10
+  const people: string[] = []
 
   const boot = () => {
+    let stopped = false
+    const clients: LlmClient[] = []
     const cast = resolveCast(FOUNDERS, store, maxMinds)
     const booted = bootMinds({
       minds: cast.filter((m) => !needsArrival(m, dbFor(m.id))),
       bridge,
       embedder,
       dbFor,
-      turnLlm: (id) =>
-        new LlmClient({ model, db: opsDb, caller: 'turn', agentId: id, maxRetries: 0 }),
+      turnLlm: (id) => {
+        const client = new LlmClient({
+          model,
+          db: opsDb,
+          caller: 'turn',
+          agentId: id,
+          maxRetries: 0,
+        })
+        clients.push(client)
+        return client
+      },
     })
     const repairing = ensureArrivals({
       cast: new Map(cast.map((m) => [m.id, m])),
@@ -170,16 +190,35 @@ async function town(opts: TownOpts = {}) {
       dbFor,
       embedder,
       boot: (spec) => {
-        booted.add(spec)
+        if (!stopped) booted.add(spec)
       },
     })
-    const stop = wireArrivals({ booted, bridge, store, dbFor, embedder, opsDb, maxMinds })
+    const stop = wireArrivals({
+      booted,
+      bridge,
+      store,
+      dbFor,
+      embedder,
+      opsDb,
+      maxMinds,
+      onPerson: (person) => people.push(person.id),
+    })
     return {
       booted,
       repairing,
-      stop: () => {
-        stop()
+      stopWatching: stop,
+      stop: async () => {
+        stopped = true
+        const draining = stop()
         booted.stop()
+        for (const client of clients) client.abort()
+        bridge.drain()
+        await Promise.all([draining, repairing])
+        for (let i = 0; i < 200 && (booted.busy() || booted.reflecting()); i += 1) {
+          await new Promise((resolve) => setImmediate(resolve))
+        }
+        if (booted.busy() || booted.reflecting())
+          throw new Error('arrival fixture work did not settle after stop')
       },
     }
   }
@@ -192,6 +231,8 @@ async function town(opts: TownOpts = {}) {
 
   return {
     gap,
+    people,
+    stopWatching: () => running.stopWatching(),
     startDay,
     get booted() {
       return running.booted
@@ -223,18 +264,68 @@ async function town(opts: TownOpts = {}) {
       await settle(5)
     },
     reboot: async () => {
-      running.stop()
+      await running.stop()
       running = boot()
       await running.repairing
       await settle()
     },
-    stop: () => {
-      running.stop()
+    stop: async () => {
+      const draining = running.stop()
+      releaseSeeding()
+      await draining
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
   }
 }
+
+describe('population shutdown', () => {
+  it.each([false, true])(
+    'drains a pending arrival without booting after stop, failed=%s',
+    async (fails) => {
+      let release!: () => void
+      let reject!: (err: Error) => void
+      let started = false
+      const embedding = new Promise<void>((resolve, fail) => {
+        release = resolve
+        reject = fail
+      })
+      const t = await town({
+        beforeEmbed: () => {
+          started = true
+          return embedding
+        },
+      })
+      t.booted.stop()
+      await t.morning()
+      expect(started).toBe(true)
+      const arrived = t.newcomers()[0]!.id
+      let drained = false
+      const stopping = Promise.resolve(t.stopWatching()).then(() => {
+        drained = true
+      })
+      try {
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(drained).toBe(false)
+        if (fails) reject(new Error('embedding failed during shutdown'))
+        else release()
+        await stopping
+        expect(t.booted.runtimes.has(arrived)).toBe(false)
+        expect(t.people).toEqual([])
+        if (fails) expect(t.alerts()).toContainEqual({ kind: 'arrival_failed', n: 1 })
+        else
+          expect(t.dbFor(arrived).prepare('SELECT COUNT(*) AS n FROM memories').get()).toEqual({
+            n: 1,
+          })
+      } finally {
+        release()
+        await stopping
+        await new Promise((resolve) => setImmediate(resolve))
+        await t.stop()
+      }
+    },
+  )
+})
 
 describe('★ somebody comes up the valley road', () => {
   it('brings the first traveller with a kit, the town in mind, and a mind of their own', async () => {
@@ -264,7 +355,7 @@ describe('★ somebody comes up the valley road', () => {
         .all(mira.id) as { text: string }[]
       expect(rows.map((r) => r.text)).toEqual([mira.arrival])
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 
@@ -274,7 +365,7 @@ describe('★ somebody comes up the valley road', () => {
       await t.morning()
       expect(t.newcomers()).toHaveLength(0)
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 
@@ -287,7 +378,7 @@ describe('★ somebody comes up the valley road', () => {
       expect(came[0]!.id).toMatch(/^agent_\d+$/)
       expect(t.booted.cast.has(came[0]!.id)).toBe(true)
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 
@@ -297,7 +388,7 @@ describe('★ somebody comes up the valley road', () => {
       await t.morning()
       expect(t.newcomers()).toHaveLength(0)
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 
@@ -310,7 +401,7 @@ describe('★ somebody comes up the valley road', () => {
       await t.morning()
       expect(t.newcomers()).toHaveLength(1)
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 })
@@ -337,7 +428,7 @@ describe('★ a walker survives a restart', () => {
       // Idempotent by the arrival it was made from: a second boot writes no second memory.
       expect(memories()).toBe(1)
     } finally {
-      t.stop()
+      await t.stop()
     }
   })
 })

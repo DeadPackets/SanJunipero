@@ -99,8 +99,9 @@ export type ArrivalsOpts = {
 /** The road brings somebody up it every three to five sim-weeks while the valley has room. The
  *  world does not know minds exist, so this is an announcement made from outside it and folded
  *  like any other — replay rebuilds the same body, and `resolveCast` the same person. */
-export function wireArrivals(opts: ArrivalsOpts): () => void {
+export function wireArrivals(opts: ArrivalsOpts): () => Promise<void> {
   const booting = new Set<string>()
+  const pending = new Set<Promise<void>>()
   let stopped = false
   let seq = opts.store.lastSeq()
 
@@ -182,8 +183,9 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
     const db = opts.dbFor(arrived.id)
     booting.add(arrived.id)
     // Off the tick: the first memory is an embedding call.
-    void (async () => {
+    const task = (async () => {
       await ensureArrival({ db, embedder: opts.embedder }, arrived, at)
+      if (stopped) return
       opts.booted.add(spec)
       opts.onPerson?.({
         id: arrived.id,
@@ -203,7 +205,11 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
           detail: err instanceof Error ? err.message : String(err),
         })
       })
-      .finally(() => booting.delete(arrived.id))
+      .finally(() => {
+        booting.delete(arrived.id)
+        pending.delete(task)
+      })
+    pending.add(task)
   }
 
   const watch = (): void => {
@@ -218,8 +224,9 @@ export function wireArrivals(opts: ArrivalsOpts): () => void {
     watch()
     morning(tick)
   })
-  return () => {
+  return async () => {
     stopped = true
+    await Promise.all(pending)
   }
 }
 

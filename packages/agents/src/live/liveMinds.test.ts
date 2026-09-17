@@ -158,6 +158,7 @@ const SPEC: MindSpec = {
 
 async function bootOne(
   opts: {
+    model?: MockLanguageModelV4
     dreamBudgetUsd?: number
     startTick?: number
     minds?: readonly MindSpec[]
@@ -168,7 +169,7 @@ async function bootOne(
   const opsDb = openAgentDb(':memory:')
   migrateLlmTables(opsDb)
   const mindDb = openAgentDb(':memory:')
-  const model = scriptedModel()
+  const model = opts.model ?? scriptedModel()
   const makeClient = (caller: string, agentId: string): LlmClient =>
     new LlmClient({
       model,
@@ -221,6 +222,38 @@ const callersIn = (db: Database.Database): string[] =>
   (db.prepare('SELECT DISTINCT caller FROM llm_calls').all() as { caller: string }[]).map(
     (r) => r.caller,
   )
+
+it('keeps an ordinary turn busy after stop until its provider and ledger settle', async () => {
+  let release = (): void => {}
+  let entered = false
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const model = new MockLanguageModelV4({
+    doGenerate: async () => {
+      entered = true
+      await gate
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(SLEEPING_TURN) }],
+        finishReason: { unified: 'stop' as const, raw: undefined },
+        usage: ZERO_USAGE,
+        warnings: [],
+      }
+    },
+  })
+  const { loop, booted, opsDb } = await bootOne({ model, startTick: 600 })
+  await stepUntil(loop, () => entered, 100)
+  expect(entered).toBe(true)
+  const during = booted.busy()
+  booted.stop()
+  const stopped = booted.busy()
+  release()
+  for (let i = 0; i < 20; i++) await flush()
+  expect(during).toBe(true)
+  expect(stopped).toBe(true)
+  expect(booted.busy()).toBe(false)
+  expect(callersIn(opsDb)).toContain('turn')
+})
 
 describe('★ a booted mind dreams, and the town pays for it through the one ledger', () => {
   it('the dream call is made, booked under "dream", and the memory row lands', async () => {
@@ -344,6 +377,7 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
 
 const SCENE_TURN = {
   thought: 'Say it plainly.',
+  mood: 'settled',
   speech: 'The well gate holds.',
   to: null,
   gesture: null,

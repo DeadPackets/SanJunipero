@@ -90,6 +90,7 @@ async function town(
     startTick?: number
     maxMinds?: number
     refuseNaming?: boolean
+    beforeEmbed?: () => Promise<void>
   } = {},
 ) {
   const dir = mkdtempSync(join(tmpdir(), 'sj-births-'))
@@ -157,12 +158,14 @@ async function town(
   let crashSeeding = false
   const embedder = {
     embed: async (t: string): Promise<Float32Array> => {
+      await opts.beforeEmbed?.()
       if (crashSeeding) throw new Error('the process died mid-seeding')
       return real.embed(t)
     },
   }
   const FOUNDERS = [specFor(MOTHER, 'f'), specFor(FATHER, 'm')]
   const maxMinds = opts.maxMinds ?? 10
+  const people: string[] = []
 
   // The one boot path: `resolveCast` decides who is in the town, and a restart is another call
   // to it over the same log.
@@ -195,13 +198,16 @@ async function town(
       opsDb,
       namingLlm: makeClient('naming'),
       maxMinds,
+      onPerson: (person) => people.push(person.id),
     })
     return {
       booted,
       repairing,
-      stop: () => {
-        stopBirths()
+      stopWatching: stopBirths,
+      stop: async () => {
+        const draining = stopBirths()
         booted.stop()
+        await draining
       },
     }
   }
@@ -213,6 +219,8 @@ async function town(
       return running.booted
     },
     namingCalls,
+    people,
+    stopWatching: () => running.stopWatching(),
     opsDb,
     dbFor,
     crash: (on: boolean) => {
@@ -222,12 +230,12 @@ async function town(
       namingBudgetUsd = undefined
     },
     reboot: async () => {
-      running.stop()
+      await running.stop()
       running = boot()
       await running.repairing
     },
-    stop: () => {
-      running.stop()
+    stop: async () => {
+      await running.stop()
       for (const db of mindDbs.values()) db.close()
       opsDb.close()
     },
@@ -280,6 +288,52 @@ const callersIn = (db: Database.Database): string[] =>
     (r) => r.caller,
   )
 
+describe('population shutdown', () => {
+  it.each([false, true])(
+    'drains a pending birth without booting after stop, failed=%s',
+    async (fails) => {
+      let release!: () => void
+      let reject!: (err: Error) => void
+      let started = false
+      const embedding = new Promise<void>((resolve, fail) => {
+        release = resolve
+        reject = fail
+      })
+      const t = await town({
+        beforeEmbed: () => {
+          started = true
+          return embedding
+        },
+      })
+      t.booted.stop()
+      t.bear()
+      await t.settle(() => started)
+      expect(started).toBe(true)
+      let drained = false
+      const stopping = Promise.resolve(t.stopWatching()).then(() => {
+        drained = true
+      })
+      try {
+        await new Promise((resolve) => setImmediate(resolve))
+        expect(drained).toBe(false)
+        if (fails) reject(new Error('embedding failed during shutdown'))
+        else release()
+        await stopping
+        expect(t.booted.runtimes.has(CHILD)).toBe(false)
+        expect(t.people).toEqual([])
+        expect(t.namingCalls.n).toBe(0)
+        if (fails) expect(birthAlerts(t.opsDb)).toMatchObject([{ kind: 'birth_failed' }])
+        else expect(memoryTexts(t.dbFor(CHILD), CHILD).length).toBeGreaterThan(0)
+      } finally {
+        release()
+        await stopping
+        await new Promise((resolve) => setImmediate(resolve))
+        await t.stop()
+      }
+    },
+  )
+})
+
 describe('★ a born mind survives a restart', () => {
   it('rejoins the cast, with its memories, on a boot that only ever knew the founders', async () => {
     const t = await town()
@@ -297,7 +351,7 @@ describe('★ a born mind survives a restart', () => {
     expect(t.dbFor(CHILD).prepare('SELECT COUNT(*) AS n FROM personality_versions').get()).toEqual({
       n: 1,
     })
-    t.stop()
+    await t.stop()
   })
 
   it('★ a child caught mid-seeding by a crash comes back with its household and its name', async () => {
@@ -318,7 +372,7 @@ describe('★ a born mind survives a restart', () => {
     )
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(t.booted.runtimes.has(CHILD)).toBe(true)
-    t.stop()
+    await t.stop()
   })
 
   it('★ and a name lost on its own is written on the next boot, without a second household', async () => {
@@ -334,7 +388,7 @@ describe('★ a born mind survives a restart', () => {
 
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(memoryTexts(t.dbFor(CHILD), CHILD)).toEqual(seeded)
-    t.stop()
+    await t.stop()
   })
 
   it('★ a mother who answers with nothing is never asked twice, however often the town reboots', async () => {
@@ -348,7 +402,7 @@ describe('★ a born mind survives a restart', () => {
 
     expect(t.namingCalls.n).toBe(1)
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: '' }])
-    t.stop()
+    await t.stop()
   })
 
   it('two births on one tick cannot both take the last slot', async () => {
@@ -360,7 +414,7 @@ describe('★ a born mind survives a restart', () => {
     expect(t.booted.runtimes.has('agent_3')).toBe(true)
     expect(t.booted.runtimes.has('agent_4')).toBe(false)
     expect(birthAlerts(t.opsDb).map((a) => a.kind)).toEqual(['birth_over_max_minds'])
-    t.stop()
+    await t.stop()
   })
 
   // The dead stay in `cast` — a newborn reads its parents from it — but a town that has buried
@@ -374,7 +428,7 @@ describe('★ a born mind survives a restart', () => {
 
     expect(t.booted.runtimes.has(CHILD)).toBe(true)
     expect(birthAlerts(t.opsDb)).toEqual([])
-    t.stop()
+    await t.stop()
   })
 
   it('a birth past the population ceiling is folded into the world and says so', async () => {
@@ -385,7 +439,7 @@ describe('★ a born mind survives a restart', () => {
     expect(t.booted.runtimes.has(CHILD)).toBe(false)
     expect(birthAlerts(t.opsDb).map((a) => a.kind)).toEqual(['birth_over_max_minds'])
     expect(birthAlerts(t.opsDb)[0]!.detail).toContain('2 minds')
-    t.stop()
+    await t.stop()
   })
 })
 
@@ -404,7 +458,7 @@ describe('★ a child born in the town gets a mind, a database and a name', () =
 
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(callersIn(t.opsDb)).toContain('naming')
-    t.stop()
+    await t.stop()
   })
 
   it('stamps the first personality with the day it was born, not the day the town booted', async () => {
@@ -413,7 +467,7 @@ describe('★ a child born in the town gets a mind, a database and a name', () =
     await t.settle(() => t.booted.runtimes.has(CHILD))
 
     expect(personalityDay(t.dbFor(CHILD), CHILD)).toBe(3)
-    t.stop()
+    await t.stop()
   })
 
   it('a naming call past its budget costs the town the name and not the child', async () => {
@@ -425,6 +479,6 @@ describe('★ a child born in the town gets a mind, a database and a name', () =
     expect(memoryTexts(t.dbFor(CHILD), CHILD).length).toBeGreaterThan(0)
     expect(socialNames(t.opsDb)).toEqual([])
     expect(callersIn(t.opsDb)).not.toContain('naming')
-    t.stop()
+    await t.stop()
   })
 })

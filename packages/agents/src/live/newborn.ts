@@ -27,12 +27,14 @@ export type BirthsOpts = {
   log?: (line: string) => void
 }
 
-export function wireBirths(opts: BirthsOpts): () => void {
+export function wireBirths(opts: BirthsOpts): () => Promise<void> {
   migrateFamilyTables(opts.opsDb)
 
   // A child counts against the ceiling from the tick it is born, not from the moment its
   // seeding finishes — two births in one tick must not both take the last slot.
   const booting = new Set<string>()
+  const pending = new Set<Promise<void>>()
+  let stopped = false
 
   const spawn = (born: AgentBornPayload, birth: { seq: number; tick: number }): void => {
     if (opts.booted.alive() + booting.size >= opts.maxMinds) {
@@ -66,8 +68,9 @@ export function wireBirths(opts: BirthsOpts): () => void {
 
     // Off the tick: the household seed reads the log and the naming is a call.
     // The same two writes a boot repairs, in the same order — see `ensureChildren`.
-    void (async () => {
+    const task = (async () => {
       await ensureHousehold({ store: opts.store, db, embedder: opts.embedder }, born, birth)
+      if (stopped) return
       opts.booted.add(spec)
       opts.onPerson?.({
         id: born.id,
@@ -91,8 +94,17 @@ export function wireBirths(opts: BirthsOpts): () => void {
           detail: err instanceof Error ? err.message : String(err),
         })
       })
-      .finally(() => booting.delete(born.id))
+      .finally(() => {
+        booting.delete(born.id)
+        pending.delete(task)
+      })
+    pending.add(task)
   }
 
-  return watchBirths(opts.bridge, opts.store, spawn)
+  const unwatch = watchBirths(opts.bridge, opts.store, spawn)
+  return async () => {
+    stopped = true
+    unwatch()
+    await Promise.all(pending)
+  }
 }

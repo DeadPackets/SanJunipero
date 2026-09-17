@@ -160,6 +160,7 @@ export class SceneCoordinator {
   /** When the floor was last handed over, in wall-clock ms. Measured from the hand-off and not
    *  from the ask, because a mouth that never asks is exactly what a stalled talk is made of. */
   readonly #floorSince = new Map<string, { agentId: string; atMs: number }>()
+  #closing = 0
   #token = 0
   #lastTick = -1
   #compileDay = -1
@@ -190,6 +191,10 @@ export class SceneCoordinator {
   /** Every open scene, for the gateway's frame and for a snapshot. */
   open(): Scene[] {
     return [...this.#scenes.values()].filter((s) => s.closedTick === null)
+  }
+
+  busy(): boolean {
+    return this.#closing > 0
   }
 
   sceneFor(agentId: string): Scene | null {
@@ -403,8 +408,8 @@ export class SceneCoordinator {
       })
     } catch (err) {
       this.#onError('scene_line', err instanceof Error ? err.message : String(err))
-      this.#asked.delete(scene.id)
-      return
+      if (this.#asked.get(scene.id) === token) this.#asked.delete(scene.id)
+      throw err
     }
     // The floor moved while the provider was thinking: a timeout already counted this as a pass.
     if (this.#asked.get(scene.id) !== token) return
@@ -710,60 +715,67 @@ export class SceneCoordinator {
     tick: number,
   ): Promise<void> {
     if (scene.closedTick !== null) return
-    // An ask nobody ever answered. There is no event for a silence, so the asker gets a memory.
-    if (scene.invitation !== undefined) {
-      const { from, to } = scene.invitation
-      delete scene.invitation
-      this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
-    }
-    scene.closedTick = tick
-    scene.closeReason = reason
-    scene.floor = null
-    this.#asked.delete(scene.id)
-    this.#floorSince.delete(scene.id)
-    this.#announced.delete(scene.id)
-    this.#scenes.delete(scene.id)
-    // Everyone who was ever in it gets the memory, not only whoever was left at the end.
-    const cast = [...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)])].sort()
-    // Standing near it is not being in it: the audience carries the summary away and no tie.
-    const overheard = scene.audience.filter((id) => !cast.includes(id))
-    const named = this.#named(cast)
-    const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
-    let summary = ''
-    let beat = ''
-    let deltas: TieDelta[] = []
-    if (teller !== null) {
-      try {
-        const answer = await teller.llm.close({ scene: structuredClone(scene), cast: named })
-        summary = answer.summary
-        beat = answer.beat ?? ''
-        deltas = answer.deltas
-      } catch (err) {
-        this.#onError('scene_close', err instanceof Error ? err.message : String(err))
+    this.#closing += 1
+    try {
+      // An ask nobody ever answered. There is no event for a silence, so the asker gets a memory.
+      if (scene.invitation !== undefined) {
+        const { from, to } = scene.invitation
+        delete scene.invitation
+        this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
       }
-    }
-    // A tie is what passed between two people who were in it. Standing near it is not being in
-    // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
-    deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
-    const at = this.#bridge.currentTick()
-    for (const id of cast) this.#mindFor(id)?.ties.apply(deltas, at)
-    this.#bridge.announce('scene_closed', {
-      id: scene.id,
-      summary,
-      beat,
-      deltas,
-      closeReason: reason,
-      participants: cast,
-    })
-    await this.#settleCouncil(scene, tick)
-    if (summary.length === 0) return
-    // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
-    // had anything at stake in still happened.
-    const importance = Math.min(10, Math.max(1, Math.round(scene.stakes)))
-    for (const id of [...cast, ...overheard]) {
-      const mind = this.#mindFor(id)
-      if (mind === null) continue
-      await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
+      scene.closedTick = tick
+      scene.closeReason = reason
+      scene.floor = null
+      this.#asked.delete(scene.id)
+      this.#floorSince.delete(scene.id)
+      this.#announced.delete(scene.id)
+      this.#scenes.delete(scene.id)
+      // Everyone who was ever in it gets the memory, not only whoever was left at the end.
+      const cast = [
+        ...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)]),
+      ].sort()
+      // Standing near it is not being in it: the audience carries the summary away and no tie.
+      const overheard = scene.audience.filter((id) => !cast.includes(id))
+      const named = this.#named(cast)
+      const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
+      let summary = ''
+      let beat = ''
+      let deltas: TieDelta[] = []
+      if (teller !== null) {
+        try {
+          const answer = await teller.llm.close({ scene: structuredClone(scene), cast: named })
+          summary = answer.summary
+          beat = answer.beat ?? ''
+          deltas = answer.deltas
+        } catch (err) {
+          this.#onError('scene_close', err instanceof Error ? err.message : String(err))
+        }
+      }
+      // A tie is what passed between two people who were in it. Standing near it is not being in
+      // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
+      deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
+      const at = this.#bridge.currentTick()
+      for (const id of cast) this.#mindFor(id)?.ties.apply(deltas, at)
+      this.#bridge.announce('scene_closed', {
+        id: scene.id,
+        summary,
+        beat,
+        deltas,
+        closeReason: reason,
+        participants: cast,
+      })
+      await this.#settleCouncil(scene, tick)
+      if (summary.length === 0) return
+      // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
+      // had anything at stake in still happened.
+      const importance = Math.min(10, Math.max(1, Math.round(scene.stakes)))
+      for (const id of [...cast, ...overheard]) {
+        const mind = this.#mindFor(id)
+        if (mind === null) continue
+        await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
+      }
+    } finally {
+      this.#closing -= 1
     }
   }
 

@@ -68,8 +68,7 @@ export type BootedMinds = {
   /** True while any mind is still finishing a night's reflection. A caller that stops the
    *  world mid-reflection loses the night and pays for it anyway. */
   reflecting(): boolean
-  /** True while a scene line or a closing is still with a back end. Closing a mind's database
-   *  under one throws out of a promise nobody awaits. */
+  /** True until ordinary turns and scene work finish, including their ledger writes. */
   busy(): boolean
   stop(): void
 }
@@ -192,7 +191,9 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         },
         ties,
         remember: async (m) => {
-          await mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS })
+          await whileAsking(() =>
+            mem.insertMemory({ ...m, kind: 'speech_heard', tags: EMPTY_SCENE_TAGS }),
+          )
         },
         // Warmth lives in each runtime's own company map; a scene reads it through the runtime.
         warmth: (otherId) => runtimes.get(spec.id)?.warmthToward(otherId) ?? 0,
@@ -249,7 +250,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     snapshots: () =>
       [...runtimes.entries()].map(([agentId, r]) => ({ agentId, snapshot: r.snapshot() })),
     reflecting: () => [...runtimes.values()].some((r) => r.reflectionInFlight()),
-    busy: () => asking > 0,
+    busy: () =>
+      asking > 0 || scenes?.busy() === true || [...runtimes.values()].some((r) => r.busy()),
     stop: () => {
       for (const r of runtimes.values()) r.stop()
     },

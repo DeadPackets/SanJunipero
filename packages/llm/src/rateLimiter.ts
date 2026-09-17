@@ -51,6 +51,7 @@ type Waiter = {
   resolve: () => void
   reject: (err: unknown) => void
   timer: ReturnType<typeof setTimeout>
+  cleanup: () => void
 }
 
 /** One provider pin's admission gate: an in-flight cap the refusals themselves set, and a FIFO
@@ -81,22 +82,25 @@ export class AdaptiveLimiter {
   /** Runs `exec` under the gate. A 429 raised while other calls of ours were in flight is one
    *  this gate can fix, so it buys the caller ONE more place in the queue behind the new
    *  cool-down; anything else goes up to the caller's own retry budget. */
-  async run<T>(exec: () => Promise<T>, maxWaitMs: number): Promise<T> {
+  async run<T>(exec: () => Promise<T>, maxWaitMs: number, signal?: AbortSignal): Promise<T> {
     const deadline = Date.now() + maxWaitMs
     let refusal: unknown = null
     let requeued = false
     for (;;) {
       try {
-        await this.#acquire(deadline, maxWaitMs)
+        await this.#acquire(deadline, maxWaitMs, signal)
       } catch (err) {
+        signal?.throwIfAborted()
         throw refusal ?? err
       }
       let ours = false
       try {
+        signal?.throwIfAborted()
         const value = await exec()
         this.#onAnswer()
         return value
       } catch (err) {
+        signal?.throwIfAborted()
         if (!rateLimited(err)) throw err
         ours = this.#inFlight > 1 || this.#queue.length > 0
         this.#onRefusal(retryAfterMs(err))
@@ -125,13 +129,25 @@ export class AdaptiveLimiter {
 
   // Everyone joins the queue, uncontended callers included: one admission rule written once,
   // and `#pump` hands the slot straight back on the same turn when there is one free.
-  #acquire(deadline: number, maxWaitMs: number): Promise<void> {
+  #acquire(deadline: number, maxWaitMs: number, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     return new Promise<void>((resolve, reject) => {
+      const aborted = (): void => {
+        waiter.cleanup()
+        this.#queue = this.#queue.filter((w) => w !== waiter)
+        this.#pump()
+        reject(signal?.reason as Error)
+      }
       const waiter: Waiter = {
         resolve,
         reject,
+        cleanup: () => {
+          clearTimeout(waiter.timer)
+          signal?.removeEventListener('abort', aborted)
+        },
         timer: setTimeout(
           () => {
+            waiter.cleanup()
             this.#queue = this.#queue.filter((w) => w !== waiter)
             this.#pump()
             reject(new RateLimitWaitError(maxWaitMs, this.#pin))
@@ -139,6 +155,7 @@ export class AdaptiveLimiter {
           Math.max(0, deadline - Date.now()),
         ),
       }
+      signal?.addEventListener('abort', aborted, { once: true })
       this.#queue.push(waiter)
       this.#pump()
     })
@@ -164,7 +181,7 @@ export class AdaptiveLimiter {
         return
       }
       const waiter = this.#queue.shift()!
-      clearTimeout(waiter.timer)
+      waiter.cleanup()
       this.#inFlight += 1
       waiter.resolve()
     }

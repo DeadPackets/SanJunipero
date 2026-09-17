@@ -81,6 +81,91 @@ const answering = (body: unknown, ok = true): typeof fetch =>
 // ★ 21 of run C's 207 calls were booked at the ceiling because nobody could say who served
 // them. The generation endpoint knows, and asking is free.
 describe('★ an unattributed row is asked about, not ceiling-priced for ever', () => {
+  it('cancels a held fetch, saves known facts and leaves unknown generations retryable', async () => {
+    const db = openDb()
+    seedUnattributed(db, 'gen-known')
+    seedUnattributed(db, 'gen-held')
+    seedUnattributed(db, 'gen-next')
+    const controller = new AbortController()
+    const unclaimable = new Set<string>()
+    const asked: string[] = []
+    let heldSignal!: AbortSignal
+    let releaseHeld: (() => void) | undefined
+    let started!: () => void
+    const held = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const fetchFn: typeof fetch = async (url, init) => {
+      const id = new URL(
+        typeof url === 'string' || url instanceof URL ? url : url.url,
+      ).searchParams.get('id')!
+      asked.push(id)
+      if (id !== 'gen-held') {
+        return Response.json({ data: { provider_name: 'Baidu', total_cost: 0.0001949 } })
+      }
+      heldSignal = init!.signal!
+      return new Promise<Response>((_resolve, reject) => {
+        releaseHeld = () => {
+          reject(new Error('cancelled'))
+        }
+        heldSignal.addEventListener('abort', releaseHeld, { once: true })
+        started()
+      })
+    }
+    const opts = { apiKey: APIKEY, fetchFn, now: NOW, unclaimable, signal: controller.signal }
+    const sweep = backfillUnattributed(db, opts)
+    try {
+      await held
+      controller.abort()
+      expect(heldSignal.aborted).toBe(true)
+      expect(await sweep).toEqual({ attempted: 2, backfilled: 1 })
+      expect(asked).toEqual(['gen-known', 'gen-held'])
+      expect([...unclaimable]).toEqual([])
+      expect(
+        db.prepare('SELECT generation_id, provider, cost_usd FROM llm_calls ORDER BY id').all(),
+      ).toEqual([
+        { generation_id: 'gen-known', provider: 'Baidu', cost_usd: 0.0001949 },
+        { generation_id: 'gen-held', provider: null, cost_usd: 0.00176 },
+        { generation_id: 'gen-next', provider: null, cost_usd: 0.00176 },
+      ])
+      expect(alertKinds(db)).toEqual(['llm_price_backfilled'])
+      expect(
+        await backfillUnattributed(db, {
+          apiKey: APIKEY,
+          fetchFn: answering({ data: { provider_name: 'Baidu', total_cost: 0.0001949 } }),
+          now: NOW,
+          unclaimable,
+        }),
+      ).toEqual({ attempted: 2, backfilled: 2 })
+    } finally {
+      releaseHeld?.()
+      await sweep
+      db.close()
+    }
+  })
+
+  it('does not fetch or mark generations unclaimable when already cancelled', async () => {
+    const db = openDb()
+    seedUnattributed(db, 'gen-cancelled')
+    const controller = new AbortController()
+    controller.abort()
+    const unclaimable = new Set<string>()
+    let asked = 0
+    const fetchFn: typeof fetch = async () => {
+      asked++
+      return new Response(null, { status: 404 })
+    }
+    const opts = { apiKey: APIKEY, fetchFn, now: NOW, unclaimable, signal: controller.signal }
+    try {
+      expect(await backfillUnattributed(db, opts)).toEqual({ attempted: 0, backfilled: 0 })
+      expect(asked).toBe(0)
+      expect([...unclaimable]).toEqual([])
+      expect(rowOf(db).provider).toBeNull()
+    } finally {
+      db.close()
+    }
+  })
+
   it('names the back end, takes its bill, and re-prices the row off the ceiling', async () => {
     const db = openDb()
     seedUnattributed(db, 'gen-1')

@@ -52,6 +52,63 @@ async function drivenToSingleFile(gate: AdaptiveLimiter, from: number): Promise<
   }
 }
 
+describe('shutdown cancellation', () => {
+  it('rejects an aborted caller before admitting it', async () => {
+    const gate = new AdaptiveLimiter('pin', 1)
+    const controller = new AbortController()
+    controller.abort()
+    let sent = false
+    const call = gate.run(
+      async () => {
+        sent = true
+      },
+      10_000,
+      controller.signal,
+    )
+    await expect(call).rejects.toMatchObject({ name: 'AbortError' })
+    expect(sent).toBe(false)
+    expect(gate.state()).toMatchObject({ inFlight: 0, queued: 0 })
+  })
+
+  it('releases a granted slot if cancellation wins before execution starts', async () => {
+    const gate = new AdaptiveLimiter('pin', 1)
+    const controller = new AbortController()
+    let sent = false
+    const call = gate.run(
+      async () => {
+        sent = true
+      },
+      10_000,
+      controller.signal,
+    )
+    controller.abort()
+    await expect(call).rejects.toMatchObject({ name: 'AbortError' })
+    expect(sent).toBe(false)
+    expect(gate.state()).toMatchObject({ inFlight: 0, queued: 0 })
+    expect(await gate.run(async () => 'next', 10_000)).toBe('next')
+  })
+
+  it('removes only the cancelled waiter while the active caller keeps its slot', async () => {
+    const gate = new AdaptiveLimiter('pin', 1)
+    const controller = new AbortController()
+    const busy = held<string>()
+    const active = gate.run(() => busy.promise, 10_000)
+    const cancelled = gate
+      .run(async () => 'cancelled', 10_000, controller.signal)
+      .catch((err: unknown) => err)
+    const next = gate.run(async () => 'next', 10_000)
+    controller.abort()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(gate.state()).toMatchObject({ inFlight: 1, queued: 1 })
+    expect(await cancelled).toMatchObject({ name: 'AbortError' })
+    busy.settle('active')
+    expect(await active).toBe('active')
+    expect(await next).toBe('next')
+    expect(gate.state()).toMatchObject({ inFlight: 0, queued: 0 })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
 describe('Retry-After, as the provider spelled it', () => {
   it('reads whole seconds', () => {
     expect(retryAfterMs(refused({ 'retry-after': '7' }))).toBe(7_000)

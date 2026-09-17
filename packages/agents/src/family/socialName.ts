@@ -73,9 +73,10 @@ export async function captureSocialName(
     })
     answer = value.name.trim()
   } catch (err) {
-    // The budget refused before the mother was ever asked, so there is nothing to write down
-    // and a funded boot may ask again. Anything else is a call that happened.
-    if (err instanceof BudgetExceededError) return null
+    // Budget refusal and shutdown leave naming for a later boot. Other failures record that
+    // the mother was asked.
+    if (err instanceof BudgetExceededError || (err instanceof Error && err.name === 'AbortError'))
+      return null
     answer = ''
   }
   if (answer.length > MAX_SOCIAL_NAME_CHARS) answer = ''

@@ -137,6 +137,7 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     {},
   ]
   const client: FakeClient = {
+    abort: () => {},
     async object<T>(o: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }) {
       for (const c of canned) {
         const parsed = o.schema.safeParse(c)
@@ -303,6 +304,7 @@ afterEach(async () => {
 async function liveWorld(opts: {
   dir: string
   turn?: unknown
+  makeClient?: (db: Database.Database, caller: string, agentId?: string) => LlmClient
   minds?: MindSpec[]
   spendCapUsd?: number
   spendDailyUsd?: number
@@ -360,6 +362,7 @@ async function liveWorld(opts: {
         makeClient: (opsDb, caller, agentId) => {
           seen = opsDb
           callers.add(caller)
+          if (opts.makeClient !== undefined) return opts.makeClient(opsDb, caller, agentId)
           // The god gets its own canned answer. Same ledger, deliberately — an arbiter that
           // billed anywhere else would spend outside the money guards, so the rig must not.
           const canned =
@@ -682,7 +685,21 @@ describe('★ the money, inside the served world', () => {
   // inside a 20 s stop grace: the container SIGKILLs the process and the reports never run.
   it('★ closes inside the container’s grace when the price sweep will not answer', async () => {
     vi.stubEnv('OPENROUTER_API_KEY', 'a-key-for-a-sweep-that-hangs')
-    vi.stubGlobal('fetch', () => new Promise(() => {}))
+    let cancelled = false
+    vi.stubGlobal(
+      'fetch',
+      (_url: string, opts: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          opts.signal!.addEventListener(
+            'abort',
+            () => {
+              cancelled = true
+              reject(opts.signal!.reason as Error)
+            },
+            { once: true },
+          )
+        }),
+    )
     try {
       const dir = tmp()
       const { world, opsDb } = await liveWorld({ dir })
@@ -698,6 +715,8 @@ describe('★ the money, inside the served world', () => {
 
       const started = Date.now()
       await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+      expect(cancelled).toBe(true)
+      expect(opsDb.open).toBe(false)
       expect(Date.now() - started, 'the sweep held the close open past the grace').toBeLessThan(
         15_000,
       )
@@ -949,6 +968,42 @@ describe('★ the cap is per town, not per process', () => {
     db.close()
   })
 })
+
+it('cancels ordinary requests and waits for their cleanup before closing the ledger', async () => {
+  let entered = 0
+  let aborted = 0
+  let completed = 0
+  let ledgerOpen = true
+  const releases: (() => void)[] = []
+  const { world, opsDb } = await liveWorld({
+    dir: tmp(),
+    makeClient: (db, _caller, agentId) => {
+      const client = fakeLlm(db, agentId ?? null, SPEAKING_TURN)
+      const object = client.object.bind(client)
+      client.object = async (opts) => {
+        entered += 1
+        await new Promise<void>((resolve) => {
+          releases.push(resolve)
+        })
+        ledgerOpen &&= db.open
+        completed += 1
+        return object(opts)
+      }
+      client.abort = () => {
+        aborted += 1
+        for (const release of releases) release()
+      }
+      return client
+    },
+  })
+  await run(world, 4)
+  expect(entered).toBeGreaterThan(0)
+  await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+  expect(aborted).toBeGreaterThan(0)
+  expect(completed).toBe(entered)
+  expect(ledgerOpen).toBe(true)
+  expect(opsDb.open).toBe(false)
+}, 15_000)
 
 describe("★ a mind's memory across a resume", () => {
   it('REFUSES a new day-0 town whose minds remember an older one', async () => {

@@ -298,8 +298,9 @@ function computeBuildSite(
   }
 }
 
-/** Every plot holds every legal mass, so a 1x1 claim's door serves every buildable kind. */
+/** Orchard work coordinates depend on the recipe, so there is no universal door to advertise. */
 export function groundForBuilding(state: WorldState): { x: number; y: number } | null {
+  if (state.townLayout === 'orchard') return null
   return claimInWorld(state, { along: 1, deep: 1 })?.door ?? null
 }
 

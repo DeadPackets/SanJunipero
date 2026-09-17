@@ -29,6 +29,7 @@ export type BackfillOpts = {
   fetchFn?: typeof fetch
   now?: number
   delayMs?: number
+  signal?: AbortSignal
   /** Generation ids this run has already been refused, ADDED TO as more are. A 404 here is
    *  permanent, and re-asking holds every newer row out of the window until it ages out. */
   unclaimable?: Set<string>
@@ -40,13 +41,16 @@ export type BackfillResult = { attempted: number; backfilled: number }
 // leave the ceiling price standing rather than replace it with a guess.
 async function fetchGeneration(
   id: string,
-  opts: { apiKey: string; fetchFn?: typeof fetch },
+  opts: { apiKey: string; fetchFn?: typeof fetch; signal?: AbortSignal },
 ): Promise<GenerationFacts | null> {
   const doFetch = opts.fetchFn ?? fetch
   try {
     const res = await doFetch(`${GENERATION_URL}?id=${encodeURIComponent(id)}`, {
       headers: { Authorization: `Bearer ${opts.apiKey}` },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.any([
+        AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        ...(opts.signal === undefined ? [] : [opts.signal]),
+      ]),
     })
     if (!res.ok) return null
     const data = ((await res.json()) as { data?: Record<string, unknown> } | undefined)?.data
@@ -68,6 +72,7 @@ export async function backfillUnattributed(
   db: Database.Database,
   opts: BackfillOpts,
 ): Promise<BackfillResult> {
+  if (opts.signal?.aborted) return { attempted: 0, backfilled: 0 }
   const now = opts.now ?? Date.now()
   const rows = unattributedCalls(db, {
     from: now - BACKFILL_GIVE_UP_MS,
@@ -76,11 +81,14 @@ export async function backfillUnattributed(
     skip: opts.unclaimable === undefined ? [] : [...opts.unclaimable],
   })
   const named: { call: UnattributedCall; facts: GenerationFacts }[] = []
+  let attempted = 0
   for (const call of rows) {
+    if (opts.signal?.aborted) break
+    attempted++
     const facts = await fetchGeneration(call.generationId, opts)
     // A failed backfill leaves the ceiling price and its alert exactly where they were.
     if (facts !== null) named.push({ call, facts })
-    else opts.unclaimable?.add(call.generationId)
+    else if (!opts.signal?.aborted) opts.unclaimable?.add(call.generationId)
   }
   // One transaction for the sweep: better-sqlite3 fsyncs per statement, and this runs on the
   // same thread as the world tick.
@@ -116,5 +124,5 @@ export async function backfillUnattributed(
       })
     }
   })()
-  return { attempted: rows.length, backfilled: named.length }
+  return { attempted, backfilled: named.length }
 }

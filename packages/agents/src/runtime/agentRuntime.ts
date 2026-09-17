@@ -460,6 +460,7 @@ export class AgentRuntime {
   #pendingIntent: Intent | null = null
   #pendingInFlight = false
   #turnInFlight = false
+  #auxiliaryInFlight = 0
   #wakeOwed = false
   #reframedThisTurn = false
   // What this mind has already been refused, when, and why. Read before the god is asked again.
@@ -695,10 +696,6 @@ export class AgentRuntime {
 
   stop(): void {
     this.#started = false
-    this.#turnInFlight = false
-    this.#plan = idlePlan()
-    this.#pendingIntent = null
-    this.#pendingInFlight = false
   }
 
   stats(): RuntimeStats {
@@ -714,6 +711,10 @@ export class AgentRuntime {
   // instead of cutting the pipeline between its steps.
   reflectionInFlight(): boolean {
     return this.#reflectionInFlight
+  }
+
+  busy(): boolean {
+    return this.#turnInFlight || this.#reflectionInFlight || this.#auxiliaryInFlight > 0
   }
 
   /** How warm this mind stands toward another. The only tie the runtime keeps itself, and what
@@ -1041,6 +1042,7 @@ export class AgentRuntime {
     return this.#bridge
       .submit(this.#agentId, intent, (res) => {
         this.#pendingInFlight = false
+        if (!this.#started) return
         this.#noteAccepted(intent, res)
         if (this.#pendingIntent !== intent) return
         if (res.ok) {
@@ -1118,61 +1120,74 @@ export class AgentRuntime {
   // try simply did not begin. `said` is whether the words are the mind's own (freeform, or an
   // experiment's description) rather than a verb flattened on its way back from the world.
   async #adjudicateFreeform(description: string, said: boolean): Promise<void> {
-    const fallback = (): void => {
-      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, CANNOT_BEGIN)
-    }
-    const refused = this.#refusedIntents.get(sameIntent(description))
-    if (refused !== undefined && this.#bridge.currentTick() - refused.tick < REFUSAL_MEMORY_TICKS) {
-      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, refused.reason)
-      return
-    }
-    let verdict
+    if (!this.#started) return
+    this.#auxiliaryInFlight++
     try {
-      verdict = await this.#adjudicator!(
-        description,
-        buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought),
+      const fallback = (): void => {
+        this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, CANNOT_BEGIN)
+      }
+      const refused = this.#refusedIntents.get(sameIntent(description))
+      if (
+        refused !== undefined &&
+        this.#bridge.currentTick() - refused.tick < REFUSAL_MEMORY_TICKS
+      ) {
+        this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, refused.reason)
+        return
+      }
+      let verdict
+      try {
+        verdict = await this.#adjudicator!(
+          description,
+          buildAgentCtx(this.#bridge, this.#agentId, this.#lastThought),
+        )
+      } catch (err) {
+        this.#llm.alert('adjudicate_failed', messageOf(err))
+        fallback()
+        return
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can run during the await.
+      if (!this.#started) return
+      if (verdict.kind === 'map') {
+        await this.#holdIntent({
+          verb: verdict.verb,
+          params: aimedAt(
+            namedParams(verdict.params),
+            this.#bridge.perception(this.#agentId).visible.agents,
+          ),
+        })
+        return
+      }
+      if (verdict.kind === 'impossible') {
+        this.#rememberRefusal(description, verdict.reason)
+        this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
+        await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
+        return
+      }
+      // Adjudicate once, physics forever.
+      if (this.#codify === null) {
+        fallback()
+        return
+      }
+      let verb: string
+      try {
+        verb = this.#codify(verdict, {
+          agentId: this.#agentId,
+          intent: description,
+          ...(said ? { saying: spokenReason(description) } : {}),
+        }).verb
+      } catch (err) {
+        this.#llm.alert('codify_failed', messageOf(err))
+        fallback()
+        return
+      }
+      // One moment answers two wants: the town credits this mind with the word, and keeps it.
+      this.#book(() =>
+        this.#wants?.feed(['discovery_credit', 'verb_codified'], this.#bridge.currentTick()),
       )
-    } catch (err) {
-      this.#llm.alert('adjudicate_failed', messageOf(err))
-      fallback()
-      return
+      await this.#holdIntent({ verb, params: {} })
+    } finally {
+      this.#auxiliaryInFlight--
     }
-    if (verdict.kind === 'map')
-      return this.#holdIntent({
-        verb: verdict.verb,
-        params: aimedAt(
-          namedParams(verdict.params),
-          this.#bridge.perception(this.#agentId).visible.agents,
-        ),
-      })
-    if (verdict.kind === 'impossible') {
-      this.#rememberRefusal(description, verdict.reason)
-      this.#lastOutcome = lastTurnLine(TRIED_FREEFORM, verdict.reason)
-      await this.#writeActionMemory(refusalMemoryText(verdict.reason, verdict.class))
-      return
-    }
-    // Adjudicate once, physics forever.
-    if (this.#codify === null) {
-      fallback()
-      return
-    }
-    let verb: string
-    try {
-      verb = this.#codify(verdict, {
-        agentId: this.#agentId,
-        intent: description,
-        ...(said ? { saying: spokenReason(description) } : {}),
-      }).verb
-    } catch (err) {
-      this.#llm.alert('codify_failed', messageOf(err))
-      fallback()
-      return
-    }
-    // One moment answers two wants: the town credits this mind with the word, and keeps it.
-    this.#book(() =>
-      this.#wants?.feed(['discovery_credit', 'verb_codified'], this.#bridge.currentTick()),
-    )
-    return this.#holdIntent({ verb, params: {} })
   }
 
   #rememberRefusal(description: string, reason: string): void {
@@ -1238,6 +1253,7 @@ export class AgentRuntime {
   }
 
   #onPlanHeadResult(res: SubmitResult, head: Intent): void {
+    if (!this.#started) return
     this.#noteAccepted(head, res)
     // A head answered after the turn replaced the plan speaks for a queue that is gone: reading
     // it would wipe the plan the mind just paid for.
@@ -1725,46 +1741,51 @@ export class AgentRuntime {
   async #runNight(day: number): Promise<void> {
     if (this.#reflectedNight === day) return
     this.#reflectedNight = day
-    await this.#letGoOfStaleTies()
-    if (this.#reflectionLlm === null) {
-      this.#nightWritten = day
-      return
-    }
-    this.#stats.reflections += 1
     this.#reflectionInFlight = true
-    const ties = this.#ties
     try {
-      await runSleepReflection({
-        mem: this.#mem!,
-        personality: this.#personality,
-        llm: this.#reflectionLlm,
-        day,
-        selfName: this.#identity.name,
-        ...(ties === null
-          ? {}
-          : { ties: { store: ties.store, cast: ties.cast(), tick: this.#bridge.currentTick() } }),
-        alert: (kind, detail) => {
-          this.#llm.alert(kind, detail)
-        },
-      })
-    } catch (err) {
-      this.#llm.alert('reflection_failed', messageOf(err))
-    }
-    this.#nightWritten = day
-    this.#tellMood()
-    try {
-      if (this.#dreamLlm !== null) {
-        const dream = await rollDream({
-          mem: this.#mem!,
-          agentId: this.#agentId,
-          day,
-          llm: this.#dreamLlm,
-          chance: this.#config.dreamChance,
-        })
-        if (dream.dreamed) this.#pendingDreamMood = dream.mood
+      await this.#letGoOfStaleTies()
+      if (!this.#started) return
+      if (this.#reflectionLlm === null) {
+        this.#nightWritten = day
+        return
       }
-    } catch (err) {
-      this.#llm.alert('dream_failed', messageOf(err))
+      this.#stats.reflections += 1
+      const ties = this.#ties
+      try {
+        await runSleepReflection({
+          mem: this.#mem!,
+          personality: this.#personality,
+          llm: this.#reflectionLlm,
+          day,
+          selfName: this.#identity.name,
+          ...(ties === null
+            ? {}
+            : { ties: { store: ties.store, cast: ties.cast(), tick: this.#bridge.currentTick() } }),
+          alert: (kind, detail) => {
+            this.#llm.alert(kind, detail)
+          },
+        })
+      } catch (err) {
+        this.#llm.alert('reflection_failed', messageOf(err))
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can run during the await.
+      if (!this.#started) return
+      this.#nightWritten = day
+      this.#tellMood()
+      try {
+        if (this.#dreamLlm !== null) {
+          const dream = await rollDream({
+            mem: this.#mem!,
+            agentId: this.#agentId,
+            day,
+            llm: this.#dreamLlm,
+            chance: this.#config.dreamChance,
+          })
+          if (dream.dreamed) this.#pendingDreamMood = dream.mood
+        }
+      } catch (err) {
+        this.#llm.alert('dream_failed', messageOf(err))
+      }
     } finally {
       this.#reflectionInFlight = false
     }
@@ -1822,15 +1843,20 @@ export class AgentRuntime {
     }
   }
 
-  #writeActionMemory(text: string, importance = REFUSAL_IMPORTANCE): Promise<number | null> {
-    if (this.#alreadyHeld(text)) return Promise.resolve(null)
-    return this.#mem!.insertMemory({
-      tick: this.#bridge.currentTick(),
-      kind: 'action',
-      text,
-      importance,
-      tags: EMPTY_TAGS,
-    })
+  async #writeActionMemory(text: string, importance = REFUSAL_IMPORTANCE): Promise<number | null> {
+    if (this.#alreadyHeld(text)) return null
+    this.#auxiliaryInFlight++
+    try {
+      return await this.#mem!.insertMemory({
+        tick: this.#bridge.currentTick(),
+        kind: 'action',
+        text,
+        importance,
+        tags: EMPTY_TAGS,
+      })
+    } finally {
+      this.#auxiliaryInFlight--
+    }
   }
 
   // Node's default terminates the process on a rejection nobody holds, and this file starts

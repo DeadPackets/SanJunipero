@@ -120,6 +120,52 @@ describe('promptBirthLine (T25)', () => {
 })
 
 describe('captureSocialName (T25)', () => {
+  it('leaves a cancelled name repairable at the next boot', async () => {
+    const db = makeDb()
+    const { model } = answering(JSON.stringify({ name: 'Little Bird' }))
+    const cancelled = client(db, model)
+    cancelled.abort()
+    const ctx = { born: BORN, motherPersona: MOTHER, tick: 10 }
+    expect(await captureSocialName(cancelled, db, ctx)).toBeNull()
+    expect(hasSocialName(db, BORN.id)).toBe(false)
+    expect(rows(db)).toEqual([])
+
+    expect(await captureSocialName(client(db, model), db, ctx)).toBe('Little Bird')
+    expect(rows(db)).toHaveLength(1)
+    db.close()
+  })
+
+  it('leaves an interrupted naming request repairable after its failed attempt is logged', async () => {
+    const db = makeDb()
+    let started!: () => void
+    const entered = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    const model = new MockLanguageModelV4({
+      doGenerate: async ({ abortSignal }) => {
+        started()
+        await new Promise((_resolve, reject) => {
+          abortSignal!.addEventListener(
+            'abort',
+            () => {
+              reject(abortSignal!.reason as Error)
+            },
+            { once: true },
+          )
+        })
+        throw new Error('unreachable')
+      },
+    })
+    const naming = client(db, model)
+    const pending = captureSocialName(naming, db, { born: BORN, motherPersona: MOTHER, tick: 10 })
+    await entered
+    naming.abort()
+    expect(await pending).toBeNull()
+    expect(hasSocialName(db, BORN.id)).toBe(false)
+    expect(db.prepare('SELECT ok FROM llm_calls').all()).toEqual([{ ok: 0 }])
+    db.close()
+  })
+
   it('records one row, and tolerates a name that diverges from the registry', async () => {
     const db = makeDb()
     const { model, prompts } = answering(JSON.stringify({ name: 'Little Bird' }))

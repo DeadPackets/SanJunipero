@@ -462,25 +462,42 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   /** A row whose answer named no back end books at the ceiling for ever otherwise; asking
    *  OpenRouter who served it is the only way back to a real price. */
   const unclaimable = new Set<string>()
-  const sweepUnattributed = async (): Promise<void> => {
-    if (openRouterKey === '') return
-    const r = await backfillUnattributed(opsDb, { apiKey: openRouterKey, unclaimable })
-    if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
+  const pricingAbort = new AbortController()
+  let pricingPending: Promise<void> | null = null
+  const sweepUnattributed = (): Promise<void> => {
+    if (pricingPending !== null) return pricingPending
+    pricingPending = (async () => {
+      if (openRouterKey === '') return
+      const r = await backfillUnattributed(opsDb, {
+        apiKey: openRouterKey,
+        unclaimable,
+        signal: pricingAbort.signal,
+      })
+      if (r.backfilled > 0) log(`stream: priced ${r.backfilled} call(s) nobody had claimed`)
+    })().finally(() => {
+      pricingPending = null
+    })
+    return pricingPending
   }
 
-  const makeClient = (caller: string, agentId?: string, audience?: 'mind' | 'ops'): LlmClient =>
-    opts.makeClient !== undefined
-      ? opts.makeClient(opsDb, caller, agentId, audience)
-      : new LlmClient({
-          db: opsDb,
-          caller,
-          ...(agentId === undefined ? {} : { agentId }),
-          ...(audience === undefined ? {} : { audience }),
-          allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
-          // The per-caller backstop: it stops one caller running away between two reads of the
-          // ledger, which the tick watchdog below cannot see.
-          ...(cap > 0 ? { budgetUsd: cap } : {}),
-        })
+  let stopped = false
+  const clients = new Set<LlmClient>()
+  const makeClient = (caller: string, agentId?: string, audience?: 'mind' | 'ops'): LlmClient => {
+    const client =
+      opts.makeClient !== undefined
+        ? opts.makeClient(opsDb, caller, agentId, audience)
+        : new LlmClient({
+            db: opsDb,
+            caller,
+            ...(agentId === undefined ? {} : { agentId }),
+            ...(audience === undefined ? {} : { audience }),
+            allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
+            ...(cap > 0 ? { budgetUsd: cap } : {}),
+          })
+    clients.add(client)
+    if (stopped) client.abort()
+    return client
+  }
 
   if (opts.preflight !== false) {
     if (!process.env.OPENROUTER_API_KEY) {
@@ -540,17 +557,28 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
   let booted: BootedMinds | null = null
   let bridge: EngineBridge | null = null
-  let stopped = false
   let saveRuntime: ((tick: number) => void) | null = null
-  let stopBirths: (() => void) | null = null
-  let stopArrivals: (() => void) | null = null
+  let stopBirths: (() => Promise<void>) | null = null
+  let stopArrivals: (() => Promise<void>) | null = null
+  let populationPending = 0
+  const trackPopulation = (work: Promise<void>): void => {
+    populationPending += 1
+    void work
+      .catch((err: unknown) => {
+        insertAlert(opsDb, { agentId: null, kind: 'population_failed', detail: String(err) })
+      })
+      .finally(() => {
+        populationPending -= 1
+      })
+  }
 
   const stopMinds = (): void => {
     if (stopped) return
     stopped = true
-    stopBirths?.()
-    stopArrivals?.()
+    if (stopBirths !== null) trackPopulation(stopBirths())
+    if (stopArrivals !== null) trackPopulation(stopArrivals())
     booted?.stop()
+    for (const client of clients) client.abort()
     bridge?.drain('the moment passes')
   }
 
@@ -618,7 +646,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         },
       })
       for (const [path, value] of Object.entries(loop.state.laws ?? {})) {
-        const kind = path.match(/^structures\.recipes\.([a-z][a-z0-9_]*)$/)?.[1]
+        const kind = /^structures\.recipes\.([a-z][a-z0-9_]*)$/.exec(path)?.[1]
         if (!kind || config.structures.recipes[kind] || !value || typeof value !== 'object')
           continue
         const recipe = value as { w?: number; h?: number }
@@ -718,23 +746,25 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       })
       // What a birth writes outside the world log — the household and the mother's name — is
       // finished here when a crash left it half done. Idempotent, so a whole town costs nothing.
-      void ensureChildren({
-        cast: new Map(cast.map((m) => [m.id, m])),
-        store,
-        dbFor,
-        opsDb,
-        embedder,
-        namingLlm: makeClient('naming'),
-        boot: (spec) => {
-          booted?.add(spec)
-        },
-      }).catch((err: unknown) => {
-        insertAlert(opsDb, {
-          agentId: null,
-          kind: 'birth_failed',
-          detail: err instanceof Error ? err.message : String(err),
-        })
-      })
+      trackPopulation(
+        ensureChildren({
+          cast: new Map(cast.map((m) => [m.id, m])),
+          store,
+          dbFor,
+          opsDb,
+          embedder,
+          namingLlm: makeClient('naming'),
+          boot: (spec) => {
+            if (!stopped) booted?.add(spec)
+          },
+        }).catch((err: unknown) => {
+          insertAlert(opsDb, {
+            agentId: null,
+            kind: 'birth_failed',
+            detail: err instanceof Error ? err.message : String(err),
+          })
+        }),
+      )
       stopBirths = wireBirths({
         booted,
         bridge,
@@ -751,21 +781,23 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       })
       // The road's own repair, beside the birth one: a walker whose first memory a crash cut
       // short is booted here, not left with a mind and no reason to be in the valley.
-      void ensureArrivals({
-        cast: new Map(cast.map((m) => [m.id, m])),
-        store,
-        dbFor,
-        embedder,
-        boot: (spec) => {
-          booted?.add(spec)
-        },
-      }).catch((err: unknown) => {
-        insertAlert(opsDb, {
-          agentId: null,
-          kind: 'arrival_failed',
-          detail: err instanceof Error ? err.message : String(err),
-        })
-      })
+      trackPopulation(
+        ensureArrivals({
+          cast: new Map(cast.map((m) => [m.id, m])),
+          store,
+          dbFor,
+          embedder,
+          boot: (spec) => {
+            if (!stopped) booted?.add(spec)
+          },
+        }).catch((err: unknown) => {
+          insertAlert(opsDb, {
+            agentId: null,
+            kind: 'arrival_failed',
+            detail: err instanceof Error ? err.message : String(err),
+          })
+        }),
+      )
       stopArrivals = wireArrivals({
         booted,
         bridge,
@@ -902,6 +934,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (recognizing) return
         recognizing = true
         setImmediate(() => {
+          if (stopped) {
+            recognizing = false
+            return
+          }
           // A site is recognized by recurring, so the pass still needs every day it has seen —
           // but it is extended, never re-read: parsing the whole log again grows without bound.
           const fresh = RECOGNIZER_EVENTS.flatMap((t) =>
@@ -949,6 +985,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         // Reading the day back is a whole sim-day of rows, so even that waits for the next turn
         // of the loop: this handler returns to the socket first.
         setImmediate(() => {
+          if (stopped) {
+            narrating = false
+            return
+          }
           const events = store
             .readFrom(from)
             .filter((e) => Math.floor(e.tick / MINUTES_PER_DAY) === day)
@@ -1064,9 +1104,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (Date.now() >= nextBackfillAt && !backfilling) {
           nextBackfillAt = Date.now() + LIVE_BACKFILL_REAL_SECONDS * 1000
           backfilling = true
-          void sweepUnattributed().finally(() => {
-            backfilling = false
-          })
+          void sweepUnattributed()
+            .catch(() => undefined)
+            .finally(() => {
+              backfilling = false
+            })
         }
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
@@ -1118,18 +1160,17 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
 
     async stop(): Promise<void> {
       stopMinds()
-      // Closing a mind's db while `runSleepReflection` is in flight throws out of a promise
-      // nobody awaits, so this waits a bounded five seconds and then closes anyway.
       const settled = await settle(
-        () => booted?.reflecting() === true || narrating || recognizing,
+        () =>
+          booted?.reflecting() === true ||
+          booted?.busy() === true ||
+          narrating ||
+          recognizing ||
+          populationPending > 0,
         REFLECTION_SETTLE_MS,
       )
-      if (!settled) log('stream: a night was still being reflected on when the town closed')
-      // A line still with a back end writes to its mind's db when it lands, so it gets the
-      // same wait the last unclaimed prices get, and no longer.
-      if (!(await settle(() => booted?.busy() === true, STOP_SWEEP_MS))) {
-        log('stream: somebody was still mid-sentence when the town closed')
-      }
+      if (!settled)
+        throw new Error('mind work did not settle after cancellation; databases remain open')
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try {
@@ -1140,19 +1181,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       for (const db of mindDbs.values()) db.close()
       arbiterDb?.close()
       narratorDb?.close()
-      // Before every report, not between them: a row still booked at the ceiling makes both
-      // the provider table and the reconciliation ratio a lie. Bounded, because 25 rows at a 10 s
-      // fetch each would sit out the container's whole stop grace and take the reports with it.
-      let sweeping = true
-      void sweepUnattributed()
-        .catch(() => {
-          /* a price nobody answered for is the ceiling, which is where it already sits */
-        })
-        .finally(() => {
-          sweeping = false
-        })
-      if (!(await settle(() => sweeping, STOP_SWEEP_MS))) {
-        log('stream: the last unclaimed prices went unasked — the town closed first')
+      void sweepUnattributed().catch(() => undefined)
+      if (!(await settle(() => pricingPending !== null, STOP_SWEEP_MS))) {
+        pricingAbort.abort()
+        await pricingPending?.catch(() => undefined)
+        log('stream: unfinished price lookups remain for the next boot')
       }
       // Each of these says nothing about a run with nothing to say, so a quiet ops surface
       // still means a quiet run.

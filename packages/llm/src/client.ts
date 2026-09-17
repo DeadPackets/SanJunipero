@@ -279,8 +279,19 @@ export function retryBackoffMs(err: unknown, attempt = 0): number {
   return window + Math.floor(Math.random() * window)
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted()
+  return new Promise((resolve, reject) => {
+    const aborted = (): void => {
+      clearTimeout(timer)
+      reject(signal.reason as Error)
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', aborted)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', aborted, { once: true })
+  })
 }
 
 export class LlmClient {
@@ -307,12 +318,14 @@ export class LlmClient {
   private readonly audience: 'mind' | 'ops'
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
+  private readonly cancellation: AbortController
   private model: LanguageModel | undefined
   private fallbackModel: LanguageModel | undefined
   private lastCallId: number | null = null
 
-  constructor(opts: LlmClientOpts) {
+  constructor(opts: LlmClientOpts, cancellation = new AbortController()) {
     this.opts = { ...opts }
+    this.cancellation = cancellation
     this.db = opts.db
     this.caller = opts.caller
     this.agentId = opts.agentId ?? null
@@ -351,6 +364,7 @@ export class LlmClient {
     repairOnce?: boolean
     bill?: CallBill
   }): Promise<{ value: T; usage: LlmUsage }> {
+    this.cancellation.signal.throwIfAborted()
     const system = this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
     const bill = opts.bill ?? {}
@@ -402,7 +416,10 @@ export class LlmClient {
           maxRetries: 0,
           ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
           ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-          abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
+          abortSignal: AbortSignal.any([
+            this.cancellation.signal,
+            AbortSignal.timeout(this.requestTimeoutMs),
+          ]),
           tools: {
             turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }),
           },
@@ -438,7 +455,10 @@ export class LlmClient {
           maxRetries: 0,
           ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
           ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-          abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
+          abortSignal: AbortSignal.any([
+            this.cancellation.signal,
+            AbortSignal.timeout(this.requestTimeoutMs),
+          ]),
           output: Output.object({ schema }),
         })
         note(stepFacts(r))
@@ -464,6 +484,7 @@ export class LlmClient {
     system?: string
     messages: LlmMessage[]
   }): Promise<{ text: string; usage: LlmUsage }> {
+    this.cancellation.signal.throwIfAborted()
     const system = opts.system === undefined ? undefined : this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
     const { value, usage } = await this.invoke(async (model, note) => {
@@ -474,7 +495,10 @@ export class LlmClient {
         maxRetries: 0,
         ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
         ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-        abortSignal: AbortSignal.timeout(this.requestTimeoutMs),
+        abortSignal: AbortSignal.any([
+          this.cancellation.signal,
+          AbortSignal.timeout(this.requestTimeoutMs),
+        ]),
       })
       note(stepFacts(r))
       return r.text
@@ -485,7 +509,11 @@ export class LlmClient {
   /** The same ledger, budget and routing under another caller name, so one call inside a pass
    *  can carry its own pinned settings and its own by-caller line. */
   forCaller(caller: string): LlmClient {
-    return new LlmClient({ ...this.opts, caller })
+    return new LlmClient({ ...this.opts, caller }, this.cancellation)
+  }
+
+  abort(): void {
+    this.cancellation.abort()
   }
 
   totalCostUsd(): number {
@@ -546,6 +574,7 @@ export class LlmClient {
     exec: (model: LanguageModel, note: Note) => Promise<T>,
     bill: CallBill = {},
   ): Promise<{ value: T; usage: LlmUsage }> {
+    this.cancellation.signal.throwIfAborted()
     if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
       throw new BudgetExceededError(
         `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} of $${this.budgetUsd.toFixed(6)}`,
@@ -620,8 +649,10 @@ export class LlmClient {
         return await this.limiter.run(
           () => this.attemptOnce(model, modelName, exec, bill),
           Math.max(sends === 1 ? 0 : MIN_QUEUE_WAIT_MS, queueUntil - Date.now()),
+          this.cancellation.signal,
         )
       } catch (err) {
+        this.cancellation.signal.throwIfAborted()
         lastError = err
         // Nothing was sent, so there is nothing to re-ask: another attempt only re-joins the
         // queue this one already timed out in.
@@ -649,7 +680,7 @@ export class LlmClient {
         const wait = retryBackoffMs(err, sends - 1)
         // A wait the caller has no time left for buys nothing: fail now rather than bill it too.
         if (wait > this.requestTimeoutMs) break
-        if (wait > 0) await sleep(wait)
+        if (wait > 0) await sleep(wait, this.cancellation.signal)
       } finally {
         const pinned = this.limiter.pinnedAlert()
         if (pinned !== null) this.alert('llm_rate_pinned', pinned)

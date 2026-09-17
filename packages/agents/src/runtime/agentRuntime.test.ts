@@ -49,6 +49,7 @@ import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from '
 import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
 import { openAgentDb } from '../memory/schema.js'
 import { MemoryStore, type MemoryRow } from '../memory/store.js'
+import { TieStore, TIE_LET_GO_TICKS } from '../memory/ties.js'
 import { GIST_MIN_CHARS } from '../memory/gist.js'
 import { PersonalityStore, type PersonalityDoc } from '../personality.js'
 import { migrateLlmTables, LlmClient } from '@sj/llm'
@@ -430,6 +431,7 @@ async function setup(opts: {
   reflectionLlm?: ReflectionLlm
   dreamLlm?: DreamLlm
   embedder?: { embed(t: string): Promise<Float32Array> }
+  withTies?: boolean
   maxRetries?: number
   simConfig?: SimConfig
   onThought?: (t: { tick: number; agentId: string; text: string; importance: number }) => void
@@ -471,6 +473,7 @@ async function setup(opts: {
   const embedder = opts.embedder ?? (await FakeEmbedder.create())
   const personality = new PersonalityStore(agentDb, AGENT)
   personality.init(baseDoc(), 0)
+  const ties = opts.withTies ? new TieStore(agentDb, AGENT) : null
   const llm = new LlmClient({
     model: opts.model,
     db: agentDb,
@@ -494,10 +497,11 @@ async function setup(opts: {
     onTurnStart: opts.onTurnStart,
     onTurnEnd: opts.onTurnEnd,
     adjudicator: opts.adjudicator,
+    ...(ties === null ? {} : { ties: { store: ties, cast: () => [] } }),
   })
   runtime.start(AGENT)
   const mem = new MemoryStore(agentDb, AGENT, embedder)
-  return { world, loop, bridge, runtime, llm, mem, personality, agentDb, embedder }
+  return { world, loop, bridge, runtime, llm, mem, personality, agentDb, embedder, ties }
 }
 
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve))
@@ -1672,7 +1676,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     const [a, b] = [prompts[0]!, prompts[1]!]
     // Last user message is block 6, `now`. It is the one place the words appear.
     const nowA = a.filter((m) => m.role === 'user').at(-1)!.text
-    expect(nowA).toContain('a house (10 wood)')
+    expect(nowA).toContain('a house (22.5 wood)')
     expect(nowA).toContain('stew (1 meat and 1 vegetable, at a fire someone is keeping fed')
     expect(a.find((m) => m.role === 'system')!.text).not.toContain('a house (10 wood)')
     // And not in the day log, which is the day's events: a standing fact repeated every turn
@@ -3093,6 +3097,196 @@ describe('★ the morning line names what this mind wants', () => {
     const { runtime } = await setup({ model, mindConfig: FAST_MIND, simConfig: STILL_BODY })
     expect(runtime.wantSaid(0)).toBeNull()
     expect(runtime.wantSaid(2880)).toBe('to belong somewhere, to be one of them')
+  })
+})
+
+describe('shutdown checkpoints', () => {
+  it('preserves a queued plan when shutdown drains its unsent head', async () => {
+    const { runtime, loop, bridge } = await setup({ model: turnModel([BENIGN_TURN]) })
+    const snapshot = runtime.snapshot()
+    snapshot.plan = {
+      queue: [
+        { verb: 'walk', params: { x: 9, y: 9 } },
+        { verb: 'walk', params: { x: 10, y: 9 } },
+      ],
+      lastResult: 'running',
+      size: 2,
+    }
+    runtime.restore(snapshot)
+    loop.step()
+    runtime.stop()
+    expect(bridge.drain()).toBeGreaterThan(0)
+    expect(runtime.snapshot().plan).toEqual(snapshot.plan)
+    await flush()
+  })
+
+  it('stays busy until a detached action memory is written after stopping', async () => {
+    const base = await FakeEmbedder.create()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    const embedder = {
+      embed: async (text: string): Promise<Float32Array> => {
+        if (text.startsWith('You realize you cannot')) {
+          held = true
+          await gate
+        }
+        return base.embed(text)
+      },
+    }
+    const { runtime, loop, agentDb } = await setup({
+      model: turnModel([
+        {
+          thought: 'I try.',
+          action: { verb: 'patch', params: { structureId: STRUCTURE_ID } },
+          importance: 4,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      embedder,
+    })
+    try {
+      await stepUntil(loop, () => held, 100)
+      expect(held).toBe(true)
+      runtime.stop()
+      await flush()
+      expect(runtime.busy()).toBe(true)
+      expect(memoriesOfKind(agentDb, 'action')).toHaveLength(0)
+      release()
+      await flush()
+      expect(memoriesOfKind(agentDb, 'action')).toHaveLength(1)
+      expect(runtime.busy()).toBe(false)
+    } finally {
+      release()
+      await flush()
+    }
+  })
+
+  it('tracks the first night memory and does not checkpoint a night interrupted there', async () => {
+    const base = await FakeEmbedder.create()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    const embedder = {
+      embed: async (text: string): Promise<Float32Array> => {
+        if (text.startsWith('You have let go')) {
+          held = true
+          await gate
+        }
+        return base.embed(text)
+      },
+    }
+    const { runtime, loop, bridge, ties } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      simConfig: SLOW_BODY,
+      embedder,
+      withTies: true,
+    })
+    ties!.apply(
+      [{ agentId: AGENT, personId: 'other', kind: 'debt', text: 'A loaf owed.' }],
+      -TIE_LET_GO_TICKS,
+    )
+    try {
+      await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+      void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+      await stepUntil(loop, () => held, 100)
+      expect(held).toBe(true)
+      runtime.stop()
+      expect(runtime.reflectionInFlight()).toBe(true)
+      release()
+      await flush()
+      expect(runtime.reflectionInFlight()).toBe(false)
+      expect(runtime.snapshot().reflectedNight).toBeNull()
+    } finally {
+      release()
+      await flush()
+    }
+  })
+
+  it('drains detached adjudication without submitting its late result after stopping', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let asked = false
+    const { runtime, loop, bridge } = await setup({
+      model: turnModel([
+        {
+          thought: 'I try.',
+          action: { verb: 'patch', params: { structureId: STRUCTURE_ID } },
+          importance: 4,
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      adjudicator: async () => {
+        asked = true
+        await gate
+        return { kind: 'map', verb: 'walk', params: { x: 9, y: 9 } }
+      },
+    })
+    try {
+      await stepUntil(loop, () => asked, 100)
+      expect(asked).toBe(true)
+      runtime.stop()
+      bridge.drain()
+      await flush()
+      expect(runtime.busy()).toBe(true)
+      release()
+      await flush()
+      expect(bridge.drain()).toBe(0)
+      expect(runtime.busy()).toBe(false)
+    } finally {
+      release()
+      await flush()
+      bridge.drain()
+      await flush()
+    }
+  })
+
+  it('does not mark an interrupted provider reflection as a completed night', async () => {
+    const reflection = new GatedReflectionLlm()
+    let release!: () => void
+    reflection.gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const { runtime, loop, bridge } = await setup({
+      model: turnModel([]),
+      mindConfig: { idleGapTicks: 300, boredomTicks: 100000 },
+      simConfig: SLOW_BODY,
+      reflectionLlm: reflection,
+    })
+    try {
+      await stepUntil(loop, () => loop.tick >= NIGHT_0_TICK, 2000)
+      void bridge.submit(AGENT, { verb: 'sleep', params: {} })
+      await stepUntil(loop, () => runtime.reflectionInFlight(), 100)
+      expect(runtime.reflectionInFlight()).toBe(true)
+      runtime.stop()
+      release()
+      await flush()
+      expect(runtime.reflectionInFlight()).toBe(false)
+      expect(runtime.snapshot().reflectedNight).toBeNull()
+    } finally {
+      release()
+      await flush()
+    }
+  })
+
+  it('retains the remaining plan after stopping, ready for the next boot', async () => {
+    const { runtime } = await setup({ model: turnModel([BENIGN_TURN]) })
+    const snapshot = runtime.snapshot()
+    snapshot.plan = {
+      queue: [{ verb: 'walk', params: { x: 9, y: 9 } }],
+      lastResult: 'running',
+      size: 2,
+    }
+    runtime.restore(snapshot)
+    runtime.stop()
+    expect(runtime.snapshot().plan).toEqual(snapshot.plan)
   })
 })
 

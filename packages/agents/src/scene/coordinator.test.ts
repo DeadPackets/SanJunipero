@@ -446,6 +446,56 @@ describe('a scene is who engaged, not who stood nearby', () => {
 })
 
 describe('only the floor-holder pays', () => {
+  it('propagates a failed line so the runtime can back off, then accepts a retry', async () => {
+    const failure = new Error('provider unavailable')
+    const errors: string[] = []
+    const h = harness({
+      script: () => (_ask, nth) => {
+        if (nth === 0) throw failure
+        return fromCorpus(nth, { leave: false, speech: 'Six planks tomorrow.', to: 'Nadia' })
+      },
+      onError: (kind, detail) => errors.push(`${kind}: ${detail}`),
+    })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+
+    await expect(h.coordinator.takeFloor(OMAR, NOON)).rejects.toBe(failure)
+    expect(errors).toEqual(['scene_line: provider unavailable'])
+    expect(scene.floor).toBe(OMAR)
+    expect(scene.thread.map((line) => line.text)).toEqual(['Omar. Six planks.'])
+
+    await h.coordinator.takeFloor(OMAR, NOON + 1)
+    expect(scene.thread.at(-1)?.text).toBe('Six planks tomorrow.')
+    expect(scene.floor).toBe(NADIA)
+  })
+
+  it('keeps the current line in flight when a stale provider call fails', async () => {
+    let clock = 0
+    let rejectOld!: (error: Error) => void
+    const failure = new Error('old provider request failed')
+    const h = harness({ now: () => clock, script: () => () => 'hold' })
+    h.llms.get(OMAR)!.line = () =>
+      new Promise<SceneTurn>((_resolve, reject) => {
+        rejectOld = reject
+      })
+    const scene = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    const oldLine = h.coordinator.takeFloor(OMAR, NOON)
+    const rejected = expect(oldLine).rejects.toBe(failure)
+
+    clock += FLOOR_TIMEOUT_MS
+    h.coordinator.onTick(NOON + 1)
+    expect(scene.floor).toBe(NADIA)
+    const currentLine = h.coordinator.takeFloor(NADIA, NOON + 1)
+    rejectOld(failure)
+    await rejected
+
+    h.llms.get(NADIA)!.held[0]!(
+      fromCorpus(0, { leave: false, speech: 'I can wait until tomorrow.', to: 'Omar' }),
+    )
+    await currentLine
+    expect(scene.thread.at(-1)?.text).toBe('I can wait until tomorrow.')
+    expect(scene.floor).toBe(OMAR)
+  })
+
   it('never asks a listener for a line', async () => {
     const h = harness({
       who: [
@@ -1843,4 +1893,34 @@ describe('being spoken to stops your legs', () => {
     expect(h.loop.state.agents[OMAR]!.activity).toBeNull()
     expect(h.coordinator.open()).toHaveLength(1)
   })
+})
+
+it('stays busy while a closing council waits for its law and final writes', async () => {
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let entered = false
+  const h = harness({
+    who: THREE,
+    script: stanced({ [SALMA]: 'unsure', [OMAR]: 'for' }),
+    laws: async () => {
+      entered = true
+      await gate
+      return READING
+    },
+  })
+  await council(h, NOON)
+  h.loop.step()
+  const closing = vote(h, NOON + MINUTES_PER_DAY)
+  try {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    expect(entered).toBe(true)
+    expect(h.coordinator.open()).toHaveLength(0)
+    expect(h.coordinator.busy()).toBe(true)
+  } finally {
+    release()
+    await closing
+  }
+  expect(h.coordinator.busy()).toBe(false)
 })
