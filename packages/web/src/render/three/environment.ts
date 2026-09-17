@@ -44,8 +44,18 @@ export function createEnvironment(scene: Scene) {
   const warm = new Color(0xffc178)
   const day = new Color(0xffecd0)
   const moon = new Color(0x91b5ef)
+  const daySky = new Color(0xc9e4ee)
+  const nightSky = new Color(0x92acd2)
+  const dayGround = new Color(0x596443)
+  const nightGround = new Color(0x343840)
+  const warmGround = new Color(0x74563e)
+  const clearBackground = new Color(0x99ac98)
+  const wetBackground = new Color(0x78868a)
+  const daylightBackground = new Color()
   const background = new Color()
   let lightTick = -1
+  let wetness = -1
+  let fogDensity = 0.0008
   return {
     flash(strength: number) {
       sky.intensity += strength
@@ -63,18 +73,33 @@ export function createEnvironment(scene: Scene) {
       heightOf: (id: string) => number,
       moving = true,
     ) {
-      if (lightTick < 0 || Math.abs(state.tick - lightTick) > 5 || !moving) lightTick = state.tick
+      const seeking = lightTick < 0 || Math.abs(state.tick - lightTick) > 5 || !moving
+      if (seeking) lightTick = state.tick
       else lightTick += (state.tick - lightTick) * (1 - Math.exp(-dt * 5))
       const token = skyToken(lightTick)
       const light = sunLight(lightTick)
       const wet = state.weather.kind === 'rain' || state.weather.kind === 'storm'
-      const daylight = token.kind === 'sun' ? Math.min(1, light.elevation * 5) : 0
+      const targetFog =
+        state.weather.kind === 'storm'
+          ? 0.0022
+          : wet || state.weather.kind === 'snow'
+            ? 0.0016
+            : 0.0008
+      const weatherBlend = seeking || wetness < 0 ? 1 : 1 - Math.exp(-dt / 3)
+      wetness += ((wet ? 1 : 0) - wetness) * weatherBlend
+      fogDensity += (targetFog - fogDensity) * weatherBlend
+      const daylight = MathUtils.smoothstep(light.elevation, 0, 0.2)
       const golden = token.kind === 'sun' ? 1 - MathUtils.smoothstep(light.elevation, 0.25, 0.8) : 0
       const moonlight = moonAltitude(lightTick)
-      sun.intensity = daylight * (wet ? 0.85 : 3.1 + golden * 0.7) + moonlight * (wet ? 0.35 : 0.65)
-      sun.shadow.intensity = wet ? 0.35 : 0.7
-      sun.shadow.radius = wet ? 3 : 2
-      sun.color.copy(token.kind === 'sun' ? day : moon).lerp(warm, golden)
+      sun.intensity =
+        daylight * MathUtils.lerp(3.1 + golden * 0.7, 0.85, wetness) +
+        moonlight * MathUtils.lerp(0.65, 0.35, wetness)
+      sun.shadow.intensity = MathUtils.lerp(0.7, 0.35, wetness)
+      sun.shadow.radius = MathUtils.lerp(2, 3, wetness)
+      sun.color
+        .copy(moon)
+        .lerp(day, daylight)
+        .lerp(warm, golden * daylight)
       sun.position.set(
         center.x - Math.cos(token.along * Math.PI) * 22,
         center.y + 4 + Math.sin(token.along * Math.PI) * 26,
@@ -89,18 +114,17 @@ export function createEnvironment(scene: Scene) {
         bottom: -extent,
       })
       sun.shadow.camera.updateProjectionMatrix()
-      sky.intensity = 0.28 + daylight * (wet ? 0.82 : 1.2 - golden * 0.15)
-      sky.color.set(wet || token.kind === 'moon' ? 0x92acd2 : 0xc9e4ee)
-      sky.groundColor.set(daylight > 0.5 ? 0x596443 : 0x343840).lerp(new Color(0x74563e), golden)
-      background.set(0x283649).lerp(new Color(wet ? 0x78868a : 0x99ac98), daylight)
+      sky.intensity = 0.28 + daylight * MathUtils.lerp(1.2 - golden * 0.15, 0.82, wetness)
+      sky.color.copy(nightSky).lerp(daySky, daylight * (1 - wetness))
+      sky.groundColor
+        .copy(nightGround)
+        .lerp(dayGround, daylight)
+        .lerp(warmGround, golden * daylight)
+      daylightBackground.copy(clearBackground).lerp(wetBackground, wetness)
+      background.set(0x283649).lerp(daylightBackground, daylight)
       ;(scene.background as Color).copy(background)
       ;(scene.fog as FogExp2).color.copy(background)
-      ;(scene.fog as FogExp2).density =
-        state.weather.kind === 'storm'
-          ? 0.0022
-          : wet || state.weather.kind === 'snow'
-            ? 0.0016
-            : 0.0008
+      ;(scene.fog as FogExp2).density = fogDensity
       const flames = flamesAt(state, state.tick, config)
       const active = new Set(flames.map((f) => f.id))
       const lampIds = new Set<string>()

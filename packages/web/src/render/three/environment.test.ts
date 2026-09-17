@@ -167,3 +167,49 @@ it('keeps a visible fire lit when eight closer lamps fill the light pool', () =>
   expect(fire).toBeDefined()
   environment.destroy()
 })
+
+it('keeps light colors continuous across every minute, including dawn, dusk and midnight', () => {
+  const state = genesisState(DEFAULT_CONFIG)
+  state.weather.kind = 'clear'
+  const scene = new Scene()
+  const environment = createEnvironment(scene)
+  let previous: number[] | undefined
+  for (let tick = 0; tick <= 1440; tick++) {
+    state.tick = tick
+    const { sun, sky } = environment.update(
+      state,
+      DEFAULT_CONFIG,
+      new Vector3(),
+      25,
+      0,
+      1 / 60,
+      () => 2,
+      false,
+    )
+    const colors = [...sun.color.toArray(), ...sky.color.toArray(), ...sky.groundColor.toArray()]
+    if (previous)
+      for (let i = 0; i < colors.length; i++)
+        expect(Math.abs(colors[i]! - previous[i]!), `minute ${tick}, channel ${i}`).toBeLessThan(
+          0.035,
+        )
+    previous = colors
+  }
+  environment.destroy()
+})
+
+it('fades weather lighting during playback and resolves it immediately when seeking', () => {
+  const state = genesisState(DEFAULT_CONFIG)
+  state.tick = 720
+  state.weather.kind = 'clear'
+  const scene = new Scene()
+  const environment = createEnvironment(scene)
+  const update = (moving = true) =>
+    environment.update(state, DEFAULT_CONFIG, new Vector3(), 25, 0, 1 / 60, () => 2, moving)
+  const before = update().sun.intensity
+  state.weather.kind = 'storm'
+  const first = update().sun.intensity
+  expect(first).toBeLessThan(before)
+  expect(before - first).toBeLessThan(0.02)
+  expect(update(false).sun.intensity).toBeCloseTo(0.85)
+  environment.destroy()
+})

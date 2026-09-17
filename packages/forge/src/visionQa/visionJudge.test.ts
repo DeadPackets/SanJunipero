@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { encodePng, type RawImage } from '../post/raw.js'
+import { selfTile3x3 } from '../terrainGen.js'
 import { DEFAULT_FORGE_CONFIG, ForgeConfigSchema } from '../forgeConfig.js'
 import { CRITERIA, NA_CRITERION } from './verdict.js'
 import { RUBRIC_VERSION, paletteCard, checkerCard } from './rubric.js'
@@ -45,6 +46,12 @@ const ARGS = {
 }
 
 describe('vision judge', () => {
+  it('shows the actual 3x3 repeat promised by the surface tiling rubric', async () => {
+    const { calls, gen } = spy(scored(9))
+    await makeVisionJudge({ apiKey: 'k', refs: [], generateFn: gen })({ ...ARGS, klass: 'terrain' })
+    const content = calls[0]!.messages[0]!.content
+    expect(content.at(-1)!.image).toEqual(await encodePng(selfTile3x3(ARGS.sprite)))
+  })
   it('sends rubric text, then refs in order, then the palette card, then the checker card', async () => {
     const { calls, gen } = spy(scored(9))
     await makeVisionJudge({ apiKey: 'k', refs: REFS, generateFn: gen })(ARGS)

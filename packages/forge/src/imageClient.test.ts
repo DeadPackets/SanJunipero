@@ -14,13 +14,19 @@ function fakeFetch(
   handler: (model: string, body: Record<string, unknown>) => { status: number; json: unknown },
 ) {
   const calls: {
+    url: string
     model: string
     body: Record<string, unknown>
     signal: AbortSignal | null | undefined
   }[] = []
   const fn = (async (_url: string | URL | Request, init?: RequestInit) => {
     const body = JSON.parse(init!.body as string) as Record<string, unknown>
-    calls.push({ model: body.model as string, body, signal: init!.signal })
+    calls.push({
+      url: typeof _url === 'string' ? _url : _url instanceof URL ? _url.href : _url.url,
+      model: body.model as string,
+      body,
+      signal: init!.signal,
+    })
     const r = handler(body.model as string, body)
     return new Response(JSON.stringify(r.json), { status: r.status })
   }) as typeof fetch
@@ -30,6 +36,12 @@ function fakeFetch(
 const ok = { status: 200, json: { data: [{ b64_json: PNG_B64 }], usage: { cost: 0.045 } } }
 
 describe('makeImageClient', () => {
+  it('uses the dedicated image API and requests PNG bytes for the cutting pipeline', async () => {
+    const { fn, calls } = fakeFetch(() => ok)
+    await makeImageClient({ apiKey: 'k', fetchFn: fn }).generateCandidates('p', [], 1)
+    expect(calls[0]!.url).toBe('https://openrouter.ai/api/v1/images')
+    expect(calls[0]!.body.output_format).toBe('png')
+  })
   it('fires n parallel requests to the primary model and returns n candidates with cost', async () => {
     const { fn, calls } = fakeFetch(() => ok)
     const out = await makeImageClient({ apiKey: 'k', fetchFn: fn }).generateCandidates(

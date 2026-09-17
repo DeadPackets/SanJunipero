@@ -108,7 +108,7 @@ export function createForge(deps: {
       judge: deps.judge,
       ledger,
       config,
-      footprint,
+      footprint: material ? undefined : footprint,
       regenerate: draw,
     }).catch((err: unknown) => {
       if (err instanceof AnomalyStopError || err instanceof BudgetExceededError) throw err
@@ -135,7 +135,7 @@ export function createForge(deps: {
       class: klass,
       desc,
       kind,
-      footprint,
+      footprint: material ? { w: 1, h: 1 } : footprint,
       png,
       widthPx: target.w,
       heightPx: target.h,

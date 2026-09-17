@@ -3,6 +3,7 @@ import { generateText, Output, type LanguageModel } from 'ai'
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type { Footprint } from '@sj/shared'
 import { encodePng, type RawImage } from '../post/raw.js'
+import { selfTile3x3 } from '../terrainGen.js'
 import { DEFAULT_FORGE_CONFIG, type ForgeConfig } from '../forgeConfig.js'
 import {
   CRITERIA,
@@ -108,6 +109,15 @@ export function makeVisionJudge(opts: {
               image: await encodePng(checkerCard(a.sprite)),
               mediaType: 'image/png' as const,
             },
+            ...(!naFor.includes('tiling')
+              ? [
+                  {
+                    type: 'image' as const,
+                    image: await encodePng(selfTile3x3(a.sprite)),
+                    mediaType: 'image/png' as const,
+                  },
+                ]
+              : []),
           ],
         },
       ],

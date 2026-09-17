@@ -8,7 +8,7 @@ export const IMAGE_MODEL_FALLBACKS = [
 ] as const
 export const GEN_SIZE = 512
 export const EST_COST_PER_IMAGE = 0.045
-const ENDPOINT = 'https://openrouter.ai/api/v1/images/generations'
+const ENDPOINT = 'https://openrouter.ai/api/v1/images'
 /** Art is drawn one commission at a time: a hung provider must not hold up every later one. */
 const REQUEST_TIMEOUT_MS = 90_000
 
@@ -49,7 +49,7 @@ export function makeImageClient(opts: {
           model,
           prompt,
           size: `${GEN_SIZE}x${GEN_SIZE}`,
-          response_format: 'b64_json',
+          output_format: 'png',
           ...(refs.length
             ? {
                 input_references: refs.map((r) => ({
@@ -58,7 +58,6 @@ export function makeImageClient(opts: {
                 })),
               }
             : {}),
-          usage: { include: true },
         }),
       })
       if (!res.ok) throw new ImageGenError(model, res.status, await res.text())

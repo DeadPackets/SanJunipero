@@ -73,6 +73,23 @@ function scriptedJudge(scores: number[]): VisionJudgeFn {
 }
 
 describe('createForge().commission', () => {
+  it('keeps a rejected surface fallback independent of the building footprint', async () => {
+    const codex = new AssetCodex(openForgeDb(':memory:'))
+    const forge = createForge({
+      client: fakeClient(await goodPng(), []),
+      judge: scriptedJudge([2]),
+      codex,
+      refs: [],
+    })
+    const rec = await forge.commission(
+      'timber surface',
+      { w: 6, h: 5 },
+      'building',
+      'material:reading_room:wood',
+    )
+    expect(rec.status).toBe('placeholder')
+    expect(rec.footprint).toEqual({ w: 1, h: 1 })
+  })
   it('ships on first attempt when the eye passes, on ONE vision call', async () => {
     const codex = new AssetCodex(openForgeDb(':memory:'))
     const gens: number[] = []
