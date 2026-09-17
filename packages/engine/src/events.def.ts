@@ -1,5 +1,11 @@
 import { z } from 'zod'
-import { InvitationVerbSchema, PACES, TOWN_FACINGS, SceneMove } from '@sj/shared'
+import {
+  IndoorDestinationSchema,
+  InvitationVerbSchema,
+  PACES,
+  TOWN_FACINGS,
+  SceneMove,
+} from '@sj/shared'
 import { LAW_TEXT_MAX, LawPredicateSchema } from './lawShapes.js'
 
 export const TickAdvanced = z.object({}).strict()
@@ -260,6 +266,9 @@ export const AgentSlept = z
   .strict()
 // Sleep the body took, not the mind: a downed body passing out keeps its collapse bookkeeping.
 export const AgentPassedOut = z.object({ agentId: z.string() }).strict()
+export const IndoorDestinationChosen = z
+  .object({ agentId: z.string(), structureId: z.string(), destination: IndoorDestinationSchema })
+  .strict()
 export const AgentEntered = z.object({ agentId: z.string(), structureId: z.string() }).strict()
 // Places this body now knows of, whether its own eyes found them or another mouth named them.
 // The set only ever grows, so a repeat is harmless and an empty one is never emitted.

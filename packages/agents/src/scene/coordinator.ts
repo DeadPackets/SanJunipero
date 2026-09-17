@@ -1,3 +1,4 @@
+import { conversationContext } from '../prompt/prose.js'
 import { dayPhaseFromTick, MINUTES_PER_DAY, sanitizeSpokenText, STAKES_BY_KIND } from '@sj/shared'
 import { LAW_TABLED_DAYS, LAW_TEXT_MAX, type LawPredicate } from '@sj/engine'
 import type { EngineBridge, SubmitResult } from '../runtime/bridge.js'
@@ -397,6 +398,7 @@ export class SceneCoordinator {
         wrapUp: wrapUpDue(scene),
         tick,
         energy: this.#bridge.energyOf(agentId),
+        physicalContext: conversationContext(this.#bridge.perception(agentId)),
         mood: mind.mood?.() ?? '',
       })
     } catch (err) {

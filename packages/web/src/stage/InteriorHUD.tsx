@@ -1,12 +1,6 @@
 import { useRef, useState, useSyncExternalStore } from 'react'
-import {
-  DEFAULT_CONFIG,
-  isHearthKind,
-  kindWords,
-  roomCapacity,
-  structureTitle,
-  verbPhraseGerund,
-} from '@sj/shared'
+import { DEFAULT_CONFIG, isHearthKind, kindWords, roomCapacity, structureTitle } from '@sj/shared'
+import { roomStateOf } from '../ui/interiorModel.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { GameIcon, Portrait } from '../paper/game/shared.js'
 import { resolveAssetId } from '../render/textures.js'
@@ -74,18 +68,12 @@ export function InteriorHUD({
                 type="button"
                 key={a.id}
                 onClick={() => onPerson(a.id)}
-                aria-label={`${a.name}, ${a.asleep ? 'asleep' : a.activity ? verbPhraseGerund(a.activity.verb) : 'awake'}. Open profile`}
+                aria-label={`${a.name}, ${roomStateOf(a, state.agents)}. Open profile`}
               >
                 <Portrait store={store} id={a.id} size={36} />
                 <span>
                   <strong>{a.name}</strong>
-                  <span>
-                    {a.asleep
-                      ? 'Sleeping'
-                      : a.activity
-                        ? verbPhraseGerund(a.activity.verb)
-                        : 'Awake'}
-                  </span>
+                  <span>{roomStateOf(a, state.agents)}</span>
                 </span>
                 {a.asleep && <GameIcon kind="moon" />}
               </button>

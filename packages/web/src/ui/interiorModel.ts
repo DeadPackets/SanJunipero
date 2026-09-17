@@ -1,4 +1,11 @@
-import { type AssetRecord, agentName, kindWords, tickToMoment, verbPhraseGerund } from '@sj/shared'
+import {
+  type AssetRecord,
+  type IndoorDestination,
+  agentName,
+  kindWords,
+  tickToMoment,
+  verbPhraseGerund,
+} from '@sj/shared'
 import type { WorldState } from '@sj/engine/state'
 import { interiorOf } from '../render/interiors.js'
 import { resolveAssetId } from '../render/textures.js'
@@ -20,9 +27,23 @@ export const ROOM_STATE_IDLE = 'Between things'
 
 const sentenceCase = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1)
 
-export function roomStateOf(a: { asleep: boolean; activity: { verb: string } | null }): string {
+export function roomStateOf(
+  a: {
+    asleep: boolean
+    activity: { verb: string } | null
+    insideId?: string
+    indoorDestination?: IndoorDestination
+  },
+  residents?: Record<string, { name: string; alive: boolean; insideId?: string }>,
+): string {
   if (a.asleep) return ROOM_STATE_ASLEEP
-  return a.activity === null ? ROOM_STATE_IDLE : sentenceCase(verbPhraseGerund(a.activity.verb))
+  if (a.activity !== null) return sentenceCase(verbPhraseGerund(a.activity.verb))
+  const choice = a.indoorDestination
+  if (choice?.kind === 'beside') {
+    const person = residents?.[choice.targetId]
+    return person?.alive && person.insideId === a.insideId ? `Near ${person.name}` : ROOM_STATE_IDLE
+  }
+  return choice ? `By the ${choice.kind}` : ROOM_STATE_IDLE
 }
 
 export type Provenance = {
@@ -114,7 +135,7 @@ export function roomCard(
     .filter((id) => state.agents[id] !== undefined)
     .map((id): RoomPresence => {
       const a = state.agents[id]!
-      return { id, name: a.name, state: roomStateOf(a) }
+      return { id, name: a.name, state: roomStateOf(a, state.agents) }
     })
 
   return {

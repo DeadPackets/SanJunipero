@@ -1,5 +1,6 @@
 import {
   type BondLevel,
+  type IndoorDestination,
   bondLevel,
   dayPhaseFromTick,
   DAYS_PER_SEASON,
@@ -7,6 +8,7 @@ import {
   inputName,
   MINUTES_PER_DAY,
   heardLine,
+  verbPhraseGerund,
   type SimTime,
   type Pace,
 } from '@sj/shared'
@@ -171,7 +173,13 @@ export type PerceptionPacket = {
     activityToward?: { x: number; y: number }
     // The roof overhead. Absent under open sky, so an outdoor packet reads as it always did.
     // Whose it is rides with it; both absent on walls nobody owns.
-    inside?: { id: string; kind: string; yours?: true; ownerName?: string }
+    inside?: {
+      id: string
+      kind: string
+      yours?: true
+      ownerName?: string
+      destination?: IndoorDestination
+    }
     inventory: PerceptionItem[]
     // Your own things heaped on the ground by your own wall. Absent on a tidy doorstep.
     doorstep?: { kind: string; qty: number }[]
@@ -1308,8 +1316,20 @@ function affordanceLines(packet: PerceptionPacket): string[] {
         ? 'you can see no way back out'
         : `the doorway at (${door.x}, ${door.y}) is the way back out`
     lines.push(
-      `You are inside ${roofSaid(inside)} (${inside.id}). While you are in here you cannot walk anywhere or enter anything, and ${out}.`,
+      `You are inside ${roofSaid(inside)} (${inside.id}). While you are in here, outdoor walking and entering another building require stepping outside first. ${out.charAt(0).toUpperCase()}${out.slice(1)}.`,
     )
+    const room = packet.visible.structures.find((s) => s.id === inside.id)
+    const places = [
+      'table',
+      'storage',
+      ...(room?.bed ? ['bed'] : []),
+      ...(room?.hearth ? ['hearth'] : []),
+    ]
+    lines.push(
+      `Within this room you can move_inside using kind ${places.join(', ')}, or kind beside with the targetId of someone in this room. This changes where you stand; it does not start sleep or work.`,
+    )
+    const chosen = indoorChoiceLine(packet)
+    if (chosen) lines.push(chosen)
   }
 
   const atHand = new Set(packet.reach?.atHand ?? [])
@@ -1392,6 +1412,56 @@ const DOING_SAID: Readonly<Record<string, string>> = {
   teach: 'teaching',
   take: 'picking something up',
   stow: 'putting something away',
+  move_inside: 'moving to a place in the room',
+  walk: 'walking',
+  cook: 'cooking',
+}
+
+function indoorChoiceLine(packet: PerceptionPacket): string {
+  const destination = packet.self.inside?.destination
+  if (!destination) return ''
+  if (destination.kind !== 'beside')
+    return `Your chosen place in this room is by the ${destination.kind}.`
+  const target = packet.visible.agents.find((a) => a.id === destination.targetId)
+  return target
+    ? `Your chosen place is beside ${target.name}.`
+    : 'The person you chose to stand beside is no longer in the room.'
+}
+
+export function conversationContext(packet: PerceptionPacket): string {
+  const { self } = packet
+  const room = self.inside && packet.visible.structures.find((s) => s.id === self.inside!.id)
+  const place = self.inside
+    ? `You are inside ${room?.name ?? roofSaid(self.inside)}.`
+    : 'You are outdoors.'
+  const activity = self.asleep
+    ? 'You are asleep.'
+    : self.collapsed
+      ? 'You are collapsed.'
+      : self.activity
+        ? `You are currently ${DOING_SAID[self.activity] ?? verbPhraseGerund(self.activity)}. Speaking does not stop that activity.`
+        : 'You have no work underway.'
+  const conditions = self.body.injuries.map((i) => `${i.kind} injury`)
+  if (self.body.ill) conditions.push('illness')
+  for (const affliction of self.body.afflictions ?? [])
+    conditions.push(affliction.kind.replaceAll('_', ' '))
+  if (self.body.hp < 100 && conditions.length === 0) conditions.push('physical hurt')
+  const held = self.inventory.slice(0, 8)
+  return [
+    place,
+    indoorChoiceLine(packet),
+    activity,
+    conditions.length
+      ? `You have ${[...new Set(conditions)].join(' and ')}.`
+      : 'You have no injuries or illness.',
+    held.length
+      ? `You carry ${heldPhrase(held)}${self.inventory.length > 8 ? ', plus other belongings' : ''}.`
+      : 'You carry no items.',
+    room?.hearth ? `The hearth here is ${room.hearth}.` : '',
+    !self.inside ? `The weather is ${packet.weather.kind}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 export function perceptionToProse(

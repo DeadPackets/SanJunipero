@@ -8,6 +8,7 @@ import {
   T_WATER,
   sanitizeSpokenText,
   type InvitationVerb,
+  type IndoorDestination,
   type Pace,
   type SimConfig,
   type TileId,
@@ -111,6 +112,7 @@ export type AgentBody = {
   equipped?: { body?: string }
   tendedTick?: number // absent until first tended: keeps pre-health state hashes stable
   lastSpokeTick?: number // absent until first speech: keeps golden hashes stable
+  indoorDestination?: IndoorDestination
   insideId?: string // absent until first entry: keeps golden hashes stable
   // Every place this body has ever had in sight, sorted and only ever growing. Absent until
   // the first one comes into view, so a mind that has seen no building hashes as it always did.

@@ -42,6 +42,7 @@ const SPENT_VERBS: ReadonlySet<string> = new Set([
   ...DOWNED_VERBS,
   'drop',
   'enter',
+  'move_inside',
   'give',
   'stop',
   'stow',

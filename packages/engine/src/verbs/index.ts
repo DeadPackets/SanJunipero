@@ -66,6 +66,7 @@ import { buildTicks, buildableRecipe, craftRoutes, shortOf, type SeedRecipe } fr
 import { bindObjectParam, unbindObjectParam } from './objectParam.js'
 import {
   CITY_HEARTH_KIND,
+  IndoorDestinationSchema,
   MINUTES_PER_DAY,
   SPEECH_INPUT_MAX_CHARS,
   T_FARMLAND,
@@ -78,6 +79,8 @@ import {
   glowRadiusFor,
   isPaveable,
   isRoofedKind,
+  isBeddedKind,
+  isHearthKind,
   isWet,
   isWoody,
   nextDawnTick,
@@ -757,6 +760,48 @@ const enter: VerbDef = makeVerb({
     return [
       { type: 'agent_moved', payload: { id: agentId, x: door.x, y: door.y } },
       { type: 'agent_entered', payload: { agentId, structureId: p.structureId } },
+    ]
+  },
+})
+
+const moveInside: VerbDef = makeVerb({
+  kind: 'move_inside',
+  params: z
+    .object({
+      kind: z.enum(['bed', 'hearth', 'table', 'storage', 'beside']),
+      targetId: z.string().min(1).optional(),
+    })
+    .strict(),
+  takes: 'moment',
+  validate(state, config, agentId, params) {
+    const p = IndoorDestinationSchema.safeParse(params)
+    if (!p.success) return 'name bed, hearth, table, storage, or beside with the person you mean'
+    const a = state.agents[agentId]!
+    const room = a.insideId === undefined ? undefined : state.structures[a.insideId]
+    if (!room || room.stage !== 'complete') return 'you must be inside a standing building'
+    if (a.asleep || a.collapsedSinceTick !== null)
+      return 'you cannot stand and move around right now'
+    if (p.data.kind === 'bed' && !isBeddedKind(config, room.kind)) return 'there is no bed in here'
+    if (p.data.kind === 'hearth' && !isHearthKind(config, room.kind))
+      return 'there is no hearth in here'
+    if (p.data.kind === 'beside') {
+      const other = state.agents[p.data.targetId]
+      if (p.data.targetId === agentId) return 'you are already where you are'
+      if (!other?.alive || other.insideId !== room.id) return 'that person is not in this room'
+    }
+    return null
+  },
+  onComplete(state, config, agentId, params) {
+    if (moveInside.validate(state, config, agentId, params) !== null) return []
+    return [
+      {
+        type: 'indoor_destination_chosen',
+        payload: {
+          agentId,
+          structureId: state.agents[agentId]!.insideId,
+          destination: IndoorDestinationSchema.parse(params),
+        },
+      },
     ]
   },
 })
@@ -2791,6 +2836,7 @@ export const VERBS: Record<string, VerbDef> = {
   stop,
   enter,
   exit,
+  move_inside: moveInside,
   eat,
   tend,
   till,

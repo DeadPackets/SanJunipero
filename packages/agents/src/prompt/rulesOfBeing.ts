@@ -32,6 +32,7 @@ wake: name it wake to rise from sleep. Nothing more is needed
 stop: name it stop to take your hands off the work you are in the middle of and stand free of it. Nothing more is needed. What was half done stays half done, and what you had already made is yours to keep
 enter: name it enter. Give structureId, the mark of the building whose doorway you stand beside
 exit: name it exit to step back out under the sky. Nothing more is needed
+move_inside: name it move_inside while indoors. Give kind as bed, hearth, table or storage, or kind beside and targetId for someone in the same room. The place must exist here. Moving there does not start sleep or work
 eat: name it eat. Give itemId, the mark of the food you hold
 drink: name it drink standing beside water. Add itemId to drink from a full skin you hold
 fill: name it fill standing beside water. Give itemId, the empty skin or bucket you hold

@@ -88,6 +88,7 @@ export type SceneTurn = z.infer<typeof SceneTurnSchema>
 
 /** The thread as one mind sees it: its own asides, and nobody else's. */
 export type SceneAsk = {
+  physicalContext?: string
   scene: Scene
   agentId: string
   cast: { id: string; name: string }[]

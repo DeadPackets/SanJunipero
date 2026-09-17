@@ -1,3 +1,4 @@
+import type { IndoorDestination } from '@sj/shared'
 import {
   isBeddedKind,
   isHearthKind,
@@ -249,7 +250,13 @@ export type PerceivedGround = { wellTravelled: true }
 // The roof the body is standing under. Absent under open sky, so a packet from a town that
 // never went in reads exactly as it always did. Whose it is rides with it: courting is gated on
 // standing under a private roof of your own or theirs, and nothing else said whose this was.
-export type PerceivedInterior = { id: string; kind: string; yours?: true; ownerName?: string }
+export type PerceivedInterior = {
+  id: string
+  kind: string
+  yours?: true
+  ownerName?: string
+  destination?: IndoorDestination
+}
 
 // What the hands and the feet can act on from where the body stands, read off the verbs' own
 // tests so the prose and a refusal can never disagree about the same body.
@@ -1003,7 +1010,14 @@ export function composePerception(
       y: self.y,
       activity: self.activity?.verb ?? null,
       ...(toward === undefined ? {} : { activityToward: toward }),
-      ...(roof === undefined ? {} : { inside: whoseRoof(lens, roof) }),
+      ...(roof === undefined
+        ? {}
+        : {
+            inside: {
+              ...whoseRoof(lens, roof),
+              ...(self.indoorDestination ? { destination: self.indoorDestination } : {}),
+            },
+          }),
       inventory: perceiveInventory(lens),
       ...(doorstep === undefined ? {} : { doorstep }),
     },

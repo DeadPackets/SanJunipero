@@ -79,7 +79,7 @@ export function sceneWordUsual(voice: IdentityCore['voiceCard']): number {
 
 // CAPABILITIES tells every prompt to name an act. A scene line is not an act, and this is the
 // one place that has to say so.
-export const SCENE_ANSWER = `Your turn to talk. Your hands are not doing anything right now, so this is not an act.
+export const SCENE_ANSWER = `Your turn to talk. This answer supplies words, not a new physical action. Your current surroundings and activity are given below.
 
 Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off. What you say in the same answer is said before you go. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
 
@@ -283,6 +283,7 @@ export function sceneBlock(
   const want = voice.want?.() ?? null
   const parts = [
     SCENE_ANSWER,
+    ask.physicalContext ?? '',
     castLaw(voice.livingCast()),
     renderKnown(voice.known?.(rest.map((p) => p.name)) ?? []),
     renderTies(ask.ties, nameOf),

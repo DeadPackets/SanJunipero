@@ -188,7 +188,17 @@ export function createThreeInterior(
     for (let y = 0; y < map.h; y++)
       for (let x = 0; x < map.w; x++) {
         const key = y * map.w + x
-        if (map.blocked[key] || used.has(key)) continue
+        if (map.blocked[key]) continue
+        let occupied = false
+        for (const taken of used) {
+          const dx = x - (taken % map.w),
+            dy = y - Math.floor(taken / map.w)
+          if (dx * dx + dy * dy < 4) {
+            occupied = true
+            break
+          }
+        }
+        if (occupied) continue
         const p = point(x, y),
           delta = p.distanceToSquared(v)
         if (delta < dist) {
@@ -198,7 +208,12 @@ export function createThreeInterior(
       }
     return best ?? v.clone()
   }
-  const destination = (a: AgentBody, slot: number) => {
+  const destination = (
+    a: AgentBody,
+    slot: number,
+    occupants: AgentBody[],
+    beside = true,
+  ): Vector3 => {
     const room = model!
     if (a.asleep && room.beds.length) return room.beds[slot % room.beds.length]!.clone()
     const verb = a.activity?.verb ?? ''
@@ -206,6 +221,23 @@ export function createThreeInterior(
     if (verb === 'stoke' || verb === 'cook') return room.hearth.clone().add(new Vector3(0, 0, 1.35))
     if (verb === 'stow' || verb === 'take') return room.storage.clone().add(new Vector3(0, 0, 1))
     if (verb === 'craft' || verb === 'eat') return room.table.clone().add(new Vector3(1.2, 0, 0))
+    const chosen = a.indoorDestination
+    if (chosen?.kind === 'bed' && room.beds.length)
+      return room.beds[slot % Math.max(1, room.beds.length - room.bedrolls.length)]!.clone()
+        .setY(0)
+        .add(new Vector3(1, 0, 0))
+    if (chosen?.kind === 'hearth') return room.hearth.clone().add(new Vector3(0, 0, 1.35))
+    if (chosen?.kind === 'storage') return room.storage.clone().add(new Vector3(0, 0, 1))
+    if (chosen?.kind === 'table') return room.table.clone().add(new Vector3(1.2, 0, 0))
+    if (beside && chosen?.kind === 'beside') {
+      const other = occupants.find((person) => person.id === chosen.targetId)
+      if (other) {
+        const otherSlot = bodies.get(other.id)?.slot ?? occupants.indexOf(other)
+        return destination(other, otherSlot, occupants, false)
+          .setY(0)
+          .add(new Vector3(0.8, 0, 0.8))
+      }
+    }
     const places = [
       new Vector3(room.w * 0.04, 0, room.d * 0.24),
       new Vector3(room.w * 0.32, 0, -room.d * 0.05),
@@ -313,7 +345,7 @@ export function createThreeInterior(
           const taken = new Set([...bodies.values()].map((b) => b.slot))
           let slot = 0
           while (taken.has(slot)) slot++
-          const desired = destination(a, slot),
+          const desired = destination(a, slot, occupants),
             at = a.asleep ? desired : nearest(fresh ? desired : room.entry, used)
           body = {
             sprite: new Sprite(),
@@ -331,7 +363,7 @@ export function createThreeInterior(
         }
         const own = grid(body.goal)
         used.delete(own.y * map.w + own.x)
-        const wanted = destination(a, body.slot),
+        const wanted = destination(a, body.slot, occupants),
           goal = a.asleep ? wanted : nearest(wanted, used)
         if (goal.distanceToSquared(body.goal) > 0.02 || a.asleep !== body.sleeping) {
           if (a.asleep || body.sleeping || !moving) {

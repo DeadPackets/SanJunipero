@@ -39,6 +39,7 @@ import {
   AgentInjured,
   AgentMoved,
   AgentEntered,
+  IndoorDestinationChosen,
   PlacesSeen,
   AgentExited,
   AgentExpressed,
@@ -795,15 +796,25 @@ export function fold(
       // named for what put it down.
       return { ...state, agents: { ...state.agents, [p.agentId]: { ...a, asleep: true } } }
     }
+    case 'indoor_destination_chosen': {
+      const p = IndoorDestinationChosen.parse(event.payload)
+      const a = state.agents[p.agentId]
+      if (!a || a.insideId !== p.structureId) throw new Error('indoor destination outside its room')
+      return {
+        ...state,
+        agents: { ...state.agents, [p.agentId]: { ...a, indoorDestination: p.destination } },
+      }
+    }
     case 'agent_entered': {
       const p = AgentEntered.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_entered for unknown agent ${p.agentId}`)
       if (!state.structures[p.structureId])
         throw new Error(`agent_entered for unknown structure ${p.structureId}`)
+      const { indoorDestination: _destination, ...body } = a
       return {
         ...state,
-        agents: { ...state.agents, [p.agentId]: { ...a, insideId: p.structureId } },
+        agents: { ...state.agents, [p.agentId]: { ...body, insideId: p.structureId } },
       }
     }
     case 'places_seen': {
@@ -818,7 +829,7 @@ export function fold(
       const p = AgentExited.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_exited for unknown agent ${p.agentId}`)
-      const { insideId: _, ...body } = a
+      const { insideId: _, indoorDestination: _destination, ...body } = a
       return { ...state, agents: { ...state.agents, [p.agentId]: body } }
     }
     case 'agent_spoke': {
@@ -1021,7 +1032,7 @@ export function fold(
       const p = AgentDied.parse(event.payload)
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_died for unknown agent ${p.agentId}`)
-      const { insideId: _, ...body } = a
+      const { insideId: _, indoorDestination: _destination, ...body } = a
       return {
         ...state,
         agents: {
@@ -1071,7 +1082,7 @@ export function fold(
       const a = state.agents[p.agentId]
       if (!a) throw new Error(`agent_departed for unknown agent ${p.agentId}`)
       if (!a.alive) throw new Error(`agent_departed for a body already gone: ${p.agentId}`)
-      const { insideId: _, ...body } = a
+      const { insideId: _, indoorDestination: _destination, ...body } = a
       const items = Object.fromEntries(
         Object.entries(state.items).filter(
           ([, i]) => !(i.loc.t === 'agent' && i.loc.id === p.agentId),
