@@ -19,14 +19,17 @@
 .control-pod :is(.help-button,.thoughts-button,.sound-button):hover { background:#f8e7bf; }
 .control-pod .control-icon { width:28px; height:28px; }
 .control-pod .sound-cues { position:absolute; bottom:100%; left:0; width:230px; }
-.app .signpost { position:absolute; right:calc(var(--dock-w,0px) + max(16px,env(safe-area-inset-right))); bottom:max(16px,env(safe-area-inset-bottom)); width:310px; height:50px; }
+.app .signpost { position:absolute; right:calc(var(--dock-w,0px) + max(16px,env(safe-area-inset-right))); bottom:max(16px,env(safe-area-inset-bottom)); width:236px; height:50px; }
 .journal-frame { border-color:#ad9b7e; box-shadow:0 2px #8e7c6044; font-weight:400; }
-.journal-bottom { display:flex; align-items:center; padding:3px; }
-.journal-toggle { min-height:44px; padding:8px 10px; width:auto; flex:1; font-size:13px; white-space:nowrap; }
-.journal-chevron { margin-left:6px; }
-.pocket-toggle { display:flex; align-items:center; justify-content:center; gap:6px; min-width:86px; min-height:42px; background:#f8e7bf; border:0; border-radius:4px; padding:6px 9px; color:#785124; font:12px var(--font-body); cursor:pointer; }
-.pocket-toggle .sj-icon { width:22px; height:22px; }
-.pocket-toggle:hover,.pocket-toggle[aria-expanded=true] { background:#efdaaa; }
+.journal-bottom { display:flex; align-items:center; padding:3px; gap:3px; }
+.journal-toggle { min-height:44px; padding:8px 10px; width:auto; min-width:0; flex:1; border-radius:3px; font-size:13px; font-weight:600; white-space:nowrap; }
+.journal-toggle .sj-icon { width:22px; height:22px; flex:none; }
+.journal-chevron { margin-left:auto; font-size:14px; }
+.pocket-toggle { position:relative; display:grid; place-items:center; flex:none; width:44px; height:44px; background:transparent; border:0; border-radius:3px; padding:8px; color:#785124; cursor:pointer; }
+.pocket-toggle::before { content:''; position:absolute; left:-2px; top:10px; bottom:10px; width:1px; background:#d8cbb5; }
+.journal-frame .pocket-toggle .sj-icon { width:24px; height:24px; }
+.pocket-toggle:hover,.pocket-toggle[aria-expanded=true] { background:#f8e7bf; }
+.pocket-count { position:absolute; top:2px; right:1px; min-width:16px; height:16px; padding:0 3px; border:1px solid #fff6e9; border-radius:8px; background:#785124; color:#fff6e9; font:600 10px/14px var(--font-body); font-variant-numeric:tabular-nums; text-align:center; }
 .journal-pocket { position:absolute; bottom:calc(100% + 14px); right:0; width:380px; max-width:calc(100vw - 32px); max-height:calc(100dvh - 240px); overflow:auto; overscroll-behavior:contain; border:1px solid #ad9b7e; border-radius:8px; background:#fff6e9; box-shadow:0 3px #8e7c60; }
 .app .journal-pocket .story-strip { display:flex; flex-direction:column; align-items:stretch; gap:14px; width:auto; margin:0; padding:18px; min-height:0; border:0; box-shadow:none; }
 .journal-pocket .story-row { display:flex; flex-direction:column; }
@@ -81,9 +84,7 @@
 @media(max-width:600px) {
   .app:not([data-broadcast=on]) .day-bar.almanac { margin-right:12px; padding:10px 12px 6px; }
   .app:not([data-broadcast=on]) { --mark-inset:12px; }
-  .app .signpost { width:280px; right:12px; bottom:max(12px,env(safe-area-inset-bottom)); }
-  .journal-toggle { padding:8px; font-size:12px; }
-  .journal-bottom { gap:0; }
+  .app .signpost { width:236px; right:12px; bottom:max(12px,env(safe-area-inset-bottom)); }
   .control-pod { left:12px; bottom:76px; padding:3px; }
   .app:has(.pocket-toggle[aria-expanded=true], .journal-toggle[aria-expanded=true]) .control-pod { visibility:hidden; }
   .pixel-balloon { width:258px; font-size:14px; line-height:1.55; }

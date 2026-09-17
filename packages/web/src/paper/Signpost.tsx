@@ -24,6 +24,8 @@ export function Signpost({
   ref?: React.Ref<HTMLElement>
 }) {
   const threads = useSyncExternalStore(store.subscribe, store.threads, store.threads)
+  const storyCount = threads?.threads.length ?? 0
+  const storiesLabel = storyCount ? `Stories · ${storyCount} active` : 'Stories'
   const [pocket, setPocket] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const root = useRef<HTMLElement>(null)
@@ -118,22 +120,6 @@ export function Signpost({
         </div>
         <div className="journal-bottom">
           <button
-            type="button"
-            className="pocket-toggle"
-            ref={pocketToggle}
-            aria-expanded={pocket}
-            aria-controls="journal-pocket"
-            onClick={() => {
-              setPocket((v) => !v)
-              setExpanded(false)
-            }}
-          >
-            <GameIcon kind="chronicle" />
-            {threads === null
-              ? 'Stories'
-              : `${threads.threads.length} ${threads.threads.length === 1 ? 'story' : 'stories'}`}
-          </button>
-          <button
             ref={toggle}
             type="button"
             className="journal-toggle"
@@ -149,6 +135,26 @@ export function Signpost({
             <span className="journal-chevron" aria-hidden="true">
               ⌃
             </span>
+          </button>
+          <button
+            type="button"
+            className="pocket-toggle"
+            ref={pocketToggle}
+            aria-label={storiesLabel}
+            title={storiesLabel}
+            aria-expanded={pocket}
+            aria-controls="journal-pocket"
+            onClick={() => {
+              setPocket((v) => !v)
+              setExpanded(false)
+            }}
+          >
+            <GameIcon kind="chronicle" />
+            {storyCount > 0 && (
+              <span className="pocket-count" aria-hidden="true">
+                {storyCount > 99 ? '99+' : storyCount}
+              </span>
+            )}
           </button>
         </div>
       </div>
