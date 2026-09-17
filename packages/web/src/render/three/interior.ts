@@ -380,18 +380,25 @@ export function createThreeInterior(
         const g = grid(body.goal)
         used.add(g.y * map.w + g.x)
         let walking = false
-        const next = body.path[0]
-        if (next && moving) {
+        let remaining = moving ? dt * 1.6 : 0
+        while (body.path.length && remaining > 0.000001) {
+          const next = body.path[0]!
           const delta = next.clone().sub(body.at),
             length = delta.length()
-          if (length < dt * 1.6) {
+          if (length < 0.000001) {
             body.at.copy(next)
             body.path.shift()
-          } else {
-            body.at.addScaledVector(delta, (dt * 1.6) / length)
-            body.facing = facingFrom(delta.x, delta.z) ?? body.facing
-            walking = true
-            body.phase += dt * 5.5
+            continue
+          }
+          const distance = Math.min(length, remaining)
+          body.at.addScaledVector(delta, distance / length)
+          body.facing = facingFrom(delta.x, delta.z) ?? body.facing
+          walking = true
+          body.phase += (distance / 1.6) * 5.5
+          remaining -= distance
+          if (distance === length) {
+            body.at.copy(next)
+            body.path.shift()
           }
         }
         if (!walking && !a.asleep) {
