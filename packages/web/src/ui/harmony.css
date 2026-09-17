@@ -49,6 +49,7 @@
 .pixel-balloon p { display:grid; margin:0; padding:12px 16px 14px; overflow-wrap:anywhere; text-wrap:pretty; }
 .pixel-balloon p > span { grid-area:1/1; }
 .pixel-reserved { visibility:hidden; }
+.pixel-balloon[data-kind=thought] p { font-style:italic; }
 .pixel-balloon::before,.pixel-balloon::after { content:''; position:absolute; left:calc(var(--tail-x) - 9px); bottom:-18px; width:18px; height:18px; background:var(--tint-ink); clip-path:polygon(0 0,100% 0,100% 33%,67% 33%,67% 67%,34% 67%,34% 100%,0 100%); }
 .pixel-balloon::after { background:#fff8ed; width:12px; height:14px; bottom:-12px; left:calc(var(--tail-x) - 7px); }
 .pixel-balloon[data-below=true]::before { top:-18px; bottom:auto; rotate:180deg; }

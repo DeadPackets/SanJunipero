@@ -1,15 +1,17 @@
 import { agentName } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
-import { bubbleLife, createBubbleLayer, type BubbleLayer } from './bubbles.js'
+import { bubbleLife, type BubbleLayer } from './bubbles.js'
+import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
 import { screenAnchor } from '../stage/anchor.js'
 import { tintOf } from '../paper/game/shared.js'
 import icons from '../paper/game/assets/flat-icons.png'
 
-type Line = { agentId: string; text: string; sceneId: string | null }
+type Line = { agentId: string; text: string; sceneId: string | null; isThought: boolean }
 
 export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer {
-  const thoughts = createBubbleLayer(scene, store)
+  let graveTone = false
+  let viewer: ThoughtsSetting = 'shown'
   const root = document.createElement('div')
   root.className = 'pixel-speech-layer'
   root.setAttribute('aria-hidden', 'true')
@@ -72,21 +74,43 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     const foot = screenAnchor(scene.viewRect(), scene.getZoom(), at.sx, at.sy)
     return foot.onScreen ? { x: foot.x, y: foot.y - 40 * scene.getZoom(), footY: foot.y } : null
   }
+  const gateThoughts = () => {
+    if (!thoughtsHidden(graveTone, viewer)) return
+    queue = queue.filter((line) => !line.isThought)
+    if (active?.isThought) {
+      active = null
+      root.hidden = true
+    }
+  }
+  const spawn = (agentId: string, text: string, isThought: boolean) => {
+    if (!store.timeMoving() || !text.trim() || !anchor(agentId)) return
+    if (isThought && (thoughtsHidden(graveTone, viewer) || (active && !active.isThought))) return
+    const room = store.openScenes().find((s) => s.participants.includes(agentId))
+    const shot = store.shotScene()
+    if (shot?.open && room && shot.id !== room.id) return
+    if (isThought) {
+      if (queue.some((line) => !line.isThought)) return
+      queue = queue.filter((line) => line.agentId !== agentId)
+      if (active?.isThought && active.agentId === agentId) active = null
+    } else {
+      queue = queue.filter((line) => !line.isThought)
+      if (active?.isThought) active = null
+    }
+    queue.push({ agentId, text, sceneId: room?.id ?? null, isThought })
+    if (queue.length > 12) queue.shift()
+  }
   return {
-    spawnSpeech(agentId, text) {
-      if (!store.timeMoving() || !text.trim()) return
-      const room = store.openScenes().find((s) => s.participants.includes(agentId))
-      const shot = store.shotScene()
-      if (shot?.open && room && shot.id !== room.id) return
-      if (!anchor(agentId)) return
-      queue.push({ agentId, text, sceneId: room?.id ?? null })
-      if (queue.length > 12) queue.shift()
+    spawnSpeech: (agentId, text) => spawn(agentId, text, false),
+    spawnThought: (agentId, text) => spawn(agentId, text, true),
+    setSuppressed(value) {
+      graveTone = value
+      gateThoughts()
     },
-    spawnThought: thoughts.spawnThought,
-    setSuppressed: thoughts.setSuppressed,
-    setThoughts: thoughts.setThoughts,
+    setThoughts(value) {
+      viewer = value
+      gateThoughts()
+    },
     tick(now) {
-      thoughts.tick(now)
       const tick = store.getTick(),
         live = store.getMode().live
       if (tick < lastTick || live !== lastLive || !store.timeMoving()) clear()
@@ -99,7 +123,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       const shot = store.shotScene()
       if (
         active &&
-        (now - born > bubbleLife(active.text) ||
+        (now - born > bubbleLife(active.text, active.isThought) ||
           !anchor(active.agentId) ||
           (shot?.open && active.sceneId !== null && active.sceneId !== shot.id))
       )
@@ -111,7 +135,10 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
         active = queue.shift()!
         born = now
         typed = -1
-        name.textContent = agentName(store.getState()?.agents, active.agentId)
+        const speaker = agentName(store.getState()?.agents, active.agentId)
+        name.textContent = active.isThought ? `${speaker} · Thought` : speaker
+        balloon.dataset.kind = active.isThought ? 'thought' : 'speech'
+        ring.hidden = active.isThought
         reserved.textContent = active.text
         balloon.dataset.tint = tintOf(active.agentId)
         ring.dataset.tint = tintOf(active.agentId)
@@ -140,22 +167,24 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       balloon.dataset.below = String(below)
       balloon.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`
       balloon.style.setProperty('--tail-x', `${Math.max(16, Math.min(w - 16, at.x - x))}px`)
-      const n = reduced.matches
-        ? active.text.length
-        : Math.min(active.text.length, Math.floor((now - born) / 30))
+      const n =
+        reduced.matches || active.isThought
+          ? active.text.length
+          : Math.min(active.text.length, Math.floor((now - born) / 30))
       if (n !== typed) {
         written.textContent = active.text.slice(0, n)
         typed = n
       }
       ring.style.transform = `translate(${at.x}px,${at.footY}px)`
       const r =
-        reactId && reactScene === active.sceneId && now - reactAt < 2300 ? anchor(reactId) : null
+        !active.isThought && reactId && reactScene === active.sceneId && now - reactAt < 2300
+          ? anchor(reactId)
+          : null
       reaction.hidden = !r
       if (r) reaction.style.transform = `translate(${r.x - 16}px,${r.y - 42}px)`
     },
     destroy() {
       off()
-      thoughts.destroy()
       root.remove()
     },
   }
