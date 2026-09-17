@@ -115,13 +115,12 @@ export function Signpost({
         >
           <div className="journal-clip">
             <div className="journal-options">
-              {ARMS.map((arm, index) => (
+              {ARMS.map((arm) => (
                 <button
                   key={arm}
                   type="button"
                   className="journal-option"
                   data-arm={arm}
-                  style={{ '--order': index } as React.CSSProperties}
                   aria-expanded={open === arm}
                   aria-controls="paper"
                   onClick={() => {

@@ -20,13 +20,28 @@
   font: 600 13px/1.4 var(--font-body);
 }
 .journal-sections {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 280ms cubic-bezier(.2,.7,.2,1);
+  position: absolute;
+  bottom: calc(100% - 5px);
+  left: -1px;
+  right: -1px;
+  padding-bottom: 4px;
+  border: 1px solid;
+  border-color: inherit;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+  background: inherit;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(.2,.7,.2,1), visibility 0s 180ms;
 }
 .journal-frame[data-expanded=true] .journal-sections {
-  grid-template-rows: 1fr;
-  transition-duration: 320ms;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 240ms ease, transform 240ms cubic-bezier(.2,.7,.2,1), visibility 0s;
 }
 .journal-clip { min-height: 0; overflow: hidden; }
 .journal-options { display: flex; flex-direction: column; gap: 6px; padding: 9px 9px 10px; }
@@ -46,18 +61,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(7px);
-  transition: opacity 120ms, transform 200ms cubic-bezier(.2,.7,.2,1), box-shadow 120ms;
+  transition: box-shadow 120ms;
 }
 .journal-option[data-arm=chronicle] { --tab-color: #f8e7bf; --tab-ink: #785124; }
 .journal-option[data-arm=found] { --tab-color: #dce8c8; --tab-ink: #455b35; }
 .journal-option[data-arm=laws] { --tab-color: #e2e8f4; --tab-ink: #465f7d; }
-.journal-frame[data-expanded=true] .journal-option {
-  opacity: 1;
-  transform: translateY(0);
-  transition-delay: calc(var(--order) * 25ms);
-}
 .journal-option:hover, .journal-option[aria-expanded=true] {
   border-color: var(--tab-ink);
   box-shadow: inset 0 -2px var(--tab-ink);
@@ -175,7 +183,7 @@
   .drawer-handle, .drawer-sheet, .drawer-scrim { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .journal-sections, .journal-option, .journal-chevron, .journal-toggle, .journal-toggle::before,
+  .journal-sections, .journal-frame[data-expanded=true] .journal-sections, .journal-option, .journal-chevron, .journal-toggle, .journal-toggle::before,
   .help-button, .thoughts-button, .sound-button, .control-tip { transition: none; }
 }
 @media (forced-colors: active) {
