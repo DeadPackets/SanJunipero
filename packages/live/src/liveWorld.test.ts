@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
-import { FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
+import { EngineBridge, FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import {
   LlmClient,
   insertAlert,
@@ -1004,6 +1004,56 @@ it('cancels ordinary requests and waits for their cleanup before closing the led
   expect(ledgerOpen).toBe(true)
   expect(opsDb.open).toBe(false)
 }, 15_000)
+
+it('persists a conversation closure delivered during cancellation before closing the world', async () => {
+  const dir = tmp()
+  let lateClose: (() => void) | undefined
+  const closure = {
+    id: 'late-close',
+    summary: 'They agreed before the town stopped.',
+    participants: ['amara', 'omar'],
+    deltas: [],
+    closeReason: 'ended',
+  }
+  const announce = EngineBridge.prototype.announce
+  const spy = vi.spyOn(EngineBridge.prototype, 'announce').mockImplementation(function (
+    this: EngineBridge,
+    type,
+    payload,
+  ) {
+    lateClose = () => {
+      this.announce('scene_closed', closure)
+    }
+    announce.call(this, type, payload)
+  })
+  let published = false
+  try {
+    const { world } = await liveWorld({
+      dir,
+      makeClient: (db, _caller, id) => {
+        const client = fakeLlm(db, id ?? null, SILENT_TURN)
+        client.abort = () => {
+          if (published) return
+          published = true
+          queueMicrotask(() => {
+            lateClose?.()
+          })
+        }
+        return client
+      },
+    })
+    await run(world, 2)
+    const tick = world.loop.tick
+    await worlds.splice(worlds.indexOf(world), 1)[0]!.stop()
+    expect(eventsOf(dir, 'scene_closed')).toContainEqual(closure)
+    const resumed = await liveWorld({ dir })
+    expect(resumed.world.resumedAtTick).toBe(tick)
+    await run(resumed.world, 1)
+    expect(eventsOf(dir, 'scene_closed').filter((p) => p.id === 'late-close')).toHaveLength(1)
+  } finally {
+    spy.mockRestore()
+  }
+})
 
 describe("★ a mind's memory across a resume", () => {
   it('REFUSES a new day-0 town whose minds remember an older one', async () => {

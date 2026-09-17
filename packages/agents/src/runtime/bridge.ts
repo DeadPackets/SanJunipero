@@ -199,6 +199,7 @@ export class EngineBridge {
   readonly #simConfig: SimConfig
   readonly #recentWindowTicks: number
   #queue: QueuedSubmit[] = []
+  #drainedReason: string | null = null
   #announcements: { type: string; payload: Record<string, unknown> }[] = []
   #tickCallbacks: ((tick: number) => void)[] = []
   #window: SimEvent[] = []
@@ -270,6 +271,11 @@ export class EngineBridge {
   // an announcement, and a caller that has already changed the rulebook cannot be told "no".
   announce(type: string, payload: Record<string, unknown>): void {
     this.#announcements.push({ type, payload })
+  }
+
+  flushAnnouncements(): void {
+    this.#loop.commitEvents(this.#announcements)
+    this.#announcements = []
   }
 
   /** Who would hear this body speak from where it stands, itself excluded. The scene's own
@@ -397,6 +403,11 @@ export class EngineBridge {
     intent: Intent,
     onResult?: (result: SubmitResult) => void,
   ): Promise<SubmitResult> {
+    if (this.#drainedReason !== null) {
+      const result: SubmitResult = { ok: false, reason: this.#drainedReason }
+      onResult?.(result)
+      return Promise.resolve(result)
+    }
     return new Promise<SubmitResult>((resolve) => {
       this.#queue.push({ agentId, intent, onResult, resolve })
     })
@@ -405,6 +416,7 @@ export class EngineBridge {
   // Shutdown: a queued intent whose loop will never step again leaves its mind
   // awaiting a promise nobody will settle. Refuse them all, in world words.
   drain(reason = 'the moment passes'): number {
+    this.#drainedReason ??= reason
     const queue = this.#queue
     this.#queue = []
     for (const item of queue) this.#tell(item, { ok: false, reason })

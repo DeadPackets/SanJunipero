@@ -3101,6 +3101,51 @@ describe('★ the morning line names what this mind wants', () => {
 })
 
 describe('shutdown checkpoints', () => {
+  it('does not speak or replace its plan after stopping during a thought memory write', async () => {
+    const base = await FakeEmbedder.create()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    const embedder = {
+      embed: async (text: string): Promise<Float32Array> => {
+        if (text === 'I should say hello.') {
+          held = true
+          await gate
+        }
+        return base.embed(text)
+      },
+    }
+    const { runtime, loop, bridge } = await setup({
+      model: turnModel([
+        {
+          thought: 'I should say hello.',
+          importance: 4,
+          speech: 'Hello.',
+          plan: [{ verb: 'walk', params: { x: 9, y: 9 } }],
+        },
+      ]),
+      mindConfig: FAST_MIND,
+      embedder,
+    })
+    try {
+      await stepUntil(loop, () => held, 100)
+      expect(held).toBe(true)
+      runtime.stop()
+      bridge.drain()
+      const plan = runtime.snapshot().plan
+      release()
+      await flush()
+      expect(runtime.busy()).toBe(false)
+      expect(bridge.drain()).toBe(0)
+      expect(runtime.snapshot().plan).toEqual(plan)
+    } finally {
+      release()
+      await flush()
+    }
+  })
+
   it('preserves a queued plan when shutdown drains its unsent head', async () => {
     const { runtime, loop, bridge } = await setup({ model: turnModel([BENIGN_TURN]) })
     const snapshot = runtime.snapshot()

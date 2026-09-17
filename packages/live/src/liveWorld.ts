@@ -1171,6 +1171,7 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       )
       if (!settled)
         throw new Error('mind work did not settle after cancellation; databases remain open')
+      bridge?.flushAnnouncements()
       // The last plan each mind was halfway through, written at the tick it stopped rather
       // than at the last multiple of 48 — a clean shutdown should lose nothing at all.
       try {

@@ -99,6 +99,16 @@ export class TickLoop {
     }
   }
 
+  commitEvents(events: readonly { type: string; payload: unknown }[]): void {
+    this.#state = this.#store.transaction(() => {
+      let state = this.#state
+      for (const event of events) {
+        state = fold(state, this.#store.append(this.#tick, event.type, event.payload), this.#config)
+      }
+      return state
+    })
+  }
+
   step(): void {
     const prevTick = this.#tick
     const prevState = this.#state

@@ -274,6 +274,21 @@ function settledYet<T>(p: Promise<T>): Promise<T | typeof settled> {
 }
 
 describe('EngineBridge.drain (T23)', () => {
+  it('refuses late submissions after shutdown instead of leaving them pending', async () => {
+    const { bridge, step } = buildBridge()
+    bridge.drain('the town goes quiet')
+    const seen: unknown[] = []
+    const pending = bridge.submit(AGENT, { verb: 'walk', params: { x: 8, y: 3 } }, (r) =>
+      seen.push(r),
+    )
+    expect(await settledYet(pending)).not.toBe(settled)
+    expect(await pending).toEqual({ ok: false, reason: 'the town goes quiet' })
+    expect(seen).toEqual([{ ok: false, reason: 'the town goes quiet' }])
+    expect(bridge.drain()).toBe(0)
+    step()
+    expect(bridge.perception(AGENT).self.activity).toBeNull()
+  })
+
   it('a queued submit pends until the loop steps', async () => {
     const { bridge, step } = buildBridge()
     const p = bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
@@ -484,6 +499,42 @@ function announceHarness(world: TickHandler = () => {}): {
 const typesOf = (store: EventStore): string[] => store.readFrom(0).map((e: SimEvent) => e.type)
 
 describe('EngineBridge.announce — a fact with no verb to ride in on', () => {
+  it('flushes a late closure without advancing time or replaying it twice', () => {
+    const { store, loop, bridge, config, terrain } = announceHarness(() => {
+      throw new Error('shutdown must not run world systems')
+    })
+    bridge.announce('agent_moved', { id: AGENT, x: 4, y: 3 })
+    bridge.announce('scene_closed', {
+      id: 'last-talk',
+      summary: 'They agreed.',
+      deltas: [],
+      closeReason: 'ended',
+    })
+    bridge.flushAnnouncements()
+    expect(loop.tick).toBe(0)
+    expect(loop.state.agents[AGENT]!.x).toBe(4)
+    expect(typesOf(store)).toEqual(['agent_spawned', 'agent_moved', 'scene_closed'])
+    expect(stateHash(replayFromGenesis(store, config, terrain))).toBe(stateHash(loop.state))
+    bridge.flushAnnouncements()
+    expect(typesOf(store)).toHaveLength(3)
+  })
+
+  it('keeps the announcement batch and live state intact when a flush rolls back', () => {
+    const { store, loop, bridge } = announceHarness()
+    const before = stateHash(loop.state)
+    bridge.announce('agent_moved', { id: AGENT, x: 4, y: 3 })
+    bridge.announce('agent_moved', { id: 'missing', x: 5, y: 3 })
+    expect(() => {
+      bridge.flushAnnouncements()
+    }).toThrow(/unknown agent/)
+    expect(stateHash(loop.state)).toBe(before)
+    expect(typesOf(store)).toEqual(['agent_spawned'])
+    expect(() => {
+      bridge.flushAnnouncements()
+    }).toThrow(/unknown agent/)
+    expect(loop.tick).toBe(0)
+  })
+
   it('puts the announcement in the world log at the next tick', () => {
     const { store, loop, bridge } = announceHarness()
     bridge.announce(DISCOVERY_EVENT, {

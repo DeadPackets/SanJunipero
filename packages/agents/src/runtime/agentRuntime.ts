@@ -1627,6 +1627,7 @@ export class AgentRuntime {
       importance: turn.importance,
       tags: EMPTY_TAGS,
     })
+    if (!this.#started) return
     this.#onThought?.({
       tick,
       agentId: this.#agentId,
@@ -1654,6 +1655,8 @@ export class AgentRuntime {
     if (turn.speech) {
       const said: Intent = { verb: 'speak', params: { text: turn.speech } }
       this.#noteAccepted(said, await this.#bridge.submit(this.#agentId, said))
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can run during the await.
+      if (!this.#started) return
     }
 
     // Words given as speech and again as a speak act are one line, not two: r16 opened 6 of
@@ -1682,6 +1685,8 @@ export class AgentRuntime {
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can run during the action await.
+    if (!this.#started) return
     if (turn.plan) {
       const roster = this.#roster?.() ?? []
       this.#plan.queue = turn.plan.map((step) => asMinted(step, roster))
