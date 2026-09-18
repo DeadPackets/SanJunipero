@@ -34,7 +34,7 @@ import { BRIDGE_KIND, bridgeAt } from './path.js'
 import { claimInWorld, standingRects, townGroundOf, townWalkOf, townSquareOf } from './town.js'
 
 // The same declared fixture dial townGrowth.test.ts uses: a house takes four hours here instead
-// of two days. It changes how LONG a build takes and nothing whatever about WHERE it goes.
+// of four and a half days. It changes how LONG a build takes and nothing whatever about WHERE it goes.
 const HOUSE_TICKS = 240
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -122,7 +122,10 @@ function runTown(seed = 'far-bank'): Run {
 
       const decked = bridgeAt(loop.state, DECK.x, DECK.y)
       if (decked && bridgeTick === null) bridgeTick = tick
-      let claim = claimInWorld(loop.state, { along: 2, deep: 2 })
+      let claim = claimInWorld(loop.state, {
+        along: CFG.structures.recipes.house!.w,
+        deep: CFG.structures.recipes.house!.h,
+      })
       if (crossedTick === null && claim !== null && claim.site.x < GENESIS_RIVER_X)
         crossedTick = tick
 
@@ -132,11 +135,11 @@ function runTown(seed = 'far-bank'): Run {
         const wood = Object.values(loop.state.items)
           .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
           .reduce((s, i) => s + i.qty, 0)
-        if (wood < 10)
+        if (wood < CFG.structures.recipes.house!.inputs.wood!)
           emit('item_spawned', {
             id: `wood_${id}_${tick}`,
             kind: 'wood',
-            qty: 10,
+            qty: CFG.structures.recipes.house!.inputs.wood!,
             loc: { t: 'agent', id },
           })
 
@@ -158,7 +161,10 @@ function runTown(seed = 'far-bank'): Run {
           const b = submitIntent(loop.state, CFG, id, 'build', { kind: 'house' })
           if (!b.ok) continue
           for (const e of b.events) emit(e.type, e.payload)
-          claim = claimInWorld(loop.state, { along: 2, deep: 2 })
+          claim = claimInWorld(loop.state, {
+            along: CFG.structures.recipes.house!.w,
+            deep: CFG.structures.recipes.house!.h,
+          })
           continue
         }
         if (a.x === claim.door.x && a.y === claim.door.y) continue
@@ -262,13 +268,16 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
         ),
       ),
     }
-    const shut = claimInWorld(eastOnly, { along: 2, deep: 2 })
+    const shut = claimInWorld(eastOnly, {
+      along: CFG.structures.recipes.house!.w,
+      deep: CFG.structures.recipes.house!.h,
+    })
     expect(shut).not.toBeNull()
     expect(shut!.site.x, 'the far bank is offered with no deck standing').toBeGreaterThan(riverX)
     // …and with the deck back, the same world offers the west again.
     const open = claimInWorld(
       { ...eastOnly, structures: { ...eastOnly.structures, deck: decks[0]! } },
-      { along: 2, deep: 2 },
+      { along: CFG.structures.recipes.house!.w, deep: CFG.structures.recipes.house!.h },
     )
     expect(open!.site.x).toBeLessThan(riverX)
   })
@@ -337,7 +346,7 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     )
     // THE INVARIANT. Only these pairs the exhaustive survey is a claim about.
     expect(sp.latticeFloor).toBeGreaterThanOrEqual(latticeFloor().closest)
-    expect(latticeFloor().closest).toBeCloseTo(86.1626, 3)
+    expect(latticeFloor().closest).toBeCloseTo(76.4199, 3)
     // NOT THE INVARIANT, and it is a smaller number: the well and the fire pit, as ever.
     expect(sp.wholeTown).toBeCloseTo(73.7564, 3)
     expect(sp.wholeTown).toBeLessThan(sp.latticeFloor)
@@ -467,7 +476,7 @@ describe('★ a bridge opens the far bank, and the town grows across the water',
     expect(cutOff(reachedFromSquare(state)), 'a building nobody in town can walk to').toEqual([])
 
     // NOT VACUOUS, and it names the far bank: pull the deck out of the same finished world and
-    // exactly the six houses west of the channel fall out of the one piece.
+    // exactly the houses west of the channel fall out of the one piece.
     const withoutDeck: WorldState = {
       ...state,
       structures: Object.fromEntries(

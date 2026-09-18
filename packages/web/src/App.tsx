@@ -217,7 +217,7 @@ export function App() {
     if (agentId === null) return
     return onFirstSnapshot(store, () => {
       const name = store.getState()?.agents[agentId]?.name
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the address bar is the canvas's only way to name a pick; this mirrors it into the ring.
+
       if (name !== undefined) {
         setSubject({ id: agentId, kind: 'agent', name })
         if (route.insideId) setSheet({ page: 'person', tab: 'Now' })
@@ -283,12 +283,12 @@ export function App() {
     const id = route.insideId ?? null
     let applied = false
     const apply = () => {
-      if (applied || !store.getState()) return
+      if (applied || !store.getState()) return applied
       applied = true
       scene.interior?.setActive(id)
+      return true
     }
-    apply()
-    return applied ? undefined : store.subscribe(apply)
+    return apply() ? undefined : store.subscribe(apply)
   }, [scene, store, route.insideId])
 
   const onMoment = useCallback((id: number | null) => {
@@ -521,11 +521,20 @@ export function App() {
       )}
       {!route.broadcast && <LivingScene store={store} stage={stage} />}
       {route.broadcast && <SceneCard store={store} cast={shot.cast} sceneId={shot.sceneId} />}
-      {route.broadcast && <StoryStrip store={store} onChronicle={() => openPage('chronicle')} />}
+      {route.broadcast && (
+        <StoryStrip
+          store={store}
+          onChronicle={() => {
+            openPage('chronicle')
+          }}
+        />
+      )}
       {!route.broadcast && (
         <Keepsake
           store={store}
-          onOpen={(first) => openPage('chronicle', first ? 'Firsts' : 'Timeline')}
+          onOpen={(first) => {
+            openPage('chronicle', first ? 'Firsts' : 'Timeline')
+          }}
         />
       )}
       <LowerThird
@@ -549,7 +558,14 @@ export function App() {
         open={sheet?.page ?? null}
         onOpen={onArm}
         ref={signpostRef}
-        stories={<StoryStrip store={store} onChronicle={() => openPage('chronicle')} />}
+        stories={
+          <StoryStrip
+            store={store}
+            onChronicle={() => {
+              openPage('chronicle')
+            }}
+          />
+        }
         store={store}
       />
       <div className="control-pod" aria-label="Viewing controls">

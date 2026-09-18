@@ -24,7 +24,7 @@ const RECENT_EVENTS_CAP = 400
 type ViewMode = { live: true } | { live: false; replaying: boolean; tick: number }
 type Thought = { agentId: string; tick: number; text: string; importance: number }
 /** A provider call in flight, or one that has landed. The wire's own two words. */
-export type MindState = ServerMind['state']
+type MindState = ServerMind['state']
 /** The coordinator's scene as the frame states it. Named apart from `render/scene.ts`'s `Scene`,
  *  which is the Pixi handle and has nothing to do with this. */
 export type TownScene = ServerScene['scene']

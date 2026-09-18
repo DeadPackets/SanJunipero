@@ -69,7 +69,7 @@ describe('★ the fixture world must be asked for by name, never received by sil
     expect(DEV_MAP_HUMAN).toBe('showcase')
     expect(DEV_MAP_HUMAN).not.toBe(DEV_MAP_DEFAULT)
     // and the one env parse both entrypoints call reads the human one, with the fixture opt-IN
-    expect(CLI).toMatch(/SJ_MAP === 'scripted' \? 'scripted' : DEV_MAP_HUMAN/)
+    expect(CLI).toMatch(/SJ_MAP === 'scripted'\s*\? 'scripted'\s*: DEV_MAP_HUMAN/)
   })
 
   it('the two worlds really are different towns, and the fixture is the one with no art', () => {

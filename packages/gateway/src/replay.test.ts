@@ -8,7 +8,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { createGateway, type Gateway } from './server.js'
 import { frameText } from './http.js'
-import { connect, until } from './testutil.js'
+import { connect, nextFrame, until } from './testutil.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
@@ -71,7 +71,7 @@ describe('a replay replays', () => {
     const sock = await connect(gw.port)
     open.push(sock)
     const frames: string[] = []
-    const greeted = new Promise((r) => sock.once('message', r))
+    const greeted = nextFrame(sock)
     sock.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: null }))
     await greeted
     collect(sock, frames)

@@ -415,10 +415,9 @@ export const CITY_BED_KIND = 'bed'
 export const CITY_HEARTH_KIND = 'hearth'
 
 // (0, 2) written in three places is (0, 2) that drifts.
-const THE_BED: CityFurnishing = { kind: CITY_BED_KIND, slot: { x: 2, y: 1 } }
 const THE_HEARTH: CityFurnishing = { kind: CITY_HEARTH_KIND, slot: { x: 0, y: 2 } }
 /** Bed count is roomCapacity — the same floor(w*h/2) the ladder is priced on. A private kind
- *  lays one bed (a couple); a shared kind lays one per body. */
+ *  lays one double bed per two bodies; a shared kind lays one per body. */
 const bedRow = (count: number): CityFurnishing[] =>
   Array.from({ length: count }, (_, i) => ({ kind: CITY_BED_KIND, slot: { x: i, y: 0 } }))
 
@@ -432,7 +431,10 @@ const sharedDwelling = (kind: DwellingKind): CityFurnishing[] => {
   ]
 }
 const HOUSE_FURNISHINGS: CityFurnishing[] = [
-  THE_BED,
+  ...Array.from({ length: Math.ceil(roomCapacity(DWELLING_FOOTPRINTS.house) / 2) }, (_, i) => ({
+    kind: CITY_BED_KIND,
+    slot: { x: 2 + i, y: 1 },
+  })),
   THE_HEARTH,
   { kind: 'table', slot: { x: 1, y: 2 } },
   { kind: 'chair', slot: { x: 1, y: 1 } },

@@ -78,7 +78,9 @@ export function createThreeWorld(
   })
   root.prepend(renderer.domElement)
   view.app.canvas.style.position = 'relative'
-  const interior = createThreeInterior(view, store, renderer, callbacks.select)
+  const interior = createThreeInterior(view, store, renderer, (id) => {
+    callbacks.select(id)
+  })
   const scene = new ThreeScene()
   const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 1000)
   const terrain = createTerrain(scene)
@@ -140,9 +142,8 @@ export function createThreeWorld(
     for (const entry of structures.values())
       entry.group.traverse((object) => {
         if (!(object instanceof Mesh)) return
-        for (const material of Array.isArray(object.material)
-          ? object.material
-          : [object.material]) {
+        const mesh = object as Mesh
+        for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           if (!material.userData.solidOccluder || faded.has(material)) continue
           faded.set(material, material.opacity)
           material.opacity = 1

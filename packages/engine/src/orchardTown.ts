@@ -20,7 +20,7 @@ import {
 import { authoredOrigin, type WorldState } from './state.js'
 import { isPassable, pathCtx } from './path.js'
 
-export function orchardOrigin(state: WorldState): { x: number; y: number } {
+function orchardOrigin(state: WorldState): { x: number; y: number } {
   const origin = authoredOrigin(state)
   return { x: ORCHARD_ANCHOR.x - origin.x, y: ORCHARD_ANCHOR.y - origin.y }
 }
@@ -71,9 +71,8 @@ export function claimOrchardPlot(
   const pass = (x: number, y: number) => isPassable(state, x, y, ctx)
   const reachable = new Set<string>(),
     queue = [{ x: square.x, y: square.y }]
-  for (let n = 0; n < queue.length; n++) {
-    const p = queue[n]!,
-      k = orchardKey(p.x, p.y)
+  for (const p of queue) {
+    const k = orchardKey(p.x, p.y)
     if (reachable.has(k) || !pass(p.x, p.y)) continue
     reachable.add(k)
     for (const [dx, dy] of [
@@ -87,9 +86,8 @@ export function claimOrchardPlot(
   }
   const streets = new Set<string>(),
     streetQueue = [square]
-  for (let n = 0; n < streetQueue.length; n++) {
-    const p = streetQueue[n]!,
-      key = orchardKey(p.x, p.y),
+  for (const p of streetQueue) {
+    const key = orchardKey(p.x, p.y),
       tile = state.terrain[p.y]?.[p.x]
     if (
       streets.has(key) ||
@@ -197,9 +195,8 @@ function pathToStreet(
   const queue = [door],
     prev = new Map<string, string | null>([[orchardKey(door.x, door.y), null]])
   let end: string | null = null
-  for (let n = 0; n < queue.length; n++) {
-    const p = queue[n]!,
-      k = orchardKey(p.x, p.y)
+  for (const p of queue) {
+    const k = orchardKey(p.x, p.y)
     if (streets.has(k)) {
       end = k
       break
@@ -229,7 +226,7 @@ function pathToStreet(
   while (end !== null) {
     const [x, y] = end.split(',').map(Number)
     result.push({ x: x!, y: y! })
-    end = prev.get(end)!
+    end = prev.get(end) ?? null
   }
   if (plot.court.i !== 0 || plot.court.j !== 0)
     for (const p of orchardStreetTiles(plot.court.i, plot.court.j)) {

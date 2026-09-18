@@ -148,7 +148,12 @@ describe('★ THE DEV WORLD BUILDS — houses appear on plots the town claims', 
     )
     expect(seats.size).toBe(raised.length)
     // the claim still has somewhere to offer at the end, so the run did not stop for want of one
-    expect(claimInWorld(run.state, { along: 2, deep: 2 })).not.toBeNull()
+    expect(
+      claimInWorld(run.state, {
+        along: SHOWCASE_CONFIG.structures.recipes.house!.w,
+        deep: SHOWCASE_CONFIG.structures.recipes.house!.h,
+      }),
+    ).not.toBeNull()
   })
 
   it('★ and the town survives building — nobody worked themselves onto the ground', () => {
@@ -270,7 +275,10 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
         )
 
       const base = devGenesisState(cfg, devTerrain('showcase', RINGS), 'showcase', RINGS)
-      const claim = claimInWorld(base, { along: 2, deep: 2 })!
+      const claim = claimInWorld(base, {
+        along: SHOWCASE_CONFIG.structures.recipes.house!.w,
+        deep: SHOWCASE_CONFIG.structures.recipes.house!.h,
+      })!
       let s = body(body(base, 'a', claim.door), 'b', { x: claim.site.x - 1, y: claim.site.y - 1 })
       const r = submitIntent(s, cfg, 'a', 'build', { kind: 'house' })
       expect(r.ok, r.ok ? '' : r.reason).toBe(true)
@@ -287,7 +295,10 @@ describe('★ TWO MASONS RAISE ONE HOUSE, in the dev world, through a real TickL
 
     it('★ the DEFAULT walks away from a neighbour’s walls — this lane changed no default', () => {
       const s = twoAtOneSite()
-      const next = claimInWorld(s, { along: 2, deep: 2 })!
+      const next = claimInWorld(s, {
+        along: SHOWCASE_CONFIG.structures.recipes.house!.w,
+        deep: SHOWCASE_CONFIG.structures.recipes.house!.h,
+      })!
       expect(masonIntent(s, SHOWCASE_CONFIG, 'b')).toEqual({
         verb: 'walk',
         params: { x: next.door.x, y: next.door.y },

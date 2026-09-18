@@ -262,7 +262,7 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
 
   // ★ The same ruling, on the surface it was still broken on: the paper's day strip carried its
   // own `Return to now`, so a scrub with the sheet open put two of them on one frame.
-  it('★ stands ONE way back on the whole frame, the sheet open over it and all', async () => {
+  it('★ keeps the global way back while the Record explains its live-only view', async () => {
     const host = await mount(createElement(App))
     const store = world!
     townArrives(store)
@@ -270,12 +270,18 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
       store.applyServer({ t: 'scrubbed', reqId: 1, tick: DAY, state: store.getState() })
     })
     await act(async () => {
-      host.querySelector<HTMLElement>('.signpost-arm[data-arm="chronicle"]')!.click()
+      host.querySelector<HTMLElement>('.journal-option[data-arm="chronicle"]')!.click()
     })
     await act(async () => {
-      host.querySelector<HTMLElement>('#paper-tab-Record')!.click()
+      const record = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+        button.textContent.includes('Open the complete town record'),
+      )!
+      record.click()
     })
-    expect(host.querySelector('.day-strip'), 'the day strip never opened').not.toBeNull()
+    expect(host.querySelector('.sj-footnote')?.textContent).toContain(
+      'This extended record describes the present town',
+    )
+    expect(host.querySelector('.record-range')).toBeNull()
     const back = [...host.querySelectorAll('button')].filter((b) =>
       b.textContent.includes('Return to now'),
     )
@@ -292,8 +298,10 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
   // live cadence: above 2x a replayed conversation is unreadable, and 2x is not worth a control.
   it('★ offers no speed at all: the bubbles and the legs are tuned to the live cadence', () => {
     const html = bar(REPLAYING)
-    expect(html, 'the bar has no transport at all').toContain('day-bar-play')
-    expect(html.match(/<button/g), 'a second control stands beside the one').toHaveLength(1)
+    expect(html, 'the bar has no transport at all').toContain('almanac-control')
+    expect(html.match(/aria-label="Stop here"/g), 'the bar has one playback control').toHaveLength(
+      1,
+    )
     const said = [
       ...[...html.matchAll(/>([^<>]+)</g)].map((m) => m[1]!),
       ...[...html.matchAll(/aria-label="([^"]*)"/g)].map((m) => m[1]!),
@@ -329,7 +337,8 @@ describe('★ the cut is a thing in the town, and the day bar is its one control
 // ★ THE GLASS IS FED BY THE WORLD. The slot printed what the App handed it and nothing checked
 // that the App handed it the town's own minute: both ends were read off the source text instead.
 describe('★ what the App puts on the glass, driven by the world', () => {
-  it('★ the cue slot says what the town’s own events said', async () => {
+  it('★ the broadcast cue says what the town’s own events said', async () => {
+    window.history.replaceState(null, '', '/?broadcast=1')
     const host = await mount(createElement(App))
     const store = world!
     townArrives(store)
@@ -349,7 +358,8 @@ describe('★ what the App puts on the glass, driven by the world', () => {
     expect(host.querySelectorAll('.stage-cue-glyph'), 'the moment lost its mark').toHaveLength(1)
   })
 
-  it('★ the scene the shot is on stands on the glass once, off the one hold', async () => {
+  it('★ the broadcast scene stands on the glass once, off the one hold', async () => {
+    window.history.replaceState(null, '', '/?broadcast=1')
     const host = await mount(createElement(App))
     const store = world!
     townArrives(store)

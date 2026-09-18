@@ -13,9 +13,9 @@ import { WEATHER_DIAG, skyLevel } from './tints.js'
 // with lamps in it; the grass between the houses said nothing about the weather at all.
 
 export const FIREFLY_MAX = 90
-export const FIREFLY_COLOR = 0xf4e289 // the same warm token a lit window takes
+const FIREFLY_COLOR = 0xf4e289 // the same warm token a lit window takes
 export const FIREFLY_MAX_ALPHA = 0.7
-export const FIREFLY_PX = 2
+const FIREFLY_PX = 2
 /** world px of drift: a lantern's worth, so a firefly never leaves the tile it belongs to */
 const DRIFT_RX = 11
 const DRIFT_RY = 5

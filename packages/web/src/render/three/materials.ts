@@ -28,7 +28,9 @@ export function createMaterialLibrary() {
         pendingLoads.delete(cancel)
         resolve(texture)
       }
-      const cancel = () => finish(null)
+      const cancel = () => {
+        finish(null)
+      }
       pendingLoads.add(cancel)
       const attempt = (number: number) => {
         loader.load(
@@ -125,7 +127,9 @@ export function createMaterialLibrary() {
                   material.roughnessMap,
                   material.emissiveMap,
                 ]
-                material.color.setHex(material.userData.baseColorTint ?? 0xffffff)
+                material.color.setHex(
+                  (material.userData.baseColorTint as number | undefined) ?? 0xffffff,
+                )
                 material.normalScale.set(0.45, 0.45)
                 material.map = baseColor
                 material.normalMap = normal

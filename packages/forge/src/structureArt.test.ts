@@ -66,13 +66,17 @@ const CREATABLE = worldStructureKinds({
   extra: DEV_TOWN_KINDS,
 })
 
-/** Where a kind's UNTURNED mass is stated — `w` along the street, `h` into the block. A template
- *  instance states its TURNED ground, so it is un-turned by its own facing before it keys this. */
+// Sprite footprints record the original art scale. Three.js uses the wider physical structures.
 const untorn = (s: { w: number; h: number; facing: 'sw' | 'se' }) =>
   footprintFor({ w: s.w, h: s.h }, s.facing)
-const AUTHORITATIVE_FOOTPRINT = new Map<string, { w: number; h: number }>([
+const AUTHORED_FOOTPRINT = new Map<string, { w: number; h: number }>([
   ...TEMPLATE.structures.map((s) => [s.kind, untorn(s)] as const),
   ...Object.entries(RECIPES).map(([k, r]) => [k, { w: r.w, h: r.h }] as const),
+  ['house', { w: 2, h: 2 }],
+  ['cabin', { w: 2, h: 2 }],
+  ['cottage', { w: 3, h: 2 }],
+  ['farmhouse', { w: 4, h: 2 }],
+  ['storehouse', { w: 2, h: 2 }],
 ])
 
 describe('every kind the WORLD CAN CREATE has a cell, in every facing it can stand in', () => {
@@ -123,7 +127,7 @@ describe('every kind the WORLD CAN CREATE has a cell, in every facing it can sta
     }
     expect(
       [...byKind].filter(([, m]) => m.size > 1).map(([k]) => k),
-      'one kind, two masses — AUTHORITATIVE_FOOTPRINT would be last-instance-wins',
+      'one kind, two masses — AUTHORED_FOOTPRINT would be last-instance-wins',
     ).toEqual([])
   })
 
@@ -306,10 +310,10 @@ describe('the committed cells', () => {
     const img = await decodePng(c.png)
     // The mass is the UNTURNED one, so an SE cell is graded against it TURNED. Reading the mass
     // straight is what let `farmhouse-se` declare 4×2 while standing on 2×4.
-    const mass = AUTHORITATIVE_FOOTPRINT.get(c.kind)
+    const mass = AUTHORED_FOOTPRINT.get(c.kind)
     // the four dev-town kinds are asserted against TOWN_STRUCTURES in the gateway's own test
     if (mass !== undefined) {
-      expect(c.manifest.footprint, `${c.dir} declares the ground it does not stand on`).toEqual(
+      expect(c.manifest.footprint, `${c.dir} changed its authored sprite scale`).toEqual(
         footprintFor(mass, c.facing),
       )
     }

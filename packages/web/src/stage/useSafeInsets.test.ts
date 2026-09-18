@@ -22,8 +22,14 @@ describe('★ the chrome bands a bubble keeps out of', () => {
   })
 
   it('names the marks the sheet draws at the two edges', () => {
-    expect(TOP_BAND).toEqual(['.day-bar', '.signpost', '.stage-exit', '.stage-live'])
-    expect(BOTTOM_BAND).toEqual(['.stage-cue', '.lower-third'])
+    expect(TOP_BAND).toEqual([
+      '.day-bar',
+      '.signpost',
+      '.stage-exit',
+      '.stage-live',
+      '.interior-hud',
+    ])
+    expect(BOTTOM_BAND).toEqual(['.stage-cue', '.lower-third', '.signpost', '.keepsake'])
   })
 
   // ★ The way out of a room and the way back to now are the row under the band, and the frame

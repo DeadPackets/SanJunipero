@@ -711,8 +711,8 @@ describe('pipsFilled', () => {
 
   it('still fills across a default-length build, and never overfills', () => {
     expect(pipsFilled(0, BUILD_TICKS_FULL)).toBe(0)
-    expect(pipsFilled(1440, BUILD_TICKS_FULL)).toBe(2)
-    expect(pipsFilled(2880, BUILD_TICKS_FULL)).toBe(PIP_COUNT)
+    expect(pipsFilled(BUILD_TICKS_FULL / 2, BUILD_TICKS_FULL)).toBe(2)
+    expect(pipsFilled(BUILD_TICKS_FULL, BUILD_TICKS_FULL)).toBe(PIP_COUNT)
     expect(pipsFilled(99999, 240)).toBe(PIP_COUNT)
   })
 

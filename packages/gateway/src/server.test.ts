@@ -19,7 +19,7 @@ import { createGateway, type Gateway } from './server.js'
 import { ensureObserverTables, publishMind, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
-import { connect } from './testutil.js'
+import { connect, nextFrame as nextRaw, until } from './testutil.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 
@@ -39,14 +39,6 @@ function makeWorld(dbPath: string) {
     },
   })
   return { db, store, loop }
-}
-
-function nextRaw(sock: WebSocket): Promise<string> {
-  return new Promise((resolve) =>
-    sock.once('message', (d) => {
-      resolve(frameText(d))
-    }),
-  )
 }
 
 async function hello(sock: WebSocket): Promise<string> {
@@ -417,10 +409,16 @@ describe('★ the director frame', () => {
     await hello(sock)
     const frames: string[] = []
     collect(sock, frames)
+    const opened = nextRaw(sock)
     sock.send(JSON.stringify({ t: 'replay', from: 1, reqId: 1 }))
-    await wait(50)
-    for (let i = 0; i < 6; i++) gw.pump()
-    await wait(80)
+    expect(ServerMsg.parse(JSON.parse(await opened))).toMatchObject({ t: 'replaying', reqId: 1 })
+    await until(() => {
+      gw.pump()
+      return frames.some((frame) => {
+        const message = ServerMsg.parse(JSON.parse(frame))
+        return message.t === 'tick' && message.tick >= 7
+      })
+    }, 5_000)
     expect(frames.filter((f) => f.includes('"t":"director"'))).toEqual([])
   }, 20000)
 })

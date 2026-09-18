@@ -75,6 +75,7 @@ const TIER1 = [
   'wake',
   'stop',
   'enter',
+  'move_inside',
   'exit',
   'eat',
   'tend',
@@ -957,7 +958,12 @@ describe('night work: the choice is fuel or time, and it is theirs', () => {
     kit.forEach(([id, kind], i) => {
       s = fold(
         s,
-        ev(710 + i, 'item_spawned', { id, kind, qty: 20, loc: { t: 'agent', id: 'a1' } }),
+        ev(710 + i, 'item_spawned', {
+          id,
+          kind,
+          qty: kind === 'wood' ? config.structures.recipes.house!.inputs.wood! : 20,
+          loc: { t: 'agent', id: 'a1' },
+        }),
         config,
       )
     })

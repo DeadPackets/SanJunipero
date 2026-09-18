@@ -84,7 +84,7 @@ export function temperOf(total: number): string {
 
 /** What the day's hottest scene was made of, in the narrator's own five columns. The word is
  *  what a reader sees, the key never is. */
-export const HEAT_SPOKES = [
+const HEAT_SPOKES = [
   ['conflict', 'conflict'],
   ['novelty', 'novelty'],
   ['firsts', 'firsts'],

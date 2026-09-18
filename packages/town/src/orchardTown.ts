@@ -3,7 +3,7 @@ import { genesisTerrainAt } from '@sj/engine'
 import type { TileId } from '@sj/engine/state'
 import { devStructureId, type DevTown } from './devTown.js'
 
-export const ORCHARD_MARGIN = 18
+const ORCHARD_MARGIN = 18
 export const ORCHARD_DEV_ORIGIN = {
   x: ORCHARD_ANCHOR.x - ORCHARD_MARGIN,
   y: ORCHARD_ANCHOR.y - ORCHARD_MARGIN,

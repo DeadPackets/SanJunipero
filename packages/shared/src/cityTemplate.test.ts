@@ -537,12 +537,12 @@ describe('city structures', () => {
     expect(structures.some((s) => s.kind === 'standing_stone')).toBe(false)
   })
 
-  it('gives every home exactly one bed and one hearth', () => {
+  it('gives every home enough double beds for its capacity and one hearth', () => {
     for (const h of houses) {
       expect(
         h.furnishings.filter((f) => f.kind === CITY_BED_KIND),
         'bed',
-      ).toHaveLength(1)
+      ).toHaveLength(Math.ceil(roomCapacity(h) / 2))
       expect(
         h.furnishings.filter((f) => f.kind === CITY_HEARTH_KIND),
         'hearth',

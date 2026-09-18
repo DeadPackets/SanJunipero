@@ -55,7 +55,11 @@ export function LivingScene({ store, stage }: { store: WorldStore; stage: SceneS
       <dialog ref={dialog} className="living-transcript" aria-labelledby="living-transcript-title">
         <header>
           <GameIcon kind="chronicle" />
-          <h2 id="living-transcript-title">{scene.topic || 'A conversation in town'}</h2>
+          <h2 id="living-transcript-title">
+            {scene.topic === ''
+              ? 'A conversation in town'
+              : (scene.topic ?? 'A conversation in town')}
+          </h2>
           <button
             type="button"
             aria-label="Close conversation"

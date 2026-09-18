@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
+const CORNER = readFileSync(new URL('./corner-controls.css', import.meta.url), 'utf8')
+const ALMANAC = readFileSync(new URL('./almanac.css', import.meta.url), 'utf8')
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
   /\/\*[\s\S]*?\*\//g,
   '',
@@ -118,7 +120,7 @@ const QUIET_SITES = [
 
 // A thought must read as a different INK, not a thinner one, or its ratio is unknowable at the one
 // surface where the town is actually speaking.
-const DARK_QUIET_SITES = ['.day-bar-when', '.night-dreamt']
+const DARK_QUIET_SITES = ['.night-dreamt']
 
 /** Every paper the chrome paints quiet text on. */
 const PAPERS = ['cream', 'parchment', 'sand'] as const
@@ -159,15 +161,9 @@ const ROLES: Readonly<Record<string, readonly string[]>> = {
     ".discovery-leaf[aria-current='true']",
     ".room-door[aria-pressed='true']",
     '.playhead',
-    '.day-bar-cursor',
-    '.story-here',
   ],
   // how hot: the top of the stakes band, and the material cut for a mind's own working out
-  ember: [
-    ".stage-scene-stamp[data-stakes='hot']",
-    ".first-plate[data-material='ember']",
-    '.story-heat-fill',
-  ],
+  ember: [".stage-scene-stamp[data-stakes='hot']", ".first-plate[data-material='ember']"],
   // the step under it, so the band is one heat at two strengths
   'ember-pale': [".stage-scene-stamp[data-stakes='warm']"],
   // struck metal: the tier the town's own work is cut at
@@ -395,29 +391,24 @@ describe('C3, C4, C5 · three marks that were painted below their own floor', ()
   })
 })
 
-describe('C9 · the signpost arm, whose ground is a drawn plank and not a token', () => {
-  // Cream on the plank's own wood sampled at 2.13:1, and a halo smeared the glyphs; the label is
-  // deep ink painted on the wood instead — 7.66:1 idle, 5.46:1 pressed, sampled off the render.
-  it('paints the label in deep ink, with a cut edge and no ink halo', () => {
-    const body = ruleBody(CSS, '.signpost-arm')
-    expect(body).toMatch(/color:\s*var\(--deep\)/)
-    expect(body).toMatch(/text-shadow:\s*0 1px 0 var\(--honey-l\)/)
-    expect(body).not.toContain('-1px 0 0')
+describe('C9 · the Journal labels and focus ring remain legible', () => {
+  const pairs = [
+    ...CORNER.matchAll(/--tab-color:\s*(#[a-f0-9]{6});\s*--tab-ink:\s*(#[a-f0-9]{6})/g),
+  ]
+  it('clears AA for each colored Journal section', () => {
+    expect(pairs).toHaveLength(4)
+    for (const [, bg, fg] of pairs) expect(contrast(fg!, bg!)).toBeGreaterThanOrEqual(AA)
   })
-
-  // brightness(1.2) on the pressed arm took the label to 1.53:1 — the arm you are on was the
-  // least readable one on screen.
-  it('signals the open arm with a second plank, never with a filter', () => {
-    expect(CSS).not.toMatch(/\.signpost-arm[^{]*\{[^}]*filter:/)
-    expect(ruleBody(CSS, ".signpost-arm[aria-expanded='true']")).toContain('signpost-arm-on.webp')
+  it('marks the open section with a border as well as color', () => {
+    const body = ruleBody(CORNER, '.journal-option[aria-expanded=true]')
+    expect(body).toContain('border-color: var(--tab-ink)')
+    expect(body).toContain('box-shadow:')
+    expect(body).not.toContain('filter:')
   })
-
-  // The ring sits over whatever the town is: honey inside deep is 9.6:1 between its own two rings.
-  it('gives the focus ring its own ground', () => {
-    const body = ruleBody(CSS, '.signpost-arm:focus-visible')
-    expect(body).toMatch(/outline:\s*2px solid var\(--honey\)/)
-    expect(body).toMatch(/box-shadow:[^;]*var\(--deep\)/)
-    expect(contrast(T.honey!, T.deep!)).toBeGreaterThanOrEqual(3)
+  it('draws an inset focus ring on the paper and every section ground', () => {
+    expect(ruleBody(CORNER, '.journal-option:focus-visible')).toContain('outline-offset: -3px')
+    for (const bg of [T.cream!, ...pairs.map((p) => p[1]!)])
+      expect(contrast('#465f7d', bg)).toBeGreaterThanOrEqual(3)
   })
 })
 
@@ -425,11 +416,15 @@ describe('C6, C11, C12 · the sheet stops thinning colours it cannot measure', (
   // The clock used to ship at opacity 0 and wake for three seconds on a pointer move, so a
   // viewer who put the town on a tab and watched never saw the time, the season or LIVE at all.
   it('★ states the clock at full strength, and never thins it behind a hand', () => {
-    expect(ruleBody(CSS, '.day-bar-stamp')).toContain('color: var(--cream)')
-    expect(ruleBody(CSS, '.day-bar-day')).toContain('color: var(--cream)')
-    expect(ruleBody(CSS, '.day-bar-weather')).toContain('color: var(--cream)')
-    expect(ruleBody(CSS, '.day-bar-state')).toContain('color: var(--honey)')
-    expect(CSS).not.toMatch(/\.day-bar[\w-]*[^{]*\{[^}]*opacity:/)
+    for (const selector of ['.almanac-clock strong', '.almanac-day b', '.almanac-weather']) {
+      expect(ruleBody(ALMANAC, selector)).not.toMatch(/opacity:/)
+    }
+    for (const selector of ['.almanac', ".almanac[data-theme='dark']"]) {
+      const body = ruleBody(ALMANAC, selector)
+      const color = (name: string) => new RegExp(`--a-${name}:\\s*(#[a-f0-9]{6})`).exec(body)![1]!
+      expect(contrast(color('fg'), color('surface'))).toBeGreaterThanOrEqual(AA)
+      expect(contrast(color('quiet'), color('surface'))).toBeGreaterThanOrEqual(AA)
+    }
   })
 
   it('names the feed zebra as a computed composite rather than an alpha', () => {

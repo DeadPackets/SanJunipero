@@ -99,7 +99,8 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
   canvas.height = 256
   const ctx = canvas.getContext('2d')!
   const stone = s.kind === 'storehouse' || s.kind === 'shed'
-  const seed = [...s.id].reduce((v, c) => (v * 31 + c.charCodeAt(0)) >>> 0, 7)
+  let seed = 7
+  for (const c of s.id) seed = (seed * 31 + c.charCodeAt(0)) >>> 0
   const noise = (n: number) => {
     const v = Math.sin(n * 127.1 + seed) * 43758.5453
     return v - Math.floor(v)

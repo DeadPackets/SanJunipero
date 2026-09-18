@@ -30,8 +30,8 @@ import { submitIntent } from './intent.js'
 import { isAdjacentToRect } from './verbs/index.js'
 import { claimInWorld, standingRects, townGroundOf } from './town.js'
 
-// One declared fixture dial: a house takes four hours here instead of two days, so a town that
-// reaches ring 2 fits inside a test suite. buildTicks is read after the site is settled.
+// A house takes four hours here instead of four and a half days, so ring 2 fits inside a test.
+// buildTicks is read after the site is settled.
 const HOUSE_TICKS = 240
 const CFG: SimConfig = SimConfigSchema.parse({
   weather: { hourlyChangeChance: 0 },
@@ -108,18 +108,21 @@ function runTown(seed = 'claim-seam'): Run {
       }
       for (const e of worldTick(loop.state).events) emit(e.type, e.payload)
 
-      let claim = claimInWorld(loop.state, { along: 2, deep: 2 })
+      let claim = claimInWorld(loop.state, {
+        along: CFG.structures.recipes.house!.w,
+        deep: CFG.structures.recipes.house!.h,
+      })
       for (const id of ids) {
         const a = loop.state.agents[id]
         if (a === undefined || !a.alive || a.activity !== null) continue
         const wood = Object.values(loop.state.items)
           .filter((i) => i.kind === 'wood' && i.loc.t === 'agent' && i.loc.id === id)
           .reduce((s, i) => s + i.qty, 0)
-        if (wood < 10)
+        if (wood < CFG.structures.recipes.house!.inputs.wood!)
           emit('item_spawned', {
             id: `wood_${id}_${tick}`,
             kind: 'wood',
-            qty: 10,
+            qty: CFG.structures.recipes.house!.inputs.wood!,
             loc: { t: 'agent', id },
           })
         if (claim === null) continue
@@ -130,7 +133,10 @@ function runTown(seed = 'claim-seam'): Run {
             continue
           }
           for (const e of b.events) emit(e.type, e.payload)
-          claim = claimInWorld(loop.state, { along: 2, deep: 2 })
+          claim = claimInWorld(loop.state, {
+            along: CFG.structures.recipes.house!.w,
+            deep: CFG.structures.recipes.house!.h,
+          })
           continue
         }
         if (a.x === claim.door.x && a.y === claim.door.y) continue
@@ -249,12 +255,12 @@ describe('★ agents build until the town reaches ring 2, and everything in it i
     ).toEqual(['fire_pit', 'well'])
   })
 
-  // 86.1626 px is the exhaustive floor over 2 496 pairings of buildings ON PLOTS. The whole-town
+  // 76.4199 px is the exhaustive floor over 2 496 pairings of buildings ON PLOTS. The whole-town
   // minimum is smaller: the two 1x1 monuments stand in a square the lattice never platted.
   it('★ and no two PLOT-SEATED buildings are closer than the floor the grammar proved', () => {
     const sp = spacingOf(state, all)
     expect(sp.latticeFloor).toBeGreaterThanOrEqual(latticeFloor().closest)
-    expect(latticeFloor().closest).toBeCloseTo(86.1626, 3)
+    expect(latticeFloor().closest).toBeCloseTo(76.4199, 3)
     expect(sp.governed).toBe(all.length - 2)
   })
 

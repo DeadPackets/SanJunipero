@@ -1,6 +1,6 @@
 import type { Structure } from '@sj/engine/state'
 
-export const BODY_RADIUS = 0.7
+const BODY_RADIUS = 0.7
 
 export function clearBody(
   x: number,

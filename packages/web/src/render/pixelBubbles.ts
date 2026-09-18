@@ -100,8 +100,12 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     if (queue.length > 12) queue.shift()
   }
   return {
-    spawnSpeech: (agentId, text) => spawn(agentId, text, false),
-    spawnThought: (agentId, text) => spawn(agentId, text, true),
+    spawnSpeech: (agentId, text) => {
+      spawn(agentId, text, false)
+    },
+    spawnThought: (agentId, text) => {
+      spawn(agentId, text, true)
+    },
     setSuppressed(value) {
       graveTone = value
       gateThoughts()
@@ -143,7 +147,9 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
         written.textContent = ''
         balloon.dataset.tint = tintOf(active.agentId)
         ring.dataset.tint = tintOf(active.agentId)
-        balloon.getAnimations().forEach((animation) => animation.cancel())
+        balloon.getAnimations().forEach((animation) => {
+          animation.cancel()
+        })
         if (!reduced.matches)
           balloon.animate(
             [

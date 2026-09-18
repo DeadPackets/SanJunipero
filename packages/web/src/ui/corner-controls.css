@@ -192,3 +192,10 @@
   .control-off { color: Canvas; background: CanvasText; forced-color-adjust: none; }
   .control-tip { border: 1px solid CanvasText; }
 }
+
+.journal-option { transition-duration: 0s; }
+.journal-option:hover { transition-duration: var(--t-fast); }
+.journal-option:active { translate: 0 1px; box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .journal-option:hover, .journal-option:active { translate: none; transition: none; }
+}

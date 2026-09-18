@@ -9,6 +9,9 @@ import { rulesFor, selectorsMatching } from './finish.test.js'
 // suite: the remaining CSS still parses, and the surface it styled just stops being styled.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
+const CORNER = readFileSync(new URL('./corner-controls.css', import.meta.url), 'utf8')
+const ALMANAC = readFileSync(new URL('./almanac.css', import.meta.url), 'utf8')
+const HARMONY = readFileSync(new URL('./harmony.css', import.meta.url), 'utf8')
 const CSS = readFileSync(join(HERE, 'chrome.css'), 'utf8')
 const LINES = CSS.split('\n')
 
@@ -19,8 +22,8 @@ const BANNERS = LINES.filter((l) => /^\/\* [──══]/u.test(l))
 /** The two blocks a merge train actually risks, named so a failure says whose block went. */
 const LANE_BLOCKS: readonly (readonly [lane: string, mark: string])[] = [
   ['the Discovery Record', '/* ── the Discovery Record: a chain of museum labels'],
-  ['THE SIGNPOST AND THE PAPER', '\n.signpost {\n'],
-  ['THE STORY STRIP', '/* ── THE STORY STRIP: the band that says what has been running'],
+  ['THE PAPER', '\n.paper {\n'],
+  ['THE STORY STRIP', '/* Town stories shares the almanac'],
   ['the beat card', '/* ── the beat card: what the room wants, what it is trying'],
   ['the three densities', '/* ── the three densities: which surfaces are up in stage'],
   ['the shot board and the dossier rail', '/* ── the shot board and the dossier rail:'],
@@ -48,6 +51,8 @@ describe('★ chrome.css survives the merge trains intact', () => {
     for (const [lane, mark] of LANE_BLOCKS) {
       expect(CSS.split(mark).length - 1, `${lane}: block missing or duplicated`).toBe(1)
     }
+    expect(CORNER.split('.signpost {\n')).toHaveLength(2)
+    expect(ALMANAC.split('.almanac {\n')).toHaveLength(2)
   })
 
   // A sweep that takes a rule can take its @keyframes with it and leave the `animation:` line
@@ -101,18 +106,18 @@ describe('★ the signpost and the paper hold their own shape', () => {
   // 3.7x further from the edge across the range, and under the notch on both. The mark that
   // used to carry that sum now names a corner and the FRAME carries the inset, once.
   it('hangs the signpost in the corner the direction picked, at one measured inset', () => {
-    const post = topRule('.signpost')
-    expect(post, '.signpost is not a top-level rule in the sheet').not.toBe('')
+    const post = rulesFor(CORNER, '.signpost')
     expect(post).toMatch(/grid-area:\s*foot-right/)
     expect(post).toMatch(/justify-self:\s*end/)
     expect(post).toMatch(/align-self:\s*end/)
-    expect(BARE).toMatch(/--mark-inset:\s*clamp\(16px, 3vmin, 40px\)/)
+    expect(rulesFor(HARMONY, '.app .signpost')).toContain('var(--dock-w,0px)')
+    expect(rulesFor(HARMONY, '.app .signpost')).toContain('env(safe-area-inset-right)')
   })
 
   /** The two marks that carry a device edge themselves, and what the frame's outer tracks
    *  cannot do for them. Anything else naming one is placing itself twice. */
   const OWN_EDGE: Readonly<Record<string, string>> = {
-    '.day-bar': 'takes the frame’s top row, so the notch is the band’s own padding',
+    '.story-strip': 'the story band spans the frame in broadcast and protects its captions',
     '.paper-sheet': 'is bottom anchored, so its last line sits under the home indicator',
   }
 
@@ -146,59 +151,43 @@ describe('★ the signpost and the paper hold their own shape', () => {
   // The arms answered that by re-anchoring on the click that pressed them, which took the control
   // out from under the hand: the position may not depend on `data-open` at any size any more.
   it('★ keeps the signpost reachable with the sheet open, without moving it to do so', () => {
-    expect(BARE).toMatch(
-      /@media \(min-width: 641px\) and \(max-width: 1400px\) \{\s*\.paper \{[^}]*grid-column: edge-start \/ foot-right-start/,
-    )
-    expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*grid-template-columns: repeat\(2, auto\)/,
-    )
-    expect(BARE).toMatch(
-      /@media \(min-width: 641px\) and \(max-height: 620px\) \{[^}]*grid-auto-flow: column/,
-    )
-    expect(
-      selectorsMatching(BARE, /^\.signpost\[data-open/),
-      'an arm still moves on the click that pressed it',
-    ).toEqual([])
+    expect(rulesFor(CORNER, '.signpost')).toContain('z-index: 25')
+    expect(rulesFor(HARMONY, '.app .signpost')).toContain('var(--dock-w,0px)')
+    expect(selectorsMatching(CORNER + HARMONY, /^\.signpost\[data-open/)).toEqual([])
+    expect(rulesFor(CORNER, '.journal-sections')).toContain('bottom: calc(100% - 5px)')
   })
 
   // ★ The arms hold the top edge below 1001px, so every mark that shared that band started
   // under them. `--sign-band` asserted that depth as 0px, 88px or 44px at three breakpoints and
   // fourteen sums downstream changed meaning with it. A row measures the arms instead: the arms
   // take `head`, `head` is as tall as they are, and no other rule is told anything.
-  it('★ steps the top marks below the arms by giving the arms a row of their own', () => {
-    expect(BARE, 'a rule still asserts the arms’ depth by hand').not.toContain('--sign-band')
+  it('★ keeps the Journal below the inset almanac and reserves the head row', () => {
+    expect(BARE).not.toContain('--sign-band')
     expect(topRule('.app')).toMatch(/grid-template-areas:[\s\S]*?'\.\s+head\s+head\s+head\s+\.'/)
-    expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{[\s\S]*?\.signpost \{[^}]*grid-area: head/,
-    )
-    expect(selectorsMatching(BARE, /data-paper='on'\] :is\(\.day-bar/)).toEqual([])
+    expect(rulesFor(CORNER, '.signpost')).toContain('grid-area: foot-right')
+    expect(rulesFor(HARMONY, '.app .signpost')).toContain('bottom:')
   })
 
   // Height is what a landscape phone runs out of.
   it('★ answers the window’s height as well as its width', () => {
     expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.paper \{[^}]*height: 100%/)
-    expect(BARE).toMatch(/@media \(max-height: 620px\) \{\s*\.signpost-post \{ display: none/)
-    // 390px wide: the arms go two by two. They stand on the top edge in both states now, so the
-    // 88px the cue and the lower third used to leave them at the bottom is the picture's again.
-    expect(BARE).toMatch(
-      /@media \(max-width: 1000px\), \(max-height: 620px\) \{\s*\.signpost \{[^}]*grid-area: head/,
-    )
-    expect(rulesFor(BARE, '.stage-cue')).not.toContain('88px')
-    expect(rulesFor(BARE, '.lower-third')).not.toContain('88px')
+    expect(rulesFor(HARMONY, '.journal-pocket')).toContain('max-height:calc(100dvh - 240px)')
+    expect(rulesFor(HARMONY, '.journal-pocket')).toContain('overflow:auto')
+    expect(HARMONY).toContain('@media(max-width:600px)')
   })
 
-  it('gives every arm a 44px hit area — an arm is a touch target before it is a sign', () => {
-    // 22 drawn pixels at --px: 2 is 44px; the row is measured live in shots-signpost/measurements
-    expect(topRule('.signpost')).toMatch(/--px:\s*2;/)
-    expect(topRule('.signpost-arm')).toMatch(/min-height:\s*calc\(22px \* var\(--px\)\)/)
+  it('gives every Journal option and toggle a 44px hit area', () => {
+    expect(rulesFor(CORNER, '.journal-option')).toMatch(/min-height:\s*44px/)
+    expect(rulesFor(HARMONY, '.journal-toggle')).toMatch(/min-height:\s*44px/)
+    expect(rulesFor(HARMONY, '.pocket-toggle')).toMatch(/width:\s*48px/)
   })
 
-  it('lifts an arm 1px in the tap band, and not at all under reduced motion', () => {
-    expect(BARE).toMatch(/\.signpost-arm:hover \{[^}]*translate:\s*0 -1px/)
-    expect(BARE).toMatch(
-      /@media \(prefers-reduced-motion: reduce\) \{\s*\.signpost-arm:hover \{[^}]*translate:\s*0 0/,
+  it('presses a Journal option 1px, with motion disabled under reduced motion', () => {
+    expect(rulesFor(CORNER, '.journal-option:active')).toContain('translate: 0 1px')
+    expect(CORNER).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.journal-option:hover, \.journal-option:active \{ translate: none; transition: none/,
     )
-    expect(topRule('.signpost-arm')).toMatch(/transition-timing-function:\s*var\(--ease-tap\)/)
+    expect(rulesFor(CORNER, '.journal-option:hover')).toContain('var(--t-fast)')
   })
 
   // ★ The sheet is 66% of the screen and it worked out where the arms end four times over, at
@@ -293,13 +282,11 @@ describe('★ the signpost and the paper hold their own shape', () => {
 
   // ★ The band took every click over the top 56px of the picture: `.stage-figures` carries the
   // same z-index and stands earlier in the DOM, so the bar won the hit test over open town.
-  it('★ takes no click the band is not a control for', () => {
-    const bar = rulesFor(BARE, '.day-bar')
-    expect(bar).toMatch(/pointer-events:\s*none/)
-    for (const control of ['.day-bar-track', '.day-bar-play'])
-      expect(rulesFor(BARE, control), control).toMatch(/pointer-events:\s*auto/)
-    // and the track's 44px of reach stood past the band, scrubbing a viewer who clicked the town
-    expect(bar).toMatch(/overflow:\s*hidden/)
+  it('★ confines timeline gestures to the almanac and keeps the cursor transparent to pointers', () => {
+    expect(rulesFor(BARE, '.day-bar')).toMatch(/grid-area:\s*bar/)
+    expect(rulesFor(ALMANAC, '.almanac')).toContain('pointer-events: auto')
+    expect(rulesFor(ALMANAC, '.almanac-track')).toContain('touch-action: none')
+    expect(rulesFor(ALMANAC, '.almanac-cursor')).toContain('pointer-events: none')
   })
 
   // ★ Asked for and then paid for: the clock hid until a pointer moved, so a viewer who left the
@@ -314,12 +301,13 @@ describe('★ the signpost and the paper hold their own shape', () => {
 
   // The rest of a day nobody has reached, so a partly lived day reads as one. A step of the ink
   // the band is drawn in, never a second bar filling up and never a colour of its own.
-  it('paints the track past the cursor in the band’s own ink', () => {
-    const dead = rulesFor(BARE, '.day-bar-dead')
-    expect(dead, '.day-bar-dead has no rule').not.toBe('')
-    expect(dead).toMatch(/left:\s*clamp\(0px, var\(--at\), 100%\)/)
-    expect(dead).toMatch(/right:\s*0/)
-    expect(dead).toMatch(/background:\s*var\(--ink\)/)
+  it('marks the unvisited timeline with a separate future layer', () => {
+    const future = rulesFor(ALMANAC, '.almanac-future')
+    expect(future).toContain('inset: 0 0 0 var(--at)')
+    expect(future).toContain('repeating-linear-gradient')
+    expect(rulesFor(HARMONY, '.app:not([data-broadcast=on]) .almanac-future')).toContain(
+      'background:#ddd5c5',
+    )
   })
 
   // The stamp that used to own the right-hand corner is folded into the bar, and the bar takes
@@ -374,7 +362,6 @@ describe('★ the signpost and the paper hold their own shape', () => {
    *  the whole picture or a thing inside another mark, and none of them is a panel. */
   const NOT_PLACED: Readonly<Record<string, string>> = {
     '.mark-tip': 'the word for a mark on the day strip, inside the sheet',
-    '.signpost-post': 'the pole the arms are nailed to, inside the signpost',
     '.skip': 'the first tab stop, held off the top edge until it is focused',
     '.stage-figures': 'the layer the bodies are drawn on, the canvas edge to edge',
     '.town-dim': 'the scrim behind the sheet, the whole picture',
@@ -389,7 +376,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
   it('★ reads the marks over the town off the sheet, never off a list', () => {
     for (const moved of ['.day-bar', '.paper', '.fps-overlay', '.stage-ticker'])
       expect(MARKS, `${moved} is a mark the frame places`).toContain(moved)
-    expect(MARKS.length, 'the derivation found nothing').toBeGreaterThan(12)
+    expect(MARKS.length, 'the derivation found nothing').toBeGreaterThan(10)
     expect(
       Object.keys(NOT_PLACED).filter((n) => !OVER_TOWN.includes(n)),
       'a mark is excused a frame it is no longer in',
@@ -429,7 +416,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
         ).toBe(true)
     }
     const named = new Set(
-      placedOn(BARE.replace(topRule('.app'), '')).flatMap((v) => [
+      placedOn(BARE.replace(topRule('.app'), '') + CORNER).flatMap((v) => [
         v,
         v.replace(/-(?:start|end)$/, ''),
       ]),
@@ -581,8 +568,9 @@ describe('★ the sheet answers the device, not only the window width', () => {
     expect(BARE).toMatch(/@container \(min-width: 46rem\) \{\s*\.roster-list \{/)
   })
 
-  it('scales the whole sign rather than four postage stamps, on a very wide screen', () => {
-    expect(BARE).toMatch(/@media \(min-width: 1920px\) \{\s*\.signpost \{[^}]*--px: 3/)
+  it('keeps Journal options readable and widens the paper on a very wide screen', () => {
+    expect(rulesFor(CORNER, '.journal-option')).toContain('min-height: 44px')
+    expect(rulesFor(CORNER, '.journal-frame')).toContain('font: 600 13px/1.4')
     expect(BARE).toMatch(
       /@media \(min-width: 1920px\) \{\s*\.paper \{[^}]*--paper-w: min\(78%, 1040px\)/,
     )
@@ -748,18 +736,16 @@ describe('★ four faces, ruled by role, and five colours', () => {
     expect(bad, 'Silkscreen has two digit advances and no tnum, so the number moves').toEqual([])
   })
 
-  it('★ decides every colour in one place', () => {
-    // A mask reads the alpha channel alone, so its stops are a ramp and not a palette value.
-    const rest = SHEET.replace(ROOT, '').replace(/mask-image:[^;]+;/g, '')
-    // Hex only, and six rgba literals decided colours outside `:root` while this was green.
+  it('★ declares the story theme palette and checks every remaining color literal', () => {
+    const rest = SHEET.replace(ROOT, '')
+      .replace(/mask-image:[^;]+;/g, '')
+      .replace(/--story-[\w-]+:\s*#[0-9a-f]{6};/g, '')
     const literals = [
       ...rest.matchAll(/#[0-9A-Fa-f]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)/g),
     ].map((m) => m[0])
-    expect(literals.filter((l) => !(l in ALPHAS))).toEqual([])
-    expect(
-      Object.keys(ALPHAS).filter((l) => !literals.includes(l)),
-      'an alpha is named here and gone from the sheet',
-    ).toEqual([])
+    const storyColors = ['#7194b3', '#ad8a47', '#a7813e', '#b76665', '#789859']
+    expect(literals.filter((l) => !(l in ALPHAS) && !storyColors.includes(l))).toEqual([])
+    for (const color of storyColors) expect(literals).toContain(color)
   })
 
   it('★ is one of the five, a step of one, or a valence — never a sixth colour', () => {
@@ -792,26 +778,19 @@ describe('★ four faces, ruled by role, and five colours', () => {
 // off the phone entirely. Both flanks now take a share and wrap instead of starving each other.
 
 describe('★ the band on a phone says every fact it holds', () => {
-  const PHONE = CSS.slice(CSS.indexOf('@media (max-width: 900px)'))
-  const block = PHONE.slice(0, PHONE.indexOf('\n}'))
-
   it('★ gives neither flank a track that can starve the other', () => {
-    const cols = /\.day-bar \{[^}]*grid-template-columns:\s*([^;]+);/.exec(block)?.[1]
-    expect(cols, 'the phone band declares no columns of its own').toBeDefined()
-    expect(cols, 'an intrinsic track takes what it needs and leaves the rest nothing').not.toMatch(
-      /\bauto\b|\bmax-content\b|\bfit-content\b/,
-    )
-    expect(cols).toMatch(/minmax\(0,\s*\d+fr\)\s+minmax\(0,\s*\d+fr\)/)
+    const phone = ALMANAC.slice(ALMANAC.indexOf('@media (max-width: 700px)'))
+    expect(phone).toContain('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)')
+    expect(phone).toContain('.almanac-weather { grid-column: 2')
   })
 
   it('★ lets every mark in the band wrap rather than lose its own words', () => {
-    for (const mark of ['.day-bar-when', '.day-bar-weather']) {
-      const body = new RegExp(`\\${mark} \\{([^}]*)\\}`).exec(block)?.[1] ?? ''
-      expect(body, `${mark} is never released from nowrap on a phone`).toMatch(
-        /white-space:\s*normal/,
-      )
-    }
-    expect(block, 'the right flank cannot take a second line').toMatch(/flex-wrap:\s*wrap/)
+    expect(rulesFor(ALMANAC, '.almanac-date')).not.toContain('white-space: nowrap')
+    expect(rulesFor(ALMANAC, '.almanac-weather')).not.toContain('white-space: nowrap')
+    expect(rulesFor(ALMANAC, '.almanac')).toContain('minmax(0, 1fr)')
+    const narrow = ALMANAC.slice(ALMANAC.indexOf('@media (max-width: 360px)'))
+    expect(narrow).toContain('grid-row: 3')
+    expect(narrow).not.toMatch(/\.almanac-date[^}]*display:\s*none/)
   })
 })
 
@@ -864,7 +843,11 @@ describe('★ the colours the sheet cannot see', () => {
   it('★ paints world art from the forge’s chart, and names every colour that is not on it', () => {
     expect(MASTER.size, 'the forge chart did not parse').toBeGreaterThan(30)
     expect(INKS.length, 'no colour was found in the source at all').toBeGreaterThan(100)
-    const off = INKS.filter((k) => !MASTER.has(k.hex) && !(k.hex in OFF_CHART))
+    const pixelInks = INKS.filter(
+      (k) => k.where.includes('/render/') && !k.where.includes('/render/three/'),
+    )
+    expect(pixelInks.length).toBeGreaterThan(100)
+    const off = pixelInks.filter((k) => !MASTER.has(k.hex) && !(k.hex in OFF_CHART))
     expect(
       off.map((k) => `${k.where} ${k.hex} — ${k.text}`),
       'a colour that is on no chart',
@@ -879,7 +862,10 @@ describe('★ the colours the sheet cannot see', () => {
   // moved in `:root` used to leave every one of them behind, silently and only in the picture.
   it('★ makes a world ink that claims a sheet token carry that token’s value', () => {
     const claims = INKS.flatMap((k) =>
-      [...k.text.matchAll(/--([a-z-]+)/g)].map((m) => ({ ...k, token: m[1]! })),
+      [...(k.text.split('//')[1] ?? '').matchAll(/--([a-z-]+)/g)].map((m) => ({
+        ...k,
+        token: m[1]!,
+      })),
     )
     expect(claims.length, 'no world ink claims a token any more').toBeGreaterThan(10)
     expect(

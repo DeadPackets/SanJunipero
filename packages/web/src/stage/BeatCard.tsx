@@ -29,9 +29,9 @@ import {
 
 /** Head and shoulders at the size the story strip uses, so a face is the same face across the
  *  screen. */
-export const BEAT_BUST_PX = 26
+const BEAT_BUST_PX = 26
 /** As many busts as the card's own head row holds before it says the rest as a count. */
-export const BEAT_BUST_CAP = 4
+const BEAT_BUST_CAP = 4
 
 /** The ten moves as a person would say them. The move is the town's own record of what a line
  *  was doing; `none` is a line doing nothing, and gets no row rather than a made-up one. */
@@ -114,8 +114,8 @@ export function tryOf(said: Said | undefined, agents: NameIndex | undefined): st
   return word === null ? null : `${agentName(agents, said.agentId)} is ${word}`
 }
 
-export type BeatLabel = 'WANT' | 'TRY' | 'TURN'
-export type BeatRow = { label: BeatLabel; text: string }
+type BeatLabel = 'WANT' | 'TRY' | 'TURN'
+type BeatRow = { label: BeatLabel; text: string }
 
 export type BeatView = {
   kind: SceneKind

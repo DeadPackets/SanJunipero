@@ -78,7 +78,7 @@ export function skillOf(a: AgentBody): { words: string; icon: string } {
   return { words: `${kindWords(best[0])} · ${Math.round(best[1])} XP`, icon: iconOf(best[0]) }
 }
 export function iconOf(kind: string): string {
-  if (/fish/.test(kind)) return 'fish'
+  if (kind.includes('fish')) return 'fish'
   if (/build|structure|craft|tool/.test(kind)) return 'hammer'
   if (/harvest|plant|farm|forage|crop|weather/.test(kind)) return 'leaf'
   if (/sleep|rest|night|dream/.test(kind)) return 'moon'
@@ -96,7 +96,7 @@ export function tintOf(id: string): string {
 const listeners = new Set<() => void>()
 function readIds(key: string): string[] {
   try {
-    const value = JSON.parse(localStore()?.getItem(key) ?? '[]')
+    const value: unknown = JSON.parse(localStore()?.getItem(key) ?? '[]')
     return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
   } catch {
     return []
@@ -125,13 +125,14 @@ function save(key: 'following' | 'opened', ids: string[]) {
 export const markOpened = (id: string) => {
   if (!notebook.opened.includes(id)) save('opened', [...notebook.opened, id])
 }
-export const toggleFollowing = (id: string) =>
+const toggleFollowing = (id: string) => {
   save(
     'following',
     notebook.following.includes(id)
       ? notebook.following.filter((v) => v !== id)
       : [...notebook.following, id],
   )
+}
 export const useNotebook = () => useSyncExternalStore(subscribe, snapshot, snapshot)
 export function FollowStar({ id, name }: { id: string; name: string }) {
   const { following } = useNotebook()
@@ -142,7 +143,9 @@ export function FollowStar({ id, name }: { id: string; name: string }) {
       type="button"
       aria-pressed={on}
       aria-label={`${on ? 'Unfollow' : 'Follow'} ${name}`}
-      onClick={() => toggleFollowing(id)}
+      onClick={() => {
+        toggleFollowing(id)
+      }}
     >
       <GameIcon kind="star" />
     </button>
@@ -214,7 +217,9 @@ export function Search({
       <input
         type="search"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          onChange(e.target.value)
+        }}
         placeholder={placeholder}
         aria-label={placeholder}
       />

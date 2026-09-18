@@ -24,11 +24,16 @@ export function GameChronicle(props: PageProps) {
   const { following } = useNotebook()
   const [search, setSearch] = useState('')
   const [range, setRange] = useState('all')
-  const [selected, setSelected] = useState<ChronicleEntry | null>(null)
+  const [view, setView] = useState<{ tab: string; selected: ChronicleEntry | null }>({
+    tab,
+    selected: null,
+  })
+  if (view.tab !== tab) setView({ tab, selected: null })
+  const selected = view.tab === tab ? view.selected : null
+  const setSelected = (entry: ChronicleEntry | null): void => {
+    setView({ tab, selected: entry })
+  }
   const back = useRef<HTMLButtonElement>(null)
-  useEffect(() => {
-    setSelected(null)
-  }, [tab])
   useEffect(() => {
     if (selected) back.current?.focus()
   }, [selected])
@@ -43,7 +48,14 @@ export function GameChronicle(props: PageProps) {
   if (selected && selected.tick <= tick)
     return (
       <div>
-        <button ref={back} type="button" className="sj-back" onClick={() => setSelected(null)}>
+        <button
+          ref={back}
+          type="button"
+          className="sj-back"
+          onClick={() => {
+            setSelected(null)
+          }}
+        >
           ← Back to {tab === 'Timeline' ? 'timeline' : 'catch up'}
         </button>
         <header className="sj-event-head">
@@ -61,7 +73,9 @@ export function GameChronicle(props: PageProps) {
             <button
               type="button"
               key={id}
-              onClick={() => onSubject({ kind: 'agent', id, name: agentName(state?.agents, id) })}
+              onClick={() => {
+                onSubject({ kind: 'agent', id, name: agentName(state?.agents, id) })
+              }}
             >
               <Portrait store={store} id={id} size={32} />
               {agentName(state?.agents, id)}
@@ -75,11 +89,11 @@ export function GameChronicle(props: PageProps) {
         <button
           type="button"
           className="sj-primary"
-          onClick={() =>
+          onClick={() => {
             onPlay(
               pointPlay(selected.tick, store.liveEdge(), selected.label, selected.agentIds ?? []),
             )
-          }
+          }}
         >
           <GameIcon kind="compass" />
           Watch this moment →
@@ -123,7 +137,12 @@ export function GameChronicle(props: PageProps) {
         <div className="sj-tools">
           <label>
             Show{' '}
-            <select value={range} onChange={(e) => setRange(e.target.value)}>
+            <select
+              value={range}
+              onChange={(e) => {
+                setRange(e.target.value)
+              }}
+            >
               <option value="all">All recorded moments</option>
               <option value="today">Today</option>
               <option value="following">People I follow</option>
@@ -139,7 +158,13 @@ export function GameChronicle(props: PageProps) {
             {(i === 0 || tickToMoment(list[i - 1]!.tick).day !== tickToMoment(e.tick).day) && (
               <h3 className="sj-day">Day {tickToMoment(e.tick).day}</h3>
             )}
-            <button type="button" className="sj-event-button" onClick={() => setSelected(e)}>
+            <button
+              type="button"
+              className="sj-event-button"
+              onClick={() => {
+                setSelected(e)
+              }}
+            >
               <span className="sj-event-top">
                 <GameIcon kind={iconOf(e.type)} />
                 <span>
@@ -217,7 +242,9 @@ function Firsts({ store, onPlay }: PageProps) {
             type="button"
             className="sj-award"
             key={r.kind}
-            onClick={() => onPlay(pointPlay(r.tick, store.liveEdge(), r.label, r.agentIds))}
+            onClick={() => {
+              onPlay(pointPlay(r.tick, store.liveEdge(), r.label, r.agentIds))
+            }}
           >
             <GameIcon kind="medal" />
             <span className="sj-meta">{momentStamp(r.tick)}</span>

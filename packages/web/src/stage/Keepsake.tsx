@@ -101,7 +101,9 @@ export function Keepsake({
   useEffect(() => {
     if (!current || hover || focus || away) return
     const start = performance.now()
-    const timer = setTimeout(() => setQueue((was) => was.slice(1)), remaining.current)
+    const timer = setTimeout(() => {
+      setQueue((was) => was.slice(1))
+    }, remaining.current)
     return () => {
       clearTimeout(timer)
       remaining.current = Math.max(0, remaining.current - (performance.now() - start))
@@ -119,9 +121,15 @@ export function Keepsake({
       className="keepsake"
       data-quiet={current.quiet}
       aria-label="Town notice"
-      onPointerEnter={() => setHover(true)}
-      onPointerLeave={() => setHover(false)}
-      onFocus={() => setFocus(true)}
+      onPointerEnter={() => {
+        setHover(true)
+      }}
+      onPointerLeave={() => {
+        setHover(false)
+      }}
+      onFocus={() => {
+        setFocus(true)
+      }}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget)) setFocus(false)
       }}

@@ -114,6 +114,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   // The body's own bookkeeping, and the ledger's.
   'tick_advanced',
   'agent_moved',
+  'indoor_destination_chosen',
   'needs_changed',
   'needs_ticked',
   'hp_changed',

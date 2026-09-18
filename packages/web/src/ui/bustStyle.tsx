@@ -38,7 +38,7 @@ export function bustStyle(records: AssetRecord[], agentId: string, px: number): 
 }
 
 /** Head and shoulders at the plate's own size; the roster uses 48 and the stream frame 96. */
-export const BUST_PX = 40
+const BUST_PX = 40
 
 /** The head and shoulders off the town's own atlas, or the pixel token where a person has no
  *  art yet. `alt=""` on purpose: the name is printed beside it. */

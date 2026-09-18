@@ -2,8 +2,8 @@ import type { WorldState } from '@sj/engine/state'
 import { parseMaterialSetManifest, type AssetRecord } from '@sj/shared'
 import * as THREE from 'three'
 
-export const TERRAIN_CHUNK_SIZE = 16
-export const TERRAIN_PIXELS_PER_TILE = 24
+const TERRAIN_CHUNK_SIZE = 16
+const TERRAIN_PIXELS_PER_TILE = 24
 const COLORS = [
   0x87945c, 0x9d8767, 0x658b8b, 0x768951, 0x979486, 0xc4b48c, 0x806546, 0xb3a38a, 0xa58f6f,
   0x84945b, 0x658b8b,
@@ -41,7 +41,7 @@ type Chunk = {
   textures: THREE.DataTexture[]
 }
 
-export function terrainFootprints(state: WorldState): Set<string> {
+function terrainFootprints(state: WorldState): Set<string> {
   const occupied = new Set<string>()
   for (const s of Object.values(state.structures)) {
     for (let y = s.y; y < s.y + s.h; y++) {
@@ -51,7 +51,7 @@ export function terrainFootprints(state: WorldState): Set<string> {
   return occupied
 }
 
-export function terrainChunkSignature(
+function terrainChunkSignature(
   state: WorldState,
   x0: number,
   y0: number,

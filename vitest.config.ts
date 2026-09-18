@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
+    setupFiles: ['./tests/browserStorage.js'],
     include: ['packages/*/src/**/*.test.ts', 'packages/*/scripts/**/*.test.ts'],
     testTimeout: 30000,
     hookTimeout: 30000,

@@ -12,12 +12,12 @@ export const BLOOM_SCALE = 0.25
 export const BLOOM_THRESHOLD = 0.26
 /** How far over the threshold a light is fully bloomed. A fire always is, a window breathes in
  *  and out of it, and that breath is the tell that somebody is awake behind the glass. */
-export const BLOOM_KNEE = 0.2
+const BLOOM_KNEE = 0.2
 /** Screened back over the frame. */
 export const BLOOM_STRENGTH = 0.55
 /** The glow's reach. `uInputSize` is in CSS pixels whatever the buffer scale, so this is 10 of
  *  them, a third of a tile. */
-export const BLOOM_RADIUS_TEXELS = 10
+const BLOOM_RADIUS_TEXELS = 10
 /** Samples over the disc. Measured at 1, 7 and 13 fetches the tap count moved the pass by less
  *  than the box's own noise, so the reach is bought with taps rather than with a bigger buffer. */
 export const BLOOM_TAPS = 16

@@ -100,9 +100,9 @@ export function GameRule(props: PageProps) {
               type="button"
               className="sj-award sj-rule-award"
               key={m.key}
-              onClick={() =>
+              onClick={() => {
                 onPlay(pointPlay(m.tick, store.liveEdge(), m.title, [m.law.proposedBy]))
-              }
+              }}
             >
               <GameIcon kind="medal" />
               <span className="sj-meta">{momentStamp(m.tick)}</span>
@@ -154,9 +154,9 @@ export function GameRule(props: PageProps) {
                 <button
                   className="sj-link"
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
                     onPlay(pointPlay(l.ratifiedTick, store.liveEdge(), l.text, [l.proposedBy]))
-                  }
+                  }}
                 >
                   Watch the agreement →
                 </button>

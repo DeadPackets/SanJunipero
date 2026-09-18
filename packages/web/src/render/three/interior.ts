@@ -126,7 +126,7 @@ export function createThreeInterior(
     const s = id === null ? null : store.getState()?.structures[id]
     if (
       id !== null &&
-      (!s || s.stage !== 'complete' || !isRoofedKind(store.getConfig() ?? DEFAULT_CONFIG, s.kind))
+      (s?.stage !== 'complete' || !isRoofedKind(store.getConfig() ?? DEFAULT_CONFIG, s.kind))
     )
       return
     if (active === id) return
@@ -173,7 +173,7 @@ export function createThreeInterior(
     )
     ray.setFromCamera(pointers, camera)
     const hit = ray.intersectObjects(people.pickables(), false)[0]
-    if (hit) select(String(hit.object.userData.pick.id))
+    if (hit) select((hit.object.userData.pick as { kind: 'agent'; id: string }).id)
   }
   view.app.stage.on('pointertap', pick)
   const grid = (v: Vector3) => ({
@@ -283,7 +283,7 @@ export function createThreeInterior(
       if (active === null || destroyed) return false
       const state = store.getState(),
         s = state?.structures[active]
-      if (!state || !s || s.stage !== 'complete') {
+      if (!state || s?.stage !== 'complete') {
         setActive(null)
         return false
       }

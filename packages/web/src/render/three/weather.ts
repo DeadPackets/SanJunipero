@@ -120,8 +120,8 @@ export function createThreeWeather(scene: Scene, view: TownView) {
     setSuppressed(value) {
       suppressed = value
     },
-    tick() {},
-    destroy() {},
+    tick: () => undefined,
+    destroy: () => undefined,
   }
   return {
     controls,

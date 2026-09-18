@@ -44,8 +44,8 @@ describe('★ clicking a chronicle line plays the moment, it does not freeze on 
   })
 
   it('★ every way into the past but the drag is a play', () => {
-    for (const page of ['Chronicle', 'Moments', 'Found', 'Days']) {
-      const s = src(`../paper/pages/${page}.tsx`)
+    for (const page of ['pages/Chronicle', 'pages/Moments', 'game/Land', 'pages/Days']) {
+      const s = src(`../paper/${page}.tsx`)
       expect(s, page).toContain('onPlay')
       expect(s, page).not.toContain('onJump')
     }

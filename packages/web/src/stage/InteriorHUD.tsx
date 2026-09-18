@@ -67,7 +67,9 @@ export function InteriorHUD({
               <button
                 type="button"
                 key={a.id}
-                onClick={() => onPerson(a.id)}
+                onClick={() => {
+                  onPerson(a.id)
+                }}
                 aria-label={`${a.name}, ${roomStateOf(a, state.agents)}. Open profile`}
               >
                 <Portrait store={store} id={a.id} size={36} />
@@ -87,7 +89,9 @@ export function InteriorHUD({
           aria-expanded={contents}
           aria-label={`Belongings, ${items.reduce((sum, item) => sum + item.qty, 0)} items`}
           aria-controls="interior-contents"
-          onClick={() => setContents((v) => !v)}
+          onClick={() => {
+            setContents((v) => !v)
+          }}
         >
           <GameIcon kind="note" />
           <span>Belongings</span>
@@ -100,7 +104,13 @@ export function InteriorHUD({
             <h3>
               <GameIcon kind="note" /> Belongings
             </h3>
-            <button type="button" aria-label="Close belongings" onClick={() => setContents(false)}>
+            <button
+              type="button"
+              aria-label="Close belongings"
+              onClick={() => {
+                setContents(false)
+              }}
+            >
               ×
             </button>
           </div>

@@ -23,7 +23,7 @@ import { skyLevel } from './tints.js'
 
 export const POOL_COLOR = 0xf7a66b // MASTER_PALETTE: the one warm-light token
 export const GLOW_COLOR = 0xf4e289
-export const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
+const POOL_TEX_R = 64 // the radial texture's own radius, in texture px
 
 /** Measured: at 0.44 a pair of posts washed the cottage wall behind them to (255,255,255);
  *  0.32 keeps it under 0.9. */
@@ -33,8 +33,8 @@ export const GLOW_BASE_ALPHA = 0.3
 export const BLOOM_ALPHA = 0.22
 export const FIRE_ALPHA = 0.62
 /** world px: a lamp head's halo, and the halo of a lit window */
-export const BLOOM_R = 22
-export const WINDOW_R = 16
+const BLOOM_R = 22
+const WINDOW_R = 16
 
 /** The cabin is the one house whose art names its window; its own point, as a fraction of the
  *  painted cell, is the height every other hearth house is lit at. */
@@ -117,7 +117,7 @@ function poolTexture(scene: Scene): Texture {
 }
 
 /** Drawn about the flame point, which sits in the middle cell. */
-export const FLAME_CELLS: readonly [number, number, number, number][] = [
+const FLAME_CELLS: readonly [number, number, number, number][] = [
   [-3, 4, 6, 4],
   [-4, 0, 8, 5],
   [-3, -4, 6, 4],

@@ -23,9 +23,6 @@ export const PAGE_TITLE: Readonly<Record<PageKey, string>> = {
 
 export const firstTab = (page: PageKey): string => PAGE_TABS[page][0]
 
-/** The four books have a colour on the masthead. A person's page and a place's do not. */
-export const isArm = (page: PageKey): page is Arm => (ARMS as readonly string[]).includes(page)
-
 export function hasTab(page: PageKey, tab: string): boolean {
   return (PAGE_TABS[page] as readonly string[]).includes(tab)
 }

@@ -115,7 +115,7 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
   it('costs two wood and two hours, and the builder says where — no plot, no town needed', () => {
     const r = doVerb(wright(), NIGHT, 'wright', 'build', { kind: 'lamp_post', x: 5, y: 4 })
     expect(r.refusal).toBeNull()
-    // ★ 120 ticks against a house's 2 880, and a night is 720. This is the number that makes
+    // ★ 120 ticks against a house's 6 480, and a night is 720. This is the number that makes
     // the want answerable: the dark arrives at dusk and the lamp is lit before dawn.
     expect(r.duration).toBe(
       Math.ceil(CFG.structures.recipes.lamp_post!.durationTicks * CFG.light.nightWorkPenalty),
@@ -148,13 +148,16 @@ describe('a lamp post: the standing light a pair of hands can raise', () => {
     expect(buildIsPlotted(town, CFG, 'house')).toBe(true)
     expect(buildIsPlotted(town, CFG, 'lamp_post')).toBe(false)
 
-    const door = claimInWorld(town, { along: 2, deep: 2 })!.door
+    const door = claimInWorld(town, {
+      along: CFG.structures.recipes.house!.w,
+      deep: CFG.structures.recipes.house!.h,
+    })!.door
     let s = fold(
       town,
       ev('agent_spawned', { id: 'a', name: 'a', x: door.x, y: door.y, ageDays: 10000 }),
       CFG,
     )
-    s = give(s, 'a', 'wood_a', 'wood', 12)
+    s = give(s, 'a', 'wood_a', 'wood', CFG.structures.recipes.house!.inputs.wood)
     // The house is the town's to place, and says so.
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house' }).ok).toBe(true)
     expect(submitIntent(s, CFG, 'a', 'build', { kind: 'house', x: door.x, y: door.y - 3 }).ok).toBe(

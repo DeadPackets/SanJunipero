@@ -191,6 +191,17 @@ describe('authoredIdentityOffenders — no panel reads a handed-down identity', 
     expect(authoredIdentityOffenders(sourceFiles())).toEqual([])
   })
 
+  it('does not mistake scene backgrounds or vector origins for a person', () => {
+    expect(
+      authoredIdentityOffenders([
+        { path: 'render.ts', source: 'scene.background; ray.ray.origin; state.origin' },
+      ]),
+    ).toEqual([])
+    expect(
+      authoredIdentityOffenders([{ path: 'person.ts', source: 'agent.background; agent.origin' }]),
+    ).toEqual(['person.ts'])
+  })
+
   it('catches a read however it is spelled', () => {
     expect(authoredIdentityOffenders([{ path: 'a.ts', source: 'const t = agent.traits' }])).toEqual(
       ['a.ts'],

@@ -23,7 +23,6 @@ import {
 } from '@sj/forge'
 import {
   DEFAULT_CONFIG,
-  DWELLING_FOOTPRINTS,
   CAST_IDS,
   ROAD_AUTOTILE_KEYS,
   TERRAIN_TILE_KINDS,
@@ -88,7 +87,10 @@ describe('ingestProductionArt', () => {
 
     const home = codex.listSince(0).find((r) => r.kind === 'house')!
     const homeManifest = parseBuildingManifest(home.meta)!
-    expect(homeManifest.footprint).toEqual(DWELLING_FOOTPRINTS.house)
+    expect(homeManifest.footprint).toEqual({ w: 2, h: 2 })
+    expect(homeManifest).toEqual(
+      listCommittedBuildings().find((building) => building.codexKind === 'house')!.manifest,
+    )
     expect(homeManifest.cell.feetY).toBeLessThan(homeManifest.cell.h)
     expect(
       codex.listSince(0).some((r) => r.kind === 'hut'),

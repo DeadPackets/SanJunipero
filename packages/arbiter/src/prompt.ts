@@ -38,7 +38,7 @@ export type AssembledAdjudicationPrompt = {
 // The town's routines, with what each one asks for. Authored rather than read off the registry
 // so the system prefix stays byte-stable while recipe verbs are minted mid-run.
 export const VERB_ROSTER = `The town's routines, and what each asks for. A "map" judgement names one of these words and fills exactly its parameters, taken from the asker's own block above. A parameter the block does not carry is a format error, not a routine. A word that is not on this list is not a routine, so it cannot be mapped.
-walk (x, y), sleep (nothing), wake (nothing), stop (nothing), enter (structureId), exit (nothing)
+walk (x, y), sleep (nothing), wake (nothing), stop (nothing), enter (structureId), exit (nothing), move_inside (kind: table, storage, bed, hearth, or beside with targetId)
 eat (itemId), drink (nothing, or itemId for a vessel in hand), fill (itemId), take (itemId), drop (itemId)
 give (itemId, targetId), stow (itemId, structureId), speak (text), write (text, and itemId to write on one in hand), read (itemId)
 inscribe (structureId, text), teach (targetId, track), tend (targetId), attack (targetId)

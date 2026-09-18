@@ -7,7 +7,6 @@ import { ladderLine, remember, type LadderLine, type Ledger } from './sentenceLa
 /** The one word a surface writes for a sign. Every panel that paints a valence reads it here, so
  *  a courtship and a quarrel wear the same two colours wherever they are drawn. */
 export const VALENCE_TONE = { '-1': 'cost', '0': 'plain', '1': 'gain' } as const
-export type Tone = (typeof VALENCE_TONE)[keyof typeof VALENCE_TONE]
 
 export type Capsule = {
   id: string

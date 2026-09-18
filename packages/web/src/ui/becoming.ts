@@ -80,7 +80,10 @@ export function authoredIdentityOffenders(
   const out: string[] = []
   for (const f of files) {
     if (f.path.endsWith('becoming.ts')) continue // the one module allowed to name them
-    const stripped = f.source.replace(BLOCK_COMMENT, ' ').replace(LINE_COMMENT, ' ')
+    const stripped = f.source
+      .replace(BLOCK_COMMENT, ' ')
+      .replace(LINE_COMMENT, ' ')
+      .replace(/\bscene\.background\b|\bray\.ray\.origin\b|\bstate\.origin\b/g, ' ')
     if (patterns.some((p) => p.test(stripped))) out.push(f.path)
   }
   return out

@@ -4,8 +4,7 @@ import { MINUTES_PER_DAY, castWords, whyOf, type StakeTerm } from '@sj/shared'
 // vocabulary is the last rung and never the first, because two of its 24 strings set at 21px
 // read as a slot machine by the second afternoon.
 
-export const LADDER_RUNGS = ['beat', 'summary', 'chronicle', 'chapter', 'why'] as const
-export type LadderRung = (typeof LADDER_RUNGS)[number]
+type LadderRung = 'beat' | 'summary' | 'chronicle' | 'chapter' | 'why'
 
 /** Twenty sim minutes. A head said twice inside that reads as a stuck record, so the ladder
  *  drops a rung rather than repeat itself. */
@@ -13,7 +12,7 @@ export const LADDER_RECENT_TICKS = 20
 
 /** A sim-day. A line this old is still the town's own words and still true of this story, so it
  *  is marked and kept: every rung under it is further from what happened, not closer. */
-export const LADDER_STALE_TICKS = MINUTES_PER_DAY
+const LADDER_STALE_TICKS = MINUTES_PER_DAY
 
 export type LadderSource = {
   beat?: string | undefined

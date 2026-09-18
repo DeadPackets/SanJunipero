@@ -26,6 +26,13 @@ import {
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
 const CSS = readFileSync(join(import.meta.dirname, '../ui/chrome.css'), 'utf8')
+const ALMANAC_CSS = readFileSync(join(import.meta.dirname, '../ui/almanac.css'), 'utf8')
+const words = (html: string): string =>
+  html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
 const at = (h: number, min = 0): number => h * 60 + min
 const DAY_12 = 12 * MINUTES_PER_DAY + at(9, 40)
 const EDGE = 400 * MINUTES_PER_DAY
@@ -70,8 +77,10 @@ const bar = (store: WorldStore, link: LinkState = 'online'): string =>
   renderToStaticMarkup(createElement(DayBar, props(store, link, false)))
 
 /** Every word the band is saying about the town, in the order a reader meets them. */
-const marksOf = (html: string): string[] =>
-  [...html.matchAll(/class="day-bar-state">([^<]*)</g)].map((m) => m[1]!)
+const marksOf = (html: string): string[] => [
+  ...(html.includes('Town asleep') ? ['ASLEEP'] : []),
+  ...[...html.matchAll(/class="almanac-status"[^>]*>([^<]*)</g)].map((m) => m[1]!.toUpperCase()),
+]
 
 const roots: { unmount: () => void }[] = []
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -101,10 +110,10 @@ describe('★ the day bar the viewer actually gets', () => {
   it('★ prints the day, the season and the weekday once each', () => {
     const html = bar(townAt(DAY_12))
     const when = stamp(DAY_12)
-    expect(html).toContain(`DAY ${when.day}`)
-    expect(html).toContain(when.season)
-    expect(html).toContain(when.weekday)
-    expect(html.match(/DAY \d/g)).toHaveLength(1)
+    expect(words(html)).toContain(`DAY ${when.day}`)
+    expect(words(html)).toContain(when.season)
+    expect(words(html)).toContain(when.weekday)
+    expect(words(html).match(/\bDAY \d/g)).toHaveLength(1)
   })
 
   it('★ reads ONE formatter, so no two marks can disagree about the minute', () => {
@@ -112,7 +121,7 @@ describe('★ the day bar the viewer actually gets', () => {
       const when = stamp(tick)
       const html = bar(townAt(tick))
       expect(html, `${tick}`).toContain(when.time)
-      expect(html, `${tick}`).toContain(`DAY ${when.day}`)
+      expect(words(html), `${tick}`).toContain(`DAY ${when.day}`)
     }
     // padded, so the corner never jitters between 9:40 and 10:40
     expect(stamp(0).time).toBe('00:00')
@@ -123,18 +132,15 @@ describe('★ the day bar the viewer actually gets', () => {
     expect(stamp((DAYS_PER_SEASON - 1) * MINUTES_PER_DAY).season).toBe('SPRING')
   })
 
-  // ★ THE DAY HAS A SHAPE. The act rides the weekday and never the clock, because the gateway
-  // marks it between cuts too and an act is not a minute.
-  it('★ reads the act off the gateway’s own frame, and says nothing before the day has one', () => {
-    const store = townAt(DAY_12)
-    expect(bar(store)).not.toContain('ACT')
-    const withAct: WorldStore = { ...store, getDirector: () => ({ act: 'II' }) as never }
-    expect(bar(withAct)).toContain('ACT II')
+  it('★ reads morning, afternoon and night from the world minute', () => {
+    expect(bar(townAt(at(9)))).toContain('Morning')
+    expect(bar(townAt(at(15)))).toContain('Afternoon')
+    expect(bar(townAt(at(23)))).toContain('night')
   })
 
   it('names the weather and the temperature it actually is', () => {
     expect(bar(townAt(DAY_12, { weather: { kind: 'sunny', temperatureC: 12 } }))).toContain(
-      'SUNNY 12°',
+      'sunny 12°',
     )
   })
 
@@ -142,8 +148,8 @@ describe('★ the day bar the viewer actually gets', () => {
   // storm is said once, by the chip that owns the sky, and never by the field beside it.
   it('★ prints a storm once, and says it is live in the same breath', () => {
     const html = bar(townAt(DAY_12, { weather: { kind: 'storm', temperatureC: 4 } }))
-    expect(html.match(/STORM/g)).toHaveLength(1)
-    expect(html).toContain('STORM 4°')
+    expect(html.match(/storm/g)).toHaveLength(1)
+    expect(html).toContain('storm 4°')
     expect(marksOf(html)).toEqual(['LIVE'])
   })
 
@@ -155,9 +161,9 @@ describe('★ the day bar the viewer actually gets', () => {
       ...stormy,
       getMode: () => ({ live: false, replaying: false, tick: DAY_12 }),
     }
-    expect(bar(back)).toContain('STORM 4°')
-    expect(marksOf(bar(back))).toEqual(['REPLAY'])
-    expect(bar(stormy, 'reconnecting')).toContain('STORM 4°')
+    expect(bar(back)).toContain('storm 4°')
+    expect(marksOf(bar(back))).toEqual(['PAUSED'])
+    expect(bar(stormy, 'reconnecting')).toContain('storm 4°')
     expect(marksOf(bar(stormy, 'reconnecting'))).toEqual(['OFFLINE'])
   })
 })
@@ -186,8 +192,8 @@ describe('★ what the town says it is', () => {
   // are three independent facts that ranking put through one slot: two of the three went unsaid.
   it('★ says all three when the world holds all three', () => {
     const html = bar(asleepInAStormWatchedBack())
-    expect(html, 'the sky').toContain('STORM 4°')
-    expect(marksOf(html), 'the picture, and what the town is doing').toEqual(['REPLAY', 'ASLEEP'])
+    expect(html, 'the sky').toContain('storm 4°')
+    expect(marksOf(html), 'the picture, and what the town is doing').toEqual(['ASLEEP', 'PAUSED'])
   })
 
   // ★ A SEVERE SKY USED TO TAKE THIS SLOT, and the phone hides the chip that would have carried
@@ -201,8 +207,8 @@ describe('★ what the town says it is', () => {
 
   it('★ reaches the viewer as a field in the bar, never as a slab over the town', () => {
     const html = bar(townAt(at(2), { agents: { a: body(true, true) } } as never))
-    expect(html).toContain('class="day-bar-state"')
-    expect(html).toContain('>ASLEEP<')
+    expect(html).toContain('class="almanac-status"')
+    expect(html).toContain('>Town asleep<')
     expect(CSS).not.toContain('.sleep-card')
   })
 
@@ -256,9 +262,9 @@ describe('a clock nobody can know is stale says so instead', () => {
   // The word the viewer reads is the one the PROP carries, not the one a unit test hands the
   // pure function: the bar said LIVE over frozen figures for as long as `link` went unpassed.
   it('★ the bar renders the word the socket is actually on', () => {
-    expect(bar(townAt(DAY_12), 'reconnecting')).toContain('OFFLINE')
-    expect(bar(townAt(DAY_12), 'connecting')).toContain('OFFLINE')
-    expect(bar(townAt(DAY_12), 'online')).toContain('LIVE')
+    expect(bar(townAt(DAY_12), 'reconnecting')).toContain('offline')
+    expect(bar(townAt(DAY_12), 'connecting')).toContain('offline')
+    expect(bar(townAt(DAY_12), 'online')).toContain('live')
   })
 })
 
@@ -277,7 +283,7 @@ describe('★ the day track', () => {
 
   it('★ draws the cursor where the minute is, in the markup a viewer gets', () => {
     const pct = (html: string): number =>
-      Number(/day-bar-cursor[^>]*--at:([\d.]+)%/.exec(html)?.[1])
+      Number(/almanac-cursor[^>]*--at:([\d.]+)%/.exec(html)?.[1])
     expect(pct(bar(townAt(at(6))))).toBeCloseTo(25, 1)
     expect(pct(bar(townAt(at(12))))).toBeCloseTo(50, 1)
     expect(pct(bar(townAt(at(18))))).toBeCloseTo(75, 1)
@@ -349,12 +355,12 @@ describe('★ the unreached part of today', () => {
 
   it('★ paints the span the town has not reached, and paints none of a whole day', () => {
     const html = bar(partly(DAY_12))
-    expect(html).toContain('class="day-bar-dead"')
-    expect(Number(/day-bar-dead[^>]*--at:([\d.]+)%/.exec(html)?.[1])).toBeCloseTo(
+    expect(html).toContain('class="almanac-future"')
+    expect(Number(/almanac-future[^>]*--at:([\d.]+)%/.exec(html)?.[1])).toBeCloseTo(
       (at(9, 40) / MINUTES_PER_DAY) * 100,
       1,
     )
-    expect(bar(townAt(DAY_12))).not.toContain('day-bar-dead')
+    expect(bar(townAt(DAY_12))).not.toContain('almanac-future')
   })
 
   it('★ says where the dead span starts, and says nothing once the day is whole', () => {
@@ -382,7 +388,7 @@ describe('★ the unreached part of today', () => {
 describe('★ the current time, at a screen nobody is touching', () => {
   it('★ stands with no pointer, no timer and no wake behind it', () => {
     const html = bar(townAt(DAY_12))
-    expect(html).toContain('class="day-bar-stamp"')
+    expect(html).toContain('class="almanac-clock"')
     expect(html).toContain(stamp(DAY_12).time)
     expect(html).not.toContain('data-shown')
     expect(CSS).not.toContain('[data-shown')
@@ -396,30 +402,23 @@ describe('★ the current time, at a screen nobody is touching', () => {
 
   // ★ Two chips printed into each other at 390px (`DAY 0 · SPRINGLOUDY 8°`), and the stream
   // frame needs the whole band, so the narrow bar is restated rather than left to shrink.
-  it('★ restates its columns on a phone and drops the camera with them', () => {
-    const narrow = /@media \(max-width: 900px\) \{(.*?)\n\}/s.exec(CSS)?.[1] ?? ''
-    expect(narrow, 'the narrow bar must be restated').toContain('grid-template-columns:')
-    expect(/\.day-bar \{([^}]*)\}/.exec(narrow)?.[1]).toMatch(/grid-template-columns:/)
-    expect(narrow).toMatch(/\.day-bar \.camera-chip[^{]*\{[^}]*display: none/)
+  it('★ keeps date, weather and a full-width timeline on a phone', () => {
+    const narrow = /@media \(max-width: 700px\) \{(.*?)\n\}/s.exec(ALMANAC_CSS)?.[1] ?? ''
+    expect(narrow).toMatch(
+      /\.almanac \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\)/,
+    )
+    expect(ALMANAC_CSS).toMatch(/\.almanac-timeline \{[^}]*grid-column: 1 \/ -1/)
+    for (const selector of ['almanac-date', 'almanac-weather', 'almanac-clock']) {
+      expect(narrow).not.toMatch(new RegExp(`\\.${selector} \\{[^}]*display: none`))
+      expect(bar(townAt(DAY_12))).toContain(`class="${selector}"`)
+    }
   })
 
-  // ★ THE PHONE SAID LESS THAN THE DESKTOP. The weekday, the season and the act were hidden and
-  // nothing else carried them. Measured at 390px: 96px of track on one row, 366px on two.
-  it('★ gives the phone a second row, and hides nothing in the band but the camera', () => {
-    const narrow = /@media \(max-width: 900px\) \{(.*?)\n\}/s.exec(CSS)?.[1] ?? ''
-    const mid = /\.day-bar-mid[^{]*\{([^}]*)\}/.exec(narrow)?.[1] ?? ''
-    expect(mid, 'the track must take a row of its own').toMatch(/grid-row: 2/)
-    expect(mid, 'and span the whole band').toMatch(/grid-column: 1 \/ -1/)
-    expect(
-      [...narrow.matchAll(/([^{}]+)\{[^}]*display: none/g)].flatMap(([, sel]) =>
-        (sel ?? '').split(',').map((one) => one.trim()),
-      ),
-    ).toEqual(['.day-bar .camera-chip'])
-    const gone = [...CSS.matchAll(/([^{}]+)\{[^}]*display: none/g)].flatMap(([, sel]) =>
-      (sel ?? '').split(',').map((one) => one.trim().split('\n').at(-1)!.trim()),
+  it('★ keeps the clock centered independently of the two flanks', () => {
+    expect(ALMANAC_CSS).toMatch(
+      /\.almanac-center \{[^}]*left: 50%;[^}]*transform: translateX\(-50%\)/,
     )
-    for (const sel of ['.day-bar-when', '.day-bar-weather'])
-      expect(gone, `${sel} is hidden somewhere in the sheet`).not.toContain(sel)
+    expect(ALMANAC_CSS).toMatch(/\.almanac-clock \{[^}]*text-align: center/)
   })
 })
 
@@ -470,10 +469,14 @@ describe('★ the bar a stream viewer is left with', () => {
   })
 
   it('★ names no caption the stream frame has taken out of the bar', () => {
-    const gone = [...CSS.matchAll(/([^{}]*)\{[^}]*display: none/g)]
-      .flatMap(([, list]) => [...(list ?? '').matchAll(/\[data-broadcast='on'\] \.([\w-]+)/g)])
-      .flatMap((m) => classesUnder(bar(townAt(DAY_12)), m[1]!))
-    expect(gone, 'the stream frame drops nothing from the bar').toContain('day-bar-track')
+    const viewer = bar(townAt(DAY_12))
+    const stream = renderToStaticMarkup(
+      createElement(DayBar, props(townAt(DAY_12), 'online', true)),
+    )
+    const gone = classesUnder(viewer, 'almanac-timeline')
+    expect(gone).toContain('almanac-track')
+    for (const cls of gone) expect(stream).not.toContain(`class="${cls}"`)
+    expect(stream).toContain(stamp(DAY_12).time)
     for (const c of BROADCAST_CAPTIONS) {
       if (c.from !== 'sheet') continue
       expect(gone, c.what).not.toContain(c.selector.replace(/^\[data-broadcast='on'\] \./, ''))

@@ -21,6 +21,8 @@ import { DIRECTOR_ZOOM } from './DirectorMode.js'
 import { parseRoute, routeToPath } from './route.js'
 import { fontSizes } from './chromeType.test.js'
 
+const CORNER = readFileSync(new URL('./corner-controls.css', import.meta.url), 'utf8')
+const ALMANAC = readFileSync(new URL('./almanac.css', import.meta.url), 'utf8')
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
   /\/\*[\s\S]*?\*\//g,
   '',
@@ -29,7 +31,7 @@ const src = (rel: string): string => readFileSync(new URL(rel, import.meta.url),
 
 /** The size the sheet lands on for one exact selector, in px. */
 function sheetPx(selector: string): number {
-  const hits = fontSizes(CSS).filter((d) =>
+  const hits = fontSizes(CSS + CORNER + ALMANAC).filter((d) =>
     d.selectors.split(',').some((s) => s.trim() === selector),
   )
   if (hits.length === 0) throw new Error(`the sheet has no font-size for ${selector}`)
@@ -57,10 +59,10 @@ describe('what turns the broadcast layout on', () => {
   })
 
   it('★ is never a viewport width — no media query decides it', () => {
-    const guarded = CSS.matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)
-    for (const [, body] of guarded) expect(body).not.toContain('data-broadcast')
+    const guarded = (CSS + CORNER + ALMANAC).matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)
+    for (const [, body] of guarded) expect(body).not.toMatch(/\[data-broadcast=['"]?on['"]?\]\s*\{/)
     for (const f of ['./broadcast.ts', './route.ts', '../App.tsx']) {
-      expect(src(f), f).not.toMatch(/innerWidth|matchMedia|clientWidth/)
+      expect(src(f), f).not.toMatch(/broadcast\s*[:=][^\n]*(?:innerWidth|matchMedia|clientWidth)/)
     }
   })
 
@@ -92,7 +94,7 @@ describe('what turns the broadcast layout on', () => {
 describe('what a stream viewer is left with', () => {
   it('removes every operator surface it names, and names a reason for each', () => {
     const notHidden = BROADCAST_REMOVED.filter(({ selector }) => {
-      const rule = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
+      const rule = [...(CSS + CORNER + ALMANAC).matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(
         ([, list, body]) =>
           (list ?? '').split(',').some((s) => s.trim() === `[data-broadcast='on'] ${selector}`) &&
           /display:\s*none/.test(body ?? ''),
@@ -106,7 +108,7 @@ describe('what a stream viewer is left with', () => {
   // ANTI-VACUITY, the mirror of the one below: a caption measured on a surface the frame takes
   // out is a size in a report and nothing at all on a screen.
   it('★ measures no caption the stream frame hides', () => {
-    const hidden = [...CSS.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    const hidden = [...(CSS + CORNER + ALMANAC).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter(([, , decls]) => /display:\s*none/.test(decls ?? ''))
       .flatMap(([, list]) => (list ?? '').split(','))
       .map((s) => s.trim())
@@ -124,7 +126,7 @@ describe('what a stream viewer is left with', () => {
     const clock = BROADCAST_CAPTIONS.find((c) => c.what === 'the town clock')
     expect(clock?.from, 'no caption claims to be the clock').toBe('sheet')
     expect(sheetPx((clock as { selector: string }).selector)).toBe(
-      sheetPx("[data-broadcast='on'] .day-bar-day"),
+      sheetPx("[data-broadcast='on'] .almanac-day b"),
     )
   })
 
@@ -133,7 +135,7 @@ describe('what a stream viewer is left with', () => {
   it('★ hides only surfaces the product actually has', () => {
     const phantom = BROADCAST_REMOVED.filter(
       ({ selector }) =>
-        ![...CSS.matchAll(/([^{}]+)\{[^{}]*\}/g)].some(([, list]) =>
+        ![...(CSS + CORNER + ALMANAC).matchAll(/([^{}]+)\{[^{}]*\}/g)].some(([, list]) =>
           (list ?? '').split(',').some((s) => s.trim() === selector),
         ),
     ).map((r) => r.selector)

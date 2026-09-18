@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { createWorldStore } from '../state/worldStore.js'
 import { PageBoundary } from './PageBoundary.js'
 import { Paper } from './Paper.js'
+import { FeedState } from './game/shared.js'
 import { Signpost } from './Signpost.js'
 import { HelpButton } from '../stage/HelpButton.js'
 import { KEY_MAP_ID, KEY_MAP_KEY, KeyMap } from '../stage/KeyMap.js'
@@ -151,39 +152,44 @@ describe('the signpost', () => {
   it('★ hangs in the same place whether the sheet is up or down', () => {
     expect(post(null)).not.toContain('data-open')
     expect(post('folk')).not.toContain('data-open')
-    expect(post('folk')).toBe(post(null).replace('aria-expanded="false"', 'aria-expanded="true"'))
+    expect(post('folk')).toBe(
+      post(null).replace(
+        'data-arm="folk" aria-expanded="false"',
+        'data-arm="folk" aria-expanded="true"',
+      ),
+    )
   })
 
   // ★ 6E supersedes the fifth arm: the way into the key map is the corner button, so the post
   // carries the four sections and nothing else.
   it('★ hangs four arms and no fifth — help is the corner button now', () => {
     const html = post(null)
-    expect(html.match(/<button/g)).toHaveLength(ARMS.length)
+    expect(html.match(/class="journal-option"/g)).toHaveLength(ARMS.length)
     expect(html).not.toContain(`>${KEY_MAP_KEY}<`)
     expect([...html.matchAll(/data-arm="([a-z]+)"/g)].map((m) => m[1])).toEqual([...ARMS])
     expect(html.match(/aria-controls="paper"/g)).toHaveLength(ARMS.length)
   })
 
-  it('★ names the corner button for the sheet it opens, at 44px in a corner of its own', () => {
+  it('★ names the corner button for the sheet it opens, at 48px in a corner of its own', () => {
     const html = renderToStaticMarkup(
       createElement(HelpButton, { open: false, onToggle: () => {} }),
     )
-    expect(html).toContain('aria-label="What the town answers to"')
-    expect(html).toContain(`>${KEY_MAP_KEY}<`)
+    expect(html).toContain('aria-label="Help and shortcuts"')
+    expect(html).toContain('class="control-icon control-icon-help"')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).toContain('aria-expanded="false"')
     expect(
       renderToStaticMarkup(createElement(HelpButton, { open: true, onToggle: () => {} })),
     ).toContain('aria-expanded="true"')
 
-    const css = src('../ui/chrome.css')
     // The corner cluster is one block now: the thoughts switch stands on the same slab.
     // Anchored: the same pair heads the `forced-colors` list, indented, further up the sheet.
+    const controls = src('../ui/corner-controls.css')
     const body =
-      /^\.help-button, \.thoughts-button(?:, \.sound-button)? \{([^}]*)\}/m.exec(css)?.[1] ?? ''
-    expect(body).toContain('width: 44px')
-    expect(body).toContain('height: 44px')
-    expect(css).toMatch(
+      /\.help-button, \.thoughts-button, \.sound-button \{([^}]*)\}/.exec(controls)?.[1] ?? ''
+    expect(body).toMatch(/width:\s*48px/)
+    expect(body).toMatch(/height:\s*48px/)
+    expect(controls).toMatch(
       /\.help-button, \.thoughts-button, \.sound-button, \.sound-cues \{[^}]*grid-area: foot-left/,
     )
   })
@@ -229,7 +235,7 @@ describe('the signpost', () => {
   it('★ writes the address bar outside the state updater, never inside it', () => {
     const app = src('../App.tsx')
     expect(app).not.toMatch(/setRoute\(\([\s\S]{0,200}?writeAddress/)
-    expect(app.match(/writeAddress\(/g)).toHaveLength(3) // the definition and its two callers
+    expect(app.match(/writeAddress\(/g)).toHaveLength(4) // the definition and navigation, moment, and interior callers
   })
 
   it('★ is what the app mounts, with the arm’s wiring kept', () => {
@@ -239,11 +245,11 @@ describe('the signpost', () => {
     expect(app).not.toContain('onHelp')
   })
 
-  it('names itself for a screen reader and puts the post under the arms', () => {
+  it('names the journal for a screen reader and provides its toggle', () => {
     // "Signpost" names the metaphor; a screen reader hears "Signpost, navigation" and learns
     // nothing about what is behind it.
-    expect(post(null)).toContain('aria-label="Town sections"')
-    expect(post(null)).toContain('class="signpost-post"')
+    expect(post(null)).toContain('aria-label="Town journal"')
+    expect(post(null)).toContain('class="journal-toggle"')
   })
 })
 
@@ -289,9 +295,9 @@ describe('the paper', () => {
   })
 
   it('★ is hidden from the accessibility tree while it is down, and only while it is down', () => {
-    expect(paper()).toMatch(/class="paper"[^>]*aria-hidden="true"/)
+    expect(paper()).toMatch(/class="paper sj-paper"[^>]*aria-hidden="true"/)
     expect(paper({ page: 'folk', tab: 'People' })).toMatch(
-      /class="paper"[^>]*data-open="yes"[^>]*aria-hidden="false"/,
+      /class="paper sj-paper"[^>]*data-open="yes"[^>]*aria-hidden="false"/,
     )
   })
 
@@ -299,9 +305,11 @@ describe('the paper', () => {
     // The tabs and the close word stay in the tree for the 300ms slide out, so the sheet keeps
     // two focusable controls. `aria-hidden` left both reachable; `inert` is what takes them out.
     const shut = paper()
-    expect(shut).toMatch(/<section class="paper"[^>]*inert=""/)
+    expect(shut).toMatch(/<section class="paper sj-paper"[^>]*inert=""/)
     expect(shut).toContain('tabindex="0"')
-    expect(paper({ page: 'folk', tab: 'People' })).not.toMatch(/<section class="paper"[^>]*inert/)
+    expect(paper({ page: 'folk', tab: 'People' })).not.toMatch(
+      /<section class="paper sj-paper"[^>]*inert/,
+    )
   })
 
   it('renders no page body while it is down — a shut sheet reads nothing off the town', () => {
@@ -312,14 +320,14 @@ describe('the paper', () => {
   it('carries a tablist with ONE tab stop, walked by the arrows', () => {
     const html = paper({ page: 'chronicle', tab: 'Firsts' })
     expect(html).toContain('role="tablist"')
-    expect(html.match(/role="tab"/g)).toHaveLength(PAGE_TABS.chronicle.length)
+    expect(html.match(/role="tab"/g)).toHaveLength(3)
     expect(html.match(/tabindex="0"/g)).toHaveLength(1)
-    expect(html).toMatch(/id="paper-tab-Firsts"[^>]*aria-selected="true"/)
+    expect(html).toMatch(/id="paper-tab-firsts"[^>]*aria-selected="true"/)
   })
 
   it('falls back to the first tab when handed one the page does not have', () => {
     const html = paper({ page: 'found', tab: 'Firsts' })
-    expect(html).toMatch(/id="paper-tab-Things"[^>]*aria-selected="true"/)
+    expect(html).toMatch(/id="paper-tab-places"[^>]*aria-selected="true"/)
   })
 
   it('names the subject rather than the page on a person’s own sheet', () => {
@@ -345,7 +353,7 @@ describe('the paper', () => {
     const html = paper({ page: 'chronicle', tab: 'Record' })
     const head = headOf(html)
     expect(head).toContain('class="paper-dateline"')
-    expect(head).toMatch(/class="paper-title" id="paper-title">Chronicle</)
+    expect(head).toMatch(/class="paper-title" id="paper-title">[\s\S]*?Chronicle</)
     for (const said of dated(stamp(0))) expect(head, said).not.toContain(said)
   })
 
@@ -478,10 +486,10 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     Object.defineProperty(sheet, 'offsetHeight', { value: 600, configurable: true })
     pointer(grip, 'pointerdown', 200, 0)
     pointer(grip, 'pointermove', 290, 16)
-    expect(sheet.style.transform).toBe('translate(-50%, 90px)')
+    expect(sheet.style.transform).toBe('translateY(90px)')
     // ...and upward it gives a third of the throw, because it is already at the top of its travel
     pointer(grip, 'pointermove', 110, 32)
-    expect(sheet.style.transform).toBe('translate(-50%, -30px)')
+    expect(sheet.style.transform).toBe('translateY(-30px)')
     // the scrim fades with the sheet, so the town brightens under the finger
     pointer(grip, 'pointermove', 500, 48)
     expect(Number(dim.style.opacity)).toBeLessThan(1)
@@ -507,13 +515,13 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   // told nothing when the panel under it was replaced.
   it('★ re-seats focus when the arm or the tab changes, not only when the sheet opens', async () => {
     const p = await live(OPEN)
-    expect(document.activeElement?.id).toBe('paper-tab-People')
+    expect(document.activeElement?.id).toBe('paper-tab-everyone')
     // a tab change replaces the panel under the reader, and focus goes with it
     await p.again({ tab: 'Families' })
-    expect(document.activeElement?.id).toBe('paper-tab-Families')
+    expect(document.activeElement?.id).toBe('paper-tab-families')
     // and so does an arm change, which unmounts the tab focus was on
     await p.again({ page: 'laws', tab: 'World' })
-    expect(document.activeElement?.id).toBe('paper-tab-World')
+    expect(document.activeElement?.id).toBe('paper-tab-agreements')
   })
 
   // The opener capture is its own effect: on the focus effect's deps its cleanup fired on every
@@ -524,10 +532,10 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     document.body.append(arm)
     arm.focus()
     const p = await live(OPEN)
-    expect(document.activeElement?.id).toBe('paper-tab-People')
+    expect(document.activeElement?.id).toBe('paper-tab-everyone')
     // a tab change must not bounce focus through the arm, which announces the sheet twice
     await p.again({ tab: 'Families' })
-    expect(document.activeElement?.id).toBe('paper-tab-Families')
+    expect(document.activeElement?.id).toBe('paper-tab-families')
     await p.again({ page: null, tab: '' })
     expect(document.activeElement?.id).toBe('the-arm')
   })
@@ -544,7 +552,7 @@ describe('★ every way the paper goes down, and where focus lands', () => {
   // opens on whatever tab it names, and focus landed on the wrong tab in both.
   it('moves focus to the tab being shown, which is not always the first one', async () => {
     await live({ page: 'folk', tab: 'Families' })
-    expect(document.activeElement?.id).toBe('paper-tab-Families')
+    expect(document.activeElement?.id).toBe('paper-tab-families')
   })
 
   // `.focus()` reveals its target by scrolling every ancestor that can scroll, and the sheet's
@@ -566,9 +574,8 @@ describe('★ every way the paper goes down, and where focus lands', () => {
     expect(box.scrollTop).toBe(0)
     // A layout effect: Found's own scroll-to-row is a child passive effect, which runs later.
     expect(code).toMatch(
-      /useLayoutEffect\(\(\) => \{[\s\S]*?scrollTop = 0[\s\S]*?\}, \[open, key, current\]\)/,
+      /useLayoutEffect\(\(\) => \{[\s\S]*?scrollTop = 0[\s\S]*?\}, \[open, key, current, subject\?\.id\]\)/,
     )
-    expect(src('./pages/Found.tsx')).toContain('scrollIntoView')
   })
 })
 
@@ -576,7 +583,6 @@ describe('★ every way the paper goes down, and where focus lands', () => {
 // about the town, `OutOfReach` is news about the wire.
 describe('★ every page that can be quiet can also be out of reach', () => {
   const PAGES = [
-    './pages/Found.tsx',
     './pages/Customs.tsx',
     './pages/Chronicle.tsx',
     './pages/Moments.tsx',
@@ -590,6 +596,25 @@ describe('★ every page that can be quiet can also be out of reach', () => {
     expect(code, 'no OutOfReach').toContain("from '../../ui/OutOfReach.js'")
     expect(code, 'no failed branch').toMatch(/\.failed|wireDown/)
     expect(code, 'no way to ask again').toMatch(/onRetry=\{/)
+  })
+
+  it('the Land feed shows a failed read and retries the same endpoint', async () => {
+    expect(src('./game/Land.tsx')).toContain('<FeedState read={read} retry={endpoint.retry} />')
+    const retry = vi.fn()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(
+        createElement(FeedState, { read: { data: null, loaded: true, failed: true }, retry }),
+      )
+    })
+    expect(host.querySelector('[role="status"]')?.textContent).toContain('could not be refreshed')
+    await act(async () => {
+      host.querySelector('button')!.click()
+    })
+    expect(retry).toHaveBeenCalledOnce()
   })
 
   // A page holding a last good answer keeps showing it: only a panel with nothing at all and a
@@ -661,14 +686,14 @@ describe('★ a pasted /agent/:id link lands on the person it names', () => {
   const app = src('../App.tsx')
 
   it('opens their story and pins the camera, once the world can be asked', () => {
-    expect(app).toContain("setSheet({ page: 'person', tab: 'Story' })")
+    expect(app).toContain("setSheet({ page: 'person', tab: 'Now' })")
     expect(app).toContain('setFollowing(linked)')
     expect(app).toContain('onFirstSnapshot(store, () => {')
   })
 
   it('holds the ring to one owner, so no id rings a person the town does not have', () => {
     expect(app.match(/setSubject\(\{ id: agentId/g)).toHaveLength(1)
-    expect(app).toContain('if (name !== undefined) setSubject(')
+    expect(app).toMatch(/if \(name !== undefined\) \{\s*setSubject\(/)
   })
 })
 
@@ -706,15 +731,15 @@ describe('households', () => {
 // four books with a colour each, and the sheet gained a place to stand that does not cover the
 // town it is about.
 describe('★ the Almanac shell', () => {
-  it('★ folds four names for one log into the Record, and keeps the old links landing on it', () => {
-    expect([...PAGE_TABS.chronicle]).toEqual(['Record', 'Firsts'])
+  it('★ opens old log tabs on Catch up and keeps the complete Record reachable', () => {
+    expect([...PAGE_TABS.chronicle]).toEqual(['Catch up', 'Timeline', 'Firsts', 'Record'])
     for (const old of ['Today', 'Chapters', 'Moments', 'Days']) {
       expect(hasTab('chronicle', old), old).toBe(false)
       expect(paper({ page: 'chronicle', tab: old }), old).toMatch(
-        /id="paper-tab-Record"[^>]*aria-selected="true"/,
+        /id="paper-tab-catch-up"[^>]*aria-selected="true"/,
       )
     }
-    expect(ARMS.reduce((n, a) => n + PAGE_TABS[a].length, 0)).toBe(10)
+    expect(ARMS.reduce((n, a) => n + PAGE_TABS[a].length, 0)).toBe(15)
   })
 
   it('★ names the four books on the arms, Land and Rule among them', () => {
@@ -731,14 +756,14 @@ describe('★ the Almanac shell', () => {
     expect(html).toContain('>Rule<')
   })
 
-  it('★ carries the open arm’s book on the sheet, and none on a page that is not an arm', () => {
+  it('★ carries the open book on the sheet, including a person’s Folk book', () => {
     for (const arm of ARMS)
       expect(paper({ page: arm, tab: firstTab(arm) }), arm).toMatch(
-        new RegExp(`class="paper"[^>]*data-book="${arm}"`),
+        new RegExp(`class="paper sj-paper"[^>]*data-book="${arm}"`),
       )
     expect(
       paper({ page: 'person', tab: 'Story', subject: { id: 'a', kind: 'agent', name: 'Amara' } }),
-    ).not.toContain('data-book')
+    ).toContain('data-book="folk"')
   })
 
   // Today was the newest 200 weighted rows with no day bound at all, so a nine-day town read

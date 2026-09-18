@@ -1326,7 +1326,7 @@ function affordanceLines(packet: PerceptionPacket): string[] {
       ...(room?.hearth ? ['hearth'] : []),
     ]
     lines.push(
-      `Within this room you can move_inside using kind ${places.join(', ')}, or kind beside with the targetId of someone in this room. This changes where you stand; it does not start sleep or work.`,
+      `Within this room you can move_inside using kind ${places.join(', ')}, or kind beside with the targetId of someone in this room. This changes where you stand. It does not start sleep or work.`,
     )
     const chosen = indoorChoiceLine(packet)
     if (chosen) lines.push(chosen)

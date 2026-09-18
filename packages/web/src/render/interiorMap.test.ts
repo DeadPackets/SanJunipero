@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CITY_INTERIOR_SLOTS, cityStructures } from '@sj/shared'
+import { roomSizeOf, slotGridOf } from './interiors.js'
 import { TILE_H, TILE_W } from './iso.js'
 import {
   INTERIOR_ACTS,
@@ -129,11 +130,16 @@ describe('interiorMap — the room is a map a body can occupy', () => {
   it('every piece the world actually furnishes a house with lands inside the room', () => {
     const house = cityStructures().find((s) => s.kind === 'house')!
     expect(house.furnishings.length).toBeGreaterThan(0)
-    const map = roomMapOf(house.furnishings.map((f) => ({ kind: f.kind, slot: f.slot })))
+    const size = roomSizeOf('house')
+    const map = roomMapOf(
+      house.furnishings.map((f) => ({ kind: f.kind, slot: f.slot })),
+      size,
+      slotGridOf('house'),
+    )
     for (const p of map.pieces) {
       for (const t of tilesOf(p)) {
-        expect(t.x, `${p.kind} at ${t.x},${t.y}`).toBeLessThan(ROOM_TILES.w)
-        expect(t.y, `${p.kind} at ${t.x},${t.y}`).toBeLessThan(ROOM_TILES.h)
+        expect(t.x, `${p.kind} at ${t.x},${t.y}`).toBeLessThan(size.w)
+        expect(t.y, `${p.kind} at ${t.x},${t.y}`).toBeLessThan(size.h)
       }
     }
   })

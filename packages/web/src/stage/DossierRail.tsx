@@ -11,7 +11,7 @@ import { sharePercent } from './ShotBoard.js'
 // the frame already carries normalised, so no unbounded number reaches the rail.
 
 /** Head and shoulders at the size the direction drew. */
-export const RAIL_BUST_PX = 44
+const RAIL_BUST_PX = 44
 
 /** ★ What a body has riding on it this minute, on the two scales the frame already carries with
  *  a denominator: the survey's share of its own leader, and a story's heat against its own peak.

@@ -115,7 +115,12 @@ function Places(props: PageProps) {
       <div className="sj-tools">
         <label>
           Show{' '}
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <select
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value)
+            }}
+          >
             <option value="all">Town places</option>
             <option value="homes">Homes</option>
             <option value="building">Under construction</option>
@@ -130,7 +135,9 @@ function Places(props: PageProps) {
             type="button"
             className="sj-place"
             key={s.id}
-            onClick={() => onSubject({ kind: 'structure', id: s.id, name: structureTitle(s) })}
+            onClick={() => {
+              onSubject({ kind: 'structure', id: s.id, name: structureTitle(s) })
+            }}
           >
             <PlacePhoto structure={s} scene={props.scene} store={store} />
             <span className="sj-place-copy">
@@ -180,7 +187,13 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
   if (leaf)
     return (
       <>
-        <button type="button" className="sj-back" onClick={() => setSelection({ thing, seq: -1 })}>
+        <button
+          type="button"
+          className="sj-back"
+          onClick={() => {
+            setSelection({ thing, seq: -1 })
+          }}
+        >
           ← All discoveries
         </button>
         <header className="sj-event-head">
@@ -209,9 +222,9 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
         <button
           type="button"
           className="sj-primary"
-          onClick={() =>
+          onClick={() => {
             onPlay(pointPlay(leaf.record.tick, store.liveEdge(), leaf.headline, [leaf.record.byId]))
-          }
+          }}
         >
           <GameIcon kind="compass" />
           Watch the discovery →
@@ -245,7 +258,9 @@ function Discoveries({ store, thing, onPlay }: PageProps) {
             className="sj-discovery"
             type="button"
             key={l.record.seq}
-            onClick={() => setSelection({ thing, seq: l.record.seq })}
+            onClick={() => {
+              setSelection({ thing, seq: l.record.seq })
+            }}
           >
             <span className="sj-discovery-icon">
               {l.assetId ? (
@@ -286,7 +301,7 @@ export function GameBuilding(props: PageProps) {
   )
   const mode = useSyncExternalStore(props.store.subscribe, props.store.getMode, props.store.getMode)
   const s = state?.structures[props.subject?.id ?? '']
-  if (!s || !state)
+  if (!s)
     return (
       <Empty icon="land" title="Nothing stands here">
         This place is not in the town at this moment.

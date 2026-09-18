@@ -223,7 +223,9 @@ export function Paper({
                     ? 'page'
                     : undefined
                 }
-                onClick={() => onBrowse(book)}
+                onClick={() => {
+                  onBrowse(book)
+                }}
               >
                 <GameIcon kind={BOOK_ICON[book]} />
                 {PAGE_TITLE[book]}
@@ -346,7 +348,13 @@ export function Paper({
         </div>
         {open && subject !== null && (key === 'person' || key === 'building') && (
           <footer className="sj-watch-footer">
-            <button type="button" className="sj-primary" onClick={() => onWatch(subject)}>
+            <button
+              type="button"
+              className="sj-primary"
+              onClick={() => {
+                onWatch(subject)
+              }}
+            >
               <GameIcon kind="compass" />
               {key === 'person' ? `Watch ${subject.name}` : 'Find this place in town'} →
             </button>

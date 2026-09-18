@@ -185,8 +185,10 @@ describe('★ where a doorway keeps its tile, and where it loses it', () => {
       undefined,
       FLAT_WORLD,
     )
-    expect(said).toContain('you cannot walk anywhere or enter anything')
-    expect(said).toContain('the doorway at (12, 10) is the way back out')
+    expect(said).toContain(
+      'outdoor walking and entering another building require stepping outside first',
+    )
+    expect(said).toContain('The doorway at (12, 10) is the way back out')
     // And the roof line, which used to say the same pair a second time, now only says which roof.
     expect(said).toContain('This is the building you are in.')
     expect(sentenceWith(said, 'structure_1) stands')).not.toMatch(PAIR)

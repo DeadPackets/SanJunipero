@@ -372,7 +372,7 @@ describe('a join does not throw the cached prefix away', () => {
   })
 
   it('tells the mind this moment is not an act', () => {
-    expect(block()).toContain('this is not an act')
+    expect(block()).toContain('This answer supplies words, not a new physical action.')
   })
 })
 

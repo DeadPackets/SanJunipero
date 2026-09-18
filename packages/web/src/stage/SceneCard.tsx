@@ -120,7 +120,7 @@ export function SceneCard({
       strikeCard(store, cast, sceneId),
     )
     held.current = next
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the store IS the external system: the card is struck from the town as it stood at the cut, which is this moment and no other.
+
     setShow(next)
     if (next.card === null) return
     const timer = setTimeout(

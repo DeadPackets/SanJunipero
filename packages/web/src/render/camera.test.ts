@@ -795,12 +795,12 @@ describe('★ D11 — the eased settle stays on the live quantum', () => {
 
 describe('stageFill — the number R8 is about', () => {
   it('THE R8 MEASUREMENT: the town the grammar grows fills almost two and a half times the frame', () => {
-    expect(TOWN_BOX).toEqual({ minX: -528, maxX: 528, minY: 448, maxY: 840 })
+    expect(TOWN_BOX).toEqual({ minX: -544, maxX: 544, minY: 432, maxY: 840 })
     expect(TOWN_DRAWN).toEqual(drawnBoundsOf(TOWN))
     expect([TOWN_DRAWN.maxX - TOWN_DRAWN.minX, TOWN_DRAWN.maxY - TOWN_DRAWN.minY]).toEqual([
-      1136, 488,
+      1192, 552,
     ])
-    expect(stageFill(TOWN_DRAWN, 1, STAGE)).toBeCloseTo(0.3646, 4)
+    expect(stageFill(TOWN_DRAWN, 1, STAGE)).toBeCloseTo((1192 * 552) / (STAGE.w * STAGE.h), 4)
     expect(
       stageFill(TOWN_DRAWN, 1, STAGE) / 0.1485,
       'against the 14.8 % R8 measured',
@@ -842,7 +842,7 @@ describe('stageFill — the number R8 is about', () => {
   })
 
   it('boundsCentre is the middle of the box, so the first frame is OF the town', () => {
-    expect(boundsCentre(TOWN_BOX)).toEqual({ sx: 0, sy: 644 })
+    expect(boundsCentre(TOWN_BOX)).toEqual({ sx: 0, sy: 636 })
     // the landed first frame centred on the middle of a 48x48 grid, which is not the town
     const landed = boundsCentre(cameraBoundsOf(terrainOf(48, 48)))
     expect(landed).not.toEqual(boundsCentre(TOWN_BOX))

@@ -33,7 +33,12 @@ function world(): WorldState {
   s = fold(s, ev('agent_spawned', { id: 'a1', name: 'a1', x: 4, y: 4, ageDays: ADULT_AGE_DAYS }))
   return fold(
     s,
-    ev('item_spawned', { id: 'item_1', kind: 'wood', qty: 20, loc: { t: 'agent', id: 'a1' } }),
+    ev('item_spawned', {
+      id: 'item_1',
+      kind: 'wood',
+      qty: CFG.structures.recipes.house!.inputs.wood! + 10,
+      loc: { t: 'agent', id: 'a1' },
+    }),
     CFG,
   )
 }

@@ -10,7 +10,7 @@ export const BAND_TILES = 6
  *  alpha drop composites toward the ground colour and reads as fog, so neither is here. */
 export const DESATURATE = 0.35
 /** The band's soft edge, as a fraction of its own radius. */
-export const BAND_FEATHER = 0.35
+const BAND_FEATHER = 0.35
 /** A cast arriving or leaving takes this long to reach full strength, so a cut never snaps. */
 export const ATTENTION_FADE_MS = 400
 

@@ -193,7 +193,7 @@ describe('★ the quiet town: ~30% of real ticks nothing is hot anywhere', () =>
 
   it('the strip says one true line and invents no story', () => {
     const said = words(draw(StoryStrip, quiet))
-    expect(said).toContain('No story is running.')
+    expect(said).toContain('No active stories right now.')
     expect(said).not.toMatch(/RISING|COOLING|HANDED OVER/)
   })
 
@@ -219,8 +219,13 @@ describe('★ the quiet town: ~30% of real ticks nothing is hot anywhere', () =>
     const html = draw(DossierRail, scrub)
     expect(words(html)).toContain('Nadia')
     expect(html).not.toContain('dossier-gutter')
-    for (const [, Surface] of [SURFACES[0]!, SURFACES[1]!, SURFACES[2]!])
-      expect(draw(Surface, scrub)).toBe('')
+    for (const [, Surface] of [SURFACES[0]!, SURFACES[1]!, SURFACES[2]!]) {
+      const html = draw(Surface, scrub)
+      if (Surface === StoryStrip) {
+        expect(html).toContain('Return to now for unfolding stories')
+        expect(html).not.toContain('story-capsule')
+      } else expect(html).toBe('')
+    }
   })
 })
 
@@ -306,8 +311,8 @@ describe('★ the camera is usually not row one, and the screen has to agree wit
     const lit = html.slice(html.indexOf('story-capsule lit'))
     expect(html.match(/story-capsule lit/g)).toHaveLength(1)
     expect(words(lit)).toContain('Ada & Bo')
-    expect(words(lit)).toContain('ON SCREEN')
-    expect(words(html.slice(0, html.indexOf('story-capsule lit')))).not.toContain('ON SCREEN')
+    expect(words(lit)).toContain('On screen')
+    expect(words(html.slice(0, html.indexOf('story-capsule lit')))).not.toContain('On screen')
   })
 
   it('★ the board lights the row the camera holds and no other', () => {

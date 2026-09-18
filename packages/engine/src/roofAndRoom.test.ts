@@ -148,8 +148,7 @@ describe('★ a roof is a property of the kind, and the valley meant what it loo
 
 // ------------------------------------------------------------- R1b: the ladder ---
 
-// One rate prices every dwelling, so a farmhouse costs a pair of houses. What a dearer roof
-// buys is fuel economy — stoke feeds the building, besideAKeptFire warms the room — not floor.
+// One rate prices every dwelling. More floor shares the same fire among more bodies.
 describe('★ a dearer dwelling is never a worse one', () => {
   const r = CFG.structures.recipes
   const buildableDwellings = Object.keys(r)
@@ -183,11 +182,10 @@ describe('★ a dearer dwelling is never a worse one', () => {
     }
   })
 
-  // Vacuous guard: the loop above passes on an empty world and on a flat one. These are the rungs
-  // as real numbers, and the price they were bought at is unchanged.
-  it('★ is a real ladder — three rungs of fuel, at one unmoved rate', () => {
-    expect(buildableDwellings.map(slotsOf)).toEqual([3, 4, 2])
-    expect(buildableDwellings.map(woodPerBodyNight)).toEqual([0.5, 0.375, 0.75])
+  // Pin the approved footprints and their fuel cost, so an empty or flat ladder cannot pass.
+  it('★ larger floors save fuel, at one unmoved rate', () => {
+    expect(buildableDwellings.map(slotsOf)).toEqual([4, 6, 4])
+    expect(buildableDwellings.map(woodPerBodyNight)).toEqual([0.375, 0.25, 0.375])
     for (const k of buildableDwellings) {
       const tiles = r[k]!.w * r[k]!.h
       expect(woodOf(k) / tiles, `${k} wood a tile`).toBe(2.5)
@@ -209,46 +207,52 @@ describe('★ a dearer dwelling is never a worse one', () => {
 
 describe('★ a room holds only so many bodies, and floor area is why', () => {
   it('is two tiles of floor a body, from the footprint and nothing else', () => {
-    expect(roomCapacity({ w: 2, h: 2 })).toBe(2) // house, cabin, storehouse
-    expect(roomCapacity({ w: 3, h: 2 })).toBe(3) // cottage
-    expect(roomCapacity({ w: 4, h: 2 })).toBe(4) // farmhouse
+    expect(roomCapacity({ w: 2, h: 2 })).toBe(2)
+    expect(roomCapacity({ w: 3, h: 2 })).toBe(3)
+    expect(roomCapacity({ w: 4, h: 2 })).toBe(4)
+    expect(roomCapacity({ w: 3, h: 3 })).toBe(4)
+    expect(roomCapacity({ w: 4, h: 3 })).toBe(6)
     expect(roomCapacity({ w: 1, h: 1 })).toBe(1) // never zero: a hut holds its one body
   })
 
-  it('fills a house at two and turns the third away', () => {
+  it('fills a house at four and turns the fifth away', () => {
     let s = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) s = withAgentAtDoor(s, id)
     expect(enter(s, 'a1').ok).toBe(true)
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     expect(enter(s, 'a2').ok).toBe(true)
     s = fold(s, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
-    expect(occupantsOf(s, 'structure_1')).toEqual(['a1', 'a2'])
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a4', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a5', structureId: 'structure_1' }))
+    expect(occupantsOf(s, 'structure_1')).toEqual(['a1', 'a2', 'a4', 'a5'])
     expect(roomIsFull(s, s.structures.structure_1!)).toBe(true)
     expect(enter(s, 'a3')).toMatchObject({
-      ok: false,
-      reason: 'there is no floor left in there, 2 bodies fill it',
-    })
-  })
-
-  it('holds four in a farmhouse and one in a hut — the same rule, not a special case', () => {
-    let big = withBuilding(world(), 'farmhouse')
-    const ids = ['a1', 'a2', 'a3', 'a4', 'a5']
-    for (const id of ids) big = withAgentAtDoor(big, id)
-    for (const id of ids.slice(0, 4)) {
-      expect(enter(big, id).ok, id).toBe(true)
-      big = fold(big, ev(30, 'agent_entered', { agentId: id, structureId: 'structure_1' }))
-    }
-    expect(enter(big, 'a5')).toMatchObject({
       ok: false,
       reason: 'there is no floor left in there, 4 bodies fill it',
     })
   })
 
+  it('holds six in a farmhouse under the same floor rule', () => {
+    let big = withBuilding(world(), 'farmhouse')
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7']
+    for (const id of ids) big = withAgentAtDoor(big, id)
+    for (const id of ids.slice(0, 6)) {
+      expect(enter(big, id).ok, id).toBe(true)
+      big = fold(big, ev(30, 'agent_entered', { agentId: id, structureId: 'structure_1' }))
+    }
+    expect(enter(big, 'a7')).toMatchObject({
+      ok: false,
+      reason: 'there is no floor left in there, 6 bodies fill it',
+    })
+  })
+
   it('empties again when somebody steps out — full is a state, not a verdict', () => {
     let s = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) s = withAgentAtDoor(s, id)
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = fold(s, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a4', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a5', structureId: 'structure_1' }))
     expect(enter(s, 'a3').ok).toBe(false)
     s = fold(s, ev(22, 'agent_exited', { agentId: 'a1', structureId: 'structure_1' }))
     expect(enter(s, 'a3').ok).toBe(true)
@@ -256,25 +260,29 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
 
   it('lets one of two bodies through a last slot in the same tick, and leaves the other out', () => {
     let s = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) s = withAgentAtDoor(s, id)
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
+    for (const id of ['a4', 'a5'])
+      s = fold(s, ev(20, 'agent_entered', { agentId: id, structureId: 'structure_1' }))
     for (const id of ['a2', 'a3']) {
       const r = enter(s, id)
       if (!r.ok) throw new Error(r.reason)
       for (const e of r.events) s = fold(s, ev(30, e.type, e.payload))
     }
     const out = runAct(s, CFG, 'a2')
-    expect(occupantsOf(out.state, 'structure_1')).toEqual(['a1', 'a2'])
+    expect(occupantsOf(out.state, 'structure_1')).toEqual(['a1', 'a2', 'a4', 'a5'])
     expect(out.state.agents.a3!.insideId).toBeUndefined()
   })
 
   it('gives the floor back when a body dies indoors', () => {
     let s = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) s = withAgentAtDoor(s, id)
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = fold(s, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a4', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a5', structureId: 'structure_1' }))
     s = fold(s, ev(22, 'agent_died', { agentId: 'a1', cause: 'starvation' }))
-    expect(occupantsOf(s, 'structure_1')).toEqual(['a2'])
+    expect(occupantsOf(s, 'structure_1')).toEqual(['a2', 'a4', 'a5'])
     expect(roomIsFull(s, s.structures.structure_1!)).toBe(false)
     expect(enter(s, 'a3').ok).toBe(true)
   })
@@ -314,9 +322,11 @@ describe('★ a room holds only so many bodies, and floor area is why', () => {
   // The single sentence a mind gets. It must say WHICH kind of no.
   it('tells a full room apart from a wall with no way through it', () => {
     let full = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) full = withAgentAtDoor(full, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) full = withAgentAtDoor(full, id)
     full = fold(full, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     full = fold(full, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
+    for (const id of ['a4', 'a5'])
+      full = fold(full, ev(21, 'agent_entered', { agentId: id, structureId: 'structure_1' }))
     const busy = enter(full, 'a3')
     const solid = enter(withAgentAtDoor(withBuilding(world(), 'well'), 'a1'), 'a1')
     expect(busy.ok).toBe(false)
@@ -336,17 +346,19 @@ describe('★ full reaches the packet, so nobody pays a turn to find out', () =>
   it('carries the doorway and no `full` while there is room', () => {
     let s = withBuilding(world(), 'house')
     s = withAgentAtDoor(s, 'a1')
-    expect(packetFor(s, 'a1').door).toEqual({ x: 2, y: 3 })
+    expect(packetFor(s, 'a1').door).toEqual({ x: 3, y: 4 })
     expect(packetFor(s, 'a1').full).toBeUndefined()
   })
 
   it('carries `full` alongside the doorway once the floor is taken', () => {
     let s = withBuilding(world(), 'house')
-    for (const id of ['a1', 'a2', 'a3']) s = withAgentAtDoor(s, id)
+    for (const id of ['a1', 'a2', 'a3', 'a4', 'a5']) s = withAgentAtDoor(s, id)
     s = fold(s, ev(20, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = fold(s, ev(21, 'agent_entered', { agentId: 'a2', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a4', structureId: 'structure_1' }))
+    s = fold(s, ev(21, 'agent_entered', { agentId: 'a5', structureId: 'structure_1' }))
     const seen = packetFor(s, 'a3')
-    expect(seen.door).toEqual({ x: 2, y: 3 })
+    expect(seen.door).toEqual({ x: 3, y: 4 })
     expect(seen.full).toBe(true)
     // And the packet agrees with the verb, which is the whole reason it is there.
     expect(enter(s, 'a3').ok).toBe(false)
@@ -384,7 +396,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
   it('counts only what is finished and has a roof over it', () => {
     let s = withBuilding(world(), 'house')
     s = withAgentAtDoor(s, 'a1')
-    expect(shelterLedger(s, CFG)).toEqual({ roofs: 1, slots: 2, bodies: 1, per: 2 })
+    expect(shelterLedger(s, CFG)).toEqual({ roofs: 1, slots: 4, bodies: 1, per: 4 })
     // A well is finished and roofless; a half-raised house has a roof nowhere yet.
     s = fold(
       s,
@@ -415,7 +427,7 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
         builderId: 'a1',
       }),
     )
-    expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 2 })
+    expect(shelterLedger(s, CFG)).toMatchObject({ roofs: 1, slots: 4 })
   })
 
   // D1 answers this one at tick zero and means to: survival is the backdrop, so nobody has to
@@ -424,8 +436,8 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     const led = shelterLedger(genesisTown(FOUNDER_IDS.length), CFG)
     expect(led.bodies).toBe(12)
     expect(led.roofs).toBe(10) // the storehouse, the cabin, the cottage, and seven houses
-    expect(led.slots).toBe(21)
-    expect(led.per).toBe(1.75)
+    expect(led.slots).toBe(39)
+    expect(led.per).toBe(3.25)
     expect(led.per, 'a founder wakes indoors on the first morning').toBeGreaterThan(1)
 
     // What is left to raise is the farmhouse nobody sleeps in: a shared project, not a shortage.
@@ -436,25 +448,25 @@ describe('★ the shelter ledger — roofs against bodies, which nobody was coun
     expect(sites).toEqual(['farmhouse'])
   })
 
-  // Every roof left down has to be one a pair of hands can put back, and the only other 2-slot
-  // kinds are the cabin and the storehouse, both exactly a house's mass.
+  // Unfinished roofs must be buildable. The authored cabin and storehouse remain unbuildable.
   it('is the floor reachable without standing up a wall nobody could finish', () => {
     for (const st of Object.values(genesisTown(0).structures)) {
       if (st.stage !== 'construction') continue
       expect(buildableRecipe(CFG, st.kind), `${st.kind} cannot be finished`).not.toBeNull()
     }
-    for (const kind of ['cabin', 'storehouse']) {
+    for (const [kind, area] of [
+      ['cabin', 6],
+      ['storehouse', 9],
+    ] as const) {
       const row = CFG.structures.recipes[kind]!
-      expect(row.w * row.h, kind).toBe(
-        CFG.structures.recipes.house!.w * CFG.structures.recipes.house!.h,
-      )
+      expect(row.w * row.h, kind).toBe(area)
       expect(buildableRecipe(CFG, kind), `${kind} became a second name for a house`).toBeNull()
     }
   })
 
   it('still counts the floor against the bodies, whatever the cast grows to', () => {
-    expect(shelterLedger(genesisTown(30), CFG).per).toBeLessThan(1)
-    expect(shelterLedger(genesisTown(4), CFG).per).toBe(5.25)
-    expect(shelterLedger(genesisTown(2), CFG).per).toBe(10.5)
+    expect(shelterLedger(genesisTown(40), CFG).per).toBeLessThan(1)
+    expect(shelterLedger(genesisTown(4), CFG).per).toBe(9.75)
+    expect(shelterLedger(genesisTown(2), CFG).per).toBe(19.5)
   })
 })

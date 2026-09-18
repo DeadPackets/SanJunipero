@@ -30,8 +30,7 @@ import { perceptionToProse } from './prose.js'
 
 const CFG = DEFAULT_CONFIG
 
-// The genesis valley through a real bridge, so nothing here is a hand-built fixture. The cabin
-// is one of the two roofs left standing, and it is 2x2 like a house.
+// Read both roofs from the genesis valley through the real bridge.
 function town(startTick: number): { bridge: EngineBridge; loop: TickLoop; homeId: string } {
   const db = openDb(':memory:')
   const g = makeGenesisWorld(CFG)
@@ -113,16 +112,14 @@ describe('★ a mind reads the fire in the room it is standing in', () => {
     expect(proseFor(bridge)).not.toContain('hearth')
   })
 
-  // Two 2x2 roofs are not the same night: the house has beds and the cabin has a floor.
-  it('★ the two 2x2 roofs read differently, and only one of them has beds', () => {
+  // Both have roofs, but only the home provides beds.
+  it('★ the home and refuge read differently, and only the home has beds', () => {
     const { bridge, loop, homeId } = town(NIGHT - 3)
     loop.step()
     const said = bridge.perception('amara').visible.structures
     const cabin = Object.values(loop.state.structures).find((s) => s.kind === 'cabin')!
-    // Same mass, same roof, same way in — and one of them is somewhere to sleep well.
-    expect(loop.state.structures[homeId]!.w * loop.state.structures[homeId]!.h).toBe(
-      cabin.w * cabin.h,
-    )
+    expect(CFG.structures.recipes.house!.roofed).toBe(true)
+    expect(CFG.structures.recipes[cabin.kind]!.roofed).toBe(true)
     expect(said.find((x) => x.id === homeId)?.bed).toBe(true)
     expect(said.find((x) => x.id === cabin.id)?.bed).toBeUndefined()
   })

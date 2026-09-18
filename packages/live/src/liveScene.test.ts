@@ -127,6 +127,7 @@ function fakeLlm(o: FakeOpts): LlmClient {
     async text() {
       return { text: 'the day passes', usage: NO_USAGE }
     },
+    abort: () => {},
     totalCostUsd: () => 0,
     alert: (kind: string, detail: string) => {
       insertAlert(o.db, { agentId: o.agentId, kind, detail })

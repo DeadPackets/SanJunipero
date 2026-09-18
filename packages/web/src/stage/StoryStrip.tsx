@@ -7,10 +7,10 @@ import { GameIcon } from '../paper/game/shared.js'
 import { sharePercent } from './ShotBoard.js'
 
 // Narrow views keep the on-screen story first.
-export const STRIP_ROOM = 3
+const STRIP_ROOM = 3
 
 /** The bust the strip overlaps, in CSS pixels of the source frame. */
-export const STRIP_BUST_PX = 26
+const STRIP_BUST_PX = 26
 
 /** What the strip says when the town holds no running story. True of the frame it came in and
  *  of nothing else: the gateway ships an empty list when nothing is above the thread floor. */
@@ -28,7 +28,7 @@ export const stateWord = (c: Capsule): string =>
 
 /** The heat bar as the sheet reads it. A share, never the raw heat: nothing on this band is an
  *  unbounded number. */
-export const shareStyle = (share: number): CSSProperties =>
+const shareStyle = (share: number): CSSProperties =>
   ({ '--share': sharePercent(share) }) as CSSProperties
 
 /** ★ The three the strip has room for, and never without the story the camera is on. The

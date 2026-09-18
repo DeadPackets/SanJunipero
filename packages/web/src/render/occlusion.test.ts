@@ -106,35 +106,54 @@ describe('the walk-around, on the thirteen buildings of the real town', () => {
     )
     // A body's screen box is the DRAWN figure, so the tiles it can cover a building on
     // move with the art rather than with a sheet cell.
-    expect(decided).toBe(471)
+    expect(decided).toBe(623)
     // One tie per frontage face: the tiles where the landed rule drew a body at a door behind
     // the building it stood in front of.
     expect(
       disagreements.map((d) => `${d.structure} ${d.tile} oracle=${d.oracle} got=${d.got}`),
     ).toEqual([
-      'structure_storehouse_36_14 (36,16) oracle=true got=false',
-      'structure_house_36_21 (36,23) oracle=true got=false',
-      'structure_house_24_26 (24,28) oracle=true got=false',
-      'structure_cottage_31_26 (31,28) oracle=true got=false',
-      'structure_cottage_31_26 (32,28) oracle=true got=false',
-      'structure_house_36_52 (36,54) oracle=true got=false',
-      'structure_cabin_36_59 (36,61) oracle=true got=false',
-      'structure_house_24_64 (24,66) oracle=true got=false',
-      'structure_house_31_64 (31,66) oracle=true got=false',
-      'structure_farmhouse_55_33 (55,37) oracle=true got=false',
-      'structure_farmhouse_55_33 (57,33) oracle=true got=false',
-      'structure_farmhouse_55_33 (57,34) oracle=true got=false',
-      'structure_house_55_40 (55,42) oracle=true got=false',
-      'structure_house_43_45 (43,47) oracle=true got=false',
+      'structure_storehouse_35_13 (35,16) oracle=true got=false',
+      'structure_storehouse_35_13 (36,16) oracle=true got=false',
+      'structure_storehouse_35_13 (38,13) oracle=true got=false',
+      'structure_house_35_20 (35,23) oracle=true got=false',
+      'structure_house_35_20 (36,23) oracle=true got=false',
+      'structure_house_35_20 (38,20) oracle=true got=false',
+      'structure_house_23_25 (23,28) oracle=true got=false',
+      'structure_house_23_25 (24,28) oracle=true got=false',
+      'structure_house_23_25 (26,25) oracle=true got=false',
+      'structure_cottage_30_25 (30,28) oracle=true got=false',
+      'structure_cottage_30_25 (31,28) oracle=true got=false',
+      'structure_cottage_30_25 (33,25) oracle=true got=false',
+      'structure_house_35_51 (35,54) oracle=true got=false',
+      'structure_house_35_51 (36,54) oracle=true got=false',
+      'structure_house_35_51 (38,51) oracle=true got=false',
+      'structure_cabin_36_58 (36,61) oracle=true got=false',
+      'structure_cabin_36_58 (38,58) oracle=true got=false',
+      'structure_house_23_63 (23,66) oracle=true got=false',
+      'structure_house_23_63 (24,66) oracle=true got=false',
+      'structure_house_23_63 (26,63) oracle=true got=false',
+      'structure_house_30_63 (30,66) oracle=true got=false',
+      'structure_house_30_63 (31,66) oracle=true got=false',
+      'structure_house_30_63 (33,63) oracle=true got=false',
+      'structure_farmhouse_54_32 (54,36) oracle=true got=false',
+      'structure_farmhouse_54_32 (55,36) oracle=true got=false',
+      'structure_farmhouse_54_32 (57,32) oracle=true got=false',
+      'structure_farmhouse_54_32 (57,33) oracle=true got=false',
+      'structure_house_54_39 (54,42) oracle=true got=false',
+      'structure_house_54_39 (55,42) oracle=true got=false',
+      'structure_house_54_39 (57,39) oracle=true got=false',
+      'structure_house_42_44 (42,47) oracle=true got=false',
+      'structure_house_42_44 (43,47) oracle=true got=false',
+      'structure_house_42_44 (45,44) oracle=true got=false',
     ])
-    expect(disagreements).toHaveLength(14)
+    expect(disagreements).toHaveLength(33)
   })
 
   it('the new sort disagrees with the geometry on NO tile', () => {
     const { decided, disagreements } = sweep((box, _i, tile) =>
       before(depthOrder([box, bodyDepthBox('body', tile.x, tile.y)]), box.id, 'body'),
     )
-    expect(decided).toBe(471)
+    expect(decided).toBe(623)
     expect(
       disagreements.map((d) => `${d.structure} at ${d.tile}: oracle ${d.oracle}, got ${d.got}`),
     ).toEqual([])

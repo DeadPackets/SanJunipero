@@ -30,6 +30,7 @@ export function AlmanacMoments({
   const id = useId()
   const [width, setWidth] = useState(0)
   const [selection, setSelection] = useState<{
+    openerKey: string
     group: readonly Mark[]
     groups: Mark[][]
     all: readonly Mark[]
@@ -45,7 +46,9 @@ export function AlmanacMoments({
       setSelection(null)
     })
     observer.observe(element)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }, [])
   const groups = useMemo(() => {
     const result: Mark[][] = []
@@ -109,7 +112,7 @@ export function AlmanacMoments({
             style={{ left: `clamp(22px, ${fraction * 100}%, calc(100% - 22px))` }}
             title={label}
             aria-label={label}
-            aria-expanded={selection !== null && opener.current?.dataset.group === String(n)}
+            aria-expanded={selection?.openerKey === `${first.tick}-${n}`}
             aria-controls={selection ? id : undefined}
             data-group={n}
             onClick={(event) => {
@@ -121,6 +124,7 @@ export function AlmanacMoments({
               const bounds = event.currentTarget.getBoundingClientRect()
               const bar = root.current!.closest('.almanac')!.getBoundingClientRect()
               setSelection({
+                openerKey: `${first.tick}-${n}`,
                 group,
                 groups,
                 all: marks,
@@ -171,7 +175,13 @@ export function AlmanacMoments({
                   : `${stamp(selection.group[0]!.tick).time} – ${stamp(selection.group[selection.group.length - 1]!.tick).time}`}
               </small>
             </div>
-            <button type="button" aria-label="Close moment" onClick={() => close(true)}>
+            <button
+              type="button"
+              aria-label="Close moment"
+              onClick={() => {
+                close(true)
+              }}
+            >
               ×
             </button>
           </div>
@@ -182,7 +192,9 @@ export function AlmanacMoments({
                   <button
                     type="button"
                     className="almanac-return"
-                    onClick={() => setSelection({ ...selection, moment: null })}
+                    onClick={() => {
+                      setSelection({ ...selection, moment: null })
+                    }}
                   >
                     ‹ Back to {selection.group.length} nearby moments
                   </button>
@@ -210,13 +222,13 @@ export function AlmanacMoments({
                     type="button"
                     aria-label="Previous moment"
                     disabled={index <= 0}
-                    onClick={() =>
+                    onClick={() => {
                       setSelection({
                         ...selection,
                         moment: all[index - 1]!,
                         group: selection.groups.find((g) => g.includes(all[index - 1]!))!,
                       })
-                    }
+                    }}
                   >
                     ‹
                   </button>
@@ -227,13 +239,13 @@ export function AlmanacMoments({
                     type="button"
                     aria-label="Next moment"
                     disabled={index < 0 || index >= all.length - 1}
-                    onClick={() =>
+                    onClick={() => {
                       setSelection({
                         ...selection,
                         moment: all[index + 1]!,
                         group: selection.groups.find((g) => g.includes(all[index + 1]!))!,
                       })
-                    }
+                    }}
                   >
                     ›
                   </button>
@@ -247,7 +259,9 @@ export function AlmanacMoments({
                   <button
                     type="button"
                     data-primary={i === 0 ? '' : undefined}
-                    onClick={() => setSelection({ ...selection, moment: m })}
+                    onClick={() => {
+                      setSelection({ ...selection, moment: m })
+                    }}
                   >
                     <GameIcon kind={categories[m.kind].icon} />
                     <span>

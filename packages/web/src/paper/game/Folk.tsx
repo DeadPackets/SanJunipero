@@ -128,7 +128,9 @@ export function GameFolk({ tab, store, onSubject, onBrowse }: PageProps) {
               <button
                 type="button"
                 key={a.id}
-                onClick={() => onSubject({ kind: 'agent', id: a.id, name: a.name })}
+                onClick={() => {
+                  onSubject({ kind: 'agent', id: a.id, name: a.name })
+                }}
               >
                 {a.name} · {a.departed ? 'Left town' : 'Remembered'} →
               </button>
@@ -333,7 +335,9 @@ function PersonEvents({ store, subject, onPlay }: PageProps) {
           className="sj-event-button"
           key={`${e.type}:${e.seq}`}
           type="button"
-          onClick={() => onPlay(pointPlay(e.tick, store.liveEdge(), e.label, e.agentIds ?? []))}
+          onClick={() => {
+            onPlay(pointPlay(e.tick, store.liveEdge(), e.label, e.agentIds ?? []))
+          }}
         >
           <span className="sj-meta">{momentStamp(e.tick)}</span>
           <strong>{e.label}</strong>
@@ -354,7 +358,7 @@ function Relationships({ store, subject, onSubject }: PageProps) {
   )
   const ledger = useFeed(endpoint)
   const a = state?.agents[subject?.id ?? '']
-  if (!a || !state) return null
+  if (!a) return null
   const mine = mode.live
     ? (read.data?.bonds.filter((b) => b.aId === a.id || b.bId === a.id) ?? [])
     : []
@@ -397,7 +401,9 @@ function Relationships({ store, subject, onSubject }: PageProps) {
               type="button"
               className="sj-relationship"
               key={id}
-              onClick={() => onSubject({ kind: 'agent', id, name: agentName(state.agents, id) })}
+              onClick={() => {
+                onSubject({ kind: 'agent', id, name: agentName(state.agents, id) })
+              }}
             >
               <Portrait store={store} id={id} size={44} />
               <span>

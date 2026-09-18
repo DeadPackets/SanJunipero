@@ -37,15 +37,21 @@ import { DEATH_CAUSES } from './systems/mortality.js'
 import { nutritionOf } from './verbs/index.js'
 import { changesOf } from './testutil/world.js'
 // Nothing is suppressed in this world: mortality, thirst, fauna, warmth, light, the night
-// witness, regrowth and desire paths are all live on the 3-day run. Two dials are held at their
-// pre-D1 speed: D1 put a stomach on a week's clock and a poisoning on a day and a half, and this
+// witness, regrowth and desire paths are all live on the 3-day run. Hunger and poisoning keep
+// their pre-D1 speed: D1 put a stomach on a week's clock and poison on a day and a half, and this
 // gate measures the machinery a dying body sets off — collapse, cause, grave — inside three days.
 const G2_CONFIG = SimConfigSchema.parse({
   needs: { hungerDecayPerTick: 0.021 },
   mortality: { drainPerTick: { poison: 0.12 }, needsKill: true },
-  // Three sim days that have to contain a build. The valley opens ground for one roof every ten,
-  // which is a rate with its own test and not what this gate is reading.
-  construction: { plotOpensEveryTicks: 0 },
+  // Keep the original 2880-tick build within this three-day gate, at the approved wider footprint.
+  // The production build duration and plot-opening rate have their own tests.
+  construction: { plotOpensEveryTicks: 0, houseTicks: 2880 },
+  structures: {
+    recipes: {
+      ...SimConfigSchema.parse({}).structures.recipes,
+      house: { ...SimConfigSchema.parse({}).structures.recipes.house!, durationTicks: 2880 },
+    },
+  },
 })
 
 const SEED = 'g2-scripted'

@@ -961,7 +961,7 @@ describe('★ prefers-reduced-motion: the person still walks, the flourish goes'
     const FLOURISHES: readonly { what: string; line: RegExp }[] = [
       {
         what: 'the 1px passing hop',
-        line: /^\{ phase: e\.gait\.phase, bob: scene\.wantsMotion\(\) \},$/,
+        line: /^\{ phase: e\.gait\.phase \+ \(walking \? e\.walkCycles : 0\), bob: scene\.wantsMotion\(\) \},$/,
       },
       { what: 'a crowd re-forming into its rank', line: /^const t = scene\.wantsMotion\(\)$/ },
       {

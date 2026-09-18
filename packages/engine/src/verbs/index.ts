@@ -778,7 +778,7 @@ const moveInside: VerbDef = makeVerb({
     if (!p.success) return 'name bed, hearth, table, storage, or beside with the person you mean'
     const a = state.agents[agentId]!
     const room = a.insideId === undefined ? undefined : state.structures[a.insideId]
-    if (!room || room.stage !== 'complete') return 'you must be inside a standing building'
+    if (room?.stage !== 'complete') return 'you must be inside a standing building'
     if (a.asleep || a.collapsedSinceTick !== null)
       return 'you cannot stand and move around right now'
     if (p.data.kind === 'bed' && !isBeddedKind(config, room.kind)) return 'there is no bed in here'

@@ -38,7 +38,7 @@ export const PIP_COUNT = 4
 export const PIP_COLOR = 0xf2c879
 /** The fallback denominator, for the frames before the snapshot's config has arrived. It is
  *  `DEFAULT_CONFIG.construction.houseTicks` and it is NOT the authority — see `pipsFilled`. */
-export const BUILD_TICKS_FULL = 2880
+export const BUILD_TICKS_FULL = 6480
 
 /** `houseTicks` comes off the snapshot the viewer already holds, so the meter measures the build the world is actually running; a non-positive or absent figure falls back. */
 export function pipsFilled(progressTicks: number, houseTicks: number | undefined): number {

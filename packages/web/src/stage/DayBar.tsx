@@ -46,10 +46,6 @@ export function stampWord(
   return paused && word === 'LIVE' ? 'PAUSED' : word
 }
 
-/** The day's shape so far, as the gateway marks it: I from the first scene, II once the day has
- *  had its hottest one, III from dusk. Null before the day has anything to be an act of. */
-export type ActMark = 'I' | 'II' | 'III'
-
 /** What the town is doing when nobody in it is doing anything. Nothing wakes a body at an hour,
  *  so there is no hour to name here. Null while anybody is up, which is a town worth watching. */
 export function sleepField(
@@ -291,7 +287,10 @@ export function DayBar({
             className="almanac-control"
             disabled={!handle || !awake}
             aria-label={running ? 'Stop here' : 'Run this day forward'}
-            onClick={() => (running ? goTo(tick) : onWatch(tick))}
+            onClick={() => {
+              if (running) goTo(tick)
+              else onWatch(tick)
+            }}
           >
             <PixelGlyph
               className="almanac-play-glyph"

@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { CSS_DURATION_TOKEN } from './motion.js'
 
+const CORNER = readFileSync(new URL('./corner-controls.css', import.meta.url), 'utf8')
+const ALMANAC = readFileSync(new URL('./almanac.css', import.meta.url), 'utf8')
 const CSS = readFileSync(new URL('./chrome.css', import.meta.url), 'utf8').replace(
   /\/\*[\s\S]*?\*\//g,
   '',
@@ -53,7 +55,7 @@ describe('1 · an icon and its word sit on one line, declared and never defaulte
   it('states align-items on every inline icon+label pair', () => {
     expect(
       missing(ICON_LABEL_PAIRS, (s) => {
-        const v = decl(rulesFor(CSS, s), 'align-items')
+        const v = decl(rulesFor(CSS + CORNER + ALMANAC, s), 'align-items')
         return v === 'baseline' || v === 'center'
       }),
     ).toEqual([])
@@ -62,8 +64,8 @@ describe('1 · an icon and its word sit on one line, declared and never defaulte
 
 // ── 2 · tabular figures wherever a number ticks ───────────────────────────────────────────
 const TICKING_NUMBERS = named([
-  '.day-bar-day',
-  '.day-bar-stamp',
+  '.almanac-day b',
+  '.almanac-clock strong',
   '.thumb-when',
   '.paper-sheet .stamp',
   '.feed-line .stamp',
@@ -78,7 +80,7 @@ describe('2 · a ticking number never shifts the box it sits in', () => {
     expect(
       missing(
         TICKING_NUMBERS,
-        (s) => decl(rulesFor(CSS, s), 'font-variant-numeric') === 'tabular-nums',
+        (s) => decl(rulesFor(CSS + CORNER + ALMANAC, s), 'font-variant-numeric') === 'tabular-nums',
       ),
     ).toEqual([])
   })
@@ -92,7 +94,7 @@ describe('3 · a state arriving does not move the row it arrives in', () => {
   it('reserves the slot, so an empty one is the same size as a full one', () => {
     expect(
       missing(RESERVED_SLOTS, (s) => {
-        const body = rulesFor(CSS, s)
+        const body = rulesFor(CSS + CORNER + ALMANAC, s)
         return decl(body, 'min-width') !== null || decl(body, 'flex-basis') !== null
       }),
     ).toEqual([])
@@ -112,7 +114,7 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
           new RegExp(`^${s.replace(/[.#]/g, '\\$&')}\\s.*:focus-visible$`),
         )
         return rules.some((r) => {
-          const v = decl(rulesFor(CSS, r), 'outline-offset')
+          const v = decl(rulesFor(CSS + CORNER + ALMANAC, r), 'outline-offset')
           return v?.startsWith('-') === true
         })
       }),
@@ -124,7 +126,7 @@ describe('4 · a focus ring inside a clipping box is drawn inside it', () => {
 // Every control that lifts on hover, not the seven somebody happened to list.
 const CONTROLS = named([
   '.feed-tab',
-  '.signpost-arm',
+  '.journal-option',
   '.room-door',
   '.place-row',
   '.roster-sort',
@@ -136,7 +138,9 @@ describe('5 · a control answers the finger that pressed it', () => {
   it('moves and loses a shadow step on :active, for every control', () => {
     expect(
       missing(CONTROLS, (s) => {
-        const body = rulesFor(CSS, `${s}:active`) + rulesFor(CSS, `${s}:active:not(:disabled)`)
+        const body =
+          rulesFor(CSS + CORNER + ALMANAC, `${s}:active`) +
+          rulesFor(CSS + CORNER + ALMANAC, `${s}:active:not(:disabled)`)
         return decl(body, 'translate') !== null && decl(body, 'box-shadow') !== null
       }),
     ).toEqual([])
@@ -149,8 +153,8 @@ describe('6 · a hover arrives in 150ms and leaves the instant the pointer does'
   it('transitions in on --t-fast and out on 0s, for every hovering control', () => {
     expect(
       missing(CONTROLS, (s) => {
-        const base = decl(rulesFor(CSS, s), 'transition-duration')
-        const hovered = decl(rulesFor(CSS, `${s}:hover`), 'transition-duration')
+        const base = decl(rulesFor(CSS + CORNER + ALMANAC, s), 'transition-duration')
+        const hovered = decl(rulesFor(CSS + CORNER + ALMANAC, `${s}:hover`), 'transition-duration')
         return base === '0s' && hovered === `var(${CSS_DURATION_TOKEN.reveal})`
       }),
     ).toEqual([])
@@ -160,8 +164,8 @@ describe('6 · a hover arrives in 150ms and leaves the instant the pointer does'
 // ── 7 · a loading surface has a shape, not a spinner ──────────────────────────────────────
 describe('7 · waiting looks like the thing that is coming', () => {
   it('defines a skeleton slab at a real row height', () => {
-    expect(decl(rulesFor(CSS, '.skeleton-row'), 'height')).not.toBeNull()
-    expect(decl(rulesFor(CSS, '.skeleton-row'), 'background')).not.toBeNull()
+    expect(decl(rulesFor(CSS + CORNER + ALMANAC, '.skeleton-row'), 'height')).not.toBeNull()
+    expect(decl(rulesFor(CSS + CORNER + ALMANAC, '.skeleton-row'), 'background')).not.toBeNull()
   })
 
   // One component, so the loading state's role and its announced word cannot drift between
@@ -188,11 +192,15 @@ describe('8 · art arriving is a cross-fade, never a hard swap', () => {
 // ── 9 · the cursor tells the truth ────────────────────────────────────────────────────────
 describe('9 · the cursor never lies about what is under it', () => {
   it('is a pointer on every control', () => {
-    expect(missing(CONTROLS, (s) => decl(rulesFor(CSS, s), 'cursor') === 'pointer')).toEqual([])
+    expect(
+      missing(CONTROLS, (s) => decl(rulesFor(CSS + CORNER + ALMANAC, s), 'cursor') === 'pointer'),
+    ).toEqual([])
   })
 
   it('is not-allowed on a disabled one, and a grab hand on the town', () => {
-    expect(decl(rulesFor(CSS, '.law-edit input:disabled'), 'cursor')).toBe('not-allowed')
+    expect(decl(rulesFor(CSS + CORNER + ALMANAC, '.law-edit input:disabled'), 'cursor')).toBe(
+      'not-allowed',
+    )
     // the canvas cursor is Pixi's, not the sheet's
     expect(src('../render/cameraRig.ts')).toContain("'grab'")
     expect(src('../render/cameraRig.ts')).toContain("'grabbing'")
@@ -235,11 +243,18 @@ const PARAGRAPHS = named([
 
 describe('11 · a title never leaves one word on its own line', () => {
   it('balances every title', () => {
-    expect(missing(TITLES, (s) => decl(rulesFor(CSS, s), 'text-wrap') === 'balance')).toEqual([])
+    expect(
+      missing(TITLES, (s) => decl(rulesFor(CSS + CORNER + ALMANAC, s), 'text-wrap') === 'balance'),
+    ).toEqual([])
   })
 
   it('prettifies every paragraph', () => {
-    expect(missing(PARAGRAPHS, (s) => decl(rulesFor(CSS, s), 'text-wrap') === 'pretty')).toEqual([])
+    expect(
+      missing(
+        PARAGRAPHS,
+        (s) => decl(rulesFor(CSS + CORNER + ALMANAC, s), 'text-wrap') === 'pretty',
+      ),
+    ).toEqual([])
   })
 })
 
@@ -250,7 +265,7 @@ describe("12 · a scrollable region says so, in the town's own colours", () => {
   it("paints every scroll container's bar from the palette and keeps it visible", () => {
     expect(
       missing(SCROLLERS, (s) => {
-        const body = rulesFor(CSS, s)
+        const body = rulesFor(CSS + CORNER + ALMANAC, s)
         return decl(body, 'scrollbar-color') !== null && decl(body, 'scrollbar-width') !== null
       }),
     ).toEqual([])
@@ -260,7 +275,9 @@ describe("12 · a scrollable region says so, in the town's own colours", () => {
 // ── the anti-vacuity check, last so every list is registered ──────────────────────────────
 describe('every line above is about a surface that exists', () => {
   it('names no selector the sheet does not already have a rule for', () => {
-    const phantom = [...new Set(ALL_NAMED)].filter((s) => rulesFor(CSS, s).length === 0)
+    const phantom = [...new Set(ALL_NAMED)].filter(
+      (s) => rulesFor(CSS + CORNER + ALMANAC, s).length === 0,
+    )
     expect(phantom, 'a finish line satisfiable by writing dead CSS is not a finish line').toEqual(
       [],
     )

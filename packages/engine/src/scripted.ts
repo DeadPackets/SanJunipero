@@ -28,8 +28,8 @@ export const ACTORS = [FARMER, FISHER, IDLER, BUILDER, THIEF, KEEPER] as const
 export const MAP_W = 64
 export const MAP_H = 64
 export const FARM_PLOT = { x: 26, y: 20 }
-export const HOUSE_SITE = { x: 30, y: 20 } // 2x2 footprint
-export const HOUSE_WORK = { x: 30, y: 22 } // adjacent, outside footprint
+export const HOUSE_SITE = { x: 30, y: 20 }
+export const HOUSE_WORK = { x: 30, y: 22 } // fixture work waypoint
 export const STOREHOUSE = { id: 'structure_1', x: 20, y: 20, w: 2, h: 2 }
 export const SHED = { id: 'structure_2', x: 22, y: 20, w: 1, h: 1 }
 export const STOREHOUSE_NEAR = { x: 22, y: 21 } // passable tile adjacent to storehouse
@@ -149,7 +149,7 @@ export function makeIdlerPolicy(): Policy {
 }
 
 // Builder: provision wood + wheat from the storehouse, build the house (with rest breaks),
-// then sleep only.
+// then go through its door and sleep.
 export function makeBuilderPolicy(config: SimConfig): Policy {
   return (p) => {
     const needs = p.self.body.needs
@@ -158,7 +158,11 @@ export function makeBuilderPolicy(config: SimConfig): Policy {
     const food = p.self.inventory.find((i) => isFoodKind(config, i.kind))
     const house = p.visible.structures.find((s) => s.kind === 'house')
 
-    if (house?.stage === 'complete') return { verb: 'sleep', params: {} }
+    if (house?.stage === 'complete') {
+      if (house.door && cheb(p.self.x, p.self.y, house.door.x, house.door.y) > 1)
+        return { verb: 'walk', params: { x: house.door.x, y: house.door.y } }
+      return { verb: 'sleep', params: {} }
+    }
 
     if (needs.hunger < 60 && food) return { verb: 'eat', params: { itemId: food.id } }
 
@@ -269,7 +273,7 @@ function scriptedTimeline(
     emit('item_spawned', {
       id: WOOD_ITEM,
       kind: 'wood',
-      qty: 12,
+      qty: Math.max(12, config.construction.houseMaterials.wood),
       loc: { t: 'structure', id: STOREHOUSE.id },
     })
     emit('item_spawned', {

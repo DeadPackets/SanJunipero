@@ -128,14 +128,15 @@ describe('the story strip never contradicts the picture it stands under', () => 
     ]
     const html = draw(town(rows, ['cyd']))
     expect(html).toContain('story-capsule lit')
-    expect(html).toContain('ON SCREEN')
+    expect(html).toContain('On screen')
     expect(html.match(/story-capsule lit/g)).toHaveLength(1)
   })
 })
 
 describe('the story strip in a quiet town says only what is true', () => {
   it('claims nothing at all off the live edge, where there is no frame', () => {
-    expect(draw(town(null))).toBe('')
+    expect(draw(town(null))).toContain('Return to now for unfolding stories')
+    expect(draw(town(null))).not.toContain('story-capsule')
   })
 
   it('says one true line when the town holds no running story', () => {

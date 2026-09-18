@@ -187,10 +187,10 @@ export function orchardStreetTiles(i = 0, j = 0): OrchardPoint[] {
     for (let n = 1; n < road.length; n++) {
       const [ax, ay] = road[n - 1]!,
         [bx, by] = road[n]!
-      const steps = Math.max(Math.abs(bx! - ax!), Math.abs(by! - ay!)) * 3
+      const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay)) * 3
       for (let t = 0; t <= steps; t++) {
-        const x = Math.round(ax! + ((bx! - ax!) * t) / steps),
-          y = Math.round(ay! + ((by! - ay!) * t) / steps)
+        const x = Math.round(ax + ((bx - ax) * t) / steps),
+          y = Math.round(ay + ((by - ay) * t) / steps)
         for (const dy of [0, 1]) points.set(orchardKey(x, y + dy), { x, y: y + dy })
       }
     }
@@ -246,7 +246,7 @@ export function makeOrchardTemplate(anchor: OrchardPoint = ORCHARD_ANCHOR): City
   const structures = orchardStructures(),
     plots = orchardPlots()
   const set = (x: number, y: number, t: number) => {
-    if (grid[y]?.[x] !== undefined) grid[y]![x] = t
+    if (grid[y]?.[x] !== undefined) grid[y][x] = t
   }
   const occupied = (x: number, y: number, gap = 0) =>
     structures.some((s) =>
@@ -318,9 +318,8 @@ export function makeOrchardTemplate(anchor: OrchardPoint = ORCHARD_ANCHOR): City
       queue = [{ x: door.dx, y: door.dy }],
       prev = new Map<string, string | null>([[orchardKey(door.dx, door.dy), null]])
     let end: string | null = null
-    for (let n = 0; n < queue.length; n++) {
-      const p = queue[n]!,
-        k = orchardKey(p.x, p.y),
+    for (const p of queue) {
+      const k = orchardKey(p.x, p.y),
         tile = grid[p.y]?.[p.x]
       if (tile === T_PATH || tile === T_ROAD) {
         end = k
@@ -352,7 +351,7 @@ export function makeOrchardTemplate(anchor: OrchardPoint = ORCHARD_ANCHOR): City
     while (end !== null) {
       const [x, y] = end.split(',').map(Number)
       if (grid[y!]?.[x!] !== T_ROAD) set(x!, y!, T_PATH)
-      end = prev.get(end)!
+      end = prev.get(end) ?? null
     }
   }
   for (const s of structures)

@@ -114,7 +114,7 @@ describe('the affordance block says what the validators would otherwise refuse',
       'the world allowed it',
     )
     expect(proseFor(t.bridge)).toContain(
-      `You are inside the house (${HOUSE}). While you are in here you cannot walk anywhere or enter anything, and the doorway at (${t.door.x}, ${t.door.y}) is the way back out.`,
+      `You are inside the house (${HOUSE}). While you are in here, outdoor walking and entering another building require stepping outside first. The doorway at (${t.door.x}, ${t.door.y}) is the way back out.`,
     )
   })
 

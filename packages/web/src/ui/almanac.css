@@ -24,7 +24,7 @@
 .almanac-date { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 12px; }
 .almanac-day { width: 48px; height: 52px; border: 1px solid #aa8760; border-radius: 5px; background: var(--a-gold); display: grid; place-content: center; text-align: center; flex-shrink: 0; box-shadow: 0 2px #a08a68; }
 .almanac-day span { font-size: 10px; font-weight: 800; letter-spacing: 1px; }
-.almanac-day b { font: 18px/1.5 'Press Start 2P', monospace; }
+.almanac-day b { font-variant-numeric: tabular-nums; font: 18px/1.5 'Press Start 2P', monospace; }
 .almanac-season { display: flex; align-items: center; gap: 4px; font-weight: 800; text-transform: capitalize; }
 .almanac-date small { display: block; color: var(--a-quiet); font-size: 12px; padding-left: 4px; text-transform: capitalize; }
 .almanac-center { position: absolute; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: 110px; min-height: 52px; display: grid; place-items: center; }
@@ -105,5 +105,16 @@
   .almanac-live { font-size: 10px !important; }
   .almanac-times span:nth-child(2), .almanac-times span:nth-child(4) { display: none; }
 }
-@media (max-width: 360px) { .almanac-date > div:last-child { display: none; } }
+@media (max-width: 360px) {
+  .almanac-center { position: static; grid-row: 2; grid-column: 1 / -1; justify-self: center; transform: none; }
+  .almanac-timeline { grid-row: 3; }
+  .almanac-date { min-width: 0; flex-wrap: wrap; }
+}
 @media (prefers-reduced-motion: reduce) { .almanac, .almanac-token { transition: none; } .almanac-card { animation: none; } }
+
+[data-broadcast='on'] .almanac-day b,
+[data-broadcast='on'] .almanac-date small,
+[data-broadcast='on'] .almanac-clock strong,
+[data-broadcast='on'] .almanac-weather p,
+[data-broadcast='on'] .almanac-status { font-size: var(--f-bcast); }
+[data-broadcast='on'] .almanac-timeline { display: none; }

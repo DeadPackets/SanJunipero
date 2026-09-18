@@ -19,8 +19,7 @@ import {
   type PerceptionPacket,
 } from './prose.js'
 
-// Hands are the rate — `stepBuild` adds one per hand on the site — so a house is a night's work
-// for five. "Still being built" reads the same one hour short as four days short.
+// Progress must use the same total work as the building verb.
 
 const CFG = DEFAULT_CONFIG
 const ev = (seq: number, type: string, payload: unknown): SimEvent => ({
@@ -48,13 +47,10 @@ describe('howFarUp — where the work has got to, in words', () => {
     expect(howFarUp({ done: 5, needs: 0 })).toBe('still being built')
   })
 
-  // The mechanism, said out loud: five hands make 2 880 ticks of walls into 576 ticks of night.
-  it('reads "nearly done" on the walls five hands raise in one night', () => {
+  it('reads "nearly done" on the last tick of a wider house', () => {
     const house = buildTicks(CFG, 'house')
-    expect(house).toBe(2880)
-    const inOneNight = 720 * 5 // five pairs of hands, one 720-tick night
-    expect(inOneNight).toBeGreaterThan(house)
-    expect(howFarUp({ done: 576 * 5, needs: house })).toBe('its walls are nearly done')
+    expect(house).toBe(6480)
+    expect(howFarUp({ done: house - 1, needs: house })).toBe('its walls are nearly done')
   })
 
   // It says where the work is and never what to do about it — the motivation lane's law.
@@ -111,7 +107,7 @@ describe('★ the packet carries how far up the walls are', () => {
   })
 
   it('never claims more work than the building is', () => {
-    expect(seen(siteWorld(9000)).raised).toEqual({ done: 2880, needs: 2880 })
+    expect(seen(siteWorld(9000)).raised).toEqual({ done: 6480, needs: 6480 })
   })
 
   // The founding valley itself: the roofless dwellings say how far up they are, and the two
@@ -140,7 +136,7 @@ describe('★ the packet carries how far up the walls are', () => {
     expect(roofless.length, 'the valley stood nothing roofless').toBeGreaterThan(0)
     for (const st of roofless) {
       expect(st.raised, st.kind).toBeDefined()
-      expect(st.raised!.done / st.raised!.needs, st.kind).toBeCloseTo(0.75, 5)
+      expect(st.raised!.done / st.raised!.needs, st.kind).toBeCloseTo(5 / 6, 5)
       expect(howFarUp(st.raised)).toBe('its walls are three quarters up')
     }
     for (const st of seen.filter((x) => x.stage === 'complete')) {
@@ -362,11 +358,11 @@ describe('* walls already standing are a place the world can name', () => {
   it('names the nearest half-raised building, and how far up it is', () => {
     const s = townWith([
       { id: 'structure_1', kind: 'house', x: 9, y: 9, progress: 2160 },
-      { id: 'structure_2', kind: 'house', x: 2, y: 2, progress: 1440 },
+      { id: 'structure_2', kind: 'house', x: 2, y: 2, progress: buildTicks(CFG, 'house') / 2 },
     ])
     const w = unfinishedWork(s, CFG, { x: 1, y: 1 })!
     expect(w.id).toBe('structure_2')
-    expect(standingWallsLine(w)).toBe('A house is already going up at (2, 4): half up.')
+    expect(standingWallsLine(w)).toBe('A house is already going up at (3, 5): half up.')
   })
 
   it('is silent when the town has nothing half-raised in it', () => {

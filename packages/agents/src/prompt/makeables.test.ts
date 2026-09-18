@@ -28,16 +28,15 @@ describe('the makeable vocabulary comes off the tables the verbs already read', 
     ])
     // A grave has no inputs: the world digs it, and `build` refuses it. It is not vocabulary.
     expect(m.builds.some((b) => b.kind === 'grave')).toBe(false)
-    // Neither is a cabin or a storehouse: both are 2x2, exactly a house's mass, so a buildable
-    // one would be a second name for the same building.
+    // Cabins and storehouses are placed by the world, not buildable recipes.
     expect(m.builds.some((b) => b.kind === 'cabin')).toBe(false)
     expect(m.builds.some((b) => b.kind === 'storehouse')).toBe(false)
-    expect(m.builds.find((b) => b.kind === 'house')!.inputs).toEqual({ wood: 10 })
+    expect(m.builds.find((b) => b.kind === 'house')!.inputs).toEqual({ wood: 22.5 })
     // ★ THE THREE ROOFS PRICE AT ONE RATE: 2.5 wood a tile of floor, off the house's own row.
     for (const [kind, tiles] of [
-      ['house', 4],
-      ['cottage', 6],
-      ['farmhouse', 8],
+      ['house', 9],
+      ['cottage', 9],
+      ['farmhouse', 12],
     ] as const) {
       expect(m.builds.find((b) => b.kind === kind)!.inputs, kind).toEqual({ wood: tiles * 2.5 })
     }
@@ -70,7 +69,7 @@ describe('the sentence a mind reads', () => {
   const line = makeablesLine(makeables(C))
 
   it('says the thing and what it costs, for raising and for shaping alike', () => {
-    expect(line).toContain('a house (10 wood)')
+    expect(line).toContain('a house (22.5 wood)')
     expect(line).toContain('a well (8 stone)')
     expect(line).toContain('cloth (2 fiber)')
     expect(line).toContain('garment (2 cloth, or 2 hide)')
@@ -117,7 +116,7 @@ describe('the road under the makeables list', () => {
 
   // Everything cheaper than a pot of stew, so stew is the only thing left wanting.
   const larderFull = [
-    { kind: 'wood', qty: 20 },
+    { kind: 'wood', qty: 30 },
     { kind: 'fiber', qty: 2 },
     { kind: 'cloth', qty: 2 },
     { kind: 'stone', qty: 8 },
@@ -147,7 +146,7 @@ describe('the road under the makeables list', () => {
   it('★ takes the route with fewest things missing, not the first one listed', () => {
     // A garment is two cloth or two hide. One hide in hand makes the hide road the shorter one.
     const line = road(
-      holding({ kind: 'wood', qty: 20 }, { kind: 'fiber', qty: 2 }, { kind: 'hide', qty: 1 }),
+      holding({ kind: 'wood', qty: 30 }, { kind: 'fiber', qty: 2 }, { kind: 'hide', qty: 1 }),
       {
         nearestSource: at('stack', 9, 9),
       },

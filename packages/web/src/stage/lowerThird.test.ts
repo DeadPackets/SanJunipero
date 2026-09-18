@@ -156,7 +156,9 @@ describe('★ the caption belongs to the shot, and goes with it', () => {
   // The App wiring: the one owner of the shot hands it down. There is no second guess at the
   // camera anywhere in the tree, which is a fact about the whole file and not about one call.
   it('★ is handed the shot by the one owner of it, never by a second guess at the camera', () => {
-    expect(APP).toMatch(/<LowerThird store=\{store\} shot=\{shot\.cast\}/)
+    expect(APP).toMatch(
+      /<LowerThird\s+store=\{store\}\s+shot=\{insideId === null \? shot\.cast : roomCastKey\.split\(\x27 \x27\)\.filter\(Boolean\)\}/,
+    )
     expect(APP).toMatch(/onShot=\{onShot\}/)
   })
 

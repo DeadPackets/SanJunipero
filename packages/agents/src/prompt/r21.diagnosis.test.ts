@@ -127,7 +127,7 @@ describe('R21 candidate 4 — "distance makes gathering irrational": REFUTED', (
     const s = genesisTown()
     // Every founder is a quarter-hour from a bush and from herbs, across two blocks now.
     expect(FIVE.map((id) => nearestOfKind(s, id, 'berry_bush'))).toEqual([10, 11, 13, 13, 10])
-    expect(FIVE.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([11, 12, 13, 15, 8])
+    expect(FIVE.map((id) => nearestOfKind(s, id, 'herb_patch'))).toEqual([13, 12, 13, 15, 8])
     // And nothing over the water moved: the west bank answers a capped search, as it always did.
     for (const [x, y] of [
       [45, 62],
@@ -244,12 +244,16 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const prose = proseFor(inside, 'nadia')
     // R21-A. No line said she was under a roof, and the roof line sent her to its own doorway.
     // Whose roof, not just which: the `lie_with` gate reads the owner and nothing said it.
-    expect(prose).toContain(`You stand inside your own house (${house.id}) at (79, 99).`)
-    expect(prose).toContain('While you are in here you cannot walk anywhere')
+    expect(prose).toContain(
+      `You stand inside your own house (${house.id}) at (${house.x}, ${house.y}).`,
+    )
+    expect(prose).toContain(
+      'outdoor walking and entering another building require stepping outside first',
+    )
     // ★ THE ONE DOOR TILE THAT STAYS. Walking is refused indoors and `exit` takes no mark, so no
     // walk can be aimed at this pair: it says where the body comes out, and the roof line, which
     // used to repeat it, now only says which roof it is.
-    expect(prose).toContain('the doorway at (81, 99) is the way back out')
+    expect(prose).toContain('The doorway at (81, 99) is the way back out')
     expect(prose).toContain('This is the building you are in.')
     expect(prose).not.toContain('Walk to it and you can go in')
     // The world's answer to the instruction that used to be given: both acts now stand, the
@@ -444,7 +448,7 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     }
     // R-H closed it, and neither of these two places is where: block 1 is byte-frozen and the
     // perception is the day log. `makeablesLine` speaks it in block 6, once per turn.
-    expect(makeablesLine(makeables(CFG))).toContain('a house (10 wood)')
+    expect(makeablesLine(makeables(CFG))).toContain('a house (22.5 wood)')
   })
 })
 
@@ -469,7 +473,7 @@ describe('R21 candidate 3 — "refusal text teaches nothing": CONFIRMED, and R21
     [
       'build',
       { kind: 'cottage' },
-      'the town keeps ground for a cottage — go and stand at (94, 94)',
+      'the town keeps ground for a cottage — go and stand at (93, 94)',
     ],
     ['tend', { targetId: 'yusuf' }, 'not adjacent to the patient — they are at (67, 75)'],
     [

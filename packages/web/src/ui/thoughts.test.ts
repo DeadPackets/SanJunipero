@@ -238,10 +238,11 @@ describe('the thoughts button', () => {
 
   // ★ OFF IS A MARK, NOT A DARKER GROUND: the two states differ in shape before they differ in
   // any colour, which is the only signal a `forced-colors` viewer is left with.
-  it('★ empties the wisp rather than swapping the paper', () => {
-    const rects = (t: 'shown' | 'hidden'): number => html(t).match(/<rect/g)?.length ?? 0
-    expect(rects('shown')).toBeGreaterThan(rects('hidden'))
-    expect(src('./chrome.css')).not.toMatch(/\.thoughts-button\[aria-pressed[^}]*var\(--deep\)/)
+  it('★ marks the off state without replacing the control icon', () => {
+    for (const state of ['shown', 'hidden'] as const) expect(html(state)).toContain('control-icon')
+    expect(html('shown')).not.toContain('control-off')
+    expect(html('hidden')).toContain('control-off')
+    expect(html('hidden')).toContain('OFF')
   })
 
   // The post's four arms are the town's four sections; how the town is SHOWN is not a fifth.
@@ -256,14 +257,16 @@ describe('the thoughts button', () => {
     )
     expect(post).not.toContain('thoughts')
     expect(post).not.toContain('Thought')
-    expect(src('./chrome.css')).toContain('.help-button, .thoughts-button, .sound-button {')
+    expect(src('./corner-controls.css')).toContain(
+      '.help-button, .thoughts-button, .sound-button {',
+    )
   })
 
   // ★ `--deep-l` was used here and declared nowhere: an unresolved var makes the declaration
   // invalid at computed-value time, so the slab's ground fell out to transparent on hover.
   it('★ every token the cluster names is a token the sheet declares', () => {
-    const css = src('./chrome.css')
-    const block = /\/\* ── the corner cluster[\s\S]*?\n\n/.exec(css)?.[0] ?? ''
+    const css = src('./chrome.css') + src('./corner-controls.css')
+    const block = src('./corner-controls.css')
     expect(block).not.toBe('')
     for (const [, name] of block.matchAll(/var\((--[\w-]+)\)/g)) {
       expect(css, name).toContain(`${name}:`)

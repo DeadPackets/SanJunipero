@@ -799,7 +799,7 @@ export function fold(
     case 'indoor_destination_chosen': {
       const p = IndoorDestinationChosen.parse(event.payload)
       const a = state.agents[p.agentId]
-      if (!a || a.insideId !== p.structureId) throw new Error('indoor destination outside its room')
+      if (a?.insideId !== p.structureId) throw new Error('indoor destination outside its room')
       return {
         ...state,
         agents: { ...state.agents, [p.agentId]: { ...a, indoorDestination: p.destination } },

@@ -57,7 +57,7 @@ export function useSafeInsets(scene: Scene | null): void {
     let raf = 0
     const measure = (): void => {
       raf = 0
-      // eslint-disable-next-line react-hooks/immutability -- Scene is an external Pixi handle; this writes to the canvas, not to React data.
+
       scene.safeInsets = insetsOf(boxOf(scene.app.canvas), boxes(TOP_BAND), boxes(BOTTOM_BAND))
     }
     const ask = (): void => {

@@ -201,7 +201,7 @@ describe('INTERIOR_LAYOUTS and roomFurnishings', () => {
 
   it('furnishes every interior kind from the C13 city template, resolving `tools`', () => {
     const house = roomFurnishings('house')
-    expect(house.map((f) => f.kind)).toEqual(['bed', 'hearth', 'table', 'chair', 'rug'])
+    expect(house.map((f) => f.kind)).toEqual(['bed', 'bed', 'hearth', 'table', 'chair', 'rug'])
     expect(roomFurnishings('storehouse').map((f) => f.kind)).toEqual([
       'shelf',
       'shelf',
@@ -269,10 +269,9 @@ describe('bedSlots', () => {
     const slots = lay('house', ['amara', 'yusuf'])
     expect(Object.keys(slots).sort()).toEqual(['amara', 'yusuf'])
     expect(slots.amara).not.toEqual(slots.yusuf)
-    // INTERIOR TILES, not template slots: `slotToTile` puts slot (2,1) on tile (9,2), and the
-    // bed is 1x2, so the second sleeper takes the tile behind the first.
-    expect(slots.amara).toEqual(slotToTile({ x: 2, y: 1 }))
-    expect(slots.yusuf).toEqual({ x: 9, y: 3 })
+    // The expanded room seats this bed at (9,3), with one sleeper on each interior tile.
+    expect(slots.amara).toEqual({ x: 9, y: 3 })
+    expect(slots.yusuf).toEqual({ x: 9, y: 4 })
   })
 
   it('maps nobody in a kind with no bed', () => {
@@ -281,8 +280,8 @@ describe('bedSlots', () => {
   })
 
   it('leaves a sleeper past the last bed cell unmapped rather than stacking bodies', () => {
-    const slots = lay('house', ['a', 'b', 'c'])
-    expect(Object.keys(slots)).toEqual(['a', 'b'])
+    const slots = lay('house', ['a', 'b', 'c', 'd', 'e'])
+    expect(Object.keys(slots)).toEqual(['a', 'b', 'c', 'd'])
     expect(BED_FOOTPRINT).toEqual({ w: 1, h: 2 })
   })
 
@@ -295,8 +294,8 @@ describe('bedSlots', () => {
         isBed: true,
       }),
     ]
-    const slots = lay('house', ['a', 'b'], records)
-    expect(Object.keys(slots)).toEqual(['a']) // a one-cell bed sleeps one
+    const slots = lay('house', ['a', 'b', 'c'], records)
+    expect(Object.keys(slots)).toEqual(['a', 'b']) // each one-cell bed sleeps one
   })
 
   it('★ reads the bed off the plan it is HANDED, and never derives one of its own', () => {
@@ -660,7 +659,7 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
     expect(path).not.toBeNull()
     expect(path!.length).toBeGreaterThan(0)
     // not vacuous: the room is furniture as well as floor, so SOMETHING must be unwalkable
-    expect(walkableCount(map)).toBeLessThan(ROOM_TILES.w * ROOM_TILES.h)
+    expect(walkableCount(map)).toBeLessThan(roomSizeOf('cabin').w * roomSizeOf('cabin').h)
     expect(walkableCount(map)).toBeGreaterThan(0)
   })
 
@@ -716,14 +715,15 @@ describe('★ the cabin is a room, and it is the room the engine says it is', ()
       expect(roomSizeOf(kind), kind).toEqual(roomTilesFor({ w: plan.w, h: plan.h }))
     }
     // the house's landed room is what FORCES the factor — it is derived, not chosen
-    expect(roomSizeOf('house')).toEqual({ w: 12, h: 6 })
-    expect(roomSizeOf('cabin')).toEqual({ w: 12, h: 6 })
-    expect(roomSizeOf('storehouse')).toEqual({ w: 12, h: 6 })
-    expect(roomSizeOf('cottage')).toEqual({ w: 18, h: 6 })
-    expect(roomSizeOf('farmhouse')).toEqual({ w: 24, h: 6 })
-    // and more bodies is strictly more floor, in the same order the ladder ranks them
+    expect(roomSizeOf('house')).toEqual({ w: 18, h: 9 })
+    expect(roomSizeOf('cabin')).toEqual({ w: 18, h: 6 })
+    expect(roomSizeOf('storehouse')).toEqual({ w: 18, h: 9 })
+    expect(roomSizeOf('cottage')).toEqual({ w: 18, h: 9 })
+    expect(roomSizeOf('farmhouse')).toEqual({ w: 24, h: 9 })
+    // The house and cottage now share a footprint, while cabin and farmhouse bound them.
     const floorOf = (k: InteriorKind): number => roomSizeOf(k).w * roomSizeOf(k).h
-    expect(floorOf('house')).toBeLessThan(floorOf('cottage'))
+    expect(floorOf('cabin')).toBeLessThan(floorOf('house'))
+    expect(floorOf('house')).toBe(floorOf('cottage'))
     expect(floorOf('cottage')).toBeLessThan(floorOf('farmhouse'))
   })
 
@@ -751,26 +751,28 @@ describe('★ a shared room and a private room, and the difference is the ladder
   }
   const isPrivate = (kind: string): boolean => DEFAULT_CONFIG.structures.privateKinds.includes(kind)
 
-  it('★ one bed if the door is yours, one bed per body if it is not', () => {
+  it('★ shared beds cover a private household, and shared rooms give each body a bed', () => {
     const bedded = INTERIOR_KINDS.filter((k) => isBeddedKind(DEFAULT_CONFIG, k))
     for (const kind of bedded) {
-      const want = isPrivate(kind) ? 1 : roomCapacity(planOf(kind))
+      const want = isPrivate(kind)
+        ? Math.ceil(roomCapacity(planOf(kind)) / 2)
+        : roomCapacity(planOf(kind))
       expect(beds(kind), `${kind} beds`).toBe(want)
     }
     // NOT VACUOUS: the two branches must both be exercised, or one rule is untested
     expect(bedded.filter(isPrivate).length).toBeGreaterThan(0)
     expect(bedded.filter((k) => !isPrivate(k)).length).toBeGreaterThan(0)
     // and the counts really are different, which is the whole point of the picture
-    expect(beds('house')).toBe(1)
-    expect(beds('cottage')).toBe(3)
-    expect(beds('farmhouse')).toBe(4)
+    expect(beds('house')).toBe(2)
+    expect(beds('cottage')).toBe(4)
+    expect(beds('farmhouse')).toBe(6)
   })
 
   it('★ so a house and a farmhouse cannot be mistaken for one another', () => {
     const house = roomFurnishings('house').map((f) => f.kind)
     const farm = roomFurnishings('farmhouse').map((f) => f.kind)
-    expect(house.filter((k) => k === 'bed')).toHaveLength(1)
-    expect(farm.filter((k) => k === 'bed')).toHaveLength(4)
+    expect(house.filter((k) => k === 'bed')).toHaveLength(2)
+    expect(farm.filter((k) => k === 'bed')).toHaveLength(6)
     // a chair seats one; a bench seats whoever sits down
     expect(house).toContain('chair')
     expect(house).not.toContain('bench')
