@@ -3,7 +3,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import type { Scene } from './scene.js'
 import { bubbleLife, type BubbleLayer } from './bubbles.js'
 import { thoughtsHidden, type ThoughtsSetting } from '../ui/thoughts.js'
-import { screenAnchor } from '../stage/anchor.js'
+import { agentScreenAnchor } from './agentAnchor.js'
 import { tintOf } from '../paper/game/shared.js'
 import icons from '../paper/game/assets/flat-icons.png'
 
@@ -61,19 +61,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       reaction.style.backgroundPosition = `${((index % 4) * 100) / 3}% ${(Math.floor(index / 4) * 100) / 3}%`
     }
   })
-  const anchor = (id: string) => {
-    const a = store.getState()?.agents[id]
-    if (!a?.alive) return null
-    if (scene.interior?.isActive()) {
-      if (a.insideId !== scene.interior.activeId()) return null
-      return scene.interior.speechAnchor?.(id) ?? null
-    }
-    if (a.insideId != null) return null
-    const at = scene.pointOf('agent', id)
-    if (!at) return null
-    const foot = screenAnchor(scene.viewRect(), scene.getZoom(), at.sx, at.sy)
-    return foot.onScreen ? { x: foot.x, y: foot.y - 40 * scene.getZoom(), footY: foot.y } : null
-  }
+  const anchor = (id: string) => agentScreenAnchor(scene, store, id)
   const gateThoughts = () => {
     if (!thoughtsHidden(graveTone, viewer)) return
     queue = queue.filter((line) => !line.isThought)
@@ -161,6 +149,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       }
       const at = active ? anchor(active.agentId) : null
       root.hidden = !at
+      root.dataset.agentId = active?.agentId ?? ''
       if (!active || !at) return
       balloon.hidden = scene.getZoom() <= 0.5 && !scene.interior?.isActive()
       const w = balloon.offsetWidth,

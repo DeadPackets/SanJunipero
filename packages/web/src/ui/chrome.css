@@ -47,9 +47,8 @@
   --rose-pale: #F2C6C2;
   --sky: #3E6786;
 
-  /* State, which is us and not the world: the one you are in, and the control that is on. The
-     ink's own hue at reading strength — 4.88:1 under deep, 3.08:1 on cream, where ember was 2.70. */
-  --current: #AA7ACD;
+  /* Selection sage holds 4.96:1 on deep and 3.03:1 on cream. */
+  --current: #83956A;
   /* The other half of us: a mark our own hand made, on a page the town never prints. Cool,
      because nothing the town prints is. Ink on it is 6.77:1. */
   --operator: #BFCCE8;

@@ -716,19 +716,21 @@ export function createCharacterLayer(
         e.ghost.visible = p < 1
       }
       const status = emotesHidden ? null : overheadRow(a, nowTick)
-      const row = scene.spatial && status?.id === 'talking' ? null : status
-      e.overhead.node.position.set(sx, sy - targetPx - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
-      setGlyph(e, row?.glyph ?? null)
-      e.overhead.setRow(row)
       const deciding =
         minds.get(a.id)?.state === 'deciding' &&
         (inScene.has(a.id) || a.id === scene.pickedId) &&
         a.alive
+      const token = status?.id === 'asleep' || statusOf(a, nowTick) === 'working' || deciding
+      const row =
+        scene.spatial && (status?.id === 'talking' || (!status?.urgent && token)) ? null : status
+      e.overhead.node.position.set(sx, sy - targetPx - SLOT_ABOVE_HEAD_PX - SLOT_PX / 2)
+      setGlyph(e, row?.glyph ?? null)
+      e.overhead.setRow(row)
       if (deciding !== e.deciding) {
         e.deciding = deciding
         e.caretSinceMs = nowMs
       }
-      const lit = deciding ? caretLit(e.caretSinceMs, nowMs, wantsMotion) : 0
+      const lit = deciding && !scene.spatial ? caretLit(e.caretSinceMs, nowMs, wantsMotion) : 0
       e.overhead.setCaret(lit)
       e.overhead.node.visible = row !== null || lit > 0
       // ONE placement rule for every label in the product, and the layer applies it: the plate

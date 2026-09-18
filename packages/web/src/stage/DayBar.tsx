@@ -5,7 +5,7 @@ import type { WorldStore } from '../state/worldStore.js'
 import { stamp } from '../paper/stamp.js'
 import { tickBadgeState, type BadgeState, type LinkState } from '../ui/broadcastReady.js'
 import { townAsleep } from '../ui/directorCut.js'
-import { WEATHER_GLYPH } from '../ui/townStats.js'
+import { WeatherIcon } from './WeatherIcon.js'
 import { skyKind, skyWord } from '../ui/skyModel.js'
 import { useFrameCoalesced } from '../ui/onFrame.js'
 import { endpoint, useFeed, usePolled } from '../ui/useEndpoint.js'
@@ -268,10 +268,7 @@ export function DayBar({
         </div>
       </div>
       <div className="almanac-weather">
-        <PixelGlyph
-          className="almanac-sky"
-          pixels={(WEATHER_GLYPH[kind] ?? WEATHER_GLYPH['—']!).pixels}
-        />
+        <WeatherIcon kind={kind} />
         <div>
           <p>{weather.toLowerCase()}</p>
           <CameraChip autoCut={autoCut} handbackAt={handbackAt} />

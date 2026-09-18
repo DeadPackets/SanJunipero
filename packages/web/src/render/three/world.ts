@@ -5,8 +5,6 @@ import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
 import type { FederatedPointerEvent } from 'pixi.js'
 import {
   ACESFilmicToneMapping,
-  Box3,
-  ConeGeometry,
   Mesh,
   Group,
   MeshStandardMaterial,
@@ -34,6 +32,7 @@ import type { Scene } from '../scene.js'
 import { entersOnClick, type WorldPick } from '../entities.js'
 import { rendersOnMap, type CharacterLayer } from '../characters.js'
 import { buildStructure, structureKey } from './structures.js'
+import { syncBuildingFire } from './buildingFire.js'
 import { createTerrain } from './terrain.js'
 import { createOcclusionFader } from './occlusion.js'
 import { createEnvironment } from './environment.js'
@@ -326,30 +325,8 @@ export function createThreeWorld(
           material.emissiveIntensity +=
             (windowIntensity - material.emissiveIntensity) *
             (roofed && view.wantsMotion() ? Math.min(1, dt * 6) : 1)
-        if (state.structures[id]?.burning && !entry.group.userData.fire) {
-          const fire = new Group()
-          entry.group.updateWorldMatrix(true, true)
-          const height = new Box3().setFromObject(entry.group).max.y
-          const structure = state.structures[id]
-          fire.position.set(structure.w / 2, Math.max(0.2, height - 0.55), structure.h / 2)
-          for (let i = 0; i < 5; i++) {
-            const flame = new Mesh(
-              new ConeGeometry(0.16, 0.65 + i * 0.1, 5),
-              new MeshStandardMaterial({
-                color: 0xffbb66,
-                emissive: 0xff8822,
-                emissiveIntensity: 1.8,
-                transparent: true,
-                opacity: 0.85,
-                depthWrite: false,
-              }),
-            )
-            flame.position.set(Math.sin(i * 2.4) * 0.25, 0.3, Math.cos(i * 2.4) * 0.25)
-            fire.add(flame)
-          }
-          entry.group.add(fire)
-          entry.group.userData.fire = fire
-        }
+        const structure = state.structures[id]
+        if (structure) syncBuildingFire(entry.group, structure, seconds)
         const fire = entry.group.userData.fire as Group | undefined
         if (fire) {
           fire.visible = lit || state.structures[id]?.burning === true

@@ -97,6 +97,7 @@ export function actTrackShown(run: ActRun): boolean {
 }
 
 export type ActLayer = {
+  working(agentId: string): boolean
   /** the exact duration, from `action_started`; everything else is read off the world state */
   noteStart(agentId: string, verb: string, duration: number): void
   /** ★ How far into their job this person is — 0..1 while a short act runs, and null the moment
@@ -177,6 +178,7 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
   }
 
   return {
+    working: (agentId) => atWork.has(agentId),
     noteStart: (agentId, verb, duration) => {
       starts.set(agentId, { verb, duration })
     },
@@ -217,13 +219,13 @@ export function createActLayer(scene: Scene, store: WorldStore): ActLayer {
           runs.set(a.id, run)
           // Indoors is off the map: the character layer has taken the body down, and a chip at
           // the record's tile would hang over the roof they are under.
-          if (rendersOnMap(a) && actShown(a, run, nowTick)) atWork.add(a.id)
+          if ((scene.spatial || rendersOnMap(a)) && actShown(a, run, nowTick)) atWork.add(a.id)
         }
         stale.length = 0
         for (const id of chips.keys()) if (!atWork.has(id)) stale.push(id)
         for (const id of stale) drop(id)
       }
-      if (atWork.size === 0) {
+      if (scene.spatial || atWork.size === 0) {
         scene.tags.setOccupied('acts', [])
         return
       }

@@ -37,7 +37,8 @@
 .almanac-weather { grid-column: 3; grid-row: 1; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .almanac-weather > div { text-align: right; }
 .almanac-weather p { text-transform: capitalize; }
-.almanac-sky { color: #af915a; flex: none; }
+.almanac-sky { flex: none; }
+.weather-icon { display: inline-block; width: 36px; height: 36px; background-size: 600% 100%; background-repeat: no-repeat; image-rendering: pixelated; vertical-align: middle; }
 .almanac-weather .camera-chip { position: static; font: 10px/1.4 Manrope, sans-serif; background: none; color: var(--a-quiet); padding: 0; border: 0; }
 .almanac-status { border: 1px solid var(--a-stroke); border-radius: 4px; background: var(--a-replay); color: var(--a-replay-ink); padding: 6px 10px; font-size: 11px; font-weight: 800; min-width: 58px; text-align: center; text-transform: capitalize; }
 .almanac-status[data-live='true'] { background: var(--a-green); color: var(--a-green-ink); border-color: var(--a-green-edge); }
@@ -118,3 +119,12 @@
 [data-broadcast='on'] .almanac-weather p,
 [data-broadcast='on'] .almanac-status { font-size: var(--f-bcast); }
 [data-broadcast='on'] .almanac-timeline { display: none; }
+
+.almanac-weather .camera-chip { letter-spacing:0; text-transform:none; }
+@media (max-width: 700px) {
+  .almanac-weather .camera-chip { white-space:normal; overflow-wrap:break-word; }
+  .almanac-weather { grid-template-columns:24px auto; column-gap:5px; justify-self:end; }
+  .almanac-weather .weather-icon { display:inline-block; width:24px; height:24px; grid-column:1; grid-row:1; align-self:start; }
+  .almanac-weather > div { grid-column:2; max-width:82px; }
+  .almanac-weather .almanac-status { grid-column:2; }
+}

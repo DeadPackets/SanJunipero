@@ -126,8 +126,8 @@ describe('a carved name is readable where it is cut', () => {
     expect(TOPONYM_LABEL_PX).toBeGreaterThanOrEqual(TEXT_MIN_PX)
   })
 
-  it('clears AA against the ink it is cut into, in both halves of the day', () => {
-    const r = bandRatios(LANDMARK_PLATE, LANDMARK_INK)
+  it('clears AA against its paper plate, in both halves of the day', () => {
+    const r = bandRatios(LANDMARK_INK, LANDMARK_PLATE)
     expect(r.day).toBeGreaterThanOrEqual(AA_RATIO)
     expect(r.night).toBeGreaterThanOrEqual(AA_RATIO)
   })
@@ -144,8 +144,8 @@ describe('a name stays with the thing it is cut into', () => {
   })
 
   // The glyph's own colour is the one channel this renderer is measured to drop.
-  it('carries its ink as a drawn slab, never as a halo of glyphs', () => {
-    expect(src).toContain('plate.fill(LANDMARK_INK)')
+  it('carries its paper as a drawn slab, never as a halo of glyphs', () => {
+    expect(src).toContain('plate.fill(LANDMARK_PLATE)')
     expect(src).not.toContain('HALO')
   })
 })

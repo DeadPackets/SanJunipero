@@ -57,7 +57,7 @@ function cutName(text: string): Cut {
   const face = createWorldLabel(text, {
     fontFamily: faceFor('label').family,
     fontSize: TOPONYM_LABEL_PX,
-    fill: LANDMARK_PLATE,
+    fill: LANDMARK_INK,
   })
   face.anchor.set(0.5, 0)
   face.eventMode = 'none'
@@ -69,8 +69,9 @@ function drawPlate(cut: Cut): void {
   const w = cut.plateW,
     h = cut.face.height + TOPONYM_PAD_Y * 2
   cut.plate.clear()
-  cut.plate.rect(-w / 2, -TOPONYM_PAD_Y, w, h)
-  cut.plate.fill(LANDMARK_INK)
+  cut.plate.roundRect(-w / 2, -TOPONYM_PAD_Y, w, h, 2)
+  cut.plate.fill(LANDMARK_PLATE)
+  cut.plate.stroke({ width: 1, color: 0xb89d7e })
 }
 
 /** How far a carved name may wander from the thing it is cut into: its own size. A name pinned
