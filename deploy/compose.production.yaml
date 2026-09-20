@@ -1,0 +1,22 @@
+services:
+  town:
+    image: ${SJ_RELEASE_IMAGE:?Set the verified release image}
+    environment:
+      SJ_LIVE: "1"
+      SJ_MAP: orchard
+      SJ_RINGS: "1"
+      SJ_FOUNDERS: "12"
+      SJ_LAMPS: "16"
+      SJ_INTERIORS: "1"
+      SJ_BUILDERS: "1"
+      SJ_BRIDGE: "1"
+      SJ_JOINT: "0"
+      SJ_SPEND_DAILY_USD: ${SJ_SPEND_DAILY_USD:?Set the approved daily spending limit}
+      SJ_SPEND_CAP_USD: ${SJ_SPEND_CAP_USD:?Set a lifetime spending ceiling}
+      SJ_MAX_MINDS: "20"
+      SJ_ART_DAILY_USD: "1.25"
+      SJ_IDLE_PACING: "1"
+      SJ_IDLE_AFTER_MS: "300000"
+      SJ_IDLE_SPEED: "0.25"
+      SJ_PUBLIC_ORIGIN: https://sanjunipero.deadpackets.pw
+

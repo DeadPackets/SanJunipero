@@ -129,8 +129,7 @@ function townAsleep(state: WorldState): boolean {
   return here.length > 0 && here.every((a) => a.asleep)
 }
 
-/** Agent memory is a separate `<id>.db` per mind, so world and mind are wiped as ONE unit.
- *  Only `*.db` goes — the rest of the directory is not this function's to delete. */
+// Reset resident memory with the world, but keep the spending ledger and its pending WAL.
 function wipeAgentMemory(agentDbDir: string | undefined): number {
   if (agentDbDir === undefined) return 0
   let gone = 0
@@ -142,6 +141,7 @@ function wipeAgentMemory(agentDbDir: string | undefined): number {
   }
   for (const name of names) {
     if (!/\.db(-wal|-shm)?$/.test(name)) continue
+    if (/^_ops\.db(-wal|-shm)?$/.test(name)) continue
     rmSync(join(agentDbDir, name), { force: true })
     gone += 1
   }

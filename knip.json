@@ -86,7 +86,8 @@
     },
     "packages/web": {
       "entry": [
-        "src/**/*.test.ts"
+        "src/**/*.test.ts",
+        "src/review/ui-review.tsx"
       ],
       "project": [
         "src/**/*.{ts,tsx}"

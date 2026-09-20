@@ -235,7 +235,7 @@ describe('the signpost', () => {
   it('★ writes the address bar outside the state updater, never inside it', () => {
     const app = src('../App.tsx')
     expect(app).not.toMatch(/setRoute\(\([\s\S]{0,200}?writeAddress/)
-    expect(app.match(/writeAddress\(/g)).toHaveLength(4) // the definition and navigation, moment, and interior callers
+    expect(app.match(/writeAddress\(/g)).toHaveLength(5) // definition, replay, moment, door entry and interior navigation
   })
 
   it('★ is what the app mounts, with the arm’s wiring kept', () => {

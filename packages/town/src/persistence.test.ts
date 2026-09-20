@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -247,5 +247,24 @@ describe('★ fresh means fresh for the minds too', () => {
     writeFileSync(omar, 'a memory written while the town ran')
     await runTo(dbPath, 6, { agentDbDir })
     expect(existsSync(omar)).toBe(true)
+  }, 60_000)
+
+  it('preserves spending history and its SQLite sidecars when founding a fresh town', async () => {
+    const agentDbDir = join(dir, 'fresh-with-ledger')
+    mkdirSync(agentDbDir, { recursive: true })
+    const files = ['_ops.db', '_ops.db-wal', '_ops.db-shm']
+    for (const name of files) writeFileSync(join(agentDbDir, name), `spend history: ${name}`)
+    for (const suffix of ['', '-wal', '-shm']) {
+      writeFileSync(join(agentDbDir, `omar.db${suffix}`), 'old memory')
+    }
+
+    await runTo(join(dir, 'fresh-ledger.db'), 3, { world: { fresh: true }, agentDbDir })
+
+    for (const name of files) {
+      expect(readFileSync(join(agentDbDir, name), 'utf8')).toBe(`spend history: ${name}`)
+    }
+    for (const suffix of ['', '-wal', '-shm']) {
+      expect(existsSync(join(agentDbDir, `omar.db${suffix}`))).toBe(false)
+    }
   }, 60_000)
 })
