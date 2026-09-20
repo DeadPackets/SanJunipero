@@ -136,8 +136,12 @@ function fakeLlm(db: Database.Database, agentId: string | null, turn: unknown): 
     { rulings: [] }, // the recognizer's classification
     {},
   ]
+  const cancellation = new AbortController()
   const client: FakeClient = {
-    abort: () => {},
+    abort: () => {
+      cancellation.abort()
+    },
+    signal: cancellation.signal,
     async object<T>(o: { schema: { safeParse(v: unknown): { success: boolean; data?: T } } }) {
       for (const c of canned) {
         const parsed = o.schema.safeParse(c)

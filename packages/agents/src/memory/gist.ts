@@ -7,7 +7,7 @@ import type { MemoryRow, MemoryStore } from './store.js'
  *  that band paid a whole call to save a line. */
 export const GIST_MIN_CHARS = 700
 
-export type GistLlm = { gist(text: string): Promise<string> }
+export type GistLlm = { signal?: AbortSignal; gist(text: string): Promise<string> }
 
 // A mark is the only handle an act has on a thing: a short form that paraphrases
 // `item_..._bread` as "bread" leaves the next turn unable to name what it reaches for.
@@ -62,7 +62,8 @@ export async function gistMemories(
   mem: MemoryStore,
   llm: GistLlm,
   memories: MemoryRow[],
-  sleep: (ms: number) => Promise<void> = pause,
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void> = (ms, signal) =>
+    pause(ms, undefined, { signal }),
 ): Promise<GistBatch> {
   const today = memories.filter(needsGist)
   const seen = new Set(today.map((m) => m.id))
@@ -72,8 +73,14 @@ export async function gistMemories(
   let written = 0
   let failed = 0
   let streak = 0
+  let halted = false
   const lane = async (): Promise<void> => {
-    for (let i = next++; i < queue.length && streak < GIST_MAX_CONSECUTIVE_FAILURES; i = next++) {
+    for (
+      let i = next++;
+      i < queue.length && streak < GIST_MAX_CONSECUTIVE_FAILURES && !halted;
+      i = next++
+    ) {
+      llm.signal?.throwIfAborted()
       const m = queue[i]!
       try {
         const gist = (await llm.gist(m.text)).trim()
@@ -83,14 +90,21 @@ export async function gistMemories(
         written += 1
       } catch (err) {
         // A night with no headroom left is not a busy endpoint: it latches the whole reflection.
-        if (err instanceof BudgetExceededError) throw err
+        if (err instanceof BudgetExceededError || llm.signal?.aborted) {
+          halted = true
+          throw err
+        }
         failed += 1
         streak += 1
         if (streak >= GIST_MAX_CONSECUTIVE_FAILURES) break
-        await sleep(GIST_RETRY_PAUSE_MS * streak)
+        await sleep(GIST_RETRY_PAUSE_MS * streak, llm.signal)
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(GIST_LANES, queue.length) }, lane))
+  const results = await Promise.allSettled(
+    Array.from({ length: Math.min(GIST_LANES, queue.length) }, lane),
+  )
+  const rejected = results.find((result) => result.status === 'rejected')
+  if (rejected) throw rejected.reason as unknown
   return { written, eligible: queue.length, failed }
 }

@@ -81,9 +81,8 @@ services:
         max-size: "10m"
         max-file: "5"
     healthcheck:
-      # `/api/timeline/marks` answers only once the world mirror has folded a state, so it
-      # reports the WORLD being up rather than the port being open.
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/timeline/marks').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      # HTTP success is not enough: a town stuck on one tick for 15 minutes is unhealthy.
+      test: ["CMD", "node", "--import", "tsx", "scripts/healthcheck.ts"]
       interval: 30s
       timeout: 5s
       start_period: 120s

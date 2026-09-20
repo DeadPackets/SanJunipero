@@ -158,6 +158,7 @@ export async function runSleepReflection(deps: {
     try {
       return await run()
     } catch (err) {
+      llm.signal?.throwIfAborted()
       // Every step here is one provider call, and no failure of one may cost the mind its day:
       // throwing skips the day node below, and the caller has already marked the night done.
       degraded.reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
@@ -271,6 +272,7 @@ export async function runSleepReflection(deps: {
     try {
       gists = await gistMemories(mem, llm, dayMemories)
     } catch (err) {
+      llm.signal?.throwIfAborted()
       degraded.reason ??= err instanceof Error ? `${err.name}: ${err.message}` : String(err)
     }
   }
@@ -609,6 +611,7 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
   const editClient = client.forCaller('reflection.edit')
   const gistClient = client.forCaller('reflection.gist')
   return {
+    signal: client.signal,
     async gist(text) {
       const p = gistPrompt(text)
       const { text: answer } = await gistClient.text({ system: p.system, messages: p.messages })

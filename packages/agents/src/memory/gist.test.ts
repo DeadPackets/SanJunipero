@@ -46,6 +46,108 @@ describe('which memories are worth a gist', () => {
 })
 
 describe('gistMemories', () => {
+  it('does not retry shutdown cancellation as a provider failure', async () => {
+    const mem = await store()
+    const rows = await rowsNamed(mem, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+    const controller = new AbortController()
+    let asked = 0
+    const batch = gistMemories(
+      mem,
+      {
+        signal: controller.signal,
+        gist: async () => {
+          asked += 1
+          controller.abort(new DOMException('Stopped', 'AbortError'))
+          throw new DOMException('Stopped', 'AbortError')
+        },
+      },
+      rows,
+      noPause,
+    )
+    await expect(batch).rejects.toThrow('Stopped')
+    expect(asked).toBeLessThanOrEqual(GIST_LANES)
+  })
+
+  it('waits for the other lanes before reporting cancellation', async () => {
+    const mem = await store()
+    const rows = await rowsNamed(mem, ['a', 'b'])
+    const controller = new AbortController()
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let settled = false
+    const batch = gistMemories(
+      mem,
+      {
+        signal: controller.signal,
+        gist: async (text) => {
+          if (text.endsWith('a')) {
+            await Promise.resolve()
+            controller.abort(new DOMException('Stopped', 'AbortError'))
+            throw new DOMException('Stopped', 'AbortError')
+          }
+          await held
+          return 'short'
+        },
+      },
+      rows,
+      noPause,
+    )
+    const done = batch.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const endedBeforeOtherLane = settled
+    release()
+    await done
+    expect(endedBeforeOtherLane).toBe(false)
+    await expect(batch).rejects.toThrow('Stopped')
+  })
+
+  it('cancels a retry pause when the shared client is stopped', async () => {
+    const mem = await store()
+    const rows = await rowsNamed(mem, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+    const controller = new AbortController()
+    let paused!: () => void
+    const enteredPause = new Promise<void>((resolve) => {
+      paused = resolve
+    })
+    let asked = 0
+    const llm = {
+      signal: controller.signal,
+      gist: async () => {
+        asked += 1
+        controller.signal.throwIfAborted()
+        throw new Error('provider busy')
+      },
+    }
+    const sleep = async (_ms: number, signal?: AbortSignal) => {
+      paused()
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 30)
+        signal?.addEventListener(
+          'abort',
+          () => {
+            clearTimeout(timer)
+            reject(signal.reason as Error)
+          },
+          { once: true },
+        )
+      })
+    }
+    const batch = gistMemories(mem, llm, rows, sleep)
+    await enteredPause
+    controller.abort()
+    await expect(batch).rejects.toThrow()
+    expect(asked).toBeLessThanOrEqual(GIST_LANES)
+  })
+
   it('writes the short form beside the row and leaves the raw text restorable', async () => {
     const mem = await store()
     const id = await write(mem, 'perception', LONG)

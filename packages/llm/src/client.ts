@@ -516,6 +516,10 @@ export class LlmClient {
     this.cancellation.abort()
   }
 
+  get signal(): AbortSignal {
+    return this.cancellation.signal
+  }
+
   totalCostUsd(): number {
     return sumCostUsd(this.db, this.caller)
   }

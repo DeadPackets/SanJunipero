@@ -530,6 +530,19 @@ describe('runSleepReflection pipeline', () => {
 })
 
 describe('runSleepReflection survives an exhausted budget (T22)', () => {
+  it('leaves a cancelled night unfinished rather than writing a fallback autobiography', async () => {
+    const { mem, personality } = await makeStores()
+    await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+    const controller = new AbortController()
+    const llm = Object.assign(new ScriptedReflectionLlm(null), { signal: controller.signal })
+    llm.extractFacts = async () => {
+      controller.abort(new DOMException('Stopped', 'AbortError'))
+      throw new DOMException('Stopped', 'AbortError')
+    }
+    await expect(runSleepReflection({ mem, personality, llm, day: DAY })).rejects.toThrow('Stopped')
+    expect(mem.autobiography()).toEqual([])
+  })
+
   function noObject(): NoObjectGeneratedError {
     return new NoObjectGeneratedError({
       text: 'not json',
