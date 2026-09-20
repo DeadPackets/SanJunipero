@@ -36,4 +36,6 @@ The active-evening restart also exposed uncancelled memory-summary retry waits. 
 
 The overnight run completed at tick 2100, with all 12 reflected minds saved at that tick and all 16 databases healthy. A narrator sentence-splitting bug after closing quotes was reproduced and fixed separately after the paid run stopped. Deployment itself remains blocked on the owner's budget, off-server backup setup, prior-ledger identity and launch approval.
 
-Final verification: 8,671 tests passed across 516 files in 197.64 seconds. Runtime `bb88d505` builds as `sj-release:bb88d505`; the local preview runs this code. The final archive restores tick 2100 with all 15 mind/operations hashes unchanged.
+Final verification: 8,671 tests passed across 516 files in 187.04 seconds. Runtime `e018c0dc` builds as `sj-release:e018c0dc`; the local preview runs this code. The final archive restores tick 2100 with all 15 mind/operations hashes unchanged.
+
+The first push exposed 13 GitHub dependency advisories. Patched xmldom, adm-zip and Vitest, then repeated the full suite and built the final Linux image. The package audit now reports zero known vulnerabilities.

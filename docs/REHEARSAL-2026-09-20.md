@@ -16,13 +16,14 @@ Production remains stopped. The local town includes the fixes. The rehearsal use
 
 | Check | Result |
 |---|---|
-| Full suite | 8,671 tests passed across 516 files, 197.64 seconds |
+| Full suite | 8,671 tests passed across 516 files, 187.04 seconds |
 | Type checking | Passed |
 | ESLint | Zero errors, existing warnings remain |
 | Biome formatting | Passed |
 | Knip | Passed |
+| Dependency audit | Zero known vulnerabilities after XML, ZIP and Vitest security patches |
 | Viewer build | Passed, existing bundle-size warning remains |
-| Linux Docker build | Final image passed, 565,629,371 bytes |
+| Linux Docker build | Final image passed, 560,823,886 bytes |
 | Docker health probe | Advancing clock passed, stalled HTTP-200 clock rejected, resumed clock recovered |
 | Production Compose validation | Passed with placeholder $10 daily and $50 lifetime limits, no service started |
 | Browser inspection | Docker-served desktop and 390 px mobile views loaded with zero runtime errors and no mobile horizontal overflow |
@@ -30,7 +31,7 @@ Production remains stopped. The local town includes the fixes. The rehearsal use
 
 The first full suite exposed one stale UI source-count assertion. It was corrected and the entire suite was run again. No test suite ran while the paid rehearsal was active. A final rerun initially hit sandbox socket restrictions (`listen EPERM`), was stopped, and was restarted with local networking permitted.
 
-The final runtime is committed at `bb88d505`, with image `sj-release:bb88d505` on the server. Its image ID is `sha256:18acb6ab596b3bb1e61598e46912c819b3ad0fd33c5846ab6564301b6b831fe3`.
+The final runtime is committed at `e018c0dc`, with image `sj-release:e018c0dc` on the server. Its image ID is `sha256:210ef15cef01110893fd31473ef22cfedc10c497ed28c2fb70ab626dbf343c3f`.
 
 ## AI rehearsal
 
@@ -61,6 +62,12 @@ A whole-directory archive was copied off the server. Its SHA-256 is `6ae27cb2070
 All 12 discovery-commission integration tests passed in this candidate. The full suite also covers construction, generated material ingestion and safe fallback. The last real paid material commission, its accepted wall maps, rejected roof fallback and browser application are documented in `REHEARSAL-2026-09-18.md`.
 
 The boundary run recorded Bashir independently discovering a rope-basket recipe at tick 2033. It did not produce a new building commission. No test forces a resident to invent a pub or store. A controlled commission and a spontaneous discovery are different evidence. This release does not claim an autonomous discover-build-generate sequence unless it occurs in the observed run.
+
+## Dependency security
+
+GitHub reported 13 dependency alerts on the first release push, including seven high-severity findings. The dependency paths were Pixi → xmldom, Transformers → ONNX Runtime → adm-zip, and the development-only Vitest runner. Overrides now require `@xmldom/xmldom ^0.8.15` and `adm-zip ^0.6.1`. Vitest is updated to `^4.1.11`, and the documented worker-limit flag is updated to its current form.
+
+`pnpm audit --json` reports zero known vulnerabilities across the resolved dependency tree. All 8,671 tests across 516 files pass on Vitest 4.1.11 in 187.04 seconds. Type checking, formatting, Knip and the rebuilt viewer pass. These package patches do not change the simulation source. The overnight rehearsal predates these dependency updates, so compatibility is checked separately against the final lockfile.
 
 ## Launch prerequisites
 
