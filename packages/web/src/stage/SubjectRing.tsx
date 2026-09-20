@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { GameIcon } from '../paper/game/shared.js'
 import { entersOnClick } from '../render/entities.js'
 import type { Scene } from '../render/scene.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -53,7 +54,7 @@ export function armFor(key: string, count: number): number | null {
 
 /** Half the ring's real footprint: the 124px circle, plus an arm hung off each side of it and
  *  the 26px the whole mark is lifted by (chrome.css `.stage-ring`, `.stage-ring-arms`). */
-const RING_REACH: Reach = { x: 100, y: 110 }
+const RING_REACH: Reach = { x: 145, y: 150 }
 
 /** Whether THIS subject has a way in. A person never does; the building answers for itself. */
 function wayIn(store: WorldStore, subject: Subject | null): boolean {
@@ -121,6 +122,7 @@ export function SubjectRing({
             }}
             type="button"
             role="menuitem"
+            data-verb={verb}
             tabIndex={i === on ? 0 : -1}
             onClick={() => {
               onVerb(verb)
@@ -135,6 +137,17 @@ export function SubjectRing({
               arms.current[next]?.focus()
             }}
           >
+            <GameIcon
+              kind={
+                {
+                  follow: 'compass',
+                  story: 'chronicle',
+                  bonds: 'folk',
+                  home: 'land',
+                  inside: 'land',
+                }[verb]
+              }
+            />
             {RING_LABEL[verb]}
           </button>
         ))}

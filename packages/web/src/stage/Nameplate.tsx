@@ -15,7 +15,7 @@ import {
 /** `.stage-plate` is `translate(-50%, 60px)` off the anchor — chromeCss.test.ts pins it. */
 export const PLATE_DROP_PX = 60
 
-export type PlateSize = { w: number; h: number }
+export type PlateSize = { w: number; h: number; drop?: number }
 
 const UNMEASURED: PlateSize = { w: 0, h: 0 }
 
@@ -28,7 +28,7 @@ export type PlatePlace = { id: string; x: number; y: number; shown: boolean; box
 function plateRect(zoom: number, at: WorldPoint, size: PlateSize): Rect {
   return {
     x: at.sx - size.w / 2 / zoom,
-    y: at.sy + PLATE_DROP_PX / zoom,
+    y: at.sy + (size.drop ?? PLATE_DROP_PX) / zoom,
     w: size.w / zoom,
     h: size.h / zoom,
   }
@@ -121,6 +121,7 @@ export function Nameplate({
   scene,
   cast,
   focus,
+  ringed = null,
 }: {
   store: WorldStore
   scene: Scene | null
@@ -128,6 +129,7 @@ export function Nameplate({
   cast: readonly string[]
   /** the figure the keyboard is on, or the one the ring is open round */
   focus: Subject | null
+  ringed?: string | null
 }) {
   const readPlates = useMemo(
     () => platedReader(() => store.getState()?.agents, cast, focus),
@@ -140,8 +142,12 @@ export function Nameplate({
   const size = useRef(new Map<string, PlateSize>())
   useEffect(() => {
     for (const [id, el] of nodes.current)
-      size.current.set(id, { w: el.offsetWidth, h: el.offsetHeight })
-  }, [plates])
+      size.current.set(id, {
+        w: el.offsetWidth,
+        h: el.offsetHeight,
+        drop: id === ringed ? 10 : PLATE_DROP_PX,
+      })
+  }, [plates, ringed])
 
   // The cast changes with every snapshot, so the loop reads it off a ref: joining and leaving
   // the one stage loop several times a second would drop a frame of every other mark with it.
@@ -180,6 +186,7 @@ export function Nameplate({
             else nodes.current.set(s.id, el)
           }}
           className="stage-plate"
+          data-ringed={s.id === ringed ? 'yes' : undefined}
           aria-hidden="true"
         >
           {s.name}

@@ -42,6 +42,7 @@ import { createThreeWeather } from './weather.js'
 import { createResources } from './resources.js'
 import { createMaterialLibrary } from './materials.js'
 import { disposeGroup } from './dispose.js'
+import { createBuildingLabel } from '../buildingLabel.js'
 import { hoverPlate } from '../../ui/interaction.js'
 import { anchorForSprite } from '../tooltip.js'
 import { syncCamera, WORLD_PX } from './projection.js'
@@ -168,6 +169,38 @@ export function createThreeWorld(
       target.dispose()
     }
   }
+  const buildingTag = createBuildingLabel(root)
+  let hoveredBuilding: string | null = null
+  const hideBuildingTag = () => {
+    hoveredBuilding = null
+    buildingTag.hide()
+  }
+  const updateBuildingTag = () => {
+    if (hoveredBuilding === null) return
+    const state = store.getState()
+    const structure = state?.structures[hoveredBuilding]
+    const at = view.pointOf('structure', hoveredBuilding)
+    if (!state || !structure || !at || view.interior?.isActive()) {
+      hideBuildingTag()
+      return
+    }
+    const rect = view.viewRect()
+    const zoom = view.getZoom()
+    const x = (at.sx - rect.x) * zoom,
+      y = (at.sy - rect.y) * zoom
+    if (x < 0 || x > width || y < 0 || y > height) {
+      buildingTag.hide()
+      return
+    }
+    buildingTag.show(
+      structure,
+      effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, state.laws),
+      x,
+      y,
+      width,
+      height,
+    )
+  }
   const ray = new Raycaster()
   const hitAt = (
     x: number,
@@ -215,16 +248,26 @@ export function createThreeWorld(
       })
   }
   const hover = (event: FederatedPointerEvent) => {
-    if (event.target !== view.app.stage || event.buttons !== 0 || view.interior?.isActive()) return
+    if (event.target !== view.app.stage || event.buttons !== 0 || view.interior?.isActive()) {
+      hideBuildingTag()
+      view.tags.hide('hover')
+      return
+    }
     const chosen = hitAt(event.global.x, event.global.y)
     view.app.canvas.style.cursor = chosen ? 'pointer' : 'grab'
+    if (chosen?.kind === 'structure') {
+      view.tags.hide('hover')
+      hoveredBuilding = chosen.id
+      updateBuildingTag()
+      return
+    }
+    hideBuildingTag()
     if (!chosen || chosen.kind === 'agent') {
       view.tags.hide('hover')
       return
     }
-    const at = chosen.kind === 'structure' ? view.pointOf(chosen.kind, chosen.id) : null
-    const x = at?.sx ?? (event.global.x - view.world.x) / view.getZoom()
-    const y = at?.sy ?? (event.global.y - view.world.y) / view.getZoom()
+    const x = (event.global.x - view.world.x) / view.getZoom()
+    const y = (event.global.y - view.world.y) / view.getZoom()
     view.tags.show(
       'hover',
       hoverPlate(store.getState(), chosen.kind, chosen.id, view.pickedId === chosen.id),
@@ -232,6 +275,7 @@ export function createThreeWorld(
     )
   }
   const leave = () => {
+    hideBuildingTag()
     view.tags.hide('hover')
   }
   view.app.stage.on('pointermove', hover)
@@ -242,6 +286,7 @@ export function createThreeWorld(
     interior,
     tick(dtMs: number) {
       if (destroyed) return
+      updateBuildingTag()
       const state = store.getState()
       if (!state) return
       const config = effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, state.laws)
@@ -386,6 +431,7 @@ export function createThreeWorld(
       store.setDressed()
     },
     destroy() {
+      buildingTag.destroy()
       if (destroyed) return
       destroyed = true
       interior.destroy()

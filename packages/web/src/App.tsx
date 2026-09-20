@@ -506,7 +506,13 @@ export function App() {
         />
       )}
       {insideId === null && (
-        <Nameplate store={store} scene={scene} cast={shot.cast} focus={focus ?? subject} />
+        <Nameplate
+          store={store}
+          scene={scene}
+          cast={shot.cast}
+          focus={focus ?? subject}
+          ringed={route.broadcast ? null : (subject?.id ?? null)}
+        />
       )}
       {insideId === null && (
         <SubjectRing subject={subject} scene={scene} store={store} onVerb={onVerb} />

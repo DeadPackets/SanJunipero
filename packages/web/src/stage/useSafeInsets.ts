@@ -6,6 +6,7 @@ import type { Scene } from '../render/scene.js'
  *  `insetsOf` reads which edge they actually reached rather than being told. */
 export const TOP_BAND: readonly string[] = [
   '.day-bar',
+  '.camera-bookmark',
   '.signpost',
   '.stage-exit',
   '.stage-live',

@@ -24,6 +24,7 @@ describe('★ the chrome bands a bubble keeps out of', () => {
   it('names the marks the sheet draws at the two edges', () => {
     expect(TOP_BAND).toEqual([
       '.day-bar',
+      '.camera-bookmark',
       '.signpost',
       '.stage-exit',
       '.stage-live',

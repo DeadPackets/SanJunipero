@@ -187,3 +187,35 @@
   .app { transition:grid-template-columns var(--t-slow) var(--ease-enter); }
   .app .signpost { transition:right var(--t-slow) var(--ease-enter); }
 }
+
+.building-hover-label {
+  --label-bg:#e0e9ce; --label-ink:#466037; --label-edge:#91a377;
+  position:absolute; z-index:5; display:flex; align-items:center; gap:7px;
+  max-width:calc(100% - 16px); padding:7px 10px; min-height:36px;
+  border:1px solid var(--label-edge); border-radius:6px; box-shadow:0 2px var(--label-edge);
+  background:var(--label-bg); color:var(--label-ink); font:12px/1.5 var(--font-body);
+  pointer-events:none; overflow-wrap:anywhere;
+}
+.building-hover-label[hidden] { display:none; }
+.building-hover-label[data-kind=public] { --label-bg:#e2e8f4; --label-ink:#465f7d; --label-edge:#8aa2b9; }
+.building-hover-label[data-kind=construction] { --label-bg:#f8e7bf; --label-ink:#785124; --label-edge:#ba9b62; }
+.building-hover-label .sj-icon { width:24px; height:24px; flex:none; }
+.building-hover-label small:not([hidden]) { display:block; font-size:10px; }
+.app:not([data-broadcast=on]) .stage-ring-arms { width:174px; height:192px; border:0; border-radius:0; }
+.app:not([data-broadcast=on]) .stage-ring-arms button {
+  --arm-bg:#f8e7bf; --arm-ink:#785124; --arm-edge:#ba9b62;
+  display:flex; align-items:center; gap:5px; padding:6px 9px; min-height:40px;
+  font:12px/1.5 var(--font-body); white-space:nowrap;
+  color:var(--arm-ink); background:var(--arm-bg); border:1px solid var(--arm-edge);
+  box-shadow:0 2px var(--arm-edge); border-radius:6px;
+  transition:background-color 140ms ease, scale 120ms ease;
+}
+.app:not([data-broadcast=on]) .stage-ring-arms [data-verb=follow] { --arm-bg:#e2e8f4; --arm-ink:#465f7d; --arm-edge:#8aa2b9; }
+.app:not([data-broadcast=on]) .stage-ring-arms [data-verb=bonds] { --arm-bg:#f7d9c9; --arm-ink:#894c33; --arm-edge:#b88069; }
+.app:not([data-broadcast=on]) .stage-ring-arms :is([data-verb=home],[data-verb=inside]) { --arm-bg:#e0e9ce; --arm-ink:#466037; --arm-edge:#91a377; }
+.app:not([data-broadcast=on]) .stage-ring-arms button:hover { background:var(--arm-bg); box-shadow:0 2px var(--arm-edge),inset 0 0 0 1px var(--arm-edge); }
+.stage-ring-arms .sj-icon { width:24px; height:24px; flex:none; }
+[data-broadcast=on] .stage-ring-arms .sj-icon { display:none; }
+@media(prefers-reduced-motion:reduce) { .stage-ring-arms button { transition:none!important; } }
+.app:not([data-broadcast=on]) .stage-plate[data-ringed=yes] { translate:-50% 10px; }
+.app:not([data-broadcast=on]):has(.camera-bookmark) .stage-live { margin-top:46px; }
