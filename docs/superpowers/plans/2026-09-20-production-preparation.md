@@ -29,3 +29,5 @@
 The dependency scan needed the existing UI review entry registered in `knip.json`. One UI test counted four address-bar references instead of five after the approved house-entry change. Both were corrected, then all 8,656 tests passed across 515 files.
 
 Off-server backup credentials are absent. The owner has been asked for the target bucket and production daily limit. These remain launch prerequisites, not inferred approvals.
+
+The real Docker entrypoint failed the stop check: `pnpm` exited on SIGTERM before `serve.ts` handled shutdown. All 12 mind checkpoints lagged the world by 8 ticks. Run Node directly as PID 1, then repeat the container stop and resume checks before accepting the release.

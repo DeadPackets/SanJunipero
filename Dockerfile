@@ -47,5 +47,6 @@ VOLUME ["/app/packages/town/data"]
 
 ENV PORT=8080
 EXPOSE 8080
-# `serve.ts` traps SIGTERM and closes the world, so `docker stop` never truncates a write.
-CMD ["pnpm", "--filter", "@sj/town", "serve"]
+# Node must receive SIGTERM directly so the world and mind checkpoints drain before exit.
+WORKDIR /app/packages/town
+CMD ["node", "--import", "tsx", "src/serve.ts"]
