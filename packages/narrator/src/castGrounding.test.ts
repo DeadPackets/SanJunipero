@@ -92,6 +92,21 @@ describe('the chronicle may name nobody the world has not got', () => {
     ).toEqual([])
   })
 
+  it('keeps the sentence after quoted dialogue, including its closing quote', () => {
+    const { store, alerts } = watched()
+    const text =
+      'Salma said, "It is not far." They walked home. Yusuf said, “Time for bed.” He went inside.'
+    expect(withoutStrangers({ store }, 'day 0', text, ROLL)).toBe(text)
+    expect(alerts()).toEqual([])
+  })
+
+  it('still detects an invented name after quoted dialogue', () => {
+    const { store, alerts } = watched()
+    const text = 'Salma said, "It is not far." They walked home with Marah.'
+    expect(withoutStrangers({ store }, 'day 0', text, ROLL)).not.toContain('Marah')
+    expect(alerts()[0]?.detail).toContain('Marah')
+  })
+
   it('a chapter for a day of weather and deer names no one off the roll', async () => {
     const chapter = await renderChapter({
       store: watched().store,

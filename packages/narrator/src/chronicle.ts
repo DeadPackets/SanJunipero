@@ -136,7 +136,7 @@ export function proseIdLeaks(text: string): string[] {
 
 // Never across a line break: a list of milestone labels carries no full stop, and one bad line
 // there must not take the whole block with it. Newlines match nothing, so they stay put.
-const SENTENCE = /[^.!?\n]+[.!?]*/gu
+const SENTENCE = /[^.!?\n]+[.!?]*["'\u201d\u2019]*/gu
 
 export function withoutProseIds(text: string): { text: string; dropped: string[] } {
   const dropped: string[] = []
