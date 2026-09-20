@@ -1,3 +1,4 @@
+import { CameraBookmark } from './stage/CameraBookmark.js'
 import { LivingScene } from './stage/LivingScene.js'
 import { Keepsake } from './stage/Keepsake.js'
 import { InteriorHUD } from './stage/InteriorHUD.js'
@@ -124,7 +125,13 @@ export function App() {
   const [operatorToken] = useState<string | null>(() => adminToken(sessionStore()))
   const appRef = useRef<HTMLDivElement>(null)
   const signpostRef = useRef<HTMLElement>(null)
-  const { autoCut, handbackAt, toggle: toggleDirector, hold: holdDirector } = useAutoCut()
+  const {
+    autoCut,
+    handbackAt,
+    toggle: toggleDirector,
+    hold: holdDirector,
+    pause: pauseDirector,
+  } = useAutoCut()
   // How much of the chrome is up: Stage, Watch or Deck. One owner, and the sheet does the rest.
   const density = useDensity()
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -521,6 +528,25 @@ export function App() {
         autoCut={autoCut}
         handbackAt={handbackAt}
         broadcast={route.broadcast}
+        cameraBookmark={
+          <CameraBookmark
+            store={store}
+            autoCut={autoCut}
+            following={following}
+            cast={shot.cast}
+            replaying={(play?.cast.length ?? 0) > 0}
+            handbackAt={handbackAt}
+            onRelease={() => {
+              setFollowing(null)
+              setPlay((prev) => (prev === null ? null : { ...prev, cast: [] }))
+              pauseDirector()
+            }}
+            onStart={() => {
+              setFollowing(null)
+              toggleDirector()
+            }}
+          />
+        }
       />
       {route.broadcast && insideId === null && (
         <DirectorCue text={cue} moment={moment} scene={sceneCue} why={why} />

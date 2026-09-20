@@ -106,6 +106,7 @@ export type Director = {
   /** the D key, and the only thing that arms or disarms the director for good */
   toggle: () => void
   hold: () => void
+  pause: () => void
 }
 
 /** A store rather than hook state, with the listeners on the first subscriber: App holds the
@@ -144,6 +145,11 @@ export function director(target: EventTarget): Director {
 
   return {
     get: () => cutting,
+    pause() {
+      armed = false
+      stopTimer()
+      publish(false)
+    },
     hold: pause,
     handbackAt: () => handback,
     subscribe(cb) {
@@ -173,6 +179,7 @@ export function useAutoCut(): {
   handbackAt: () => number | null
   toggle: () => void
   hold: () => void
+  pause: () => void
 } {
   const [d] = useState(() => director(window))
   return {
@@ -180,5 +187,6 @@ export function useAutoCut(): {
     handbackAt: d.handbackAt,
     toggle: d.toggle,
     hold: d.hold,
+    pause: d.pause,
   }
 }

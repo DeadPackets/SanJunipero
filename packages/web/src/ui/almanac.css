@@ -128,3 +128,36 @@
   .almanac-weather > div { grid-column:2; max-width:82px; }
   .almanac-weather .almanac-status { grid-column:2; }
 }
+
+.camera-bookmark {
+  --cam-bg: #f8e7bf; --cam-ink: #785124; --cam-edge: #b79a66;
+  position: absolute; right: -1px; top: calc(100% - 1px);
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% + 2px);
+  padding: 1px 5px 1px 10px; border: 1px solid var(--cam-edge); border-top: 0;
+  border-radius: 0 0 7px 7px; background: var(--cam-bg); color: var(--cam-ink);
+  box-shadow: 0 2px #6b594035; font: 12px/1.5 Manrope, sans-serif; white-space: nowrap;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+.camera-bookmark[data-state='following'] { --cam-bg: #e2e8f4; --cam-ink: #465f7d; --cam-edge: #8aa2b9; }
+.camera-bookmark[data-state='free'] { --cam-bg: #e9e3d8; --cam-ink: #665e54; --cam-edge: #ab9b85; }
+.camera-bookmark[data-state='replay'] { --cam-bg: #f7d9c9; --cam-ink: #894c33; --cam-edge: #b67b61; }
+.camera-bookmark .sj-icon { width: 24px; height: 24px; flex: none; }
+.camera-bookmark-mode { font-size: 11px; }
+.camera-bookmark-divider { opacity: .55; }
+.camera-bookmark strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.camera-bookmark button {
+  flex: none; min-height: 38px; padding: 6px 10px; margin-left: 3px;
+  border: 0; border-left: 1px solid var(--cam-edge); background: transparent;
+  color: inherit; font-size: 11px; transition: background-color 160ms ease, scale 120ms ease;
+}
+.camera-bookmark button:hover { background: #ffffff40; }
+.camera-bookmark button:active { scale: .96; }
+.almanac[data-theme='dark'] .camera-bookmark { --cam-bg: #514938; --cam-ink: #f1d79c; --cam-edge: #a18b5d; }
+.almanac[data-theme='dark'] .camera-bookmark[data-state='following'] { --cam-bg: #354a5d; --cam-ink: #d5e6fa; --cam-edge: #809ab4; }
+.almanac[data-theme='dark'] .camera-bookmark[data-state='free'] { --cam-bg: #3d3d3c; --cam-ink: #dfd6c8; --cam-edge: #948879; }
+.almanac[data-theme='dark'] .camera-bookmark[data-state='replay'] { --cam-bg: #594137; --cam-ink: #ffe2cd; --cam-edge: #b67b61; }
+@media (max-width: 700px) {
+  .camera-bookmark { gap: 5px; font-size: 11px; }
+  .camera-bookmark-mode { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .camera-bookmark, .camera-bookmark button { transition: none; } }

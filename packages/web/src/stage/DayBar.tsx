@@ -1,4 +1,11 @@
-import { useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { MINUTES_PER_DAY, dayPhaseFromTick } from '@sj/shared'
 import type { ObservatoryHandle } from '../net/socket.js'
 import type { WorldStore } from '../state/worldStore.js'
@@ -158,6 +165,7 @@ export function DayBar({
   autoCut,
   handbackAt,
   broadcast = false,
+  cameraBookmark,
 }: {
   store: WorldStore
   link: LinkState
@@ -168,6 +176,7 @@ export function DayBar({
   autoCut: boolean
   handbackAt: () => number | null
   broadcast?: boolean
+  cameraBookmark?: ReactNode
 }) {
   const tick = useSyncExternalStore(store.subscribe, store.getTick, store.getTick)
   const mode = useSyncExternalStore(store.subscribe, store.getMode, store.getMode)
@@ -271,7 +280,7 @@ export function DayBar({
         <WeatherIcon kind={kind} />
         <div>
           <p>{weather.toLowerCase()}</p>
-          <CameraChip autoCut={autoCut} handbackAt={handbackAt} />
+          {broadcast && <CameraChip autoCut={autoCut} handbackAt={handbackAt} />}
         </div>
         <span className="almanac-status" data-live={word === 'LIVE'}>
           {!mode.live && !mode.replaying && word === 'REPLAY' ? 'Paused' : word.toLowerCase()}
@@ -355,6 +364,7 @@ export function DayBar({
           </button>
         </div>
       )}
+      {!broadcast && cameraBookmark}
     </div>
   )
 }
