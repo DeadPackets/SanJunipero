@@ -131,8 +131,8 @@
 
 .camera-bookmark {
   --cam-bg: #f8e7bf; --cam-ink: #785124; --cam-edge: #b79a66;
-  position: absolute; right: -1px; top: calc(100% - 1px);
-  display: flex; align-items: center; gap: 8px; max-width: calc(100% + 2px);
+  position: absolute; right: calc(var(--dock-w, 0px) - 1px); top: calc(100% - 1px);
+  display: flex; align-items: center; gap: 8px; max-width: calc(100% - var(--dock-w, 0px) + 2px);
   padding: 1px 5px 1px 10px; border: 1px solid var(--cam-edge); border-top: 0;
   border-radius: 0 0 7px 7px; background: var(--cam-bg); color: var(--cam-ink);
   box-shadow: 0 2px #6b594035; font: 12px/1.5 Manrope, sans-serif; white-space: nowrap;
