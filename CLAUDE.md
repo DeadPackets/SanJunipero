@@ -27,7 +27,7 @@ pnpm test                   # vitest across every package
 pnpm rehearse [minutes]     # one scored live hour under a budget; spends real money
 ```
 
-Targeted runs: `npx vitest run <paths> --poolOptions.forks.maxForks=2 --silent=true`.
+Targeted runs: `npx vitest run <paths> --maxWorkers=2 --silent=true`.
 
 ## Toolchain facts that cost somebody an afternoon
 
