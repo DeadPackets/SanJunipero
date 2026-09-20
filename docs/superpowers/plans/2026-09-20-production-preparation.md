@@ -20,9 +20,9 @@
 
 - [x] Fix fresh reset in `packages/town/src/devWorld.ts`. Add a failing regression in `packages/town/src/persistence.test.ts` that preserves the operations database and its WAL while deleting resident memory.
 - [x] Run the full type, lint, format, dependency and test checks, then build the viewer and a fresh Linux Docker image. Resolve failures before running minds.
-- [ ] Run an isolated, bounded release rehearsal on port 8099. Verify tick progress, day transition, restart, indoor dialogue, database integrity and spend limits. Reuse prior Forge evidence and verify construction integration separately. Record limits honestly.
-- [ ] Prepare deployment settings and backup/restore evidence. Verify configured credentials by presence only. Keep startup fresh-reset disabled and document the selected data volume and spending limits.
-- [ ] Record release evidence, integrate the verified changes into the local town, and present the concrete production launch procedure for final approval.
+- [x] Run an isolated, bounded release rehearsal on port 8099. Verify tick progress, day transition, restart, indoor dialogue, database integrity and spend limits. Reuse prior Forge evidence and verify construction integration separately. Record limits honestly.
+- [x] Prepare deployment settings and backup/restore evidence. Verify configured credentials by presence only. Keep startup fresh-reset disabled and document the selected data volume and spending limits.
+- [x] Record release evidence, integrate the verified changes into the local town, and present the concrete production launch procedure for final approval.
 
 ## Deviations
 
@@ -31,3 +31,9 @@ The dependency scan needed the existing UI review entry registered in `knip.json
 Off-server backup credentials are absent. The owner has been asked for the target bucket and production daily limit. These remain launch prerequisites, not inferred approvals.
 
 The real Docker entrypoint failed the stop check: `pnpm` exited on SIGTERM before `serve.ts` handled shutdown. All 12 mind checkpoints lagged the world by 8 ticks. Run Node directly as PID 1, then repeat the container stop and resume checks before accepting the release.
+
+The active-evening restart also exposed uncancelled memory-summary retry waits. Pass the shared client cancellation signal into reflection, interrupt retry waits, and await every request before closing databases. Four cancellation regressions cover this, while provider timeouts retain their existing fallback. The health probe now checks 15-minute tick stalls, with nine focused checks.
+
+The overnight run completed at tick 2100, with all 12 reflected minds saved at that tick and all 16 databases healthy. A narrator sentence-splitting bug after closing quotes was reproduced and fixed separately after the paid run stopped. Deployment itself remains blocked on the owner's budget, off-server backup setup, prior-ledger identity and launch approval.
+
+Final verification: 8,671 tests passed across 516 files in 197.64 seconds. Runtime `bb88d505` builds as `sj-release:bb88d505`; the local preview runs this code. The final archive restores tick 2100 with all 15 mind/operations hashes unchanged.
