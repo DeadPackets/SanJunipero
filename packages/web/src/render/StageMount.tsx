@@ -51,6 +51,7 @@ export function StageMount({
   store,
   onScene,
   onInterior,
+  onDoor,
   onPick,
   onGround,
 }: {
@@ -60,6 +61,7 @@ export function StageMount({
   onScene?: (scene: Scene | null) => void
   /** the interior sub-scene opened or closed — App draws the back-to-town chrome from it */
   onInterior?: (structureId: string | null) => void
+  onDoor?: (structureId: string) => void
   /** what the pointer landed on — App draws the popover, the canvas draws nothing of the kind */
   onPick?: (pick: WorldPick) => void
   /** a click that landed on the bare ground, which is how a viewer puts a pick back down */
@@ -72,6 +74,9 @@ export function StageMount({
   const onInteriorRef = useRef(onInterior)
   // eslint-disable-next-line react-hooks/refs -- Pixi holds this across renders it does not join; an effect would hand it a prop one frame stale.
   onInteriorRef.current = onInterior
+  const onDoorRef = useRef(onDoor)
+  // eslint-disable-next-line react-hooks/refs -- as above
+  onDoorRef.current = onDoor
   const onPickRef = useRef(onPick)
   // eslint-disable-next-line react-hooks/refs -- as above
   onPickRef.current = onPick
@@ -162,17 +167,20 @@ export function StageMount({
         const book = new TextureBook()
         const openDoor = (structureId: string): void => {
           s.tags.hideAll() // a destroyed sprite never fires pointerout
-          interiorRef.current?.setActive(structureId)
+          if (onDoorRef.current) onDoorRef.current(structureId)
+          else interiorRef.current?.setActive(structureId)
         }
-        landmarks = createLandmarkLayer(s, store)
-        toponyms = createToponymLayer(s, store)
+        if (!spatial) {
+          landmarks = createLandmarkLayer(s, store)
+          toponyms = createToponymLayer(s, store)
+        }
         const marks = landmarks
         const carved = toponyms
         const nameTown = (): void => {
-          marks.rebuild()
-          marks.place()
-          carved.rebuild()
-          carved.place()
+          marks?.rebuild()
+          marks?.place()
+          carved?.rebuild()
+          carved?.place()
         }
         const pick = (p: WorldPick): void => onPickRef.current?.(p)
         // The rig already refuses a drag and anything that landed on a body or a building, so
@@ -185,8 +193,8 @@ export function StageMount({
         if (!spatial) syncEntities(s, book, store, openDoor, pick)
         // a place name is a map legend: it fades on the way in, so it follows the camera too
         offCamera = s.onCamera(() => {
-          marks.place()
-          carved.place()
+          marks?.place()
+          carved?.place()
         })
         nameTown()
         // click-to-inspect: the G6 check — route change only, React owns the chrome. The town

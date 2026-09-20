@@ -220,10 +220,9 @@ export function App() {
 
       if (name !== undefined) {
         setSubject({ id: agentId, kind: 'agent', name })
-        if (route.insideId) setSheet({ page: 'person', tab: 'Now' })
       }
     })
-  }, [agentId, store, route.insideId])
+  }, [agentId, store])
 
   const closePaper = useCallback(() => {
     setSheet(null)
@@ -315,8 +314,14 @@ export function App() {
   const enterInterior = (structureId: string | null): void => {
     if (structureId !== null) {
       holdDirector()
+      setFollowing(null)
       setSubject(null)
+      setFocus(null)
       closePaper()
+      const next = { ...routeRef.current, agentId: null, insideId: structureId }
+      routeRef.current = next
+      writeAddress(next, true)
+      setRoute(next)
     } else setFollowing(null)
     scene?.interior?.setActive(structureId)
   }
@@ -434,6 +439,7 @@ export function App() {
         <StageMount
           store={store}
           onScene={setScene}
+          onDoor={enterInterior}
           onInterior={(id) => {
             setInsideId(id)
             const next = { ...routeRef.current, insideId: id }

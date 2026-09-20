@@ -218,14 +218,11 @@ export function createThreeWorld(
     if (event.target !== view.app.stage || event.buttons !== 0 || view.interior?.isActive()) return
     const chosen = hitAt(event.global.x, event.global.y)
     view.app.canvas.style.cursor = chosen ? 'pointer' : 'grab'
-    if (!chosen) {
+    if (!chosen || chosen.kind === 'agent') {
       view.tags.hide('hover')
       return
     }
-    const at =
-      chosen.kind === 'agent' || chosen.kind === 'structure'
-        ? view.pointOf(chosen.kind, chosen.id)
-        : null
+    const at = chosen.kind === 'structure' ? view.pointOf(chosen.kind, chosen.id) : null
     const x = at?.sx ?? (event.global.x - view.world.x) / view.getZoom()
     const y = at?.sy ?? (event.global.y - view.world.y) / view.getZoom()
     view.tags.show(

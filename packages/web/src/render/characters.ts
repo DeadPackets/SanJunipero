@@ -736,7 +736,7 @@ export function createCharacterLayer(
       // ONE placement rule for every label in the product, and the layer applies it: the plate
       // is welded to the feet and only leaves them when the view has no room down there. Said
       // every frame, because the body it names walks.
-      if (e.hovered) {
+      if (e.hovered && !scene.spatial) {
         // The head box is what the plate flips ABOVE into, so it measures what is drawn there:
         // the slot, at its own offset, and nothing that used to be.
         const head = targetPx + SLOT_ABOVE_HEAD_PX + SLOT_PX
