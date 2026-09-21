@@ -1,4 +1,4 @@
-.conversation-presence { position: absolute; inset: 0; z-index: 7; pointer-events: none; overflow: hidden; }
+.conversation-presence { position: absolute; inset: 0; z-index: var(--layer-conversation); pointer-events: none; overflow: hidden; }
 .conversation-presence[hidden] { display: none; }
 .conversation-caption { position: absolute; top: 0; left: 0; width: max-content; max-width: 248px; translate: -50% 0; min-width: 148px; padding: 7px 12px 7px 39px; background: #fff4dc; color: #514334; border: 2px solid #a79268; box-shadow: 0 3px 0 #6d60444d; text-align: center; font: 12px/1.45 Manrope, sans-serif; animation: conversation-arrive 220ms ease-out; }
 .conversation-caption strong { display: block; font-size: 13px; }

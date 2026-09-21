@@ -81,6 +81,7 @@ export function createConversationPresence(scene: Scene, store: WorldStore) {
           ended = now
           status.textContent = 'Conversation ended'
           root.dataset.phase = 'ended'
+          caption.hidden = false
         }
         if (!selected && visible(current) && now - ended < 1000) return
         reset()
@@ -122,6 +123,7 @@ export function createConversationPresence(scene: Scene, store: WorldStore) {
           ? bubble.dataset.agentId
           : null
       root.dataset.speaking = String(!!speaker)
+      caption.hidden = !!speaker
       const points: { x: number; footY: number }[] = []
       for (const id of selected.participants) {
         const at = anchor(id)

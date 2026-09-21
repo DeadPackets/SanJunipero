@@ -743,4 +743,37 @@ describe('★ the Almanac shell', () => {
     expect(p.el('.paper-grip')).toBeNull()
     expect(p.el('.paper-close')?.textContent).toContain('Close')
   })
+
+  it('blocks mobile background siblings and restores them on close and desktop resize', async () => {
+    const query = Object.assign(new EventTarget(), { matches: true })
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue(query as MediaQueryList)
+    try {
+      const p = await live()
+      const background = document.createElement('button')
+      const alreadyInert = document.createElement('div')
+      alreadyInert.inert = true
+      p.host.append(background, alreadyInert)
+      await p.again({ page: 'folk', tab: 'Everyone' })
+      expect(background.inert).toBe(true)
+      expect(p.el('.paper')?.inert).toBe(false)
+      const late = document.createElement('button')
+      p.host.append(late)
+      await act(async () => {})
+      expect(late.inert).toBe(true)
+      await p.again({ page: null })
+      expect(background.inert).toBe(false)
+      expect(late.inert).toBe(false)
+      expect(alreadyInert.inert).toBe(true)
+      await p.again({ page: 'folk', tab: 'Everyone' })
+      await act(async () => {
+        query.matches = false
+        query.dispatchEvent(new Event('change'))
+      })
+      expect(p.el('.paper')?.getAttribute('aria-modal')).toBe('false')
+      expect(background.inert).toBe(false)
+      expect(alreadyInert.inert).toBe(true)
+    } finally {
+      media.mockRestore()
+    }
+  })
 })

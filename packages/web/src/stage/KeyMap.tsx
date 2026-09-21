@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react'
-import { stageKeyAllowed } from './useStageKeys.js'
+import { stageInputBlocked, stageKeyAllowed } from './useStageKeys.js'
 
 /** The key that opens it — where a person looks for exactly this, which is why the frame meter
  *  had to move off it (`ui/FpsOverlay.tsx`). */
@@ -42,6 +42,7 @@ export function KeyMap({
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== KEY_MAP_KEY || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return
+      if (stageInputBlocked()) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
       e.preventDefault()
@@ -53,10 +54,15 @@ export function KeyMap({
     }
   }, [open, onOpenChange])
 
+  useEffect(() => {
+    if (open && stageInputBlocked()) onOpenChange(false)
+  })
+
   // A click on the town is the fourth way down, the same as the paper's.
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
+      if (stageInputBlocked()) return
       const t = e.target as HTMLElement | null
       // Whatever opened this is not "outside": closing here and reopening on its own click
       // would leave a control that cannot put down what it puts up. Asked of the DOM through
@@ -72,6 +78,7 @@ export function KeyMap({
 
   useEffect(() => {
     if (open) {
+      if (stageInputBlocked()) return
       opener.current = document.activeElement
       sheet.current?.focus()
       return

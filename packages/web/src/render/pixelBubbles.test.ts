@@ -27,7 +27,10 @@ function setup(reduced = true) {
     canvas = document.createElement('canvas')
   root.append(canvas)
   document.body.append(root)
-  const scene = { app: { canvas, screen: { width: 600 } }, getZoom: () => 1 } as unknown as Scene
+  const scene = {
+    app: { canvas, screen: { width: 600, height: 400 } },
+    getZoom: () => 1,
+  } as unknown as Scene
   let revision = 0
   let tick = 1,
     moving = true,
@@ -183,4 +186,35 @@ it('keeps the visible indoor conversation when the director cuts outside', () =>
   bubbles.spawnSpeech('amara', 'Here in the room.')
   bubbles.tick(100)
   expect(text()).toBe('Here in the room.')
+})
+
+it('keeps speech inside the measured lower safe band when below the speaker cannot fit', () => {
+  const { bubbles, scene, root } = setup()
+  scene.safeInsets = { top: 120, bottom: 80, right: 0 }
+  bubbles.spawnSpeech('amara', 'Here in the room.')
+  bubbles.tick(0)
+  const balloon = root.querySelector<HTMLElement>('.pixel-balloon')
+  const y = Number(/,(-?\d+)px\)/.exec(balloon?.style.transform ?? '')?.[1])
+  expect(balloon?.hidden).toBe(false)
+  expect(y).toBeGreaterThanOrEqual(144)
+  expect(y + 60).toBeLessThanOrEqual(320)
+})
+
+it('places speech below the speaker when that side fits the safe frame', () => {
+  const { bubbles, scene, root } = setup()
+  scene.safeInsets = { top: 160, bottom: 20, right: 0 }
+  bubbles.spawnSpeech('amara', 'Here in the room.')
+  bubbles.tick(0)
+  const balloon = root.querySelector<HTMLElement>('.pixel-balloon')
+  expect(balloon?.dataset.below).toBe('true')
+  expect(balloon?.style.transform).toContain('272px')
+})
+
+it('does not draw a clipped balloon when safe bands leave no room', () => {
+  const { bubbles, scene, root } = setup()
+  scene.safeInsets = { top: 250, bottom: 140, right: 0 }
+  bubbles.spawnSpeech('amara', 'Here in the room.')
+  bubbles.tick(0)
+  expect(root.querySelector<HTMLElement>('.pixel-balloon')?.hidden).toBe(true)
+  expect(root.querySelector<HTMLElement>('.pixel-speech-layer')?.dataset.speaking).toBe('false')
 })

@@ -1,0 +1,20 @@
+/* Page priorities. Children stay inside their owner's stacking context. */
+:root {
+  --layer-world: 0;
+  --layer-world-effect: 1;
+  --layer-world-label: 10;
+  --layer-status: 11;
+  --layer-conversation: 12;
+  --layer-speech: 13;
+  --layer-world-action: 14;
+  --layer-chrome: 20;
+  --layer-notice: 25;
+  --layer-scrim: 29;
+  --layer-panel: 30;
+  --layer-popover: 40;
+  --layer-debug: 45;
+  --layer-mobile-dialog: 50;
+  --layer-help: 60;
+  --layer-skip: 70;
+  --layer-boot: 80;
+}

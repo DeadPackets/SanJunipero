@@ -1,7 +1,9 @@
+import { useEffect, useRef } from 'react'
 import { PublicUsageSchema } from '@sj/shared'
 import { endpoint, useFeed } from '../ui/useEndpoint.js'
 import { GameIcon } from '../paper/game/shared.js'
 import { usageLabel, usageMoney } from './usageModel.js'
+import { stageInputBlocked } from './useStageKeys.js'
 import './usage-meter.css'
 
 const usageFeed = endpoint(
@@ -14,11 +16,44 @@ const usageFeed = endpoint(
 )
 
 export function UsageMeter() {
+  const details = useRef<HTMLDetailsElement>(null)
+  useEffect(() => {
+    const outside = (event: Event) => {
+      if (
+        details.current?.open &&
+        !stageInputBlocked() &&
+        !details.current.contains(event.target as Node)
+      )
+        details.current.open = false
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        !details.current?.open ||
+        stageInputBlocked() ||
+        document.querySelector('.key-map:not([hidden])')
+      )
+        return
+      event.preventDefault()
+      event.stopPropagation()
+      details.current.open = false
+      details.current.querySelector('summary')?.focus()
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('focusin', outside)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('focusin', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [])
   const read = useFeed(usageFeed)
   const usage = read.failed ? null : read.data
   const known = usage && usage.mode !== 'unavailable' ? usage : null
   return (
-    <details className="usage-meter">
+    <details className="usage-meter" ref={details}>
       <summary aria-label={`AI usage: ${read.loaded ? usageLabel(usage, read.failed) : 'loading'}`}>
         {read.loaded ? usageLabel(usage, read.failed) : 'Loading usage…'}
       </summary>

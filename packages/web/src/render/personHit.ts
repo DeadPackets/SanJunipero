@@ -14,3 +14,20 @@ export function personHit(targets: readonly PersonTarget[], x: number, y: number
   }
   return best?.id ?? null
 }
+
+export function personHoverPosition(
+  at: { x: number; y: number },
+  viewport: { width: number; height: number },
+  label: { width: number; height: number },
+  safe: { top: number; right?: number; bottom: number },
+): { x: number; y: number } | null {
+  const left = label.width / 2 + 8
+  const right = viewport.width - (safe.right ?? 0) - left
+  const top = safe.top + 8
+  const bottom = viewport.height - safe.bottom - label.height - 8
+  if (right < left || bottom < top) return null
+  return {
+    x: Math.max(left, Math.min(right, at.x)),
+    y: Math.max(top, Math.min(bottom, at.y - 36)),
+  }
+}

@@ -57,7 +57,7 @@ export function heard(view: ViewRect, sx: number, sy: number): { near: number; p
 /** The slider hangs off the note, so how loud is answered where whether is. */
 const LEVEL_CSS = `
 .sound-level {
-  position: absolute; z-index: 25; margin: 0;
+  position: absolute; z-index: var(--layer-chrome); margin: 0;
   left: calc(max(var(--mark-inset), env(safe-area-inset-left)) + 44px + var(--s-2));
   bottom: calc(max(var(--mark-inset), env(safe-area-inset-bottom)) + 88px + 2 * var(--s-3));
   width: 88px; height: 44px;

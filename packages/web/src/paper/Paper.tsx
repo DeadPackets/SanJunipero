@@ -90,6 +90,28 @@ export function Paper({
     }
   }, [])
 
+  useLayoutEffect(() => {
+    const sheet = sheetRef.current
+    const parent = sheet?.parentElement
+    if (!open || !mobile || !sheet || !parent) return
+    const previous = new Map<HTMLElement, boolean>()
+    const block = (): void => {
+      for (const sibling of parent.children) {
+        if (!(sibling instanceof HTMLElement) || sibling === sheet || previous.has(sibling))
+          continue
+        previous.set(sibling, sibling.inert)
+        sibling.inert = true
+      }
+    }
+    block()
+    const observer = new MutationObserver(block)
+    observer.observe(parent, { childList: true })
+    return () => {
+      observer.disconnect()
+      for (const [sibling, inert] of previous) sibling.inert = inert
+    }
+  }, [open, mobile])
+
   // The opener is whatever was pressed to raise the sheet, and it gets the focus back on the way
   // down. Its own effect, so a tab change does not bounce focus through it and announce twice.
   useEffect(() => {

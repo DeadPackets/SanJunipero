@@ -196,7 +196,6 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       ring.hidden = !!active?.isThought || !!active?.sceneId
       if (!active || !at) return
       balloon.hidden = scene.getZoom() <= 0.5 && !scene.interior?.isActive()
-      root.dataset.speaking = String(!balloon.hidden && !active.isThought)
       if (measureNeeded && !balloon.hidden) measure()
       if (entering && !reduced.matches)
         balloon.animate(
@@ -210,9 +209,17 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       const width = scene.app.screen.width - (scene.safeInsets?.right ?? 0)
       const x = Math.max(12, Math.min(width - w - 12, at.x - w / 2))
       const top = (scene.safeInsets?.top ?? 0) + 24
-      let y = Math.max(top, at.y - h - 20)
-      const below = y + h > at.y - 6
-      if (below) y = at.footY + 22
+      const maxY = scene.app.screen.height - (scene.safeInsets?.bottom ?? 0) - h - 12
+      if (w + 24 > width || maxY < top) {
+        root.hidden = true
+        balloon.hidden = true
+      }
+      root.dataset.speaking = String(!balloon.hidden && !active.isThought)
+      if (root.hidden) return
+      const aboveY = at.y - h - 20
+      const belowY = at.footY + 22
+      const below = aboveY < top && belowY <= maxY
+      const y = below ? belowY : Math.max(top, Math.min(maxY, aboveY))
       balloon.dataset.below = String(below)
       balloon.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`
       balloon.style.setProperty('--tail-x', `${Math.max(16, Math.min(w - 16, at.x - x))}px`)

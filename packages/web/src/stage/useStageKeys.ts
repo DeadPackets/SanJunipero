@@ -39,6 +39,13 @@ export function stageKeyAllowed(tagName: string, editable: boolean): boolean {
   return !editable && !/^(INPUT|TEXTAREA|SELECT)$/.test(tagName)
 }
 
+export function stageInputBlocked(paperEscape = false): boolean {
+  if (document.querySelector('dialog[open], #first-frame:not(.gone)')) return true
+  return (
+    !paperEscape && document.querySelector('.paper[data-open="yes"][aria-modal="true"]') !== null
+  )
+}
+
 /** A browser may refuse it (no user gesture, an iframe without the permission); the stage stays
  *  as it is. */
 export function toggleFullscreen(el: Element | null): void {
@@ -72,6 +79,7 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
       const key = stageKeyFor(e.key)
+      if (stageInputBlocked(key === 'escape')) return
       if (key !== 'escape' && !stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false))
         return
       if (key === null) return

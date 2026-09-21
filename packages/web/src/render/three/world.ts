@@ -1,5 +1,5 @@
 import { agentScreenAnchor } from '../agentAnchor.js'
-import { personHit } from '../personHit.js'
+import { personHit, personHoverPosition } from '../personHit.js'
 import { createThreeInterior } from './interior.js'
 import { createOrchardGardens } from './orchard.js'
 import { effectiveConfig } from '@sj/engine/laws'
@@ -203,6 +203,7 @@ export function createThreeWorld(
       y,
       width,
       height,
+      view.safeInsets ?? { top: 0, bottom: 0 },
     )
   }
   const personTag = document.createElement('button')
@@ -225,7 +226,15 @@ export function createThreeWorld(
     if (!at || !hoveredPerson) return
     const label = store.getState()?.agents[hoveredPerson]?.name ?? ''
     if (personTag.textContent !== label) personTag.textContent = label
-    personTag.style.transform = `translate(${Math.max(55, Math.min(width - 55, at.x))}px,${Math.max(12, at.y - 36)}px)`
+    const point = personHoverPosition(
+      at,
+      { width, height },
+      { width: personTag.offsetWidth, height: personTag.offsetHeight },
+      view.safeInsets ?? { top: 0, bottom: 0 },
+    )
+    personTag.hidden = !point || !!view.interior?.isActive()
+    if (point)
+      personTag.style.transform = `translate(${Math.round(point.x)}px,${Math.round(point.y)}px)`
   }
   const ray = new Raycaster()
   const hitAt = (

@@ -15,7 +15,7 @@
   --a-green: #3a4c3e; --a-green-ink: #e0edce; --a-green-edge: #8c9f7a;
   --a-replay: #594137; --a-replay-ink: #ffe2cd; border-bottom-color: #796f5b; color-scheme: dark;
 }
-.almanac:has(.almanac-card) { z-index: 35; }
+.almanac:has(.almanac-card, .usage-meter[open]) { z-index: var(--layer-popover); }
 .almanac p { margin: 0; }
 .almanac button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 .almanac button:disabled { cursor: default; opacity: .4; }

@@ -151,7 +151,7 @@ describe('★ the signpost and the paper hold their own shape', () => {
   // The arms answered that by re-anchoring on the click that pressed them, which took the control
   // out from under the hand: the position may not depend on `data-open` at any size any more.
   it('★ keeps the signpost reachable with the sheet open, without moving it to do so', () => {
-    expect(rulesFor(CORNER, '.signpost')).toContain('z-index: 25')
+    expect(rulesFor(CORNER, '.signpost')).toContain('z-index: var(--layer-chrome)')
     expect(rulesFor(HARMONY, '.app .signpost')).toContain('var(--dock-w,0px)')
     expect(selectorsMatching(CORNER + HARMONY, /^\.signpost\[data-open/)).toEqual([])
     expect(rulesFor(CORNER, '.journal-sections')).toContain('bottom: calc(100% - 5px)')
@@ -361,6 +361,8 @@ describe('★ the signpost and the paper hold their own shape', () => {
   /** The marks the frame does NOT place, each for a reason written down. Every one of these is
    *  the whole picture or a thing inside another mark, and none of them is a panel. */
   const NOT_PLACED: Readonly<Record<string, string>> = {
+    '.stage-plate': 'anchored to a person',
+    '.stage-ring': 'anchored to a selected person',
     '.mark-tip': 'the word for a mark on the day strip, inside the sheet',
     '.skip': 'the first tab stop, held off the top edge until it is focused',
     '.stage-figures': 'the layer the bodies are drawn on, the canvas edge to edge',

@@ -29,9 +29,12 @@ export function createLayers(world: Container): {
   layers: LayerSet
   graded: Container
   attention: Container
+  reading: Container
 } {
   const attention = new Container()
   const graded = new Container()
+  const reading = new Container()
+  reading.eventMode = 'none'
   world.addChild(attention)
   attention.addChild(graded)
   const out = {} as Record<LayerName, Container>
@@ -39,10 +42,10 @@ export function createLayers(world: Container): {
     const c = new Container()
     if (name === SORTED_LAYER) c.sortableChildren = true
     else c.eventMode = 'none'
-    ;(GRADED_LAYERS.includes(name) ? graded : world).addChild(c)
+    ;(GRADED_LAYERS.includes(name) ? graded : reading).addChild(c)
     out[name] = c
   }
-  return { layers: out, graded, attention }
+  return { layers: out, graded, attention, reading }
 }
 
 /** In paint order over `world`. `lights` mirrors the world's transform and is the ONLY place

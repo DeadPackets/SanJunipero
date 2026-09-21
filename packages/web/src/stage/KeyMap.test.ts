@@ -97,4 +97,35 @@ describe('the key map — heuristic 10 used to score zero', () => {
     expect(open).toContain('aria-label="Controls"')
     expect(open).toContain('tabindex="-1"')
   })
+
+  it.each([
+    '<dialog open></dialog>',
+    '<section class="paper" data-open="yes" aria-modal="true"></section>',
+    '<div id="first-frame"></div>',
+  ])('does not open through an input-blocking surface: %s', async (markup) => {
+    const { asked } = await stage()
+    document.body.insertAdjacentHTML('beforeend', markup)
+    await press(KEY_MAP_KEY)
+    expect(asked).toEqual([])
+  })
+
+  it('closes existing Controls when the mobile journal takes input', async () => {
+    const onOpenChange = vi.fn()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(KeyMap, { open: true, onOpenChange }))
+    })
+    expect(onOpenChange).not.toHaveBeenCalled()
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<section class="paper" data-open="yes" aria-modal="true"></section>',
+    )
+    await act(async () => {
+      root.render(createElement(KeyMap, { open: true, onOpenChange }))
+    })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
 })

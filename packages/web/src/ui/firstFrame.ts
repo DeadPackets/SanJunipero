@@ -9,12 +9,22 @@ export const FIRST_FRAME_COPY = {
 let card: HTMLElement | null = null
 let done = false
 let loading = false
+let restoreBackground: (() => void) | null = null
 
 /** React clears `#root` on mount, so the static title card — the LCP element — steps out of
  *  it first and the town comes up underneath. */
 export function detachFirstFrame(): void {
   card = document.getElementById('first-frame')
-  if (card !== null) document.body.append(card)
+  if (card === null) return
+  document.body.append(card)
+  const root = document.getElementById('root')
+  if (root) {
+    const inert = root.inert
+    root.inert = true
+    restoreBackground = () => {
+      root.inert = inert
+    }
+  }
 }
 
 /** What the card is waiting for, in the town's own voice. Ignored once the town has arrived. */
@@ -36,6 +46,8 @@ export function firstFrameStuck(text: string): void {
 export function dismissFirstFrame(): void {
   if (done || card === null) return
   done = true
+  restoreBackground?.()
+  restoreBackground = null
   fade(card)
 }
 

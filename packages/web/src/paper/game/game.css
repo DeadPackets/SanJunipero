@@ -201,7 +201,7 @@
 @media (max-width: 999px) {
   .paper.sj-paper[data-dock=on] {
     position: fixed; inset: 0; width: 100%; height: 100dvh; max-height: 100dvh;
-    grid-area: auto; border-radius: 0; border: 0; z-index: 40;
+    grid-area: auto; border-radius: 0; border: 0; z-index: var(--layer-mobile-dialog);
     padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
   }
   .sj-paper .paper-marginalia { top: 72px; }

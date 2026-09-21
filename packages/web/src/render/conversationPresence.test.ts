@@ -76,12 +76,16 @@ it('marks the displayed speaker and listeners, then closes without needing a sum
   layer.tick(0)
   expect(parent.querySelector('[data-person="amara"]')?.getAttribute('data-role')).toBe('speaking')
   expect(parent.querySelector('[data-person="halim"]')?.getAttribute('data-role')).toBe('listening')
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(true)
+  expect(parent.querySelectorAll('.conversation-person:not([hidden])')).toHaveLength(2)
   bubble.hidden = true
   layer.tick(1000)
   expect(parent.querySelector('[data-person="amara"]')?.getAttribute('data-role')).toBe('present')
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(false)
   close()
   layer.tick(3000)
   expect(parent.textContent).toContain('Conversation ended')
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(false)
   layer.tick(4100)
   expect(parent.querySelector<HTMLElement>('.conversation-presence')?.hidden).toBe(true)
 })
@@ -115,4 +119,33 @@ it('does not call a thought or hidden balloon speaking', () => {
   parent.append(bubble)
   layer.tick(0)
   expect(parent.querySelector('[data-person="amara"]')?.getAttribute('data-role')).toBe('present')
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(false)
+})
+
+it('keeps the caption for speech from another scene', () => {
+  const { parent, layer } = setup()
+  const bubble = document.createElement('div')
+  bubble.className = 'pixel-speech-layer'
+  bubble.dataset.agentId = 'amara'
+  bubble.dataset.speaking = 'true'
+  bubble.dataset.sceneId = 'elsewhere'
+  parent.append(bubble)
+  layer.tick(0)
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(false)
+})
+
+it('shows the ending even if the last speech balloon is still visible', () => {
+  const { parent, layer, close } = setup()
+  const bubble = document.createElement('div')
+  bubble.className = 'pixel-speech-layer'
+  bubble.dataset.agentId = 'amara'
+  bubble.dataset.speaking = 'true'
+  bubble.dataset.sceneId = 'talk'
+  parent.append(bubble)
+  layer.tick(0)
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(true)
+  close()
+  layer.tick(100)
+  expect(parent.querySelector<HTMLElement>('.conversation-caption')?.hidden).toBe(false)
+  expect(parent.textContent).toContain('Conversation ended')
 })

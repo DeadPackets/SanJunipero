@@ -1,4 +1,4 @@
-.resident-token-layer { position:absolute; inset:0; pointer-events:none; z-index:7; overflow:hidden; }
+.resident-token-layer { position:absolute; inset:0; pointer-events:none; z-index: var(--layer-status); overflow:hidden; }
 .resident-token-layer[hidden], .resident-token-layer [hidden] { display:none; }
 .resident-marker { position:absolute; top:0; left:0; }
 .resident-badge { display:flex; align-items:center; gap:6px; min-height:34px; padding:4px 6px; border:1px solid #ad9b7e; border-radius:6px; background:#fff6e9; box-shadow:0 2px #ad9b7e; white-space:nowrap; font:600 12px/1.4 Manrope,sans-serif; color:#785124; translate:-50% -100%; }
