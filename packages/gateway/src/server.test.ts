@@ -73,11 +73,22 @@ describe('gateway server', () => {
     const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
     open.push(gw)
     expect(gw.port).toBeGreaterThan(0)
+    const usage = await fetch(`http://127.0.0.1:${gw.port}/api/usage`)
+    expect(usage.status).toBe(200)
+    expect(usage.headers.get('cache-control')).toBe('public, max-age=10')
+    expect(await usage.json()).toMatchObject({ mode: 'unavailable', total: null, last24h: null })
 
     // hello → snapshot, live, matching hash
     const a = await connect(gw.port)
     open.push(a)
+    const initialFrames: string[] = []
+    collect(a, initialFrames)
     const snapRaw = await hello(a)
+    await wait(20)
+    expect(initialFrames.map((frame) => ServerMsg.parse(JSON.parse(frame)))).toContainEqual({
+      t: 'assets',
+      records: [],
+    })
     const snap = ServerMsg.parse(JSON.parse(snapRaw))
     if (snap.t !== 'snapshot') throw new Error('expected snapshot')
     expect(snap.live).toBe(true)

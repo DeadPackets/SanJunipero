@@ -33,7 +33,8 @@ import { entersOnClick, type WorldPick } from '../entities.js'
 import { rendersOnMap, type CharacterLayer } from '../characters.js'
 import { buildStructure, structureKey } from './structures.js'
 import { syncBuildingFire } from './buildingFire.js'
-import { createTerrain } from './terrain.js'
+import { createTerrain, terrainNeedsSync } from './terrain.js'
+import type { WorldState } from '@sj/engine/state'
 import { createOcclusionFader } from './occlusion.js'
 import { createEnvironment } from './environment.js'
 import { createNightBackdrop } from './nightBackdrop.js'
@@ -110,6 +111,7 @@ export function createThreeWorld(
   composer.addPass(output)
   let dirty = true
   let artSeq = -1
+  let terrainState: WorldState | null = null
   let width = 0
   let height = 0
   let seconds = 0
@@ -309,7 +311,8 @@ export function createThreeWorld(
         const records = store.assetRecords()
         const changedArt = artSeq !== store.assetsSeq()
         artSeq = store.assetsSeq()
-        terrain.sync(state, records)
+        if (changedArt || terrainNeedsSync(terrainState, state)) terrain.sync(state, records)
+        terrainState = state
         gardens.sync(state)
         resources.sync(state, records)
         for (const [id, entry] of structures)
@@ -332,7 +335,6 @@ export function createThreeWorld(
         weather.sync([...structures.values()].map((e) => e.group))
         fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
       }
-      fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
       const center = syncCamera(
         camera,
         width,
@@ -428,7 +430,7 @@ export function createThreeWorld(
       root.dataset.structures = String(structures.size)
       root.dataset.faded = String(faded)
       root.dataset.drawCalls = String(renderer.info.render.calls)
-      store.setDressed()
+      if (terrain.isReady() && library.isReady() && resources.isReady()) store.setDressed()
     },
     destroy() {
       buildingTag.destroy()

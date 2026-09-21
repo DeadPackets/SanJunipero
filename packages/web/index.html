@@ -20,7 +20,7 @@
       body {
         height: 100%;
         margin: 0;
-        background: #322b38;
+        background: #fff6e9;
       }
       .first-frame,
       .no-script {
@@ -31,7 +31,7 @@
         justify-items: center;
         gap: 0.75rem;
         padding: 6vmin;
-        background: #322b38;
+        background: #fff6e9;
         text-align: center;
       }
       .first-frame {
@@ -47,19 +47,21 @@
         margin: 0;
         font: 500 clamp(28px, 6vw, 44px) / 1.1 Georgia, 'Times New Roman', serif;
         letter-spacing: -0.01em;
-        color: #fff6e9;
+        color: #493e4a;
       }
       .first-frame p,
       .no-script p {
         margin: 0;
         max-width: 42ch;
         font: 400 16px / 1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
-        color: #c4b8ae;
+        color: #746759;
         text-wrap: pretty;
       }
       .no-script a {
         color: #f2c879;
       }
+      .first-frame progress { width: min(280px, 70vw); height: 8px; accent-color: #849e63; }
+      .first-frame button { padding: 12px 18px; border: 2px solid #8e745b; border-radius: 8px; background: #f6e4c1; color: #493e4a; cursor: pointer; font: 600 16px system-ui; }
       .first-frame.gone {
         opacity: 0;
         pointer-events: none;
@@ -76,6 +78,7 @@
       <div class="first-frame" id="first-frame">
         <h1>San Junipero</h1>
         <p id="first-frame-note" role="status">Looking for the town…</p>
+        <progress hidden aria-label="Town assets loaded"></progress>
       </div>
     </div>
     <noscript>

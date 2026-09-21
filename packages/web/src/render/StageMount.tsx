@@ -1,3 +1,4 @@
+import { prepareTownAssets } from './bootAssets.js'
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { parseRoute, routeToPath } from '../ui/route.js'
@@ -6,7 +7,7 @@ import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { createThreeWorld } from './three/world.js'
 import { installFaces } from './textFaces.js'
-import { TextureBook } from './textures.js'
+import { TextureBook, whenDressed } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createPixelBubbles } from './pixelBubbles.js'
@@ -97,6 +98,7 @@ export function StageMount({
     const spatial = new URLSearchParams(location.search).get('renderer') !== 'pixi'
     let scene: Scene | null = null
     let disposed = false
+    const boot = new AbortController()
     let published = false
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
@@ -156,7 +158,8 @@ export function StageMount({
     }
     // Faces install before the scene exists so the first label drawn is already a bitmap
     // glyph; installFaces resolves even when the webfonts never do.
-    void installFaces(document)
+    void prepareTownAssets(store, boot.signal)
+      .then(() => installFaces(document))
       .then(() => createScene(rootEl, store, spatial))
       .then((s) => {
         if (disposed) {
@@ -293,6 +296,7 @@ export function StageMount({
         s.app.ticker.add(tickFn)
         published = true
         onScene?.(s)
+        if (!spatial) void whenDressed().then(store.setDressed)
       })
       .catch(() => {
         // No WebGL, no WebGPU, or a context lost mid-build.
@@ -302,6 +306,7 @@ export function StageMount({
       })
     return () => {
       disposed = true
+      boot.abort()
       // Fast Refresh remounts this component and the effect below destroys the scene; without
       // this line the chrome upstream keeps the dead one and throws on its next ticker call.
       if (published) onScene?.(null)

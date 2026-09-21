@@ -8,6 +8,7 @@ export const FIRST_FRAME_COPY = {
 
 let card: HTMLElement | null = null
 let done = false
+let loading = false
 
 /** React clears `#root` on mount, so the static title card — the LCP element — steps out of
  *  it first and the town comes up underneath. */
@@ -18,6 +19,7 @@ export function detachFirstFrame(): void {
 
 /** What the card is waiting for, in the town's own voice. Ignored once the town has arrived. */
 export function firstFrameNote(text: string): void {
+  if (loading) return
   const note = done ? null : card?.querySelector('#first-frame-note')
   if (note != null && note.textContent !== text) note.textContent = text
 }
@@ -25,6 +27,7 @@ export function firstFrameNote(text: string): void {
 /** The town will never arrive: say why, and let nothing write over it — "Looking for the town…"
  *  is a lie once the canvas has failed, and there is no town underneath to uncover. */
 export function firstFrameStuck(text: string): void {
+  loading = false
   firstFrameNote(text)
   done = true
 }
@@ -45,4 +48,37 @@ function fade(el: HTMLElement): void {
   }
   el.addEventListener('transitionend', drop, { once: true })
   setTimeout(drop, MOTION.scene.ms + 100)
+}
+
+export function firstFrameProgress(loaded: number, total: number): void {
+  loading = true
+  const note = card?.querySelector('#first-frame-note')
+  if (note) note.textContent = `Preparing the town · ${loaded} of ${total} assets`
+  const meter = card?.querySelector<HTMLProgressElement>('progress')
+  if (meter) {
+    meter.hidden = false
+    meter.max = Math.max(1, total)
+    meter.value = loaded
+  }
+}
+
+export function firstFrameRetry(failed: number, signal: AbortSignal): Promise<void> {
+  const note = card?.querySelector('#first-frame-note')
+  if (note) note.textContent = `${failed} assets could not load. Check your connection and retry.`
+  return new Promise((resolve, reject) => {
+    const button = document.createElement('button')
+    button.textContent = 'Retry loading'
+    button.type = 'button'
+    const abort = () => {
+      button.remove()
+      reject(new DOMException('Loading cancelled', 'AbortError'))
+    }
+    button.onclick = () => {
+      button.remove()
+      signal.removeEventListener('abort', abort)
+      resolve()
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    card?.append(button)
+  })
 }

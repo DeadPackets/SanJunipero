@@ -18,6 +18,7 @@ import {
 import { disposeGroup } from './dispose.js'
 
 export function createResources(scene: Scene) {
+  let pending = 0
   const entries = new Map<string, { key: string; group: Group }>()
   function put(id: string, key: string, x: number, z: number, build: () => Group) {
     let entry = entries.get(id)
@@ -48,6 +49,7 @@ export function createResources(scene: Scene) {
     group.add(mesh)
   }
   return {
+    isReady: () => pending === 0,
     sync(state: WorldState, records: AssetRecord[]) {
       const live = new Set<string>()
       for (const crop of Object.values(state.crops)) {
@@ -94,9 +96,11 @@ export function createResources(scene: Scene) {
           box(group, 0, 0.27, 0, 0.04, 0.03, 0.28, 0x6e5844)
           if (art) {
             const fallback = [...group.children]
+            pending++
             const texture = new TextureLoader().load(
               `/assets/${art.id}.png`,
               () => {
+                pending--
                 if (!group.parent) {
                   texture.dispose()
                   return
@@ -105,7 +109,9 @@ export function createResources(scene: Scene) {
                 picture.visible = true
               },
               undefined,
-              () => undefined,
+              () => {
+                pending--
+              },
             )
             texture.colorSpace = SRGBColorSpace
             texture.magFilter = NearestFilter

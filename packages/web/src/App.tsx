@@ -9,7 +9,6 @@ import { connectObservatory, type LinkStatus, type ObservatoryHandle } from './n
 import { parseRoute, routeToPath, titleFor, type Route } from './ui/route.js'
 import { StageMount } from './render/StageMount.js'
 import { BROADCAST_TEXT_SCALE } from './render/textFaces.js'
-import { whenDressed } from './render/textures.js'
 import type { Scene } from './render/scene.js'
 import {
   DirectorCue,
@@ -36,14 +35,14 @@ import { Soundscape } from './stage/Soundscape.js'
 import { DirectorMode } from './ui/DirectorMode.js'
 import { FpsOverlay } from './ui/FpsOverlay.js'
 import { useAutoCut } from './ui/autoCut.js'
-import { playClosesPaper, pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
+import { pointPlay, useMomentEnd, type MomentPlay } from './ui/replayRun.js'
 import { sceneCueFor, useSceneStage, useStageCue } from './ui/stageCue.js'
 import { FIRST_FRAME_COPY, dismissFirstFrame, firstFrameNote } from './ui/firstFrame.js'
 import { useDressed } from './ui/bustStyle.js'
 import { useDensity } from './ui/density.js'
 import { escapeStep } from './ui/interaction.js'
 import { adminToken } from './ui/lawsModel.js'
-import { localStore, paperDock, rememberPaperDock, sessionStore } from './ui/storage.js'
+import { localStore, sessionStore } from './ui/storage.js'
 import { rememberThoughts, thoughtsSetting } from './ui/thoughts.js'
 import { Paper } from './paper/Paper.js'
 import { Signpost } from './paper/Signpost.js'
@@ -115,8 +114,6 @@ export function App() {
   }))
   const [keysOpen, setKeysOpen] = useState(false)
   const [thoughts, setThoughts] = useState(() => thoughtsSetting(localStore()))
-  // Where the Almanac stands. It lives here, not in the sheet, because Watch has to ask.
-  const [dock, setDock] = useState(() => paperDock(localStore()))
   const [following, setFollowing] = useState<string | null>(null)
   useEffect(() => {
     scene?.interior?.setFollowed(following)
@@ -199,9 +196,6 @@ export function App() {
   // The card leaves when the town is DRESSED, never when the scene object exists: art in hand
   // is the only thing that makes the reveal a town rather than an empty field.
   const dressed = useDressed(store)
-  useEffect(() => {
-    void whenDressed().then(store.setDressed)
-  }, [store])
   // One way only: a socket that drops after the town can be seen is the stamp's news, not this.
   useEffect(() => {
     if (scene !== null && link === 'online' && dressed) dismissFirstFrame()
@@ -258,15 +252,13 @@ export function App() {
   )
   const onPlay = useCallback(
     (next: MomentPlay) => {
-      // As a sheet the paper takes 66% of the screen and dims the town, and a replay behind it
-      // is invisible. Docked it takes 380px and dims nothing, so it stays up.
-      if (playClosesPaper(dock) || !window.matchMedia('(min-width: 1000px)').matches) closePaper()
+      if (!window.matchMedia('(min-width: 1000px)').matches) closePaper()
       setFollowing(null)
       setPlay(next)
       handle?.replay(next.from)
       address(next.from)
     },
-    [handle, address, closePaper, dock],
+    [handle, address, closePaper],
   )
   const onLive = useCallback(() => {
     setPlay(null)
@@ -387,14 +379,6 @@ export function App() {
     scene.pickedId = subject?.id ?? null
   }, [scene, subject])
 
-  // The 1000px floor is the sheet's, not this file's: every dock rule sits inside that media
-  // query, so below it the attribute flips and the Almanac stays the sheet it was.
-  const toggleDock = useCallback(() => {
-    const next = dock === 'docked' ? 'sheet' : 'docked'
-    setDock(next)
-    rememberPaperDock(localStore(), next)
-  }, [dock])
-
   const toggleThoughts = useCallback(() => {
     const next = thoughts === 'hidden' ? 'shown' : 'hidden'
     setThoughts(next)
@@ -425,7 +409,6 @@ export function App() {
     onDirector: toggleDirector,
     onThoughts: toggleThoughts,
     onDensity: density.cycle,
-    onDock: toggleDock,
   })
 
   return (
@@ -525,8 +508,7 @@ export function App() {
         onWatch={(tick) => {
           setPlay(null)
           setFollowing(null)
-          if (playClosesPaper(dock) || !window.matchMedia('(min-width: 1000px)').matches)
-            closePaper()
+          if (!window.matchMedia('(min-width: 1000px)').matches) closePaper()
           handle?.replay(tick)
           address(tick)
         }}
@@ -535,23 +517,25 @@ export function App() {
         handbackAt={handbackAt}
         broadcast={route.broadcast}
         cameraBookmark={
-          <CameraBookmark
-            store={store}
-            autoCut={autoCut}
-            following={following}
-            cast={shot.cast}
-            replaying={(play?.cast.length ?? 0) > 0}
-            handbackAt={handbackAt}
-            onRelease={() => {
-              setFollowing(null)
-              setPlay((prev) => (prev === null ? null : { ...prev, cast: [] }))
-              pauseDirector()
-            }}
-            onStart={() => {
-              setFollowing(null)
-              toggleDirector()
-            }}
-          />
+          insideId === null ? (
+            <CameraBookmark
+              store={store}
+              autoCut={autoCut}
+              following={following}
+              cast={shot.cast}
+              replaying={(play?.cast.length ?? 0) > 0}
+              handbackAt={handbackAt}
+              onRelease={() => {
+                setFollowing(null)
+                setPlay((prev) => (prev === null ? null : { ...prev, cast: [] }))
+                pauseDirector()
+              }}
+              onStart={() => {
+                setFollowing(null)
+                toggleDirector()
+              }}
+            />
+          ) : undefined
         }
       />
       {route.broadcast && insideId === null && (
@@ -627,8 +611,6 @@ export function App() {
         operatorToken={operatorToken}
         insideId={insideId}
         gapTicks={gapTicks}
-        dock={dock}
-        onDock={toggleDock}
         onTab={(tab) => {
           setSheet((prev) => (prev === null ? prev : { ...prev, tab }))
         }}

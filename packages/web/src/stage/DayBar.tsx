@@ -1,3 +1,4 @@
+import { UsageMeter } from './UsageMeter.js'
 import {
   useMemo,
   useRef,
@@ -280,6 +281,7 @@ export function DayBar({
         <WeatherIcon kind={kind} />
         <div>
           <p>{weather.toLowerCase()}</p>
+          <UsageMeter />
           {broadcast && <CameraChip autoCut={autoCut} handbackAt={handbackAt} />}
         </div>
         <span className="almanac-status" data-live={word === 'LIVE'}>

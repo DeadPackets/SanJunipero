@@ -233,6 +233,14 @@ describe('worldStore', () => {
     expect(store.thoughtsLog()).toHaveLength(200)
   })
 
+  it('waits for the catalog frame, including an empty catalog', () => {
+    const store = createWorldStore()
+    expect(store.assetsReady()).toBe(false)
+    store.applyServer({ t: 'assets', records: [] })
+    expect(store.assetsReady()).toBe(true)
+    expect(store.assetsSeq()).toBe(0)
+  })
+
   it('asset frames bump assetsSeq and accumulate records', () => {
     const store = createWorldStore()
     expect(store.assetsSeq()).toBe(0)

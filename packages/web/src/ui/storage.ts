@@ -58,11 +58,3 @@ export function pref<T extends string>(key: string, allowed: readonly T[], fallb
     },
   }
 }
-
-/** Where the Almanac stands: the sheet over the town, or a column beside it. Remembered, because
- *  a reader who docks it once means it. */
-const DOCKS = ['sheet', 'docked'] as const
-export type PaperDock = (typeof DOCKS)[number]
-const dock = pref('sj.paperDock', DOCKS, 'sheet')
-export const paperDock = dock.read
-export const rememberPaperDock = dock.write

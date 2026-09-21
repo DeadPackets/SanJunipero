@@ -1,3 +1,4 @@
+import { mountPublicUsage, type UsageSource } from './publicUsage.js'
 import { createServer } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -64,6 +65,7 @@ export type GatewayOpts = {
    *  absent, `SJ_ADMIN_TOKEN`/`SJ_ADMIN_PORT` decide. */
   adminPort?: number | null
   paused?: () => boolean // the world clock's own state; absent → the town is always running
+  usageSource?: UsageSource
   onViewers?: (count: number) => void // live viewer count, as one greets and as one leaves
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
   replayMsPerTick?: number // default TICK_REAL_MS — the cadence a replay plays the past back at
@@ -152,6 +154,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     knowsAgent: (id) => personAt(mirror.state().agents, id) !== undefined,
     kinOf: (id) => forebears(mirror.state().agents, id),
   })
+  mountPublicUsage(router, opts.usageSource ?? (() => null))
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   const moments = makeMomentsReader({ db, mirror, narratorDb })
@@ -406,11 +409,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             catchUp.push(record)
             catchUpJson = null
           }
-          if (catchUp.length > 0) {
-            catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
-            sock.send(catchUpJson)
-          }
         }
+        catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
+        sock.send(catchUpJson)
         // The word each mind holds about itself, so a late roster does not guess from the body.
         if (observerSeen) for (const m of latestMoods(db)) sock.send(moodJson(m))
         // Whoever is mid-turn right now. A turn runs ten to ninety seconds, so a viewer that

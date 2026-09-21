@@ -1404,17 +1404,6 @@ body {
   .paper { --paper-w: min(78%, 1040px); }
 }
 
-.paper-grip {
-  position: relative; justify-self: center;
-  width: 44px; height: 5px; margin: var(--s-3) 0;
-  /* 5.83:1 on parchment: the one "drag me down" affordance, well past the 3:1 floor. */
-  background: var(--ink-quiet);
-  cursor: grab; touch-action: none;
-}
-.paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
-.paper-grip:active { cursor: grabbing; }
-
-/* ── the broadsheet head: a masthead, then a dated rule with the sections along it ── */
 .paper-head { display: grid; gap: var(--s-3); padding: var(--s-5) var(--s-6) 0; }
 /* The masthead. Fraunces at its heaviest and tightest, centred: the one place on the sheet
    where the type is the ornament. */
@@ -2649,21 +2638,11 @@ body {
 .record-range-pick:hover { color: var(--ink); }
 .record-range-pick[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
 
-.paper-dock {
-  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-2); display: none;
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
-  color: var(--ink-quiet); background: none; cursor: pointer;
-  border: 0; border-bottom: 2px solid transparent;
-}
-.paper-dock:hover { color: var(--ink); }
-.paper-dock[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
-
 /* ── THE DOCK: the Almanac as a column beside the town rather than a sheet over it ───────────
    The frame grows a sixth track outside its own right gutter, so the band, the strip and the
    three deck surfaces reflow off the column instead of being covered by it. The world is not
    dimmed here: reading and watching stop being exclusive. A phone has the drawer instead. */
 @media (min-width: 1000px) {
-  .paper-dock { display: block; }
   .app:has(> .paper[data-dock='on'][data-open='yes']) { --dock-w: 380px; }
   .town-dim[data-open='yes'][data-dock='on'] { opacity: 0; pointer-events: none; }
   .paper[data-dock='on'] {
@@ -2674,8 +2653,6 @@ body {
     transform: translateX(102%);
   }
   .paper[data-dock='on'][data-open='yes'] { transform: translateX(0); }
-  /* The grip pulls a sheet DOWN, and a column has nowhere down to go. */
-  .paper[data-dock='on'] .paper-grip { display: none; }
   /* A 380px column is narrower than the tabs at any viewport, so the dateline takes the shape
      the sheet takes under 1920: tabs on a second row that scrolls, the marginalia beside the day. */
   .paper[data-dock='on'] .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }

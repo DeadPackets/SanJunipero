@@ -2,7 +2,7 @@ import { createWorldStore } from '../state/worldStore.js'
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Signpost } from '../paper/Signpost.js'
 import { SoundButton } from '../stage/SoundButton.js'
 import {
@@ -24,6 +24,7 @@ import {
   soundCues,
   soundLevel,
   soundSetting,
+  soundscapeOrSilence,
   standingChips,
   trackStarts,
 } from './sound.js'
@@ -139,9 +140,16 @@ describe('★ every sound has a source the viewer can see', () => {
     expect(sources(scene({ bellAgeMs: null }))).not.toContain('bell')
   })
 
+  it('lets a calm dry town be quiet while retaining weather, fire and conversation cues', () => {
+    expect(soundCues(scene({ gust: 0 }))).toEqual([])
+    expect(sources(scene({ gust: 0, weatherKind: 'storm' }))).toContain('rain')
+    expect(sources(scene({ gust: 0, firesInView: 1 }))).toContain('fire')
+    expect(sources(scene({ gust: 0, voicesInView: 2 }))).toContain('murmur')
+  })
+
   // The whole picture drifts on `windNow()` — every canopy, every column of smoke — so the
   // wind is the one voice whose source is always on screen.
-  it('the wind is always there, and leans on the weather', () => {
+  it('wind rises with weather and a visible gust', () => {
     expect(sources(scene())).toContain('wind')
     const gain = (k: string): number =>
       soundCues(scene({ weatherKind: k })).find((c) => c.source === 'wind')!.gain
@@ -296,9 +304,10 @@ describe('★ the mix, and not a pile of gains', () => {
   })
 
   it('the wind answers the gust the canopies lean to', () => {
-    const gain = (gust: number): number => soundCues(scene({ gust }))[0]!.gain
+    const gain = (gust: number): number =>
+      soundCues(scene({ gust })).find((c) => c.source === 'wind')?.gain ?? 0
     expect(gain(1)).toBeGreaterThan(gain(0))
-    expect(gain(0)).toBeGreaterThan(0)
+    expect(gain(0)).toBe(0)
   })
 })
 
@@ -443,4 +452,89 @@ describe('★ the ♪ toggle', () => {
     expect(chip).toContain('text-shadow: var(--halo-deep)')
     expect(chip).toContain('pointer-events: none')
   })
+})
+
+it('builds independent softened beds once, then suspends and closes the audio clock', async () => {
+  vi.useFakeTimers()
+  const buffers: Float32Array[] = []
+  const param = () => ({
+    value: 0,
+    setTargetAtTime: vi.fn(),
+    setValueAtTime: vi.fn(),
+    exponentialRampToValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
+  })
+  const node = () => ({
+    connect: vi.fn(function (next: unknown) {
+      return next
+    }),
+    gain: param(),
+    pan: param(),
+    frequency: param(),
+    Q: param(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    threshold: param(),
+    knee: param(),
+    ratio: param(),
+    attack: param(),
+    release: param(),
+  })
+  const resume = vi.fn(async () => {})
+  const suspend = vi.fn(async () => {})
+  const close = vi.fn(async () => {})
+  const context = vi.fn(function () {
+    return {
+      sampleRate: 8000,
+      currentTime: 0,
+      destination: node(),
+      resume,
+      suspend,
+      close,
+      createGain: node,
+      createBiquadFilter: node,
+      createBufferSource: node,
+      createStereoPanner: node,
+      createOscillator: node,
+      createDynamicsCompressor: node,
+      createBuffer: (_channels: number, length: number) => {
+        const data = new Float32Array(length)
+        buffers.push(data)
+        return { getChannelData: () => data }
+      },
+    }
+  })
+  vi.stubGlobal('AudioContext', context)
+  const synth = soundscapeOrSilence()
+  try {
+    expect(context).not.toHaveBeenCalled()
+    synth.play(soundCues(scene({ weatherKind: 'rain' })))
+    synth.setMuted(false)
+    expect(resume).toHaveBeenCalledOnce()
+    expect(buffers.length).toBeGreaterThan(1)
+    expect(new Set(buffers.map((b) => b[400])).size).toBe(buffers.length)
+    for (const data of buffers) {
+      expect(Math.abs(data[0] ?? 0)).toBe(0)
+      expect(Math.abs(data.at(-1) ?? 0)).toBe(0)
+      expect(data.some((sample) => Math.abs(sample) > 0.1)).toBe(true)
+    }
+    const built = buffers.length
+    synth.play(soundCues(scene({ weatherKind: 'storm' })))
+    expect(buffers).toHaveLength(built)
+    synth.setHidden(true)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(suspend).toHaveBeenCalledOnce()
+    synth.setHidden(false)
+    expect(resume).toHaveBeenCalledTimes(2)
+    synth.setMuted(true)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(suspend).toHaveBeenCalledTimes(2)
+    synth.destroy()
+    expect(close).toHaveBeenCalledOnce()
+    expect(vi.getTimerCount()).toBe(0)
+  } finally {
+    synth.destroy()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  }
 })

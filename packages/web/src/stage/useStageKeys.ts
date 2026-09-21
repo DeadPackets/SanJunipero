@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export type StageKey =
-  | 'signpost'
-  | 'escape'
-  | 'fullscreen'
-  | 'director'
-  | 'thoughts'
-  | 'density'
-  | 'dock'
+export type StageKey = 'signpost' | 'escape' | 'fullscreen' | 'director' | 'thoughts' | 'density'
 
 export type StageKeyHandlers = {
   onSignpost?: () => void
@@ -16,10 +9,9 @@ export type StageKeyHandlers = {
   onDirector?: () => void
   onThoughts?: () => void
   onDensity?: () => void
-  onDock?: () => void
 }
 
-/** The seven keys the stage itself owns. The arrows, `+` and `-` are NOT here: StageMount binds
+/** The six keys the stage itself owns. The arrows, `+` and `-` are NOT here: StageMount binds
  *  them to the camera already, and a second binding would pan twice. */
 export function stageKeyFor(key: string): StageKey | null {
   // `toLowerCase`, so Caps Lock keeps the keys; the SHIFT key is what the listener refuses,
@@ -37,8 +29,6 @@ export function stageKeyFor(key: string): StageKey | null {
       return 'thoughts'
     case '[':
       return 'density'
-    case 'a':
-      return 'dock'
     default:
       return null
   }
@@ -70,7 +60,6 @@ const HANDLER: Readonly<Record<StageKey, keyof StageKeyHandlers>> = {
   director: 'onDirector',
   thoughts: 'onThoughts',
   density: 'onDensity',
-  dock: 'onDock',
 }
 
 export function useStageKeys(handlers: StageKeyHandlers): void {

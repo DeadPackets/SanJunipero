@@ -82,6 +82,7 @@ export type WorldStore = {
   /** Who is thinking right now, and as of when. Dropped on a scrub and a replay with the
    *  director and the board, for the same reason: it is about the live minute. */
   minds: () => ReadonlyMap<string, { state: MindState; tick: number }>
+  assetsReady: () => boolean
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** Has the reveal happened? A bust is a whole 400 KB character sheet on the wire, so none may
@@ -106,6 +107,7 @@ export function createWorldStore(): WorldStore {
   let paused = false
   let liveEdge = 0
   let assetsSeq = 0
+  let assetsReady = false
   let dressed = false
   let thoughtsSeq = 0
   let logSeq = 0
@@ -189,6 +191,7 @@ export function createWorldStore(): WorldStore {
     threads: () => threads,
     board: () => board,
     minds: () => minds,
+    assetsReady: () => assetsReady,
     assetsSeq: () => assetsSeq,
     logSeq: () => logSeq,
     assetRecords: () => records,
@@ -293,6 +296,7 @@ export function createWorldStore(): WorldStore {
           setMind(msg.agentId, 'idle', msg.tick)
           break
         case 'assets':
+          assetsReady = true
           records.push(...msg.records)
           assetsSeq += msg.records.length
           break

@@ -61,14 +61,14 @@ type Town = {
 }
 
 /** Only what the mix reads off a store: the world, the clock, and the events. */
-function town(): Town {
+function town(weatherKind = 'clear'): Town {
   const subs = new Set<() => void>()
   const evs = new Set<(e: SimEvent[]) => void>()
   let state = {
     items: {},
     structures: {},
     agents: { nadia: { id: 'nadia', x: 3, y: 4 } },
-    weather: { kind: 'clear' },
+    weather: { kind: weatherKind },
     terrain: { w: 4, h: 4 },
   }
   return {
@@ -180,7 +180,7 @@ describe('★ the synth hears every snapshot', () => {
   // ★ THE PRINTED CUE STRING WAS THE CHANGE DETECTOR. It is byte-identical from 20:30 to 05:00,
   // so a still night wrote no gain at all and the whole bed landed in one go at dawn.
   it('★ plays the cue list itself, never a string of its gains', async () => {
-    const t = town()
+    const t = town('cloudy')
     await mount(t.store, VIEW)
     const first = deck.plays.length
     expect(first).toBeGreaterThan(0)
@@ -199,7 +199,7 @@ describe('★ the synth hears every snapshot', () => {
 
   it('★ stamps a chip off the roll call of voices, not off their gains', async () => {
     vi.useFakeTimers()
-    const t = town()
+    const t = town('cloudy')
     const host = await mount(t.store, VIEW)
     const standing = chips(host)
     expect(standing).toContain(cueChip('wind'))

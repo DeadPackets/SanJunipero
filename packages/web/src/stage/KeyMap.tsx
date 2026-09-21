@@ -10,7 +10,7 @@ export const KEY_MAP_KEY = '?'
 export const KEY_MAP_ID = 'key-map-sheet'
 
 /** Every key the town answers to, in the order a hand finds them. Read off the bindings, not off
- *  a document: `useStageKeys` owns S/F/D/T/A/[/Esc, `render/cameraNav.ts` owns the camera. */
+ *  a document: `useStageKeys` owns S/F/D/T/[/Esc, `render/cameraNav.ts` owns the camera. */
 export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
   { keys: ['S'], says: 'the town journal' },
   { keys: ['Tab'], says: 'step through the chrome' },
@@ -23,7 +23,6 @@ export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
   { keys: ['D'], says: 'the director' },
   { keys: ['T'], says: 'thought bubbles' },
   { keys: ['['], says: 'more of the story, or less' },
-  { keys: ['A'], says: 'the Almanac beside the town, or over it' },
   { keys: ['?'], says: 'this sheet' },
   { keys: ['⇧', 'P'], says: 'the frame meter' },
 ]
@@ -90,11 +89,11 @@ export function KeyMap({
         id={KEY_MAP_ID}
         ref={sheet}
         role="dialog"
-        aria-label="What the town answers to"
+        aria-label="Controls"
         tabIndex={-1}
       >
         <div className="key-map-head">
-          <h2 className="key-map-title">What the town answers to</h2>
+          <h2 className="key-map-title">Controls</h2>
           <button
             type="button"
             className="paper-close"

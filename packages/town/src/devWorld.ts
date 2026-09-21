@@ -369,6 +369,7 @@ export async function startDevWorld(
       config,
       db,
       paused: () => loop.paused,
+      usageSource: () => ({ live: opts.cast !== undefined, db: cast?.ops?.opsDb ?? null }),
       onViewers: (n) => {
         pacing.viewers(n)
       },
