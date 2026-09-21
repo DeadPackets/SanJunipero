@@ -45,6 +45,11 @@ export class SocketHub {
     for (const m of this.#members) if (m.sock === sock) m.muted = muted
   }
 
+  isMuted(sock: HubSocket): boolean {
+    for (const m of this.#members) if (m.sock === sock) return m.muted
+    return false
+  }
+
   broadcast(json: string): void {
     for (const m of this.#members) {
       if (m.sock.readyState !== OPEN) {

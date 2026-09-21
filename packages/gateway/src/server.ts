@@ -337,6 +337,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     let replayAt = 0 // last opened replay: the same floor, because it pays the same fold
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
+    const cancelScrub = (): void => {
+      pendingScrub = null
+      if (scrubTimer !== null) clearTimeout(scrubTimer)
+      scrubTimer = null
+    }
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
@@ -456,17 +461,19 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           if (next !== null && sock.readyState === OPEN) answerScrub(next)
         }, SCRUB_MIN_MS - since)
       } else if (msg.t === 'replay') {
+        cancelScrub()
         const now = Date.now()
         if (now - replayAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
         replayAt = now
         answerReplay(msg)
       } else if (msg.t === 'live') {
+        cancelScrub()
         // A full snapshot per 40-byte frame, otherwise: the same floor a scrub gets, on its own
         // clock so ending a drag is never the ask that gets dropped.
         const now = Date.now()
         // A replay ends on this frame and nothing follows it — the floor may drop a spare `live`,
         // never the one that hands a viewer back the live town.
-        const ending = endReplay(sock)
+        const ending = endReplay(sock) || hub.isMuted(sock)
         if (!ending && (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED)) return
         liveAt = now
         hub.setMuted(sock, false)

@@ -340,6 +340,33 @@ describe('what a stranger cannot do to the town', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('returns live inside the rate floor and cancels a queued scrub', async () => {
+    const dbPath = join(dir, 'scrub-cancel.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 10; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    await hello(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    for (const message of [
+      { t: 'live' },
+      { t: 'scrub', tick: 2, reqId: 1 },
+      { t: 'scrub', tick: 3, reqId: 2 },
+      { t: 'live' },
+    ])
+      sock.send(JSON.stringify(message))
+    await wait(150)
+    const parsed = frames.map((f) => ServerMsg.parse(JSON.parse(f)))
+    expect(parsed.filter((f) => f.t === 'snapshot')).toHaveLength(2)
+    expect(parsed.filter((f) => f.t === 'scrubbed').map((f) => f.reqId)).toEqual([1])
+    loop.step()
+    gw.pump()
+    await until(() => frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'tick'), 2000)
+  })
+
   it('★ answers a request target `URL` refuses with 400, and keeps serving', async () => {
     const gw = await gateway()
     const sock = netConnect(gw.port, '127.0.0.1')
