@@ -50,6 +50,7 @@ export type WorldStore = {
   /** The operator has stopped the world clock. The town is still served; it is not moving. */
   getPaused: () => boolean
   getTick: () => number
+  viewSeq: () => number
   /** the furthest tick the LIVE town has reached — scrubbing back must not walk it in */
   liveEdge: () => number
   latestThought: (agentId: string) => { tick: number; text: string } | null
@@ -157,8 +158,10 @@ export function createWorldStore(): WorldStore {
     return () => eventSubs.delete(fn)
   }
   const tension = createTension({ onEvents })
+  let viewSeq = 0
   let shotSceneId: string | null = null
   const forgetScenes = (): void => {
+    viewSeq++
     scenes.clear()
     transcripts.clear()
     openList = NO_SCENES
@@ -206,6 +209,7 @@ export function createWorldStore(): WorldStore {
       shotSceneId = id
       for (const fn of subs) fn()
     },
+    viewSeq: () => viewSeq,
     shotScene: () => (shotSceneId === null ? null : (scenes.get(shotSceneId) ?? null)),
     tension,
     getDirector: () => director,

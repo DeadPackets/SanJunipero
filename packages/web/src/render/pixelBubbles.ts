@@ -39,6 +39,10 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     typed = -1
   let lastTick = store.getTick(),
     lastLive = store.getMode().live
+  let lastView = store.viewSeq()
+  let lastRoom = scene.interior?.activeId() ?? null
+  let clock = 0,
+    previousTime: number | null = null
   let reactAt = 0,
     reactId: string | null = null,
     reactScene: string | null = null
@@ -83,11 +87,18 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       if (index === null) continue
       reactId = p.agentId
       reactScene = p.id
-      reactAt = performance.now()
+      reactAt = clock
       reaction.style.backgroundPosition = `${((index % 4) * 100) / 3}% ${(Math.floor(index / 4) * 100) / 3}%`
     }
   })
   const anchor = (id: string) => agentScreenAnchor(scene, store, id)
+  const focus = () => {
+    const shot = store.shotScene()
+    if (!scene.interior?.isActive()) return shot
+    if (shot?.open && shot.participants.some((id) => anchor(id))) return shot
+    const rooms = store.openScenes().filter((room) => room.participants.some((id) => anchor(id)))
+    return rooms.find((room) => room.id === active?.sceneId) ?? rooms[0] ?? null
+  }
   const gateThoughts = () => {
     if (!thoughtsHidden(graveTone, viewer)) return
     queue = queue.filter((line) => !line.isThought)
@@ -100,18 +111,18 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     if (!store.timeMoving() || !text.trim() || !anchor(agentId)) return
     if (isThought && (thoughtsHidden(graveTone, viewer) || (active && !active.isThought))) return
     const room = store.openScenes().find((s) => s.participants.includes(agentId))
-    const shot = store.shotScene()
-    if (shot?.open && room && shot.id !== room.id) return
+    const shot = focus()
+    if (shot?.open && shot.id !== room?.id) return
     if (isThought) {
       if (queue.some((line) => !line.isThought)) return
       queue = queue.filter((line) => line.agentId !== agentId)
       if (active?.isThought && active.agentId === agentId) active = null
     } else {
-      queue = []
-      active = null
+      queue = queue.filter((line) => !line.isThought)
+      if (active?.isThought) active = null
     }
     queue.push({ agentId, text, sceneId: room?.id ?? null, isThought })
-    if (queue.length > 12) queue.shift()
+    if (queue.length > 2) queue.shift()
   }
   return {
     spawnSpeech: (agentId, text) => {
@@ -128,28 +139,40 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       viewer = value
       gateThoughts()
     },
-    tick(now) {
+    tick(time) {
+      if (previousTime !== null && store.timeMoving()) clock += Math.max(0, time - previousTime)
+      previousTime = time
+      const now = clock
       let entering = false
       const tick = store.getTick(),
         live = store.getMode().live
-      if (tick < lastTick || live !== lastLive || !store.timeMoving()) clear()
+      const view = store.viewSeq()
+      const roomId = scene.interior?.activeId() ?? null
+      if (tick < lastTick || live !== lastLive || view !== lastView || roomId !== lastRoom) clear()
+      lastRoom = roomId
+      lastView = view
       lastTick = tick
       lastLive = live
       if (document.hidden) {
         clear()
         return
       }
-      const shot = store.shotScene()
+      const shot = focus()
       if (
         active &&
         (now - born > bubbleLife(active.text, active.isThought) ||
           !anchor(active.agentId) ||
-          (shot?.open && active.sceneId !== null && active.sceneId !== shot.id))
+          (shot?.open && active.sceneId !== shot.id))
       )
         active = null
-      queue = queue.filter(
-        (line) => !shot?.open || line.sceneId === null || line.sceneId === shot.id,
+      queue = queue.filter((line) => !shot?.open || line.sceneId === shot.id)
+      if (
+        active &&
+        queue.length &&
+        now - born >=
+          Math.min(6000, Math.max(1400, 600 + active.text.trim().split(/\s+/).length * 230))
       )
+        active = null
       if (!active && queue.length) {
         active = queue.shift()!
         born = now
@@ -168,8 +191,12 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       const at = active ? anchor(active.agentId) : null
       root.hidden = !at
       root.dataset.agentId = active?.agentId ?? ''
+      root.dataset.sceneId = active?.sceneId ?? ''
+      root.dataset.speaking = 'false'
+      ring.hidden = !!active?.isThought || !!active?.sceneId
       if (!active || !at) return
       balloon.hidden = scene.getZoom() <= 0.5 && !scene.interior?.isActive()
+      root.dataset.speaking = String(!balloon.hidden && !active.isThought)
       if (measureNeeded && !balloon.hidden) measure()
       if (entering && !reduced.matches)
         balloon.animate(
@@ -180,7 +207,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
           { duration: 220, easing: 'cubic-bezier(.16,1,.3,1)' },
         )
       const { w, h } = dimensions
-      const width = scene.app.screen.width
+      const width = scene.app.screen.width - (scene.safeInsets?.right ?? 0)
       const x = Math.max(12, Math.min(width - w - 12, at.x - w / 2))
       const top = (scene.safeInsets?.top ?? 0) + 24
       let y = Math.max(top, at.y - h - 20)

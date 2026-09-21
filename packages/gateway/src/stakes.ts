@@ -113,6 +113,7 @@ type SceneEntry = Entry & {
   presses: number
   /** Held for `SUMMARY_HOLD_TICKS` after the close, so the shot stays through the summary. */
   closedAt: number | null
+  ended: boolean
 }
 
 type BodyEntry = Entry & { score: number; atTick: number }
@@ -219,7 +220,11 @@ export function makeDirector(
     const id = key.slice(2)
     if (key.startsWith('s:')) {
       const e = scenes.get(id)
-      return e === undefined || (e.cast.length < 2 && e.closedAt === null) ? -1 : sceneScore(e)
+      return e === undefined ||
+        (e.ended && e.closedAt === null) ||
+        (e.cast.length < 2 && e.closedAt === null)
+        ? -1
+        : sceneScore(e)
     }
     const e = bodies.get(id)
     return e === undefined ? -1 : decayed(e, tick)
@@ -261,6 +266,7 @@ export function makeDirector(
         ratified: 0,
         presses: 0,
         closedAt: null,
+        ended: false,
       }
       scenes.set(id, e)
     } else {
@@ -269,6 +275,7 @@ export function makeDirector(
     }
     e.kind = kind
     e.closedAt = null
+    e.ended = false
     e.base = stakes * SCENE_STAKES_X + (kind === 'council' ? COUNCIL_IN_SESSION : 0)
     e.firstToday += firstOf(kind)
     markTerm(e.terms, kind, e.base)
@@ -380,6 +387,11 @@ export function makeDirector(
         }
         return
       }
+      case 'scene_ended': {
+        const e = scenes.get(str(p.id) ?? '')
+        if (e !== undefined) e.ended = true
+        return
+      }
       case 'scene_closed': {
         const id = str(p.id)
         if (id === null) return
@@ -455,6 +467,7 @@ export function makeDirector(
         scenes.delete(id)
         continue
       }
+      if (e.ended && e.closedAt === null) continue
       // A talk somebody walked out of is one body standing there: not a shot until it closes
       // with its summary, or somebody else joins.
       if (e.cast.length < 2 && e.closedAt === null) continue
@@ -550,7 +563,7 @@ export function makeDirector(
       const scenes = db
         .prepare(
           `SELECT seq, tick, type, payload FROM events
-            WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_closed')
+            WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_ended', 'scene_closed')
               AND tick >= ? AND tick <= ? ORDER BY seq`,
         )
         .all(dayStart, tick) as { seq: number; tick: number; type: string; payload: string }[]

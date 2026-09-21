@@ -449,7 +449,7 @@ export class SceneCoordinator {
       } else this.#noteWalkedOff(scene, agentId, tick)
       this.#leaving.delete(agentId)
       this.#part(scene, agentId, tick)
-      if (scene.participants.length < TALKERS_NEEDED) await this.#close(scene, 'left', tick)
+      if (scene.participants.length < TALKERS_NEEDED) this.#close(scene, 'left', tick)
       return
     }
     // An answer given and an invitation put are both things done: a mouth that did one of them
@@ -460,7 +460,7 @@ export class SceneCoordinator {
       pendingProposals.some((proposal) => proposal.id === turn.reconvene) &&
       this.#reconvene(scene, turn.reconvene, tick)
     if (said.length === 0 && !answered && !invited && !reconvened) {
-      await this.#pass(scene, tick)
+      this.#pass(scene, tick)
       return
     }
     scene.passes = 0
@@ -471,8 +471,8 @@ export class SceneCoordinator {
     }
     this.#recordLine(scene, agentId, said, turn.thought, turn.move, turn.to, tick, turn.stance)
     this.#saidLately(agentId, said)
-    if (councilDecided(scene)) await this.#close(scene, 'ended', tick)
-    else if (scene.thread.length >= lineCapOf(scene)) await this.#close(scene, 'capped', tick)
+    if (councilDecided(scene)) this.#close(scene, 'ended', tick)
+    else if (scene.thread.length >= lineCapOf(scene)) this.#close(scene, 'capped', tick)
   }
 
   /** The body took this mind out of the talk. One person's alarm drops that person; the talk
@@ -482,7 +482,7 @@ export class SceneCoordinator {
     if (scene === null) return
     this.#part(scene, agentId, tick)
     if (scene.participants.length < TALKERS_NEEDED) {
-      void this.#close(scene, 'left', tick).catch(this.#sink)
+      this.#close(scene, 'left', tick)
     }
   }
 
@@ -527,7 +527,7 @@ export class SceneCoordinator {
       for (const id of scene.participants) this.#countTalk(id, tick)
       this.#dropAbsent(scene, tick)
       if (scene.participants.length < TALKERS_NEEDED) {
-        void this.#close(scene, 'left', tick).catch(this.#sink)
+        this.#close(scene, 'left', tick)
         continue
       }
       if (scene.floor === null) continue
@@ -538,7 +538,7 @@ export class SceneCoordinator {
       }
       if (this.#now() - held.atMs < FLOOR_TIMEOUT_MS) continue
       this.#asked.delete(scene.id)
-      void this.#timedOut(scene, tick).catch(this.#sink)
+      this.#timedOut(scene, tick)
     }
   }
 
@@ -560,10 +560,10 @@ export class SceneCoordinator {
 
   /** A silence the mouth chose. It hands the floor back to the anchor, and the anchor's own
    *  silence is the end of it — there is nobody left for the talk to fall back on. */
-  async #pass(scene: Scene, tick: number): Promise<void> {
+  #pass(scene: Scene, tick: number): void {
     const quiet = scene.floor ?? scene.anchor
     if (quiet === scene.anchor) {
-      await this.#close(scene, 'ended', tick)
+      this.#close(scene, 'ended', tick)
       return
     }
     scene.passes += 1
@@ -572,10 +572,10 @@ export class SceneCoordinator {
 
   /** A provider that never came back. The floor moves on and nobody is asked twice for the same
    *  line; two silences in a row is a scene nothing is coming back from. */
-  async #timedOut(scene: Scene, tick: number): Promise<void> {
+  #timedOut(scene: Scene, tick: number): void {
     scene.timeouts += 1
     if (scene.timeouts >= CLOSING_TIMEOUTS) {
-      await this.#close(scene, 'timeout', tick)
+      this.#close(scene, 'timeout', tick)
       return
     }
     this.#floorTo(scene, this.#floorAfter(scene, scene.floor ?? scene.anchor, '', null))
@@ -728,95 +728,99 @@ export class SceneCoordinator {
     scene.audience = scene.audience.filter(here)
   }
 
-  async #close(
+  #close(scene: Scene, reason: NonNullable<Scene['closeReason']>, tick: number): void {
+    if (scene.closedTick !== null) return
+    // An ask nobody ever answered. There is no event for a silence, so the asker gets a memory.
+    if (scene.invitation !== undefined) {
+      const { from, to } = scene.invitation
+      delete scene.invitation
+      this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
+    }
+    scene.closedTick = tick
+    scene.closeReason = reason
+    scene.floor = null
+    this.#asked.delete(scene.id)
+    this.#floorSince.delete(scene.id)
+    this.#announced.delete(scene.id)
+    this.#scenes.delete(scene.id)
+    // Everyone who was ever in it gets the memory, not only whoever was left at the end.
+    const cast = [...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)])].sort()
+    this.#bridge.announce('scene_ended', { id: scene.id, closeReason: reason, participants: cast })
+    this.#closing += 1
+    void this.#finishClose(scene, reason, tick, cast)
+      .catch(this.#sink)
+      .finally(() => {
+        this.#closing -= 1
+      })
+  }
+
+  async #finishClose(
     scene: Scene,
     reason: NonNullable<Scene['closeReason']>,
     tick: number,
+    cast: string[],
   ): Promise<void> {
-    if (scene.closedTick !== null) return
-    this.#closing += 1
-    try {
-      // An ask nobody ever answered. There is no event for a silence, so the asker gets a memory.
-      if (scene.invitation !== undefined) {
-        const { from, to } = scene.invitation
-        delete scene.invitation
-        this.#tell(from, noAnswerLine(this.#nameOf(to) ?? to), 7, tick)
+    // Standing near it is not being in it: the audience carries the summary away and no tie.
+    const overheard = scene.audience.filter((id) => !cast.includes(id))
+    const named = this.#named(cast)
+    const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
+    let summary = ''
+    let beat = ''
+    let deltas: TieDelta[] = []
+    if (teller !== null) {
+      try {
+        const answer = await teller.llm.close({
+          scene: {
+            thread: scene.thread.map(({ agentId, text, move, tick, presence }) => ({
+              agentId,
+              text,
+              move,
+              tick,
+              ...(presence === undefined ? {} : { presence }),
+            })),
+            closeReason: reason,
+          },
+          cast: named,
+        })
+        summary = answer.summary
+        beat = answer.beat ?? ''
+        deltas = answer.deltas
+      } catch (err) {
+        this.#onError('scene_close', err instanceof Error ? err.message : String(err))
       }
-      scene.closedTick = tick
-      scene.closeReason = reason
-      scene.floor = null
-      this.#asked.delete(scene.id)
-      this.#floorSince.delete(scene.id)
-      this.#announced.delete(scene.id)
-      this.#scenes.delete(scene.id)
-      // Everyone who was ever in it gets the memory, not only whoever was left at the end.
-      const cast = [
-        ...new Set([...scene.participants, ...scene.thread.map((l) => l.agentId)]),
-      ].sort()
-      // Standing near it is not being in it: the audience carries the summary away and no tie.
-      const overheard = scene.audience.filter((id) => !cast.includes(id))
-      const named = this.#named(cast)
-      const teller = cast.map((id) => this.#mindFor(id)).find((m) => m !== null) ?? null
-      let summary = ''
-      let beat = ''
-      let deltas: TieDelta[] = []
-      if (teller !== null) {
-        try {
-          const answer = await teller.llm.close({
-            scene: {
-              thread: scene.thread.map(({ agentId, text, move, tick, presence }) => ({
-                agentId,
-                text,
-                move,
-                tick,
-                ...(presence === undefined ? {} : { presence }),
-              })),
-              closeReason: reason,
-            },
-            cast: named,
-          })
-          summary = answer.summary
-          beat = answer.beat ?? ''
-          deltas = answer.deltas
-        } catch (err) {
-          this.#onError('scene_close', err instanceof Error ? err.message : String(err))
-        }
+    }
+    // A tie is what passed between two people who were in it. Standing near it is not being in
+    // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
+    deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
+    const at = this.#bridge.currentTick()
+    const accepted: TieDelta[] = []
+    for (const delta of deltas) {
+      try {
+        if (delta.tieId !== undefined || delta.resolution !== undefined)
+          throw new Error('public closure cannot change an existing private tie')
+        accepted.push(...(this.#mindFor(delta.agentId)?.ties.apply([delta], at) ?? []))
+      } catch (err) {
+        this.#onError('tie_rejected', String(err))
       }
-      // A tie is what passed between two people who were in it. Standing near it is not being in
-      // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
-      deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
-      const at = this.#bridge.currentTick()
-      const accepted: TieDelta[] = []
-      for (const delta of deltas) {
-        try {
-          if (delta.tieId !== undefined || delta.resolution !== undefined)
-            throw new Error('public closure cannot change an existing private tie')
-          accepted.push(...(this.#mindFor(delta.agentId)?.ties.apply([delta], at) ?? []))
-        } catch (err) {
-          this.#onError('tie_rejected', String(err))
-        }
-      }
-      deltas = accepted
-      this.#bridge.announce('scene_closed', {
-        id: scene.id,
-        summary,
-        beat,
-        deltas,
-        closeReason: reason,
-        participants: cast,
-      })
-      await this.#settleCouncil(scene, tick)
-      if (summary.length === 0) return
-      // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
-      // had anything at stake in still happened.
-      const importance = Math.min(10, Math.max(1, Math.round(scene.stakes)))
-      for (const id of [...cast, ...overheard]) {
-        const mind = this.#mindFor(id)
-        if (mind === null) continue
-        await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
-      }
-    } finally {
-      this.#closing -= 1
+    }
+    deltas = accepted
+    this.#bridge.announce('scene_closed', {
+      id: scene.id,
+      summary,
+      beat,
+      deltas,
+      closeReason: reason,
+      participants: cast,
+    })
+    await this.#settleCouncil(scene, tick)
+    if (summary.length === 0) return
+    // Importance is the scene's stakes; the memories table's floor is one, and a scene nobody
+    // had anything at stake in still happened.
+    const importance = Math.min(10, Math.max(1, Math.round(scene.stakes)))
+    for (const id of [...cast, ...overheard]) {
+      const mind = this.#mindFor(id)
+      if (mind === null) continue
+      await mind.remember({ tick, text: summary, importance }).catch(this.#sink)
     }
   }
 
@@ -1057,7 +1061,7 @@ export class SceneCoordinator {
     }
     // Two bodies busy for an hour do not hold a floor.
     if (invitation.verb === 'lie_with') {
-      void this.#close(scene, 'ended', this.#bridge.currentTick()).catch(this.#sink)
+      this.#close(scene, 'ended', this.#bridge.currentTick())
     }
   }
 

@@ -132,6 +132,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'scene_opened',
   'scene_turned',
   'scene_line',
+  'scene_ended',
   // The mind already remembers letting go; the feed does not need to watch it happen.
   'tie_let_go',
   // Superseded by the mortality events above, which say the same things better.

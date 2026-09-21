@@ -639,3 +639,16 @@ it('replaces run identity on reconnect without putting observer metadata into wo
   store.applyServer(snapshot)
   expect(store.runId()).toBeNull()
 })
+
+it('advances the view reset sequence on forward replay seeks, not normal clock ticks', () => {
+  const store = createWorldStore()
+  const snapshot = makeSnapshot()
+  store.applyServer(snapshot)
+  const before = store.viewSeq()
+  store.applyServer({ t: 'replaying', reqId: 1, tick: 100, seq: 100, state: snapshot.state })
+  expect(store.viewSeq()).toBe(before + 1)
+  store.applyServer({ t: 'replaying', reqId: 2, tick: 200, seq: 200, state: snapshot.state })
+  expect(store.viewSeq()).toBe(before + 2)
+  store.applyServer({ t: 'paused', paused: true })
+  expect(store.viewSeq()).toBe(before + 2)
+})

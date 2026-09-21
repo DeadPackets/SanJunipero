@@ -359,6 +359,13 @@ export const SceneLineSaid = z
     move: SceneMove,
   })
   .strict()
+export const SceneEnded = z
+  .object({
+    id: z.string().min(1),
+    closeReason: z.enum(['ended', 'left', 'capped', 'timeout']),
+    participants: z.array(z.string().min(1)),
+  })
+  .strict()
 export const SceneClosed = z
   .object({
     id: z.string().min(1),

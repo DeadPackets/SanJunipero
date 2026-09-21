@@ -64,6 +64,76 @@ describe('gateway server', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('broadcasts a scene ending before its summary and omits it from late catchup', async () => {
+    const dbPath = join(dir, 'scene-ending.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('scene-ending'),
+      onTick: ({ tick, emit }) => {
+        if (tick === 2)
+          emit('scene_opened', {
+            id: 'ending',
+            kind: 'talk',
+            participants: ['a', 'b'],
+            topic: 'The gate',
+            stakes: 2,
+          })
+        if (tick === 3)
+          emit('scene_ended', { id: 'ending', closeReason: 'left', participants: ['a', 'b'] })
+        if (tick === 5)
+          emit('scene_closed', {
+            id: 'ending',
+            summary: 'B left the gate.',
+            deltas: [],
+            closeReason: 'left',
+          })
+      },
+    })
+    loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    await hello(sock)
+    loop.step()
+    gw.pump()
+    await until(() => frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene'), 2000)
+    frames.length = 0
+    loop.step()
+    gw.pump()
+    await until(
+      () =>
+        frames.some((f) => {
+          const m = ServerMsg.parse(JSON.parse(f))
+          return m.t === 'scene' && !m.scene.open
+        }),
+      2000,
+    )
+    const late = await connect(gw.port)
+    open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(30)
+    expect(lateFrames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+    frames.length = 0
+    loop.step()
+    loop.step()
+    gw.pump()
+    await until(
+      () =>
+        frames.some((f) => {
+          const m = ServerMsg.parse(JSON.parse(f))
+          return m.t === 'scene' && m.scene.summary === 'B left the gate.'
+        }),
+      2000,
+    )
+  })
+
   it('restores active scenes on startup, replay entry, reconnect and return to live', async () => {
     const dbPath = join(dir, 'scene-catchup.db')
     const db = openDb(dbPath)

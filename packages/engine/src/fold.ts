@@ -55,6 +55,7 @@ import {
   SceneOpened,
   SceneTurned,
   SceneLineSaid,
+  SceneEnded,
   SceneClosed,
   TieLetGo,
   AgentWoke,
@@ -342,6 +343,10 @@ export function fold(
     }
     case 'scene_line': {
       SceneLineSaid.parse(event.payload)
+      return state
+    }
+    case 'scene_ended': {
+      SceneEnded.parse(event.payload)
       return state
     }
     case 'scene_closed': {

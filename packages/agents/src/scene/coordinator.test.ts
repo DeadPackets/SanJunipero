@@ -85,7 +85,10 @@ class FakeSceneLlm implements SceneLlm {
     readonly agentId: string,
     readonly calls: Map<string, number>,
     private readonly script: (ask: SceneAsk, nth: number) => SceneTurn | 'stall' | 'hold',
-    private readonly closer: () => SceneClose = () => ({ summary: '', deltas: [] }),
+    private readonly closer: () => SceneClose | Promise<SceneClose> = () => ({
+      summary: '',
+      deltas: [],
+    }),
   ) {}
 
   async line(ask: SceneAsk): Promise<SceneTurn> {
@@ -187,7 +190,7 @@ function harness(opts: {
   wooed?: boolean
   who?: readonly Who[]
   script?: (agentId: string) => (ask: SceneAsk, nth: number) => SceneTurn | 'stall' | 'hold'
-  closer?: () => SceneClose
+  closer?: () => SceneClose | Promise<SceneClose>
   now?: () => number
   ties?: Record<string, TieDelta[]>
   laws?: LawSeam
@@ -416,6 +419,7 @@ describe('a scene is who engaged, not who stood nearby', () => {
       expect(h.coordinator.sceneFor(id), `${id} is free to take its own turn`).toBeNull()
     }
     await play(h, NOON)
+    await flush()
     expect(h.remembered.map((r) => r.agentId).sort(), 'the town can gossip about it').toEqual(
       [LAYLA, NADIA, OMAR, SALMA, TAREK, YUSUF].sort(),
     )
@@ -793,6 +797,42 @@ describe('what a close leaves behind', () => {
     ],
   }
 
+  it('ends visibly and releases the floor before the close summary returns', async () => {
+    let release = (_answer: SceneClose): void => {}
+    const held = new Promise<SceneClose>((resolve) => {
+      release = resolve
+    })
+    const h = harness({
+      script: () => () => fromCorpus(0, { leave: true, speech: 'I should go.' }),
+      closer: () => held,
+    })
+    const opened = h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)!
+    let floorReleased = false
+    const floor = h.coordinator.takeFloor(OMAR, NOON).then(() => {
+      floorReleased = true
+    })
+    try {
+      await flush()
+      h.loop.step()
+      expect(floorReleased).toBe(true)
+      expect(h.coordinator.sceneFor(OMAR)).toBeNull()
+      expect(h.coordinator.busy(), 'shutdown still waits for the summary').toBe(true)
+      expect(sceneEvents(h.engineDb).filter((e) => e.type === 'scene_ended')).toMatchObject([
+        { payload: { id: opened.id, closeReason: 'left' } },
+      ])
+      expect(sceneEvents(h.engineDb).some((e) => e.type === 'scene_closed')).toBe(false)
+    } finally {
+      release({ summary: 'Omar left after Nadia asked about the planks.', deltas: [] })
+      await floor
+    }
+    await flush()
+    h.loop.step()
+    expect(h.coordinator.busy()).toBe(false)
+    expect(sceneEvents(h.engineDb).filter((e) => e.type === 'scene_closed')).toMatchObject([
+      { payload: { id: opened.id, summary: 'Omar left after Nadia asked about the planks.' } },
+    ])
+  })
+
   it('hands an exit plan only to the resident who chose it', async () => {
     const chosen: unknown[] = []
     const h = harness({
@@ -831,6 +871,7 @@ describe('what a close leaves behind', () => {
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
     const stakes = h.coordinator.open()[0]!.stakes
     await play(h, NOON)
+    await flush()
     expect(h.remembered.map((r) => r.agentId).sort()).toEqual([NADIA, OMAR])
     expect(h.remembered.every((r) => r.text === CLOSE.summary)).toBe(true)
     expect(h.remembered.every((r) => r.importance === stakes)).toBe(true)
@@ -862,6 +903,7 @@ describe('what a close leaves behind', () => {
       )
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
     await play(h, NOON)
+    await flush()
     h.loop.step()
     const requests = [...h.llms.values()].flatMap((llm) => llm.closeAsks)
     expect(requests).toHaveLength(1)
@@ -901,6 +943,7 @@ describe('what a close leaves behind', () => {
     h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
     expect(h.coordinator.open()[0]!.audience, 'Salma is in earshot and not in it').toContain(SALMA)
     await play(h, NOON)
+    await flush()
     h.loop.step()
 
     expect(h.minds.get(SALMA)!.ties.all(), 'she owes nothing for standing there').toEqual([])
@@ -2059,5 +2102,6 @@ it('stays busy while a closing council waits for its law and final writes', asyn
     release()
     await closing
   }
+  await flush()
   expect(h.coordinator.busy()).toBe(false)
 })

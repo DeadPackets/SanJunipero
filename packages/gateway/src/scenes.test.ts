@@ -34,6 +34,37 @@ describe('the scene frame', () => {
     relay.fold([ev('scene_closed', { id: OPENED.id, summary: 'Done.' })])
     expect(relay.snapshot()).toEqual([])
   })
+  it('ends immediately and later enriches the same closed scene with a summary', () => {
+    const relay = makeSceneRelay()
+    relay.fold([ev('scene_opened', OPENED)])
+    const [ended] = relay.fold([ev('scene_ended', { id: OPENED.id, closeReason: 'left' })])
+    expect(ended?.scene).toEqual({ ...OPENED, open: false })
+    expect(relay.snapshot()).toEqual([])
+    const [summarized] = relay.fold([
+      ev('scene_closed', {
+        id: OPENED.id,
+        summary: 'Omar left after the question.',
+        deltas: [],
+        closeReason: 'left',
+      }),
+    ])
+    expect(summarized?.scene).toEqual({
+      ...OPENED,
+      open: false,
+      summary: 'Omar left after the question.',
+    })
+    expect(relay.snapshot()).toEqual([])
+  })
+  it('does not restore a scene after its ending while summary is pending', () => {
+    const db = new Database(':memory:')
+    db.exec('CREATE TABLE events (seq INTEGER PRIMARY KEY, tick INTEGER, type TEXT, payload TEXT)')
+    const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?)')
+    insert.run(1, 720, 'scene_opened', JSON.stringify(OPENED))
+    insert.run(2, 730, 'scene_ended', JSON.stringify({ id: OPENED.id, closeReason: 'left' }))
+    expect(scenesAt(db, 729).snapshot()).toHaveLength(1)
+    expect(scenesAt(db, 730).snapshot()).toEqual([])
+    db.close()
+  })
   it('opens on scene_opened and closes with the summary', () => {
     const relay = makeSceneRelay()
     const [open] = relay.fold([ev('scene_opened', OPENED)])

@@ -61,7 +61,11 @@ export function LivingScene({ store, stage }: { store: WorldStore; stage: SceneS
     <>
       <div className="living-scene" data-ended={stage.phase === 'summary'}>
         <GameIcon kind={stage.phase === 'summary' ? 'note' : 'people'} />
-        {stage.phase === 'summary' ? <p>{scene.summary}</p> : <span>{names}</span>}
+        {stage.phase === 'summary' ? (
+          <p>{scene.summary}</p>
+        ) : (
+          <span>In conversation · {names}</span>
+        )}
         <button
           type="button"
           onClick={() => {

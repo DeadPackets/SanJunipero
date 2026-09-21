@@ -9,6 +9,7 @@ export function makeSceneRelay(): {
   transcripts(atTick: number): ServerTranscript[]
 } {
   const open = new Map<string, SceneState>()
+  const ended = new Map<string, SceneState>()
   const transcripts = new Map<string, { lines: ServerTranscript['lines']; truncated: boolean }>()
   const fold = (events: readonly SimEvent[]): ServerScene[] => {
     const out: ServerScene[] = []
@@ -48,11 +49,20 @@ export function makeSceneRelay(): {
         }
         open.set(scene.id, scene)
         out.push({ t: 'scene', scene })
-      } else if (ev.type === 'scene_closed') {
-        const p = ev.payload as { id: string; summary: string; beat?: string }
+      } else if (ev.type === 'scene_ended') {
+        const p = ev.payload as { id: string }
         const was = open.get(p.id)
         if (was === undefined) continue
         open.delete(p.id)
+        ended.set(p.id, was)
+        transcripts.delete(p.id)
+        out.push({ t: 'scene', scene: { ...was, open: false } })
+      } else if (ev.type === 'scene_closed') {
+        const p = ev.payload as { id: string; summary: string; beat?: string }
+        const was = open.get(p.id) ?? ended.get(p.id)
+        if (was === undefined) continue
+        open.delete(p.id)
+        ended.delete(p.id)
         transcripts.delete(p.id)
         const beat = p.beat === undefined || p.beat === '' ? {} : { beat: p.beat }
         out.push({ t: 'scene', scene: { ...was, open: false, summary: p.summary, ...beat } })
@@ -84,7 +94,7 @@ export function scenesAt(db: Database.Database, tick: number): ReturnType<typeof
         SELECT json_extract(o.payload, '$.id') FROM events o
         WHERE o.type = 'scene_opened' AND o.tick <= ?
           AND NOT EXISTS (
-            SELECT 1 FROM events c WHERE c.type = 'scene_closed' AND c.tick <= ?
+            SELECT 1 FROM events c WHERE c.type IN ('scene_ended', 'scene_closed') AND c.tick <= ?
               AND json_extract(c.payload, '$.id') = json_extract(o.payload, '$.id')
           )
       )

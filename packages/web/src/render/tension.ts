@@ -226,7 +226,7 @@ export function createTension(store: Pick<WorldStore, 'onEvents'>): Tension {
       const id = typeof p.id === 'string' ? p.id : ''
       if (ev.type === 'scene_opened' || ev.type === 'scene_turned') opened(id, castOf(p), nowMs)
       else if (ev.type === 'scene_line') said(ev, p, nowMs)
-      else if (ev.type === 'scene_closed') talks.delete(id)
+      else if (ev.type === 'scene_closed' || ev.type === 'scene_ended') talks.delete(id)
     }
   })
 

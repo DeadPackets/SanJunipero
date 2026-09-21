@@ -1,18 +1,17 @@
-import { createMaterialLibrary } from './materials.js'
-import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
 import { effectiveConfig } from '@sj/engine/laws'
 import type { AgentBody } from '@sj/engine/state'
-import { Sprite, type FederatedPointerEvent } from 'pixi.js'
+import { DEFAULT_CONFIG, isRoofedKind } from '@sj/shared'
+import { type FederatedPointerEvent, Sprite } from 'pixi.js'
 import {
   Box3,
   BoxGeometry,
   DirectionalLight,
   HemisphereLight,
   Mesh,
-  MeshStandardMaterial,
   MeshBasicMaterial,
-  PlaneGeometry,
+  MeshStandardMaterial,
   OrthographicCamera,
+  PlaneGeometry,
   PointLight,
   Raycaster,
   Scene as ThreeScene,
@@ -21,17 +20,19 @@ import {
   type WebGLRenderer,
 } from 'three'
 import type { WorldStore } from '../../state/worldStore.js'
-import type { Scene } from '../scene.js'
-import type { InteriorScene } from '../interiorScene.js'
-import { TextureBook, characterArt } from '../textures.js'
-import { characterCell } from '../characters.js'
-import { facingFrom, tileToScreen, type Facing } from '../iso.js'
 import { WALK_LOOP } from '../charAnim.js'
+import { characterCell } from '../characters.js'
+import { faceInScene, type Voice } from '../converse.js'
 import { interiorPath, type RoomMap } from '../interiorMap.js'
-import { createPeople } from './people.js'
-import { CAMERA_ELEVATION, WORLD_PX } from './projection.js'
+import type { InteriorScene } from '../interiorScene.js'
+import { type Facing, facingFrom, tileToScreen } from '../iso.js'
+import type { Scene } from '../scene.js'
+import { characterArt, TextureBook } from '../textures.js'
 import { disposeGroup } from './dispose.js'
 import { buildInteriorRoom } from './interiorRoom.js'
+import { createMaterialLibrary } from './materials.js'
+import { createPeople } from './people.js'
+import { CAMERA_ELEVATION, WORLD_PX } from './projection.js'
 
 type Body = {
   sprite: Sprite
@@ -42,6 +43,22 @@ type Body = {
   phase: number
   sleeping: boolean
   slot: number
+}
+
+type Conversation = { cast: readonly string[]; voices: readonly Voice[] }
+
+export function conversationFacing(
+  agent: { id: string; asleep: boolean; activity: { verb: string } | null },
+  walking: boolean,
+  conversation: Conversation | undefined,
+  positions: ReadonlyMap<string, { at: { x: number; z: number } }>,
+): Facing | null {
+  if (walking || agent.asleep || agent.activity !== null || !conversation?.cast.includes(agent.id))
+    return null
+  const partner = faceInScene(agent.id, conversation.cast, conversation.voices)
+  const from = positions.get(agent.id)?.at
+  const to = partner === null ? undefined : positions.get(partner)?.at
+  return from && to ? facingFrom(to.x - from.x, to.z - from.z) : null
 }
 
 export function createThreeInterior(
@@ -334,6 +351,18 @@ export function createThreeInterior(
           b.sprite.destroy()
           bodies.delete(id)
         }
+      const conversations = new Map<string, Conversation>()
+      for (const scene of store.openScenes()) {
+        if (!scene.participants.some((id) => ids.includes(id))) continue
+        const voices = (store.transcript(scene.id)?.lines ?? []).map((line) => ({
+          agentId: line.agentId,
+          x: 0,
+          y: 0,
+          atMs: line.tick,
+        }))
+        const conversation = { cast: scene.participants, voices }
+        for (const id of scene.participants) conversations.set(id, conversation)
+      }
       const used = new Set<number>()
       for (const b of bodies.values()) {
         const p = grid(b.goal)
@@ -403,7 +432,10 @@ export function createThreeInterior(
         }
         if (!walking && !a.asleep) {
           const target = room.table.clone().sub(body.at)
-          body.facing = facingFrom(target.x, target.z) ?? 'se'
+          body.facing =
+            conversationFacing(a, walking, conversations.get(a.id), bodies) ??
+            facingFrom(target.x, target.z) ??
+            'se'
         }
         const art = characterArt(store.assetRecords(), a.id),
           sheet = book.peek(art.url)

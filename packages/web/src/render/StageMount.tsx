@@ -11,6 +11,7 @@ import { TextureBook, whenDressed } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createPixelBubbles } from './pixelBubbles.js'
+import { createConversationPresence } from './conversationPresence.js'
 import { createResidentTokens } from './residentTokens.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
@@ -105,6 +106,7 @@ export function StageMount({
     let bubbles: BubbleLayer | null = null
     let acts: ActLayer | null = null
     let residentTokens: ReturnType<typeof createResidentTokens> | null = null
+    let conversation: ReturnType<typeof createConversationPresence> | null = null
     let moments: MomentEmoteLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
@@ -144,6 +146,7 @@ export function StageMount({
       bubbles?.destroy()
       acts?.destroy()
       residentTokens?.destroy()
+      conversation?.destroy()
       moments?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
@@ -211,7 +214,10 @@ export function StageMount({
         bubbles = spatial ? createPixelBubbles(s, store) : createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
-        if (spatial) residentTokens = createResidentTokens(s, store, acts)
+        if (spatial) {
+          residentTokens = createResidentTokens(s, store, acts)
+          conversation = createConversationPresence(s, store)
+        }
         moments = createMomentEmotes(s, store, book)
         if (!spatial) atmosphere = createAtmosphere(s)
         if (atmosphere) s.atmosphere = atmosphere
@@ -281,6 +287,7 @@ export function StageMount({
             weather?.setKind(state.weather.kind)
           }
           three?.tick(dt)
+          conversation?.tick(now)
           residentTokens?.tick()
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()

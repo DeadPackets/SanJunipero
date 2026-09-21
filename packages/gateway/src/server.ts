@@ -106,6 +106,7 @@ const MEMORY_TYPES: readonly string[] = [
   'scene_opened',
   'scene_turned',
   'scene_line',
+  'scene_ended',
   'scene_closed',
   ...PRIMED_TYPES,
 ]
