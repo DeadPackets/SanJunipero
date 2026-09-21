@@ -3,6 +3,12 @@ import type Database from 'better-sqlite3'
 import { openAgentDb } from './schema.js'
 import { MemoryStore, type MemoryKind, type MemoryTags } from './store.js'
 import { FakeEmbedder } from '@sj/llm/testutil'
+import { LlmClient, migrateLlmTables } from '@sj/llm'
+import { MockLanguageModelV4 } from 'ai/test'
+import { NO_PARAMS } from '@sj/shared'
+import { StrictTurnSchema } from '../turn.js'
+import { assemblePrompt } from '../prompt/assemble.js'
+import { fixtureBlocks } from '../testutil/fixtures.js'
 import {
   DEFAULT_WEIGHTS,
   MISS_MIN_RESULTS,
@@ -48,6 +54,127 @@ describe('keywords and cuesToQuery', () => {
 })
 
 describe('hybrid retrieval', () => {
+  it('keeps one relevant formative memory despite a crowded recent candidate pool', async () => {
+    const { store } = await makeStore()
+    const now = 20 * TICKS_PER_DAY
+    const formative = await store.insertMemory({
+      tick: 2 * TICKS_PER_DAY,
+      kind: 'speech_heard',
+      text: 'Nadia told me our mother died by the river.',
+      importance: 9,
+      tags: { ...EMPTY_TAGS, people: ['Nadia'], place: 'river' },
+    })
+    for (let i = 0; i < 70; i++)
+      await store.insertMemory({
+        tick: now - 80 + i,
+        kind: 'speech_heard',
+        text: `Nadia spoke by the river about carrying water, occasion ${i}.`,
+        importance: 4,
+        tags: { ...EMPTY_TAGS, people: ['Nadia'], place: 'river' },
+      })
+    const results = await retrieveAmbient(
+      store,
+      { people: ['Nadia'], place: 'river', topics: [] },
+      now,
+      8,
+    )
+    expect(results.map((m) => m.id)).toContain(formative)
+    expect(results).toHaveLength(8)
+    const blocks = fixtureBlocks()
+    const prompt = assemblePrompt({ ...blocks, scene: { ...blocks.scene, memories: results } })
+    expect(prompt.messages.map((m) => m.content).join(' ')).toContain(
+      'our mother died by the river',
+    )
+  })
+
+  it('lets a deliberate fake decision honor an old consequence from the retrieved packet', async () => {
+    const { store, db } = await makeStore()
+    migrateLlmTables(db)
+    const now = 20 * TICKS_PER_DAY
+    const old = await store.insertMemory({
+      tick: 2 * TICKS_PER_DAY,
+      kind: 'speech_heard',
+      importance: 9,
+      text: 'Nadia told me the river reminds her of our mother’s death; she prefers to meet at the bench.',
+      tags: { ...EMPTY_TAGS, people: ['Nadia'], place: 'river' },
+    })
+    for (let i = 0; i < 70; i++)
+      await store.insertMemory({
+        tick: now - 80 + i,
+        kind: 'speech_heard',
+        importance: 3,
+        text: `Nadia discussed carrying water, occasion ${i}.`,
+        tags: { ...EMPTY_TAGS, people: ['Nadia'] },
+      })
+    const packet = await retrieveAmbient(
+      store,
+      { people: ['Nadia'], place: 'river', topics: [] },
+      now,
+      8,
+    )
+    const model = new MockLanguageModelV4({
+      doGenerate: async (options) => {
+        const honorsMemory = JSON.stringify(options.prompt).includes(
+          'she prefers to meet at the bench',
+        )
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                thought: honorsMemory
+                  ? 'She asked for the bench; I will meet her there.'
+                  : 'I will meet Nadia by the river.',
+                speech: null,
+                mood: null,
+                journal: null,
+                recall: null,
+                reconsider_at: null,
+                importance: 5,
+                plan: null,
+                action: {
+                  verb: 'walk',
+                  params: { ...NO_PARAMS, x: honorsMemory ? 8 : 2, y: 3 },
+                  freeform: null,
+                },
+              }),
+            },
+          ],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
+            outputTokens: { total: 0, text: 0, reasoning: 0 },
+          },
+          warnings: [],
+        }
+      },
+    })
+    const llm = new LlmClient({ model, db, caller: 'turn', agentId: 'tamar', maxRetries: 0 })
+    const decide = async (memories: typeof packet) => {
+      const blocks = fixtureBlocks()
+      const prompt = assemblePrompt({
+        ...blocks,
+        scene: { ...blocks.scene, memories },
+        now: { prose: 'You can meet Nadia at the river (2, 3) or the bench (8, 3).' },
+      })
+      return (
+        await llm.object({
+          system: prompt.system,
+          messages: prompt.messages,
+          schema: StrictTurnSchema,
+        })
+      ).value
+    }
+    try {
+      expect(packet).toHaveLength(8)
+      expect(packet.map((memory) => memory.id)).toContain(old)
+      expect((await decide(packet)).action.params.x).toBe(8)
+      expect((await decide(packet.filter((memory) => memory.id !== old))).action.params.x).toBe(2)
+    } finally {
+      db.close()
+    }
+  })
+
   it('ranks an exact tag cue above a text-only match with identical wording', async () => {
     const { store } = await makeStore()
     const now = 5 * TICKS_PER_DAY

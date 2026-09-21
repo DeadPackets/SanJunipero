@@ -9,11 +9,11 @@ export type AgentCtx = {
   agentId: string
   name: string
   skills: Record<string, number>
-  inventory: { kind: string; qty: number }[]
+  inventory: { id?: string; kind: string; qty: number }[]
   position: { x: number; y: number }
   // The world the asker is standing in: an arbiter shown neither rules on a town it cannot see.
   visible: {
-    structures: { kind: string; x: number; y: number }[]
+    structures: { id?: string; kind: string; x: number; y: number }[]
     ground: string[]
   }
   // Who stands in sight, by the id a targeted routine takes: the arbiter writes what it is shown.
@@ -44,15 +44,11 @@ export type LawSeam = (ask: {
   places: { id: string; kind: string; name?: string }[]
 }) => Promise<{ predicate: LawPredicate; repeals: number | null; why: string }>
 
-// The four things the runtime needs of the arbiter: rule on it, make it law, say what laws the
-// town already has, and say what the town has named for itself.
+// The runtime-facing part of the observer arbiter.
 export type SeamArbiter = {
   adjudicate: Adjudicator
   codify: Codifier
   roster?: () => RosterEntry[]
-  /** Names the town spoke for its own habits. Names only: the recognizer's words never cross. */
-  customs?: () => readonly string[]
-  habits?: () => readonly string[]
   /** What stands one step beyond what the town practices, in the codex's own words. */
   frontier?: () => readonly string[]
   /** Read a rule the town agreed. Absent, a rule is kept in words only. */
@@ -92,11 +88,16 @@ export function buildAgentCtx(bridge: EngineBridge, agentId: string, saying?: st
     agentId,
     name: body.name,
     skills: body.skills,
-    inventory: packet.self.inventory.map((i) => ({ kind: i.kind, qty: i.qty })),
+    inventory: packet.self.inventory.map((i) => ({ id: i.id, kind: i.kind, qty: i.qty })),
     position: { x: packet.self.x, y: packet.self.y },
     people: packet.visible.agents.map((a) => ({ id: a.id, name: a.name })),
     visible: {
-      structures: packet.visible.structures.map((s) => ({ kind: s.kind, x: s.x, y: s.y })),
+      structures: packet.visible.structures.map((s) => ({
+        id: s.id,
+        kind: s.kind,
+        x: s.x,
+        y: s.y,
+      })),
       ground: bridge.groundKinds(agentId),
     },
   }

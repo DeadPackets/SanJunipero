@@ -63,6 +63,9 @@ export function migrateArbiterTables(db: Database.Database): void {
   if (!rulebookCols.some((c) => c.name === 'last_used_tick')) {
     db.exec('ALTER TABLE rulebook ADD COLUMN last_used_tick INTEGER')
   }
+  if (!rulebookCols.some((c) => c.name === 'pending_discovery')) {
+    db.exec('ALTER TABLE rulebook ADD COLUMN pending_discovery TEXT')
+  }
   // The construct registry and its ops-plane record. Agent-invisible by construction: these
   // tables live in the arbiter's database, never in the world's.
   db.exec(`

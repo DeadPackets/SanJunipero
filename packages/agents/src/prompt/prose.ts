@@ -499,7 +499,10 @@ export function makeablesLine(
   if (m.builds.length > 0) {
     parts.push(
       `What you know how to build, if you have the stuff and a place to put it: ${m.builds
-        .map((b) => `a ${words(b.kind)} (${costPhrase(b.inputs)})`)
+        .map(
+          (b) =>
+            `a ${words(b.kind)} (${costPhrase(b.inputs)})${b.durationTicks === undefined ? '' : `, ${b.durationTicks} minutes of work`}`,
+        )
         .join(', ')}.`,
     )
     // "to begin a new one", never "to raise one": this ground is where a roof starts, and walls
@@ -525,7 +528,10 @@ export function makeablesLine(
   if (m.crafts.length > 0) {
     parts.push(
       `What you know how to make: ${m.crafts
-        .map((c) => `${words(c.name)} (${c.roads.map(roadPhrase).join(', or ')})`)
+        .map(
+          (c) =>
+            `${words(c.name)} (${c.roads.map(roadPhrase).join(', or ')})${c.durationTicks === undefined ? '' : `, ${c.durationTicks} minutes of work`}`,
+        )
         .join(', ')}.`,
     )
   }

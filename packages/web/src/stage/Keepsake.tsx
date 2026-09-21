@@ -53,7 +53,7 @@ export function Keepsake({
           const key = `${row.kind}:${row.eventSeq}`
           if (firsts.has(key) || row.eventSeq <= baseline) continue
           push({
-            id: key,
+            id: `event:${row.eventSeq}`,
             title: row.label,
             label: 'A town first',
             icon: iconOf(row.kind),
@@ -68,7 +68,7 @@ export function Keepsake({
     const offEvents = store.onEvents((events) => {
       if (!store.getMode().live || document.hidden) return
       for (const ev of events) {
-        if (!NEWS.has(ev.type)) continue
+        if (!NEWS.has(ev.type) || baseline === null || ev.seq <= baseline) continue
         const cue = cueFor(ev, store.getState())
         if (!cue) continue
         push({

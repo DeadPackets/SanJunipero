@@ -1,10 +1,11 @@
 // LIVE ONLY. `@sj/forge/gen` is 9.7 MB of LLM SDK, so this file is reachable from `liveWorld.ts`
 // and nothing else — `discoveryArt.ts` beside it stays free of it for the scripted path.
 import type Database from 'better-sqlite3'
-import { insertLlmCall } from '@sj/llm'
+import { makeBudgetGuard } from '@sj/llm'
 import {
   PER_ASSET_STOP_USD,
   BudgetGuard,
+  BudgetExceededError,
   CAST_V5,
   characterImageClient,
   characterKind,
@@ -50,8 +51,8 @@ export type CommissionArtOpts = {
   /** The minds' own ops db: every image books a row here, so one wallet answers for a thought
    *  and a picture alike. */
   opsDb: Database.Database
-  /** Dollars this run may still spend, off that same ledger. `<= 0` refuses the commission. */
-  spendableUsd: () => number
+  artDailyUsd?: number
+  signal?: AbortSignal
   /** Absent — no key — draws nothing. */
   apiKey: string | undefined
   onError?: (kind: string, err: unknown) => void
@@ -61,51 +62,76 @@ export type CommissionArtOpts = {
   judge?: VisionJudgeFn
 }
 
-/** One image, on the ledger the minds bill — so one wallet answers for a thought and a picture. */
-const bookOn =
-  (opsDb: Database.Database) =>
-  (model: string, costUsd: number): void => {
-    insertLlmCall(opsDb, {
-      agentId: null,
-      caller: FORGE_CALLER,
-      model,
-      provider: null,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      reasoningTokens: 0,
-      costUsd,
-      // Art is billed by the image, not by a token table: the estimate IS the charge.
-      estimatedCostUsd: costUsd,
-      reportedCostUsd: null,
-      latencyMs: 0,
-      finishReason: null,
-      ok: true,
-      error: null,
+function reserveArtCharge(opts: CommissionArtOpts, budget: BudgetGuard) {
+  const guard = makeBudgetGuard(opts.opsDb, FORGE_CALLER)
+  return (model: string, expectedUsd: number) => {
+    opts.signal?.throwIfAborted()
+    budget.spend(expectedUsd)
+    const artDailyUsd = opts.artDailyUsd ?? LIVE_ART_DAILY_USD
+    const reservation = guard.reserve(expectedUsd, null, {
+      usd: artDailyUsd,
+      sinceMs: Date.now() - ART_DAY_MS,
     })
+    if ('held' in reservation) {
+      budget.release(expectedUsd)
+      throw new BudgetExceededError(artDailyUsd, reservation.spentUsd + expectedUsd)
+    }
+    let settled = false
+    return {
+      settle(costUsd: number) {
+        guard.reconcile(reservation.id, {
+          agentId: null,
+          caller: FORGE_CALLER,
+          model,
+          provider: null,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          reasoningTokens: 0,
+          costUsd,
+          estimatedCostUsd: expectedUsd,
+          reportedCostUsd: costUsd,
+          latencyMs: 0,
+          finishReason: null,
+          ok: true,
+          error: null,
+        })
+        if (settled) return
+        settled = true
+        if (costUsd > expectedUsd) budget.spend(costUsd - expectedUsd)
+        else budget.release(expectedUsd - costUsd)
+      },
+      retainUncertain() {
+        guard.retainUncertain(reservation.id)
+        settled = true
+      },
+      release() {
+        guard.release(reservation.id)
+        if (!settled) {
+          budget.release(expectedUsd)
+          settled = true
+        }
+      },
+    }
   }
+}
 
 export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher {
   const apiKey = opts.apiKey
-  if (apiKey === undefined) return noDiscoveryArt()
+  if (apiKey === undefined || (opts.artDailyUsd ?? LIVE_ART_DAILY_USD) <= 0) return noDiscoveryArt()
 
   let refs: Promise<Buffer[]> | null = null
-  // Commissions run one at a time: side by side they would each read the same balance and each
-  // spend it. Art is fire-and-forget, so the queue costs nothing anyone waits on.
+  // One commission at a time bounds image processing memory.
   let queue: Promise<unknown> = Promise.resolve()
 
-  const book = bookOn(opts.opsDb)
-
   const draw: Forge['commission'] = async (desc, footprint, klass, kind) => {
-    const left = opts.spendableUsd()
-    if (left <= 0) throw new Error(`no budget left to draw ${kind}`)
-    // The cap is what the run has left, never past the per-asset anomaly stop, and it is read
-    // fresh because the day rolls and the minds spend out of the same balance.
-    const budget = new BudgetGuard(Math.min(PER_ASSET_STOP_USD, left))
+    opts.signal?.throwIfAborted()
+    const budget = new BudgetGuard(PER_ASSET_STOP_USD)
+    const reserveCharge = reserveArtCharge(opts, budget)
     const client = makeImageClient({
       apiKey,
-      budget,
-      onCharge: book,
+      reserveCharge,
+      ...(opts.signal === undefined ? {} : { signal: opts.signal }),
       ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
     })
     // A rejected sheet must not be memoised: one bad encode would draw nothing ever again.
@@ -113,27 +139,52 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       refs = null
       throw e
     }))
-    // The eye draws the retry-vs-blocked line, so it reads the operator's config, not the defaults.
-    const judge = opts.judge ?? makeVisionJudge({ apiKey, refs: sheet, config: loadForgeConfig() })
-    return createForge({
-      codex: opts.codex,
-      refs: sheet,
-      client: {
-        async generateCandidates(prompt, candidateRefs, n) {
-          // Reserved with the picture, not after it: a balance that cannot pay for both must
-          // refuse before the picture is bought.
-          budget.spend(EST_COST_PER_VISION_CALL)
-          const out = await client.generateCandidates(prompt, candidateRefs, n)
-          for (const c of out) book(c.model, c.costUsd)
-          return out
+    let eye: ReturnType<typeof reserveCharge> | null = null
+    const releaseEye = () => {
+      eye?.release()
+      eye = null
+    }
+    const config = loadForgeConfig()
+    const judge =
+      opts.judge ??
+      makeVisionJudge({
+        apiKey,
+        refs: sheet,
+        config,
+        ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+        onCharge: (_model, costUsd) => eye?.settle(costUsd),
+      })
+    try {
+      return await createForge({
+        codex: opts.codex,
+        refs: sheet,
+        ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+        client: {
+          async generateCandidates(prompt, candidateRefs, n) {
+            releaseEye()
+            eye = reserveCharge(config.visionQa.model, EST_COST_PER_VISION_CALL)
+            return client.generateCandidates(prompt, candidateRefs, n)
+          },
         },
-      },
-      judge: async (a) => {
-        const reviewed = await judge(a)
-        book(reviewed.verdict.model, reviewed.costUsd)
-        return reviewed
-      },
-    }).commission(desc, footprint, klass, kind)
+        judge: async (a) => {
+          let dispatched = false
+          try {
+            opts.signal?.throwIfAborted()
+            dispatched = true
+            const reviewed = await judge(a)
+            eye?.settle(reviewed.costUsd)
+            return reviewed
+          } catch (err) {
+            if (dispatched) eye?.retainUncertain()
+            throw err
+          } finally {
+            releaseEye()
+          }
+        },
+      }).commission(desc, footprint, klass, kind)
+    } finally {
+      releaseEye()
+    }
   }
 
   return watchDiscoveryArt({
@@ -145,6 +196,7 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
       },
     },
     codex: opts.codex,
+    ...(opts.signal === undefined ? {} : { signal: opts.signal }),
     ...(opts.onError === undefined ? {} : { onError: opts.onError }),
   })
 }
@@ -154,8 +206,6 @@ export function createDiscoveryArt(opts: CommissionArtOpts): DiscoveryArtWatcher
 const ART_DAY_MS = 24 * 60 * 60 * 1000
 
 export type CastArtOpts = CommissionArtOpts & {
-  /** What a DAY may put into faces. `0` draws nothing — `SJ_ART_DAILY_USD`. */
-  artDailyUsd?: number
   /** Every measurement one commission made, for the operator's log. */
   onNote?: (agentId: string, line: string) => void
 }
@@ -174,42 +224,30 @@ export function createCastArt(opts: CastArtOpts): CastArtWatcher {
   const artDailyUsd = opts.artDailyUsd ?? LIVE_ART_DAILY_USD
   if (apiKey === undefined || artDailyUsd <= 0) return noCastArt()
 
-  const generate = characterImageClient({
-    apiKey,
-    onCharge: bookOn(opts.opsDb),
-    ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
-  })
-
   return watchCastArt({
     codex: opts.codex,
-    artSpendableUsd: () =>
-      Math.min(opts.spendableUsd(), artDailyUsd - artSpentUsd(opts.opsDb, Date.now() - ART_DAY_MS)),
+    ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+    artSpendableUsd: () => artDailyUsd - artSpentUsd(opts.opsDb, Date.now() - ART_DAY_MS),
     ...(opts.onError === undefined ? {} : { onError: opts.onError }),
     draw: async (p) => {
-      // The cap is what the day's art has left, never past the per-asset anomaly stop, and it is
-      // read fresh because the minds spend out of the same balance.
-      const left = Math.min(
-        PER_ASSET_STOP_USD,
-        opts.spendableUsd(),
-        artDailyUsd - artSpentUsd(opts.opsDb, Date.now() - ART_DAY_MS),
-      )
-      const budget = new BudgetGuard(Math.max(0, left))
+      opts.signal?.throwIfAborted()
+      const budget = new BudgetGuard(PER_ASSET_STOP_USD)
+      const generate = characterImageClient({
+        apiKey,
+        reserveCharge: reserveArtCharge(opts, budget),
+        ...(opts.signal === undefined ? {} : { signal: opts.signal }),
+        ...(opts.fetchFn === undefined ? {} : { fetchFn: opts.fetchFn }),
+      })
       const sheet = await commissionCharacter(
         {
           onNote: (line) => opts.onNote?.(p.id, line),
           onRefused: (reason) => opts.onError?.(characterKind(p.id), new Error(reason)),
-          generate: async (req) => {
-            // Reserved with the picture: a balance that cannot pay for the next cell must refuse
-            // before it is bought, and `BudgetExceededError` stops the whole commission.
-            budget.spend(req.reserveUsd)
-            const img = await generate(req)
-            if (img.costUsd > req.reserveUsd) budget.spend(img.costUsd - req.reserveUsd)
-            return img
-          },
+          generate,
         },
         lookOf(p),
       )
-      if (sheet === null) return
+      if (sheet === null) throw new Error('character generation did not pass its image gates')
+      opts.signal?.throwIfAborted()
       const cells = Object.values(sheet.manifest.cells)
       opts.codex.register({
         class: 'rig-part',

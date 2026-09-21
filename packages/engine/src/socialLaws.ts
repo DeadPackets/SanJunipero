@@ -48,7 +48,7 @@ export function tabledLaws(state: WorldState): TabledLaw[] {
   return Object.values(state.tabledLaws ?? {}).sort((a, b) => a.tabledTick - b.tabledTick)
 }
 
-export type LawJudgement = { refusal: string } | { broken: string[] } | null
+export type LawJudgement = { broken: string[] } | null
 
 /** Whoever could see this body where it stands: alive, somebody else, on the same side of a
  *  wall, and inside the light. The same lens a taking is witnessed by. */
@@ -67,8 +67,6 @@ export function witnessesOf(state: WorldState, config: SimConfig, agentId: strin
       )
     })
 }
-
-const agreed = (law: Law): string => `the town agreed: ${law.text}`
 
 const doneToday = (state: WorldState, agentId: string, verb: string, tick: number): boolean => {
   const at = state.agents[agentId]?.lawMarks?.[verb]
@@ -150,8 +148,8 @@ function forbidBites(
   return true
 }
 
-/** What the town's own rules make of an act the world has already agreed to. A `forbid` never
- *  stops anybody: it hands back the laws this act breaks, and the act goes through witnessed. */
+/** What the town's own rules make of an act the world has already agreed to. Social rules do
+ *  not stop bodies: they hand back the laws this act breaks, and it goes through witnessed. */
 export function judgeLaws(
   state: WorldState,
   config: SimConfig,
@@ -168,22 +166,21 @@ export function judgeLaws(
       if (p.verb === verb && forbidBites(state, config, agentId, p, params, tick))
         broken.push(law.id)
     } else if (p.kind === 'require_before') {
-      if (p.verb === verb && !doneToday(state, agentId, p.before, tick))
-        return { refusal: agreed(law) }
+      if (p.verb === verb && !doneToday(state, agentId, p.before, tick)) broken.push(law.id)
     } else if (p.kind === 'common') {
       if (
         verb === 'take' &&
         onTheShelf(state, params, p.itemKind, p.structureId) &&
         heldQty(state, agentId, p.itemKind) >= 1
       )
-        return { refusal: agreed(law) }
+        broken.push(law.id)
     } else if (p.kind === 'tithe') {
       if (
         verb === 'take' &&
         onTheShelf(state, params, p.itemKind, p.to) &&
         state.agents[agentId]?.lawMarks?.[law.id] !== periodIndex(tick, p.every)
       )
-        return { refusal: agreed(law) }
+        broken.push(law.id)
     }
   }
   return broken.length === 0 ? null : { broken }

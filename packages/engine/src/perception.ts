@@ -634,7 +634,7 @@ function perceiveReach(lens: Lens, visible: PerceptionPacket['visible']): Percei
   const atHand = visible.items
     .filter((i) => {
       const item = lens.state.items[i.id]
-      return item !== undefined && itemWithinReach(lens.state, lens.self.id, item)
+      return item !== undefined && itemWithinReach(lens.state, lens.config, lens.self.id, item)
     })
     .map((i) => i.id)
 

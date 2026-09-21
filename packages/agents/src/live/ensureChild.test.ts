@@ -22,8 +22,8 @@ const BORN: AgentBornPayload = {
 }
 const BIRTH = { seq: 3, tick: 1 }
 
-const HOUSE_LINE = 'The house you were born in was finished.'
-const BORN_LINE = 'You were born to your mother and your father, in this town.'
+const HOUSE_LINE = 'On day 1: The house you were born in was finished.'
+const BORN_LINE = 'On day 1: You were born to your mother and your father, in this town.'
 
 const texts = (db: Database.Database): string[] =>
   (

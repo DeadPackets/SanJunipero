@@ -4,8 +4,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
+import Database from 'better-sqlite3'
 import { DEFAULT_CONFIG, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
-import { openDb } from '@sj/engine/store'
+import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, createWorldTick, genesisState } from '@sj/engine'
 import {
   DEV_MAP_DEFAULT,
@@ -91,6 +92,44 @@ describe('dev world server', () => {
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true })
   })
+
+  it.each(['factory', 'attach'])(
+    'closes startup resources after a cast %s failure',
+    async (phase) => {
+      const path = join(dir, `failed-${phase}.db`)
+      const closed = vi.spyOn(Database.prototype, 'close')
+      const stoppedStores = vi.spyOn(EventStore.prototype, 'close')
+      const stop = vi.fn(async () => {})
+      try {
+        await expect(
+          startDevWorld({
+            dbPath: path,
+            port: 0,
+            cast: async () => {
+              if (phase === 'factory') throw new Error('cast factory failed')
+              return {
+                ops: null,
+                attach: () => {
+                  throw new Error('cast attach failed')
+                },
+                stop,
+              }
+            },
+          }),
+        ).rejects.toThrow(`cast ${phase} failed`)
+        const handles = (closed.mock.contexts as Database.Database[]).filter(
+          (db) => db.name === path,
+        )
+        expect(handles).toHaveLength(3)
+        expect(handles.every((db) => !db.open)).toBe(true)
+        expect(stoppedStores).toHaveBeenCalledTimes(2)
+        expect(stop).toHaveBeenCalledTimes(phase === 'attach' ? 1 : 0)
+      } finally {
+        stoppedStores.mockRestore()
+        closed.mockRestore()
+      }
+    },
+  )
 
   it('★ says which map it loaded, on every boot, in every path', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})

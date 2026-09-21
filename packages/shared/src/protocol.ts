@@ -5,7 +5,7 @@ import { STAKE_TERMS } from './stakes.js'
 import { BOARD_TOP_N, THREAD_STATES, THREAD_TOP_N } from './threads.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 8 // 8: the director's cut and act ride the socket; a v7 viewer polls a heat that no longer exists
+export const PROTOCOL_VERSION = 9 // v9 snapshots identify the town run; older strict decoders must reload.
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -37,6 +37,7 @@ export type ClientMsg = z.infer<typeof ClientMsg>
 export const ServerSnapshot = z
   .object({
     t: z.literal('snapshot'),
+    runId: z.uuid().optional(),
     tick,
     seq: z.number().int().nonnegative(),
     state: z.unknown(),
@@ -244,6 +245,9 @@ export const ThreadRowSchema = z
     beat: z.string().min(1).optional(),
     summary: z.string().min(1).optional(),
     proseTick: tick.optional(),
+    proseSceneId: z.string().min(1).optional(),
+    sourceEventSeqs: z.array(z.number().int().nonnegative()).max(12).optional(),
+    basis: z.literal('observed-overlap').optional(),
   })
   .strict()
 export type ThreadRow = z.infer<typeof ThreadRowSchema>

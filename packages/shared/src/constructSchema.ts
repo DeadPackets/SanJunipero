@@ -34,6 +34,7 @@ export const ConstructRecordSchema = z
     /** Times they came back to it, the first gathering included. */
     gatherings: z.number().int().positive(),
     anchor: z.object({ x: z.number().int(), y: z.number().int() }).strict().nullable(),
+    place: z.string().min(1).nullable(),
     quote: z.string().min(1).nullable(),
     saidBy: z.string().min(1).nullable(),
   })

@@ -25,6 +25,9 @@ importers:
       '@sj/shared':
         specifier: workspace:*
         version: link:packages/shared
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3

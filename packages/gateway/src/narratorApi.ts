@@ -14,6 +14,7 @@ import {
   chronicleIcon,
   chronicleLine,
   discoveryHeadline,
+  isSeededStructureEvent,
   kindWords,
 } from '@sj/shared'
 // Plain SELECTs rather than @sj/narrator, which drags @sj/llm and the `ai` SDK behind it.
@@ -293,7 +294,7 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
   // The SOURCES, not the marks: the rule that turns them into marks lives in the viewer's
   // `ui/timelineMarks.ts`, and a second copy here is a second copy to keep right.
   const selMarkEvents = deps.db.prepare(
-    `SELECT tick, type FROM events WHERE type IN (${MARK_EVENT_TYPES.map(() => '?').join(', ')})
+    `SELECT seq, tick, type, payload FROM events WHERE type IN (${MARK_EVENT_TYPES.map(() => '?').join(', ')})
      ORDER BY tick, seq`,
   )
 
@@ -363,7 +364,17 @@ export function mountNarratorApi(router: Router, deps: NarratorApiDeps): void {
         discoveries: readDiscoveries(deps.db, (id) =>
           agentName(deps.mirror.state().agents, id),
         ).map((d) => ({ tick: d.tick, words: discoveryHeadline(d) })),
-        events: selMarkEvents.all(...MARK_EVENT_TYPES) as { tick: number; type: string }[],
+        events: (
+          selMarkEvents.all(...MARK_EVENT_TYPES) as {
+            seq: number
+            tick: number
+            type: string
+            payload: string
+          }[]
+        )
+          .map(toEvent)
+          .filter((event) => !isSeededStructureEvent(event))
+          .map(({ tick, type }) => ({ tick, type })),
       })),
     )
   })

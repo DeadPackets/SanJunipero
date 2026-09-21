@@ -28,6 +28,15 @@ export function UsageMeter() {
         </h3>
         {known ? (
           <>
+            <p role="status">
+              {known.mindStatus === 'budget-stopped'
+                ? 'Minds are paused at the spending limit. The town clock can still move.'
+                : known.mindStatus === 'delayed'
+                  ? 'AI responses are delayed. Residents may wait before choosing their next action.'
+                  : known.mindStatus === 'active'
+                    ? 'AI minds are active.'
+                    : 'AI minds are disabled.'}
+            </p>
             <p>
               {known.mode === 'scripted'
                 ? 'Scripted preview. No AI calls are being made.'

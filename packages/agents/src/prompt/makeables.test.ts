@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { craftRoutes, makeables } from '@sj/engine'
-import { DEFAULT_CONFIG, FORBIDDEN_FRAMING } from '@sj/shared'
+import { DEFAULT_CONFIG, FORBIDDEN_FRAMING, SimConfigSchema } from '@sj/shared'
 import {
   makeablesLine,
   roadLine,
@@ -16,6 +16,16 @@ import { quietMeadowPacket } from '../testutil/fixtures.js'
 const C = DEFAULT_CONFIG
 
 describe('the makeable vocabulary comes off the tables the verbs already read', () => {
+  it('shows the effective one-person work cost for a fast house and a long cottage', () => {
+    const config = SimConfigSchema.parse({ construction: { houseTicks: 240 } })
+    const builds = makeables(config).builds
+    expect(builds.find((b) => b.kind === 'house')).toMatchObject({ durationTicks: 240 })
+    expect(builds.find((b) => b.kind === 'cottage')).toMatchObject({ durationTicks: 6480 })
+    const line = makeablesLine(makeables(config))
+    expect(line).toContain('a house (22.5 wood), 240 minutes of work')
+    expect(line).toContain('a cottage (22.5 wood), 6480 minutes of work')
+  })
+
   it('names every kind a pair of hands can raise, and nothing the world places itself', () => {
     const m = makeables(C)
     expect(m.builds.map((b) => b.kind)).toEqual([

@@ -16,7 +16,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
-import { ensureObserverTables, publishMind, publishThought } from './observer.js'
+import { ensureObserverTables, observerRunId, publishMind, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
 import { connect, nextFrame as nextRaw, until } from './testutil.js'
@@ -171,6 +171,7 @@ describe('gateway server', () => {
     })
     const snap = ServerMsg.parse(JSON.parse(snapRaw))
     if (snap.t !== 'snapshot') throw new Error('expected snapshot')
+    expect(snap.runId).toBe(observerRunId(db))
     expect(snap.live).toBe(true)
     expect(snap.tick).toBe(loop.state.tick)
     expect(stateHash(snap.state)).toBe(stateHash(JSON.parse(JSON.stringify(loop.state))))

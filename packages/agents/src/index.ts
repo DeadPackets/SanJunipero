@@ -69,6 +69,7 @@ export { DEFAULT_MIND_CONFIG, type MindConfig } from './wake.js'
 export { SceneCoordinator, type SceneMind } from './scene/coordinator.js'
 export {
   SceneTurnSchema,
+  StrictSceneTurnSchema,
   lineCapFor,
   sceneId,
   type Move,

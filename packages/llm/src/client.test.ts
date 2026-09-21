@@ -75,6 +75,35 @@ const alertsOf = (db: Database.Database, kind: string): string[] =>
 // test's calls behind its cool-down.
 beforeEach(resetLimiters)
 
+it('rejects each invalid response schema before dispatch even after the caller used a valid schema', async () => {
+  const db = openDb()
+  const model = mockModel([{ text: JSON.stringify({ mood: 'calm', count: 1 }) }])
+  const client = new LlmClient({ db, caller: 'schema-gate', model, maxRetries: 0 })
+  const request = { system: 'Answer.', messages: [{ role: 'user' as const, content: 'hello' }] }
+  const invalid = z
+    .object({
+      outcomes: z.array(
+        z.discriminatedUnion('kind', [
+          z.object({ kind: z.literal('memory'), text: z.string() }).strict(),
+          z.object({ kind: z.literal('tie'), personId: z.string() }).strict(),
+        ]),
+      ),
+    })
+    .strict()
+  try {
+    await expect(client.object({ ...request, schema: SCHEMA })).resolves.toBeDefined()
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await expect(client.object({ ...request, schema: invalid })).rejects.toThrow('oneOf')
+    }
+    expect(model.doGenerateCalls).toHaveLength(1)
+    expect(rows(db)).toHaveLength(1)
+    expect(sumReserved(db)).toBe(0)
+    expect(alertsOf(db, 'schema_not_strict')).toHaveLength(2)
+  } finally {
+    db.close()
+  }
+})
+
 describe('migrateLlmTables', () => {
   it('is idempotent', () => {
     const db = openDb()
@@ -83,9 +112,7 @@ describe('migrateLlmTables', () => {
     }).not.toThrow()
   })
 
-  // ★ A reservation is released in a JS `finally`, so a kill or an OOM leaves it behind and it
-  // counts against that caller's budget for ever. One process owns the ledger: boot clears them.
-  it('★ clears the reservations a killed process left behind, and no call it billed', () => {
+  it('★ retains unresolved reservations across restart without erasing booked charges', () => {
     const db = openDb()
     db.prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)').run(
       Date.now(),
@@ -112,7 +139,9 @@ describe('migrateLlmTables', () => {
 
     migrateLlmTables(db)
 
-    expect(db.prepare('SELECT COUNT(*) AS n FROM llm_reservations').get()).toEqual({ n: 0 })
+    expect(
+      db.prepare("SELECT COUNT(*) AS n FROM llm_reservations WHERE status = 'held'").get(),
+    ).toEqual({ n: 1 })
     expect(db.prepare('SELECT COUNT(*) AS n FROM llm_calls').get()).toEqual({ n: 1 })
   })
 
@@ -816,7 +845,7 @@ describe('pessimistic reservation (T21)', () => {
     expect(sumReserved(db, 'test')).toBe(0)
   })
 
-  it('releases the reservation when the call throws', async () => {
+  it('retains each dispatched allowance when failures carry no billing facts', async () => {
     const db = openDb()
     const model = mockModel([{ fail: true }, { fail: true }, { fail: true }])
     const client = new LlmClient({
@@ -830,7 +859,7 @@ describe('pessimistic reservation (T21)', () => {
     await expect(client.text({ messages: [{ role: 'user', content: 'u' }] })).rejects.toThrow(
       'scripted failure',
     )
-    expect(sumReserved(db, 'test')).toBe(0)
+    expect(sumReserved(db, 'test')).toBeCloseTo(0.015, 10)
   })
 
   it('leaves a single sequential call under a sane budget exactly as it was', async () => {
@@ -1448,7 +1477,7 @@ describe('shutdown cancellation', () => {
       expect(await call).toMatchObject({ name: 'AbortError' })
       expect(model.doGenerateCalls).toHaveLength(1)
       expect(rows(db)).toMatchObject([{ caller: 'test.child', ok: 0 }])
-      expect(sumReserved(db, 'test.child')).toBe(0)
+      expect(sumReserved(db, 'test.child')).toBeGreaterThan(0)
       expect(limiterFor(PROVIDER_ORDER.join(',')).state().inFlight).toBe(0)
       db.close()
     },
@@ -1527,7 +1556,7 @@ describe('shutdown cancellation', () => {
         inFlight: 0,
         queued: 0,
       })
-      expect(sumReserved(db, 'test')).toBeGreaterThan(0)
+      expect(sumReserved(db, 'test')).toBe(0)
       client.abort()
       await vi.advanceTimersByTimeAsync(0)
       expect(outcome).toMatchObject({ name: 'AbortError' })

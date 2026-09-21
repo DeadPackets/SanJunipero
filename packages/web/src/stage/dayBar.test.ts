@@ -450,21 +450,23 @@ function classesUnder(html: string, cls: string): string[] {
 describe('★ the bar a stream viewer is left with', () => {
   // ★ A STREAM HAS NO HANDS. The track is `display: none` under `[data-broadcast='on']`, so both
   // reads drew nothing, on a frame that runs for days: 2 URLs every 30 s, for ever.
-  it('★ asks the gateway for nothing it has no track to draw', async () => {
+  it('★ reads visible usage but no timeline lists when the stream has no track', async () => {
     const asked: string[] = []
     vi.stubGlobal('fetch', (url: string) => {
       asked.push(url)
       return Promise.reject(new Error('no gateway in a test'))
     })
     await mount(createElement(DayBar, props(townAt(DAY_12), 'online', true)))
-    expect(asked, 'a stream frame reads neither list').toEqual([])
+    expect(asked, 'a stream frame reads usage but neither timeline list').toEqual(['/api/usage'])
     await act(async () => {
       for (const root of roots.splice(0)) root.unmount()
     })
+    asked.length = 0
     await mount(createElement(DayBar, props(townAt(DAY_12), 'online', false)))
     expect(asked.sort(), 'a viewer who can scrub still gets the marks').toEqual([
       '/api/milestones',
       '/api/timeline/marks',
+      '/api/usage',
     ])
   })
 

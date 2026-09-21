@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+import { RAIL_WINDOW_MS } from './rails.js'
 
 export type LlmCallInsert = {
   agentId: string | null
@@ -83,13 +84,27 @@ export function migrateLlmTables(db: Database.Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       ts INTEGER NOT NULL,
       caller TEXT NOT NULL,
-      amount_usd REAL NOT NULL
+      amount_usd REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'held',
+      call_id INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_llm_reservations_caller ON llm_reservations(caller);
+    CREATE TABLE IF NOT EXISTS spend_limits (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      lifetime_usd REAL,
+      rolling_day_usd REAL
+    );
   `)
-  // A reservation is released in a JS `finally`, which a kill never reaches. One process owns
-  // this ledger, so anything still reserved when it opens belongs to a run that is gone.
-  db.exec('DELETE FROM llm_reservations')
+  const reservationCols = db.prepare('PRAGMA table_info(llm_reservations)').all() as {
+    name: string
+  }[]
+  if (!reservationCols.some((c) => c.name === 'status'))
+    db.exec("ALTER TABLE llm_reservations ADD COLUMN status TEXT NOT NULL DEFAULT 'held'")
+  if (!reservationCols.some((c) => c.name === 'call_id'))
+    db.exec('ALTER TABLE llm_reservations ADD COLUMN call_id INTEGER')
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_llm_reservations_unsettled ON llm_reservations(caller) WHERE status IN ('held', 'uncertain')",
+  )
   const cols = db.prepare('PRAGMA table_info(llm_calls)').all() as { name: string }[]
   if (!cols.some((c) => c.name === 'provider'))
     db.exec('ALTER TABLE llm_calls ADD COLUMN provider TEXT')
@@ -145,53 +160,140 @@ export function insertTurnOutcome(
   )
 }
 
-export function sumReserved(db: Database.Database, caller: string): number {
+export function configureSpendLimits(
+  db: Database.Database,
+  limits: { lifetimeUsd: number | null; rollingDayUsd: number | null },
+): void {
+  for (const value of [limits.lifetimeUsd, limits.rollingDayUsd]) {
+    if (value !== null && (!Number.isFinite(value) || value < 0))
+      throw new Error('invalid spending limit')
+  }
+  db.prepare(
+    `INSERT INTO spend_limits (id, lifetime_usd, rolling_day_usd) VALUES (1, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET lifetime_usd = excluded.lifetime_usd,
+       rolling_day_usd = excluded.rolling_day_usd`,
+  ).run(limits.lifetimeUsd, limits.rollingDayUsd)
+}
+
+export function sumReserved(db: Database.Database, caller?: string): number {
   const row = db
-    .prepare('SELECT COALESCE(SUM(amount_usd), 0) AS total FROM llm_reservations WHERE caller = ?')
-    .get(caller) as { total: number }
+    .prepare(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS total FROM llm_reservations
+     WHERE status IN ('held', 'uncertain')${caller === undefined ? '' : ' AND caller = ?'}`,
+    )
+    .get(...(caller === undefined ? [] : [caller])) as { total: number }
   return row.total
 }
 
-/** This caller's own ceiling for a rolling day, and where that day starts. */
 type CallerRail = { usd: number; sinceMs: number }
-
-/** A reservation, or the reason it was refused — the lifetime budget or this caller's own rail.
- *  Two shapes and not one null, because a rail holds ONE caller and the budget stops the run. */
 export type Reserved = { id: number } | { held: 'budget' | 'rail'; spentUsd: number }
 
 export type BudgetGuard = {
   reserve(expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved
+  reconcile(reservationId: number, call: LlmCallInsert): number
+  retainUncertain(reservationId: number): void
   release(reservationId: number): void
   sumReserved(): number
 }
 
-// Booking after the fact lets every call in flight pass one read-only check and all overshoot.
-// Read and claim inside one synchronous transaction; the worst overshoot is one reserved call.
 export function makeBudgetGuard(db: Database.Database, caller: string): BudgetGuard {
-  const insert = db.prepare(
-    'INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)',
-  )
-  const remove = db.prepare('DELETE FROM llm_reservations WHERE id = ?')
   const reserve = db.transaction(
     (expectedUsd: number, budgetUsd: number | null, rail: CallerRail | null): Reserved => {
-      const held = sumReserved(db, caller)
-      const lifetime = sumCostUsd(db, caller)
-      if (budgetUsd !== null && lifetime + held + expectedUsd > budgetUsd) {
+      if (!Number.isFinite(expectedUsd) || expectedUsd < 0) throw new Error('invalid reservation')
+      if (budgetUsd !== null && (!Number.isFinite(budgetUsd) || budgetUsd < 0))
+        throw new Error('invalid spending limit')
+      if (
+        rail !== null &&
+        (!Number.isFinite(rail.usd) || rail.usd < 0 || !Number.isFinite(rail.sinceMs))
+      )
+        throw new Error('invalid caller allowance')
+      const limits = db
+        .prepare('SELECT lifetime_usd, rolling_day_usd FROM spend_limits WHERE id = 1')
+        .get() as { lifetime_usd: number | null; rolling_day_usd: number | null } | undefined
+      const lifetime = sumCostUsd(db)
+      const held = sumReserved(db)
+      const ceiling = limits?.lifetime_usd ?? Infinity
+      const refuse = (
+        window: 'lifetime' | 'rolling-day',
+        spentUsd: number,
+        limitUsd: number,
+      ): Reserved => {
+        insertAlert(db, {
+          agentId: null,
+          kind: 'town_budget_refused',
+          detail: JSON.stringify({
+            caller,
+            window,
+            spentUsd,
+            limitUsd,
+            heldUsd: held,
+            expectedUsd,
+          }),
+        })
+        return { held: 'budget', spentUsd }
+      }
+      if (lifetime + held + expectedUsd > ceiling) return refuse('lifetime', lifetime, ceiling)
+      const today = sumCostUsdSince(db, undefined, Date.now() - RAIL_WINDOW_MS)
+      const dailyCeiling = limits?.rolling_day_usd ?? Infinity
+      if (today + held + expectedUsd > dailyCeiling)
+        return refuse('rolling-day', today, dailyCeiling)
+      if (budgetUsd !== null && lifetime + held + expectedUsd > budgetUsd)
         return { held: 'budget', spentUsd: lifetime }
-      }
-      // The rail joins the same transaction the budget is read in: a runaway caller must not be
-      // able to spend between one read of the ledger and the next.
       if (rail !== null) {
-        const today = sumCostUsdSince(db, caller, rail.sinceMs)
-        if (today + held + expectedUsd > rail.usd) return { held: 'rail', spentUsd: today }
+        const callerToday = sumCostUsdSince(db, caller, rail.sinceMs)
+        if (callerToday + sumReserved(db, caller) + expectedUsd > rail.usd)
+          return { held: 'rail', spentUsd: callerToday }
       }
-      return { id: Number(insert.run(Date.now(), caller, expectedUsd).lastInsertRowid) }
+      return {
+        id: Number(
+          db
+            .prepare('INSERT INTO llm_reservations (ts, caller, amount_usd) VALUES (?, ?, ?)')
+            .run(Date.now(), caller, expectedUsd).lastInsertRowid,
+        ),
+      }
     },
   )
+  const reconcile = db.transaction((reservationId: number, call: LlmCallInsert): number => {
+    const row = db
+      .prepare('SELECT amount_usd, call_id FROM llm_reservations WHERE id = ? AND caller = ?')
+      .get(reservationId, caller) as { amount_usd: number; call_id: number | null } | undefined
+    if (row === undefined || call.caller !== caller) throw new Error('unknown spending reservation')
+    if (row.call_id !== null) return row.call_id
+    if (!Number.isFinite(call.costUsd) || call.costUsd < 0)
+      throw new Error('invalid provider charge')
+    const id = insertLlmCall(db, call)
+    db.prepare("UPDATE llm_reservations SET status = 'settled', call_id = ? WHERE id = ?").run(
+      id,
+      reservationId,
+    )
+    if (call.costUsd > row.amount_usd)
+      insertAlert(db, {
+        agentId: call.agentId,
+        kind: 'reservation_overrun',
+        detail: `${caller}: reserved $${row.amount_usd.toFixed(6)}, charged $${call.costUsd.toFixed(6)}`,
+      })
+    return id
+  })
   return {
-    reserve,
+    reserve: (expectedUsd, budgetUsd, rail) => reserve.immediate(expectedUsd, budgetUsd, rail),
+    reconcile: (reservationId, call) => reconcile.immediate(reservationId, call),
+    retainUncertain: (reservationId) => {
+      const retained = db
+        .prepare(
+          "UPDATE llm_reservations SET status = 'uncertain' WHERE id = ? AND caller = ? AND status = 'held'",
+        )
+        .run(reservationId, caller)
+      if (retained.changes > 0)
+        insertAlert(db, {
+          agentId: null,
+          kind: 'unconfirmed_charge',
+          detail: `${caller}: reservation ${reservationId} is retained until provider billing is known`,
+        })
+    },
     release: (reservationId) => {
-      remove.run(reservationId)
+      db.prepare(
+        "UPDATE llm_reservations SET status = 'released' WHERE id = ? AND caller = ? AND status = 'held'",
+      ).run(reservationId, caller)
     },
     sumReserved: () => sumReserved(db, caller),
   }
@@ -316,20 +418,26 @@ export function updateCallPricing(db: Database.Database, id: number, p: CallPric
   ).run(p.provider, p.reportedCostUsd, p.estimatedCostUsd, p.costUsd, id)
 }
 
-export function sumCostUsd(db: Database.Database, caller: string): number {
+export function sumCostUsd(db: Database.Database, caller?: string): number {
   const row = db
-    .prepare('SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ?')
-    .get(caller) as { total: number }
+    .prepare(
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls${caller === undefined ? '' : ' WHERE caller = ?'}`,
+    )
+    .get(...(caller === undefined ? [] : [caller])) as { total: number }
   return row.total
 }
 
 /** What this caller has spent inside a rolling window. `idx_llm_calls_caller` serves it. */
-function sumCostUsdSince(db: Database.Database, caller: string, sinceMs: number): number {
+function sumCostUsdSince(
+  db: Database.Database,
+  caller: string | undefined,
+  sinceMs: number,
+): number {
   const row = db
     .prepare(
-      'SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE caller = ? AND ts >= ?',
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total FROM llm_calls WHERE ts >= ?${caller === undefined ? '' : ' AND caller = ?'}`,
     )
-    .get(caller, sinceMs) as { total: number }
+    .get(sinceMs, ...(caller === undefined ? [] : [caller])) as { total: number }
   return row.total
 }
 

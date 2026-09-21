@@ -26,6 +26,7 @@ const record: ConstructRecord = {
   firstDay: 0,
   gatherings: 2,
   anchor: { x: 21, y: 20 },
+  place: null,
   quote: 'we call it the Long Table',
   saidBy: 'bex',
 }
@@ -59,6 +60,13 @@ describe('ConstructRowSchema', () => {
 describe('ConstructRecordSchema', () => {
   it('round-trips what the route serves', () => {
     expect(ConstructRecordSchema.parse(record)).toEqual(record)
+  })
+
+  it('carries an indoor place without inventing an outdoor anchor', () => {
+    expect(ConstructRecordSchema.parse({ ...record, anchor: null, place: 'hall' })).toMatchObject({
+      anchor: null,
+      place: 'hall',
+    })
   })
 
   it('refuses a stray field, a zero gathering count and a type off the taxonomy', () => {

@@ -18,7 +18,6 @@ import {
   SUMMARY_HOLD_TICKS,
   TIE_TERMS,
   tieActOf,
-  tieActOfLetGo,
   whyOf,
   type SceneKind,
   type ServerDirector,
@@ -327,12 +326,17 @@ export function makeDirector(
 
   const closeScene = (id: string, deltas: readonly unknown[], tick: number): void => {
     for (const raw of deltas) {
-      const d = raw as { agentId?: unknown; personId?: unknown; kind?: unknown; settled?: unknown }
+      const d = raw as {
+        agentId?: unknown
+        personId?: unknown
+        kind?: unknown
+        resolution?: unknown
+      }
       const a = str(d.agentId)
       const b = str(d.personId)
       const kind = str(d.kind)
       if (a === null || b === null || kind === null) continue
-      const act = tieActOf(kind, d.settled === true)
+      const act = tieActOf(kind, str(d.resolution) ?? undefined)
       if (act === 'slight') {
         payEvent([a, b], 'slight', tick, id)
         if (partnerOf(a) === b) payEvent([a, b], 'partnership_strained', tick, id)
@@ -431,11 +435,6 @@ export function makeDirector(
       case 'invitation_refused': {
         if (!Array.isArray(p.witnesses) || p.witnesses.length === 0) return
         payEvent([str(p.byId) ?? '', str(p.agentId) ?? ''], 'invitation_refused_seen', ev.tick)
-        return
-      }
-      case 'tie_let_go': {
-        if (tieActOfLetGo(str(p.kind) ?? '') !== 'promise_broken') return
-        payEvent([str(p.agentId) ?? '', str(p.personId) ?? ''], 'promise_broken', ev.tick)
         return
       }
       default:

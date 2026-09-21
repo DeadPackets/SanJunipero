@@ -626,3 +626,16 @@ describe('the reveal', () => {
     expect(woke).toBe(1)
   })
 })
+
+it('replaces run identity on reconnect without putting observer metadata into world state', () => {
+  const store = createWorldStore()
+  const snapshot = makeSnapshot()
+  const hash = stateHash(snapshot.state)
+  store.applyServer({ ...snapshot, runId: 'cc6e6ed2-f68d-43eb-b195-19c882a0a1ff' })
+  expect(store.runId()).toBe('cc6e6ed2-f68d-43eb-b195-19c882a0a1ff')
+  store.applyServer({ ...snapshot, seq: 500, runId: '32a926e2-844e-4543-b2f7-85ded478206a' })
+  expect(store.runId()).toBe('32a926e2-844e-4543-b2f7-85ded478206a')
+  expect(stateHash(store.getState())).toBe(hash)
+  store.applyServer(snapshot)
+  expect(store.runId()).toBeNull()
+})

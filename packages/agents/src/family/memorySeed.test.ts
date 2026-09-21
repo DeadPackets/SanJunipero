@@ -142,7 +142,7 @@ describe('buildHouseholdSeed (T25)', () => {
     expect(seed.map((s) => s.text).join('\n')).not.toContain(SECRET)
   })
 
-  it('respects upToTick and max, newest kept', () => {
+  it('respects upToTick and max, keeping consequential events first', () => {
     const store = seedWorld()
     const early = buildHouseholdSeed(store, { ...OPTS, upToTick: 25 })
     expect(early.map((s) => s.text).join('\n')).not.toContain('The seed is in the ground.')
@@ -150,7 +150,31 @@ describe('buildHouseholdSeed (T25)', () => {
 
     const capped = buildHouseholdSeed(store, { ...OPTS, max: 2 })
     expect(capped).toHaveLength(2)
-    expect(capped[capped.length - 1]!.text).toContain('mother’s hands')
+    expect(capped[0]!.text).toContain('was seen taking')
+    expect(capped[1]!.text).toContain('You were born')
+  })
+
+  it('keeps dated birth and loss through recent household speech, deterministically', () => {
+    const store = seedWorld()
+    store.append(1440, 'agent_died', { agentId: FATHER, cause: 'old_age' })
+    for (let i = 0; i < 70; i++)
+      store.append(1441 + i, 'agent_spoke', {
+        agentId: MOTHER,
+        text: `Routine line ${i}.`,
+        x: 4,
+        y: 4,
+      })
+    const opts = { ...OPTS, upToTick: 1600, max: 3 }
+    const seed = buildHouseholdSeed(store, opts)
+    expect(seed).toHaveLength(3)
+    expect(seed.map((entry) => entry.text).join('\n')).toContain('On day 1: You were born')
+    expect(seed.map((entry) => entry.text).join('\n')).toContain('On day 2: Your father died.')
+    expect(seed.some((entry) => entry.text.includes('Routine line'))).toBe(false)
+    expect(buildHouseholdSeed(store, opts)).toEqual(seed)
+    const refs = seed.map((entry) =>
+      Number(entry.tags.find((tag) => tag.startsWith('event:'))!.slice(6)),
+    )
+    expect(refs).toEqual([...refs].sort((a, b) => a - b))
   })
 
   it('★ reads the log by type — never the whole of it, which is 99.5% noise', () => {

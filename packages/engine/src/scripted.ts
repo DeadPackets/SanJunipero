@@ -41,10 +41,10 @@ export const FISHER_WATER = { x: 3, y: 32 }
 // ------------------------------------------------------- the scripted theft
 // The knife's id ends in no number on purpose: the counter law only rises on a numeric suffix.
 export const STOLEN_ITEM = 'item_knife'
-export const THIEF_POST = { x: 19, y: 20 } // beside the storehouse, on the far side from the traffic
-// Six tiles from (20, 20), the corner a taking out of the storehouse is logged at. Night
+export const THIEF_POST = { x: 21, y: 20 } // beside the open shed, on the far side from the traffic
+// Six tiles from (22, 20), the corner a taking out of the shed is logged at. Night
 // vision reaches four; noon reaches twelve. The post is the whole experiment.
-export const WATCH_POST = { x: 20, y: 26 }
+export const WATCH_POST = { x: 22, y: 26 }
 export const NIGHT_THEFT_TICK = 2760 // day 2, 22:00 — no moon, no torch
 export const NOON_THEFT_TICK = 3600 // day 3, 12:00 — the same act, in full light
 const RESTOW_TICK = 3000 // the knife goes back on the shelf between the two
@@ -270,6 +270,8 @@ function scriptedTimeline(
       flammable: true,
       builderId: 'script',
     })
+    emit('structure_completed', { id: STOREHOUSE.id })
+    emit('structure_completed', { id: SHED.id })
     emit('item_spawned', {
       id: WOOD_ITEM,
       kind: 'wood',
@@ -326,14 +328,14 @@ function scriptedTimeline(
       id: STOLEN_ITEM,
       kind: 'knife',
       qty: 1,
-      loc: { t: 'structure', id: STOREHOUSE.id },
+      loc: { t: 'structure', id: SHED.id },
       owner: KEEPER,
     })
   }
-  // The knife goes back on the shelf, so the noon taking is the same act as the night one and
-  // the light is the only thing that changed.
+  // The knife goes back on the open shed shelf, so the noon taking is the same act as the night
+  // one and the light is the only thing that changed.
   if (tick === RESTOW_TICK)
-    emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: STOREHOUSE.id } })
+    emit('item_moved', { id: STOLEN_ITEM, loc: { t: 'structure', id: SHED.id } })
   // These two are placed, not lived: a body that only stands runs out before the second night,
   // so twice a day the fixture puts them back on their feet, on a fixed clock so replay agrees.
   if (tick % UPKEEP_EVERY === 0) {
@@ -359,7 +361,14 @@ function bedGate(
 ): ScriptedIntent {
   const a = state.agents[id]!
   const here = a.insideId === undefined ? undefined : state.structures[a.insideId]
-  if (intent.verb !== 'sleep') return here ? { verb: 'exit', params: {} } : intent
+  if (intent.verb !== 'sleep') {
+    const item =
+      intent.verb === 'take' && typeof intent.params.itemId === 'string'
+        ? state.items[intent.params.itemId]
+        : undefined
+    const sameRoomTake = item?.loc.t === 'structure' && item.loc.id === here?.id
+    return here && !sameRoomTake ? { verb: 'exit', params: {} } : intent
+  }
   if (a.collapsedSinceTick !== null) return intent // a body already down may lie where it fell
   if (here) return isRoofedKind(config, here.kind) ? intent : { verb: 'exit', params: {} }
   for (const sid of Object.keys(state.structures).sort()) {
@@ -370,6 +379,29 @@ function bedGate(
       return { verb: 'enter', params: { structureId: s.id } }
   }
   return intent
+}
+
+// The packet names an item and its store but does not expose `insideId`. Keep the scripted actor
+// on the same physical route as a resident: walk to the door, enter, then reach the shelf.
+function roomStorageGate(
+  state: WorldState,
+  config: SimConfig,
+  id: string,
+  intent: ScriptedIntent,
+): ScriptedIntent {
+  if (intent.verb !== 'take' || typeof intent.params.itemId !== 'string') return intent
+  const item = state.items[intent.params.itemId]
+  if (item?.loc.t !== 'structure') return intent
+  const store = state.structures[item.loc.id]
+  if (!store || !isRoofedKind(config, store.kind)) return intent
+  const a = state.agents[id]!
+  if (a.insideId === store.id) return intent
+  if (a.insideId !== undefined) return { verb: 'exit', params: {} }
+  const door = doorTile(state, store)
+  if (door === null) return intent
+  return cheb(a.x, a.y, door.x, door.y) <= 1
+    ? { verb: 'enter', params: { structureId: store.id } }
+    : { verb: 'walk', params: door }
 }
 
 export type ScriptedOnTick = TickHandler
@@ -410,7 +442,7 @@ export function makeScriptedOnTick(
       const packet = composePerception(state, config, id, [])
       const intent = policies[id]!(packet)
       if (!intent) continue
-      const gated = bedGate(state, config, id, intent)
+      const gated = bedGate(state, config, id, roomStorageGate(state, config, id, intent))
       const r = submitIntent(state, config, id, gated.verb, gated.params)
       if (r.ok) for (const e of r.events) emit(e.type, e.payload)
     }

@@ -1,23 +1,23 @@
-import { describe, expect, it } from 'vitest'
-import { EventStore, openDb } from '@sj/engine/store'
 import {
   createWorldTick,
   fold,
   genesisState,
   RngStreams,
   replayFromGenesis,
-  TickLoop,
   type TickHandler,
+  TickLoop,
   type TileId,
 } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
 import {
   ADULT_AGE_DAYS,
   DISCOVERY_EVENT,
-  SimConfigSchema,
-  stateHash,
   type SimConfig,
+  SimConfigSchema,
   type SimEvent,
+  stateHash,
 } from '@sj/shared'
+import { describe, expect, it } from 'vitest'
 import { DEFAULT_MIND_CONFIG } from '../wake.js'
 import { DEFAULT_RECENT_WINDOW_TICKS, EngineBridge, ROLLED_BACK } from './bridge.js'
 
@@ -693,8 +693,66 @@ describe('★ an act the world already held is answered as settled, and what the
     // The window is read on a look, the way the runtime reads it after a perception.
     bridge.perception(AGENT)
     const done = bridge.completedSince(AGENT, 0)
-    expect(done.map(({ seq, ...act }) => act)).toEqual([{ verb: 'walk', settled: true }])
+    expect(done.map(({ seq, ...act }) => act)).toEqual([
+      { verb: 'walk', settled: true, params: { x: 3, y: 3 } },
+    ])
     expect(typeof done[0]?.seq).toBe('number')
+  })
+
+  it('keeps a physical target while speech starts and finishes during the walk', () => {
+    const { bridge, store, loop } = ownedWorld()
+    store.append(loop.tick, 'action_started', {
+      agentId: AGENT,
+      verb: 'walk',
+      params: { x: 8, y: 3 },
+      duration: 12,
+    })
+    store.append(loop.tick, 'action_started', {
+      agentId: AGENT,
+      verb: 'speak',
+      params: { text: 'On my way.' },
+      duration: 0,
+    })
+    store.append(loop.tick, 'action_completed', { agentId: AGENT, verb: 'speak' })
+    const walking = store.append(loop.tick, 'action_completed', { agentId: AGENT, verb: 'walk' })
+    bridge.perception(AGENT)
+    expect(bridge.completedSince(AGENT, walking.seq - 1)).toEqual([
+      { seq: walking.seq, verb: 'walk', settled: false, params: { x: 8, y: 3 } },
+    ])
+  })
+
+  it('retains a long build target after its start leaves perception and the bridge restarts', () => {
+    const { bridge, store, loop, config, step } = ownedWorld()
+    store.append(loop.tick, 'action_started', {
+      agentId: AGENT,
+      verb: 'build',
+      params: { kind: 'house', x: 8, y: 3 },
+      duration: 240,
+    })
+    bridge.perception(AGENT)
+    for (let i = 0; i <= DEFAULT_RECENT_WINDOW_TICKS; i++) step()
+    const resumed = new EngineBridge({ loop, store, simConfig: config })
+    const completed = store.append(loop.tick, 'action_completed', { agentId: AGENT, verb: 'build' })
+    resumed.perception(AGENT)
+    expect(resumed.completedSince(AGENT, completed.seq - 1)).toEqual([
+      { seq: completed.seq, verb: 'build', settled: false, params: { kind: 'house', x: 8, y: 3 } },
+    ])
+  })
+
+  it('does not reuse interrupted start parameters', () => {
+    const { bridge, store, loop } = ownedWorld()
+    store.append(loop.tick, 'action_started', {
+      agentId: AGENT,
+      verb: 'walk',
+      params: { x: 8, y: 3 },
+      duration: 12,
+    })
+    store.append(loop.tick, 'action_interrupted', { agentId: AGENT, reason: 'blocked' })
+    const unknown = store.append(loop.tick, 'action_completed', { agentId: AGENT, verb: 'walk' })
+    bridge.perception(AGENT)
+    expect(bridge.completedSince(AGENT, unknown.seq - 1)).toEqual([
+      { seq: unknown.seq, verb: 'walk', settled: false },
+    ])
   })
 
   it('a real step is not settled, and a thing made on the tick an act finished is named with it', async () => {
@@ -705,7 +763,9 @@ describe('★ an act the world already held is answered as settled, and what the
     while (loop.state.agents.cass!.activity !== null) step()
     bridge.perception('cass')
     const done = bridge.completedSince('cass', 0)
-    expect(done.map(({ seq, ...act }) => act)).toEqual([{ verb: 'walk', settled: false }])
+    expect(done.map(({ seq, ...act }) => act)).toEqual([
+      { verb: 'walk', settled: false, params: { x: 6, y: 3 } },
+    ])
     // A catch is logged after the cast completes, on the same tick.
     store.append(loop.tick, 'item_spawned', {
       id: 'item_9',
@@ -717,7 +777,7 @@ describe('★ an act the world already held is answered as settled, and what the
     step()
     bridge.perception('cass')
     expect(bridge.completedSince('cass', 0)).toEqual([
-      { seq: done[0]!.seq, verb: 'walk', settled: false, made: 'fish' },
+      { seq: done[0]!.seq, verb: 'walk', settled: false, made: 'fish', params: { x: 6, y: 3 } },
     ])
     // Somebody else's catch is not this body's.
     expect(bridge.completedSince('bex', 0)).toEqual([])

@@ -93,6 +93,7 @@ export type WorldStore = {
   setDressed: () => void
   /** The world log's head as the server last reported it — the signal a read model refetches on,
    *  instead of on a wall-clock timer. */
+  runId: () => string | null
   logSeq: () => number
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
@@ -112,6 +113,7 @@ export function createWorldStore(): WorldStore {
   let assetsReady = false
   let dressed = false
   let thoughtsSeq = 0
+  let runId: string | null = null
   let logSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
@@ -212,6 +214,7 @@ export function createWorldStore(): WorldStore {
     minds: () => minds,
     assetsReady: () => assetsReady,
     assetsSeq: () => assetsSeq,
+    runId: () => runId,
     logSeq: () => logSeq,
     assetRecords: () => records,
     dressed: () => dressed,
@@ -231,6 +234,7 @@ export function createWorldStore(): WorldStore {
           // across a config change cannot — only a reload fetches a bundle that can.
           const carried = SimConfigSchema.safeParse(msg.config)
           if (!carried.success) return 'reload'
+          runId = msg.runId ?? null
           logSeq = msg.seq
           config = carried.data
           state = msg.state as WorldState

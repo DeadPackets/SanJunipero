@@ -17,8 +17,6 @@ import { CANON } from './canon.js'
 import { makeCouncil, type LawCompileAnswer, type LawCompileAsk } from './council.js'
 import { isCharterRow, type AttemptVerdict, type VerbCharter } from './charter.js'
 import { CodexStore } from './codex.js'
-import { habitLines, namedCustoms } from './constructs.js'
-import { ConstructStore } from './constructStore.js'
 import { codify as codifyAttempt, verbFromCharter } from './codify.js'
 import {
   assembleExpressivePrompt,
@@ -179,12 +177,12 @@ export type AgentCtx = {
   agentId: string
   name: string
   skills: Record<string, number>
-  inventory: { kind: string; qty: number }[]
+  inventory: { id?: string; kind: string; qty: number }[]
   position: { x: number; y: number }
   // What the asker can see. Absent from a caller that projects no world — and then the
   // arbiter judges as it always did, on the asker alone.
   visible?: {
-    structures: { kind: string; x: number; y: number }[]
+    structures: { id?: string; kind: string; x: number; y: number }[]
     ground: string[]
   }
   // Who stands in sight, by the id a targeted routine takes. r33's first courtship was mapped
@@ -229,10 +227,6 @@ export type Arbiter = {
   codify(attempt: AttemptVerdict, credit: DiscoveryCredit): { ruleId: number; verb: string }
   // Every active minted verb as a prompt lists it, in rulebook order.
   roster(): RosterEntry[]
-  // The names the town gave its own recurrences. Names only — see `namedCustoms`.
-  customs(): string[]
-  // What keeps happening, named or not: gatherings that came back on enough separate days.
-  habits(): string[]
   // The rungs one step out, in the codex's own words. What the court has always been shown and
   // no mind ever was, which is why no mind ever reached for one.
   frontier(): string[]
@@ -253,7 +247,6 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
   const rulebook = new RulebookStore(deps.db)
   const review = new ReviewStore(deps.db)
   const codex = new CodexStore(deps.db)
-  const constructs = new ConstructStore(deps.db)
   const rulings = new RulingsStore(deps.db, deps.embedder)
   const council = makeCouncil({
     llm: deps.llm,
@@ -288,6 +281,7 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     }
     registerVerb(verbFromCharter(parsed))
   }
+  rulebook.publishPending(deps.onCodified)
 
   // The cheap approval: a word for an act that changes nothing. One small call, one rulebook
   // row, and thereafter the whole town has the verb for free.
@@ -305,19 +299,20 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
       review.queue(existing.id, row.id, tick)
       return row.id
     }
-    const ruleId = rulebook.insert(row, tick)
-    if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
-    review.queue(ruleId, row.id, tick)
-    // F-B: the coined word is the second codification path and it reports too. A record that
-    // hooked only codify() would leave the town inventing a name for dancing with no trace.
-    deps.onCodified?.({
+    const discovery: Codified = {
       recipeId: row.id,
       name: row.name,
       kind: 'word',
       makes: [],
       raises: [],
       credit,
-    })
+    }
+    deps.db.transaction(() => {
+      const ruleId = rulebook.insert(row, tick, discovery)
+      review.queue(ruleId, row.id, tick)
+    })()
+    if (!VERBS[row.id]) registerVerb(expressiveVerbFromRuling(row.name, row))
+    rulebook.publishPending(deps.onCodified)
     return row.id
   }
 
@@ -421,7 +416,10 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           if (row.revertedAtTick === null)
             return { kind: 'map', verb: stored.recipe.id, params: NO_PARAMS }
           // Reverted → fall through to the LLM (the admin re-decides after revert).
-        } else if (stored.kind === 'map') {
+        } else if (
+          stored.kind === 'map' &&
+          Object.values(stored.params).every((value) => value === null)
+        ) {
           if (stored.verb.startsWith('recipe:')) {
             const row = rulebook.byId(stored.verb)
             if (row !== null && row.revertedAtTick === null) return stored
@@ -431,7 +429,8 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
           }
           // Unregistered verb → fall through to the LLM.
         } else {
-          if (CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class)) return stored
+          if (stored.kind === 'impossible' && CONTEXT_INDEPENDENT_IMPOSSIBLE.has(stored.class))
+            return stored
           // Contextual (insufficient_skill/materials) → fall through to the LLM,
           // which sees the asking agent's own skills and inventory.
         }
@@ -575,14 +574,6 @@ export function makeArbiter(deps: ArbiterDeps): Arbiter {
     },
 
     roster,
-
-    customs() {
-      return namedCustoms(constructs.all())
-    },
-
-    habits() {
-      return habitLines(constructs.all())
-    },
 
     frontier() {
       return codex.frontierNames()

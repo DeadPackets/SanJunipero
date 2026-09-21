@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+export const MindStatusSchema = z.enum(['active', 'delayed', 'budget-stopped', 'disabled'])
+export type MindStatus = z.infer<typeof MindStatusSchema>
+
 const UsageTotalsSchema = z
   .object({
     calls: z.number().int().nonnegative(),
@@ -14,6 +17,7 @@ export const PublicUsageSchema = z.discriminatedUnion('mode', [
   z
     .object({
       mode: z.literal('unavailable'),
+      mindStatus: MindStatusSchema,
       updatedAt: z.number().int().nonnegative(),
       total: z.null(),
       last24h: z.null(),
@@ -22,6 +26,7 @@ export const PublicUsageSchema = z.discriminatedUnion('mode', [
   z
     .object({
       mode: z.enum(['live', 'scripted']),
+      mindStatus: MindStatusSchema,
       updatedAt: z.number().int().nonnegative(),
       total: UsageTotalsSchema,
       last24h: UsageTotalsSchema,

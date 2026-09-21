@@ -368,18 +368,20 @@ export function codify(
     }
     return { ruleId: existing.id, verb: charter.id }
   }
-  const ruleId = deps.rulebook.insert(charter, deps.tick)
-  registerVerb(verbFromCharter(charter))
-  deps.review.queue(ruleId, charter.id, deps.tick)
-  // First insert only. A reactivation above is an operator re-opening a reverted rule, and the
-  // admin is not its inventor — the original event is already in the log and stays there.
-  deps.onCodified?.({
+  const discovery = {
     recipeId: charter.id,
     name: charter.name,
-    kind: 'craft',
+    kind: 'craft' as const,
     makes: productsOf(recipe),
     raises: buildingsOf(recipe),
     credit,
-  })
+  }
+  const ruleId = deps.rulebook.db.transaction(() => {
+    const id = deps.rulebook.insert(charter, deps.tick, discovery)
+    deps.review.queue(id, charter.id, deps.tick)
+    return id
+  })()
+  registerVerb(verbFromCharter(charter))
+  deps.rulebook.publishPending(deps.onCodified)
   return { ruleId, verb: charter.id }
 }

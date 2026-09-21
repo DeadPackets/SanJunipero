@@ -389,13 +389,12 @@ describe('R21 candidate 1 — "the prose never names the opportunity": CONFIRMED
     const s = genesisTown()
     const p = composePerception(s, CFG, 'amara', [])
     expect(p.self.inventory).toHaveLength(0)
-    // Six things, all of them on the house's shelf; the doorway peek shows them and the hands
-    // hold none of them. R21-D: `eat` used to answer "not holding that" and stop there.
+    // The doorway peek shows the six things on the shelf, but hands stay outside.
     expect(p.visible.items).toHaveLength(6)
     const bread = p.visible.items.find((i) => i.kind === 'bread')!
-    expect(submitIntent(s, CFG, 'amara', 'take', { itemId: bread.id }).ok).toBe(true)
-    // R21-D: the same reach `take` measures is now reach enough to eat, so no turn is spent.
-    expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: bread.id }).ok).toBe(true)
+    expect(p.reach.atHand).not.toContain(bread.id)
+    expect(submitIntent(s, CFG, 'amara', 'take', { itemId: bread.id }).ok).toBe(false)
+    expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: bread.id }).ok).toBe(false)
     // A mark for nothing that exists still says only that the hands are empty.
     expect(submitIntent(s, CFG, 'amara', 'eat', { itemId: 'item_nowhere' })).toEqual({
       ok: false,

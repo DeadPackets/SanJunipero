@@ -3,7 +3,6 @@ import {
   bondId,
   foldBond,
   tieActOf,
-  tieActOfLetGo,
   type Bond,
   type BondFold,
   type BondKind,
@@ -25,7 +24,7 @@ const VERB_BONDS: Readonly<Record<string, BondKind>> = {
 }
 
 /** What a close writes about one pair. The minds' own reading, not an act the world witnessed. */
-type SceneTieDelta = { agentId: string; personId: string; kind: string; settled?: true }
+type SceneTieDelta = { agentId: string; personId: string; kind: string; resolution?: string }
 
 /** The whole of what `buildBonds` folds; every other type falls through its chain untouched.
  *  `co_slept` is not here: a shared roof is a roof, and the partnership is its own act now. */
@@ -39,7 +38,6 @@ export const BOND_TYPES: readonly string[] = [
   'partnership_formed',
   'partnership_dissolved',
   'scene_closed',
-  'tie_let_go',
 ]
 
 /** How often the graph is read forward. Warmth's half-life is 2,880 ticks, so 20 moves
@@ -79,6 +77,10 @@ function makeBondsFold(earshot: number): BondsFold {
     between(a, b)?.add(kind, tick)
   }
 
+  const observe = (a: string, b: string, kind: BondKind, tick: number): void => {
+    between(a, b)?.observe(kind, tick)
+  }
+
   // Every spoke against every earlier spoke is O(n²) and a badge polls this. A spoke older than the
   // talk window can pair with nothing again, so dropping it is the same answer in bounded time.
   let spokes: { agentId: string; tick: number; x: number; y: number }[] = []
@@ -94,7 +96,7 @@ function makeBondsFold(earshot: number): BondsFold {
         for (const prev of spokes) {
           if (prev.agentId === p.agentId) continue
           if (Math.hypot(p.x - prev.x, p.y - prev.y) > earshot) continue
-          tie(prev.agentId, p.agentId, 'friend', ev.tick)
+          observe(prev.agentId, p.agentId, 'friend', ev.tick)
         }
         spokes.push({ agentId: p.agentId, tick: ev.tick, x: p.x, y: p.y })
       } else if (ev.type === 'action_started') {
@@ -127,13 +129,9 @@ function makeBondsFold(earshot: number): BondsFold {
       } else if (ev.type === 'scene_closed') {
         const p = ev.payload as { deltas: readonly SceneTieDelta[] }
         for (const d of p.deltas) {
-          const act = tieActOf(d.kind, d.settled === true)
+          const act = tieActOf(d.kind, d.resolution)
           if (act !== null) between(d.agentId, d.personId)?.addTie(act, ev.tick)
         }
-      } else if (ev.type === 'tie_let_go') {
-        const p = ev.payload as { agentId: string; personId: string; kind: string }
-        const act = tieActOfLetGo(p.kind)
-        if (act !== null) between(p.agentId, p.personId)?.addTie(act, ev.tick)
       }
     }
   }

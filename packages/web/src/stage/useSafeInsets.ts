@@ -18,6 +18,7 @@ export const BOTTOM_BAND: readonly string[] = [
   '.signpost',
   '.keepsake',
 ]
+const DOCK = '.paper[data-dock="on"]'
 
 type Box = { top: number; bottom: number; height: number }
 
@@ -59,13 +60,17 @@ export function useSafeInsets(scene: Scene | null): void {
     const measure = (): void => {
       raf = 0
 
-      scene.safeInsets = insetsOf(boxOf(scene.app.canvas), boxes(TOP_BAND), boxes(BOTTOM_BAND))
+      const dock = root.querySelector(`${DOCK}[data-open="yes"][aria-modal="false"]`)
+      scene.safeInsets = {
+        ...insetsOf(boxOf(scene.app.canvas), boxes(TOP_BAND), boxes(BOTTOM_BAND)),
+        right: dock?.getBoundingClientRect().width ?? 0,
+      }
     }
     const ask = (): void => {
       if (raf === 0) raf = requestAnimationFrame(measure)
     }
     const ro = new ResizeObserver(ask)
-    const selector = [...TOP_BAND, ...BOTTOM_BAND].join(',')
+    const selector = [...TOP_BAND, ...BOTTOM_BAND, DOCK].join(',')
     const observed = new Set<Element>()
     const observeBands = (): void => {
       const bands = new Set<Element>([root, ...root.querySelectorAll(selector)])

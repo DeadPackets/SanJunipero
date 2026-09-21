@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { CharacterAtlasManifest } from '@sj/shared'
-import { BudgetExceededError } from './budget.js'
+import { BudgetExceededError, type ReserveCharge } from './budget.js'
 import { CAST_CONTENT_DIR } from './castArt.js'
 import { PROPORTION_ANCHOR_ID, type CastLook } from './castLooks.js'
 import { PALETTE_WORDS, SWATCH_CLAUSE } from './palette.js'
@@ -91,33 +91,64 @@ export function characterImageClient(opts: {
   model?: string
   /** Every billed reply, image or not — the row no candidate will ever book. */
   onCharge?: (model: string, costUsd: number) => void
+  reserveCharge?: ReserveCharge
+  signal?: AbortSignal
 }): CharacterGenerate {
   const doFetch = opts.fetchFn ?? fetch
   const model = opts.model ?? CHARACTER_MODEL
   return async ({ prompt, refs, size, reserveUsd }) => {
-    const res = await doFetch(CHARACTER_ENDPOINT, {
-      method: 'POST',
-      signal: AbortSignal.timeout(CHARACTER_TIMEOUT_MS),
-      headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt,
-        size,
-        response_format: 'b64_json',
-        input_references: refs.map((r) => ({
-          type: 'image_url',
-          image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
-        })),
-        usage: { include: true },
-      }),
-    })
-    if (!res.ok) throw new Error(`${model} HTTP ${res.status}: ${await res.text()}`)
-    const json = (await res.json()) as { data?: { b64_json?: string }[]; usage?: { cost?: number } }
-    const costUsd = json.usage?.cost ?? reserveUsd
-    opts.onCharge?.(model, costUsd)
-    const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
-    if (b64 === undefined) throw new Error(`${model}: no b64_json`)
-    return { png: Buffer.from(b64, 'base64'), model, costUsd }
+    opts.signal?.throwIfAborted()
+    const reservation = opts.reserveCharge?.(model, reserveUsd)
+    let billed = false
+    let unbilled = false
+    let costUsd = reserveUsd
+    try {
+      const res = await doFetch(CHARACTER_ENDPOINT, {
+        method: 'POST',
+        signal: AbortSignal.any([
+          AbortSignal.timeout(CHARACTER_TIMEOUT_MS),
+          ...(opts.signal ? [opts.signal] : []),
+        ]),
+        headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          size,
+          response_format: 'b64_json',
+          input_references: refs.map((r) => ({
+            type: 'image_url',
+            image_url: { url: `data:image/png;base64,${r.toString('base64')}` },
+          })),
+          usage: { include: true },
+        }),
+      })
+      if (!res.ok) {
+        unbilled = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 499
+        throw new Error(`${model} HTTP ${res.status}: ${await res.text()}`)
+      }
+      billed = true
+      const json = (await res.json()) as {
+        data?: { b64_json?: string }[]
+        usage?: { cost?: number }
+      }
+      const reported = json.usage?.cost
+      costUsd =
+        typeof reported === 'number' && Number.isFinite(reported) && reported >= 0
+          ? reported
+          : reserveUsd
+      reservation?.settle(costUsd)
+      opts.onCharge?.(model, costUsd)
+      opts.signal?.throwIfAborted()
+      const b64 = (json.data ?? []).filter((d) => d.b64_json).at(-1)?.b64_json
+      if (b64 === undefined) throw new Error(`${model}: no b64_json`)
+      return { png: Buffer.from(b64, 'base64'), model, costUsd }
+    } catch (err) {
+      if (!billed && !unbilled) reservation?.retainUncertain()
+      throw err
+    } finally {
+      if (billed) reservation?.settle(costUsd)
+      reservation?.release()
+    }
   }
 }
 

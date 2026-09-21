@@ -24,6 +24,7 @@ import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import {
   latestMoods,
+  observerRunId,
   maxMindId,
   type MindRow,
   mindsSince,
@@ -118,6 +119,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const ownsDb = opts.db === undefined
   // Read-only law: without an in-process handle the world DB is opened readonly — no write path exists.
   const db = opts.db ?? new Database(opts.dbPath, { readonly: true, fileMustExist: true })
+  const runId = observerRunId(db)
   const mirror = new WorldMirror({ db, config, terrain: opts.terrain })
   const hub = new SocketHub()
   const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -254,6 +256,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const snapshotJson = (): string => {
     snapJson ??= JSON.stringify({
       t: 'snapshot',
+      runId,
       tick: mirror.state().tick,
       seq: mirror.seq(),
       state: mirror.state(),

@@ -10,6 +10,7 @@ import {
 } from '@sj/shared'
 import type { LawPredicate } from '@sj/engine'
 import type { Tie } from '../memory/ties.js'
+import { TurnSchema, StrictTurnSchema } from '../turn.js'
 
 /** What a line is doing: the shared list, so the log always holds what a mind may say. */
 export type Move = SceneMove
@@ -65,6 +66,9 @@ export type Scene = {
   closeReason?: 'ended' | 'left' | 'capped' | 'timeout'
 }
 
+export const SceneExitSchema = TurnSchema.pick({ plan: true, reconsider_at: true })
+export type SceneExit = z.infer<typeof SceneExitSchema>
+
 export const SceneTurnSchema = z
   .object({
     thought: z.string(),
@@ -78,17 +82,25 @@ export const SceneTurnSchema = z
     answer: z.enum(['accept', 'refuse']).nullable(),
     /** An invitation this line puts to whoever it is aimed at. Null in every ordinary line. */
     ask: z.enum(INVITATION_VERBS).nullable(),
+    /** A tabled proposal this resident explicitly chooses to bring back before the room. */
+    reconvene: z.string().trim().min(1).nullable(),
     leave: z.boolean(),
+    ...SceneExitSchema.shape,
     importance: z.number().int().min(1).max(10),
     /** How the speaker feels now, in their own word or two. Null when nothing has changed. */
     mood: z.string().nullable(),
   })
   .strict()
 export type SceneTurn = z.infer<typeof SceneTurnSchema>
+export const StrictSceneTurnSchema = SceneTurnSchema.extend({
+  plan: StrictTurnSchema.shape.plan,
+  reconsider_at: StrictTurnSchema.shape.reconsider_at,
+})
 
 /** The thread as one mind sees it: its own asides, and nobody else's. */
 export type SceneAsk = {
   physicalContext?: string
+  actionContext?: string
   scene: Scene
   agentId: string
   cast: { id: string; name: string }[]
@@ -107,6 +119,8 @@ export type SceneAsk = {
   mood: string
   /** The last few things this mind said anywhere, newest last, so it does not say them again. */
   recent: readonly string[]
+  /** Tabled proposals this resident may choose to bring before the current room. */
+  pendingProposals?: readonly { id: string; text: string; proposedBy: string }[]
 }
 
 export const TIE_KINDS = [
@@ -121,15 +135,31 @@ export const TIE_KINDS = [
 ] as const
 export type TieKind = (typeof TIE_KINDS)[number]
 
-export type TieDelta = {
-  agentId: string
-  personId: string
-  kind: TieKind
-  text: string
-  settled?: true
+const TieResolutionSchema = z.enum(['fulfilled', 'released', 'broken'])
+export const TieDeltaSchema = z
+  .object({
+    agentId: z.string().min(1),
+    personId: z.string().min(1),
+    kind: z.enum(TIE_KINDS),
+    text: z.string().trim().min(1),
+    tieId: z.number().int().positive().optional(),
+    resolution: TieResolutionSchema.optional(),
+    evidenceSeqs: z.array(z.number().int().positive()).optional(),
+    remindAtTick: z.number().int().nonnegative().nullable().optional(),
+  })
+  .strict()
+export type TieDelta = z.infer<typeof TieDeltaSchema>
+export const TieAnswerFields = {
+  tieId: z.number().int().positive().nullable(),
+  resolution: TieResolutionSchema.nullable(),
+  evidenceSeqs: z.array(z.number().int().positive()),
+  remindAtTick: z.number().int().nonnegative().nullable(),
 }
 
-export type SceneCloseAsk = { scene: Scene; cast: { id: string; name: string }[] }
+export type SceneCloseAsk = {
+  scene: { thread: Omit<SceneLine, 'aside'>[]; closeReason?: Scene['closeReason'] }
+  cast: { id: string; name: string }[]
+}
 /** `beat` is the one line the stage shows; `summary` is what the people in it remember. */
 export type SceneClose = { summary: string; beat?: string; deltas: TieDelta[] }
 
@@ -297,8 +327,7 @@ export const lawIdOf = (scene: Scene): string => scene.id.replace(/^scene_/, 'la
 export type CouncilTally = { for: string[]; against: string[]; unsure: string[]; passed: boolean }
 
 /** Where the room came down. The one who put it counts for it; silence is not opposition, so a
- *  majority is of whoever took a side — but a rule said to a departing back passes nothing, so
- *  somebody other than the proposer has to have answered at all. */
+ *  majority is of whoever took a side. At least one other resident must support it. */
 export function tallyCouncil(scene: Scene): CouncilTally {
   const proposal = scene.proposal
   if (proposal === undefined) return { for: [], against: [], unsure: [], passed: false }
@@ -313,7 +342,7 @@ export function tallyCouncil(scene: Scene): CouncilTally {
     for: forIt,
     against,
     unsure: heldBy('unsure'),
-    passed: voters.length > 0 && forIt.length > against.length,
+    passed: heldBy('for').length > 0 && forIt.length > against.length,
   }
 }
 

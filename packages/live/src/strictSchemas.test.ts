@@ -9,7 +9,7 @@ import {
   PARAGRAPH_SCHEMA,
   ProposeEditSchema,
   SCENES_SCHEMA,
-  SceneTurnSchema,
+  StrictSceneTurnSchema,
   StrictTurnSchema,
   TIES_SCHEMA,
 } from '@sj/agents'
@@ -33,7 +33,7 @@ import {
 type Shape = Parameters<typeof strictSchemaFaults>[0]
 const SHAPES: [string, Shape][] = [
   ['turn', StrictTurnSchema],
-  ['scene', SceneTurnSchema],
+  ['scene', StrictSceneTurnSchema],
   ['scene.close', CloseAnswerSchema],
   ['reflection.facts', FACTS_SCHEMA],
   ['reflection.scenes', SCENES_SCHEMA],

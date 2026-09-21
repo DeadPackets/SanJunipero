@@ -135,7 +135,7 @@ function renderPersonality(p: PromptBlocks['personality']): string {
     `Goals: ${doc.current.goals.join(' | ')}`,
   ]
   // One paragraph a night, so the whole story would be 6,000 tokens of system prompt by day 60;
-  // a week of it rides in every prompt and the rest stays in the book, where recall reaches it.
+  // a week rides in the prompt. Recall searches source memories, not older autobiography.
   const recent = p.autobiography.slice(-AUTOBIOGRAPHY_DAYS)
   if (recent.length > 0) lines.push(`Your life so far:\n${recent.join('\n\n')}`)
   return lines.join('\n')

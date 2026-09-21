@@ -3,6 +3,7 @@ import {
   MINUTES_PER_DAY,
   type SimConfig,
   type SimEvent,
+  isSeededStructureEvent,
   personWords,
   placeWordsAt,
 } from '@sj/shared'
@@ -12,6 +13,7 @@ import { renderNewspaper, timelapseCaptions, writeBiography } from './publicatio
 import { detectFirsts, populationDelta } from './firsts.js'
 import { detectTier2 } from './milestones/tier2.js'
 import { detectSemanticFirsts, type SemanticDeps } from './semanticFirsts.js'
+import { priorContext } from './priorContext.js'
 import { scoreHeat } from './heat.js'
 import { pickDayMoments } from './moments.js'
 import { detectInstitutions } from './institutions.js'
@@ -27,6 +29,7 @@ import type {
   NarratorLlm,
   PublicationRow,
   SegmentConfig,
+  PublicRecord,
 } from './types.js'
 
 // A night whose chronicle would not render. The rest of the night is attached, because the
@@ -61,6 +64,7 @@ export async function narrateDay(deps: {
   store: NarratorStore
   llm: NarratorLlm
   events: SimEvent[]
+  priorEvents?: readonly PublicRecord[]
   rulebookCount: number
   privateCounts: { thoughts: number; journals: number }
   /** The name index. Absent, nobody is named — and a viewer is still never shown an id. */
@@ -82,6 +86,7 @@ export async function narrateDay(deps: {
 }> {
   const { store, events } = deps
   if (events.length === 0) throw new Error('narrateDay requires at least one event')
+  const publicEvents = events.filter((event) => !isSeededStructureEvent(event))
   const names = new Map((deps.cast ?? []).map((c) => [c.id, c.name]))
   const nameOf = (id: string): string => personWords(names.get(id))
   // A scene is stored as the tile it happened on. The prompt is given the place instead, so no
@@ -105,21 +110,21 @@ export async function narrateDay(deps: {
     }
   }
 
-  const scenes = segmentScenes(events, deps.segmentCfg)
+  const scenes = segmentScenes(publicEvents, deps.segmentCfg)
   const seenKinds = store.milestoneKinds()
   // The world in reach answers what the day's own events cannot: `structure_completed` carries
   // no kind, and the day that finishes a house never saw the day that planned it.
   const structures = deps.world?.state?.structures
   // The state is the world as the day ENDS, and the detector counts the day onto what it is
   // given: the day is run backwards off the living to reach the count it began with.
-  const tier1 = detectFirsts(events, {
+  const tier1 = detectFirsts(publicEvents, {
     seenKinds,
     rulebookCount: deps.rulebookCount,
     ...(structures === undefined ? {} : { structureKind: (id: string) => structures[id]?.kind }),
     ...(deps.world?.state === undefined
       ? {}
       : {
-          population: events.reduce(
+          population: publicEvents.reduce(
             (n, e) => n - populationDelta(e),
             known.filter((a) => a.alive).length,
           ),
@@ -128,7 +133,7 @@ export async function narrateDay(deps: {
   const tier2 =
     deps.world === undefined
       ? []
-      : detectTier2(events, {
+      : detectTier2(publicEvents, {
           seenKinds: new Set([...seenKinds, ...tier1.map((m) => m.kind)]),
           config: deps.world.config,
         })
@@ -141,7 +146,7 @@ export async function narrateDay(deps: {
   const sceneEvents: SimEvent[][] = []
   const heats = scenes.map((scene) => {
     const inScene = new Set(scene.eventIds)
-    const evs = events.filter((e) => inScene.has(e.seq))
+    const evs = publicEvents.filter((e) => inScene.has(e.seq))
     sceneEvents.push(evs)
     const priorTypeCounts: Record<string, number> = {}
     for (const e of evs) priorTypeCounts[e.type] = running[e.type] ?? 0
@@ -153,7 +158,7 @@ export async function narrateDay(deps: {
         privateThoughts,
         publicSpeech: evs.filter((e) => e.type === 'agent_spoke').length,
       },
-      events,
+      publicEvents,
     )
     for (const e of evs) running[e.type] = (running[e.type] ?? 0) + 1
     return heat
@@ -177,6 +182,7 @@ export async function narrateDay(deps: {
       day,
       scenes,
       moments,
+      priorEvents: deps.priorEvents ?? [],
       look: { nameOf, placeOf },
       cast: roll,
       alert: deps.alert,
@@ -205,7 +211,7 @@ export async function narrateDay(deps: {
   // A thing the town does is recognised the day it recurs, not on the day of the week the
   // detector happens to run; the roster is what keeps a standing role from being founded twice.
   const founded = new Set(store.institutions().map((i) => `${i.kind}\n${i.name}`))
-  for (const inst of detectInstitutions(scenes, events, deps.detectCfg, nameOf)) {
+  for (const inst of detectInstitutions(scenes, publicEvents, deps.detectCfg, nameOf)) {
     const { foundingSceneIndex, ...rest } = inst
     if (founded.has(`${rest.kind}\n${rest.name}`)) continue
     const foundingSceneId = rendered.sceneIds[foundingSceneIndex]
@@ -275,6 +281,9 @@ export async function closeDay(deps: {
     store,
     llm,
     events: deps.events,
+    priorEvents: priorContext(deps.worldDb, deps.events, (id) =>
+      personWords(cast.find((c) => c.id === id)?.name),
+    ),
     rulebookCount: deps.rulebookCount,
     privateCounts: deps.privateCounts,
     cast,

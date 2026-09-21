@@ -39,7 +39,7 @@ const DAY1: SimEvent[] = [
   ev(11, 1521, 'agent_moved', { id: 'omar', x: 5, y: 6 }),
 ]
 
-const scriptedLlm = (citations: number[] = [4, 9999]): NarratorLlm => ({
+const scriptedLlm = (citations: number[] = [9, 9999]): NarratorLlm => ({
   summarizeChapter: vi.fn(async () => ({
     title: 'The Wall Quarrel',
     text: 'Omar and Yusuf quarrelled over a wall.',
@@ -345,6 +345,40 @@ describe('narrateDay: a roof finished on a day whose plan it never read', () => 
       privateCounts: { thoughts: 0, journals: 0 },
     })
     expect(milestones.map((m) => m.kind)).toContain('first_structure')
+    expect(milestones.map((m) => m.kind)).not.toContain('first_house')
+  })
+
+  it('does not turn a founding roof into a resident first or a valid citation', async () => {
+    const seeded = [
+      ev(1, 4320, 'structure_planned', {
+        id: 'structure_9',
+        kind: 'house',
+        builderId: 'genesis',
+      }),
+      ev(2, 4321, 'structure_completed', { id: 'structure_9', seeded: true }),
+      ev(3, 4340, 'agent_spoke', {
+        agentId: 'amara',
+        text: 'We found this house already standing.',
+        x: 3,
+        y: 3,
+      }),
+      ev(4, 4341, 'agent_spoke', {
+        agentId: 'amara',
+        text: 'No one here raised its first roof.',
+        x: 3,
+        y: 3,
+      }),
+    ]
+    const { chapter, milestones } = await narrateDay({
+      store: memStore(),
+      llm: scriptedLlm([2, 3]),
+      events: seeded,
+      rulebookCount: 0,
+      privateCounts: { thoughts: 0, journals: 0 },
+      world: worldWith('house'),
+    })
+    expect(chapter.citations).toEqual([3])
+    expect(milestones.map((m) => m.kind)).not.toContain('first_structure')
     expect(milestones.map((m) => m.kind)).not.toContain('first_house')
   })
 })

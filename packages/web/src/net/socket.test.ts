@@ -331,6 +331,38 @@ describe('connectObservatory link status', () => {
     expect(setItem).not.toHaveBeenCalled()
   })
 
+  it('saves the current run and reports return gaps only within that run', () => {
+    const runA = 'cc6e6ed2-f68d-43eb-b195-19c882a0a1ff'
+    const runB = '32a926e2-844e-4543-b2f7-85ded478206a'
+    const saved = new Map<string, string>([
+      ['sj:lastVisit', JSON.stringify({ runId: runA, seq: 100, tick: 10 })],
+    ])
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => saved.set(key, value),
+    })
+    const onGap = vi.fn()
+    const store = createWorldStore()
+    const handle = connectObservatory({ url: 'ws://test/ws', store, onGap })
+    const sock = FakeWebSocket.instances[0]!
+    sock.open()
+    sock.onmessage?.({ data: JSON.stringify({ ...SNAPSHOT, runId: runB, seq: 200, tick: 2000 }) })
+    expect(onGap).not.toHaveBeenCalled()
+    expect(JSON.parse(saved.get('sj:lastVisit')!)).toEqual({ runId: runB, seq: 200, tick: 2000 })
+    sock.drop()
+    vi.advanceTimersByTime(1000)
+    const reconnected = FakeWebSocket.instances[1]!
+    reconnected.open()
+    reconnected.onmessage?.({
+      data: JSON.stringify({ ...SNAPSHOT, runId: runB, seq: 300, tick: 4000 }),
+    })
+    expect(onGap).toHaveBeenCalledWith(2000)
+    reconnected.onmessage?.({ data: JSON.stringify({ ...SNAPSHOT, seq: 400, tick: 6000 }) })
+    expect(onGap).toHaveBeenCalledTimes(1)
+    expect(store.runId()).toBeNull()
+    handle.close()
+  })
+
   it('a deliberate close() never reports reconnecting', () => {
     const statuses: string[] = []
     const handle = connectObservatory({

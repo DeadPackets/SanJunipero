@@ -1,3 +1,5 @@
+import { agentScreenAnchor } from '../agentAnchor.js'
+import { personHit } from '../personHit.js'
 import { createThreeInterior } from './interior.js'
 import { createOrchardGardens } from './orchard.js'
 import { effectiveConfig } from '@sj/engine/laws'
@@ -203,11 +205,39 @@ export function createThreeWorld(
       height,
     )
   }
+  const personTag = document.createElement('button')
+  personTag.type = 'button'
+  personTag.className = 'person-hover-label'
+  personTag.hidden = true
+  root.append(personTag)
+  let hoveredPerson: string | null = null
+  let pressedPerson: string | null = null
+  personTag.onclick = () => {
+    if (hoveredPerson) callbacks.select(hoveredPerson)
+  }
+  personTag.onpointerleave = () => {
+    hoveredPerson = null
+    personTag.hidden = true
+  }
+  const updatePersonTag = () => {
+    const at = hoveredPerson ? agentScreenAnchor(view, store, hoveredPerson) : null
+    personTag.hidden = !at || !!view.interior?.isActive()
+    if (!at || !hoveredPerson) return
+    const label = store.getState()?.agents[hoveredPerson]?.name ?? ''
+    if (personTag.textContent !== label) personTag.textContent = label
+    personTag.style.transform = `translate(${Math.max(55, Math.min(width - 55, at.x))}px,${Math.max(12, at.y - 36)}px)`
+  }
   const ray = new Raycaster()
   const hitAt = (
     x: number,
     y: number,
   ): { kind: 'agent' | WorldPick['kind']; id: string } | null => {
+    const targets = Object.keys(store.getState()?.agents ?? {}).flatMap((id) => {
+      const at = agentScreenAnchor(view, store, id)
+      return at ? [{ id, ...at }] : []
+    })
+    const person = personHit(targets, x, y)
+    if (person) return { kind: 'agent', id: person }
     ray.setFromCamera(new Vector2((x / width) * 2 - 1, 1 - (y / height) * 2), camera)
     const hits = ray.intersectObjects(
       [
@@ -229,7 +259,11 @@ export function createThreeWorld(
   }
   const pick = (event: FederatedPointerEvent) => {
     if (event.target !== view.app.stage || view.wasDrag() || view.interior?.isActive()) return
-    const chosen = hitAt(event.global.x, event.global.y)
+    const chosen =
+      pressedPerson && agentScreenAnchor(view, store, pressedPerson)
+        ? { kind: 'agent' as const, id: pressedPerson }
+        : hitAt(event.global.x, event.global.y)
+    pressedPerson = null
     if (!chosen) callbacks.ground()
     else if (chosen.kind === 'agent') callbacks.select(chosen.id)
     else if (
@@ -252,10 +286,14 @@ export function createThreeWorld(
   const hover = (event: FederatedPointerEvent) => {
     if (event.target !== view.app.stage || event.buttons !== 0 || view.interior?.isActive()) {
       hideBuildingTag()
+      hoveredPerson = null
+      personTag.hidden = true
       view.tags.hide('hover')
       return
     }
     const chosen = hitAt(event.global.x, event.global.y)
+    hoveredPerson = chosen?.kind === 'agent' ? chosen.id : null
+    updatePersonTag()
     view.app.canvas.style.cursor = chosen ? 'pointer' : 'grab'
     if (chosen?.kind === 'structure') {
       view.tags.hide('hover')
@@ -277,9 +315,18 @@ export function createThreeWorld(
     )
   }
   const leave = () => {
+    if (!personTag.matches(':hover')) {
+      hoveredPerson = null
+      personTag.hidden = true
+    }
     hideBuildingTag()
     view.tags.hide('hover')
   }
+  const press = (event: FederatedPointerEvent) => {
+    const chosen = hitAt(event.global.x, event.global.y)
+    pressedPerson = chosen?.kind === 'agent' ? chosen.id : null
+  }
+  view.app.stage.on('pointerdown', press)
   view.app.stage.on('pointermove', hover)
   view.app.canvas.addEventListener('pointerleave', leave)
   view.app.stage.on('pointertap', pick)
@@ -289,6 +336,7 @@ export function createThreeWorld(
     tick(dtMs: number) {
       if (destroyed) return
       updateBuildingTag()
+      updatePersonTag()
       const state = store.getState()
       if (!state) return
       const config = effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, state.laws)
@@ -434,6 +482,8 @@ export function createThreeWorld(
     },
     destroy() {
       buildingTag.destroy()
+      personTag.remove()
+      view.app.stage.off('pointerdown', press)
       if (destroyed) return
       destroyed = true
       interior.destroy()

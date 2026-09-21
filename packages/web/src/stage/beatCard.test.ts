@@ -83,6 +83,22 @@ const ev = (type: string, payload: unknown): SimEvent => {
 const said = (id: string, agentId: string, move: string): SimEvent =>
   ev('scene_line', SceneLineSaid.parse({ id, agentId, text: 'The well is mine.', move }))
 
+describe('scene source grounding', () => {
+  it('does not borrow another conversation outcome from the same pair', () => {
+    const view = beatViewOf(
+      args({
+        threads: [
+          thread({
+            beat: 'The chair promise was fulfilled.',
+            proseSceneId: 'old_chair_talk',
+          }),
+        ],
+      }),
+    )
+    expect(view?.head).toBeNull()
+  })
+})
+
 describe('★ the try row: the move the world already records on every line', () => {
   it('★ keeps the newest move per room, and reads the ten the world may write', () => {
     expect(Object.keys(MOVE_WORDS).sort()).toEqual(
@@ -202,13 +218,19 @@ describe('★ the card, which omits a row rather than fake one', () => {
     expect(view?.rows).toEqual([{ label: 'TURN', text: 'Nadia gave way' }])
   })
 
-  it('★ heads the card with the room’s own prose, and with the story’s when it has none yet', () => {
+  it('★ uses only prose sourced to the displayed room', () => {
     expect(beatViewOf(args({ scene: scene({ beat: 'They settled the well.' }) }))?.head?.text).toBe(
       'They settled the well.',
     )
     const carried = beatViewOf(
       args({
-        threads: [thread({ beat: 'It began over water.', proseTick: 900 - MINUTES_PER_DAY })],
+        threads: [
+          thread({
+            beat: 'It began over water.',
+            proseTick: 900 - MINUTES_PER_DAY,
+            proseSceneId: 'sc_1',
+          }),
+        ],
       }),
     )
     expect(carried?.head).toEqual({
@@ -364,7 +386,13 @@ describe('a head the town wrote a sim-day ago is kept and marked', () => {
   it('marks a stale head and leaves a fresh one alone', () => {
     const stale = beatViewOf(
       args({
-        threads: [thread({ beat: 'It began over water.', proseTick: 900 - MINUTES_PER_DAY })],
+        threads: [
+          thread({
+            beat: 'It began over water.',
+            proseTick: 900 - MINUTES_PER_DAY,
+            proseSceneId: 'sc_1',
+          }),
+        ],
       }),
     )
     expect(stale).not.toBeNull()

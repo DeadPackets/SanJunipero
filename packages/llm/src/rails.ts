@@ -1,3 +1,5 @@
+import type Database from 'better-sqlite3'
+
 /** Dollars in a rolling 24 real hours — the same window the town's own daily stop is measured
  *  on, so a caller's rail and the total it sits under are read against the same day. */
 export const RAIL_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -13,10 +15,22 @@ type Held = RailHold & { nextCheckMs: number }
 
 // Process-wide on purpose: one caller has many clients — every mind builds its own for `turn` —
 // and a rail that only held the client that tripped it would hold nothing at all.
-const holds = new Map<string, Held>()
+let towns = new WeakMap<Database.Database, Map<string, Held>>()
+
+export function heldCallers(db: Database.Database, now: number): string[] {
+  return [...(towns.get(db)?.values() ?? [])]
+    .filter((hold) => now < hold.untilMs)
+    .map((hold) => hold.caller)
+}
+
+export function clearRail(db: Database.Database, caller: string): void {
+  towns.get(db)?.delete(caller)
+}
 
 /** Whether this caller's ask is refused on the map alone. Null lets it through to the ledger. */
-export function railHold(caller: string, now: number): RailHold | null {
+export function railHold(db: Database.Database, caller: string, now: number): RailHold | null {
+  const holds = towns.get(db)
+  if (holds === undefined) return null
   const held = holds.get(caller)
   if (held === undefined) return null
   if (now >= held.untilMs) {
@@ -32,7 +46,9 @@ export function railHold(caller: string, now: number): RailHold | null {
 
 /** Records a trip. True the first time a caller is held — the alert is written behind that,
  *  so an operator reads one line per rail per day and not one per refused call. */
-export function tripRail(hold: RailHold, now: number): boolean {
+export function tripRail(db: Database.Database, hold: RailHold, now: number): boolean {
+  const holds = towns.get(db) ?? new Map<string, Held>()
+  towns.set(db, holds)
   const was = holds.get(hold.caller)
   holds.set(hold.caller, { ...hold, nextCheckMs: now + RAIL_RECHECK_MS })
   return was === undefined || now >= was.untilMs
@@ -40,5 +56,5 @@ export function tripRail(hold: RailHold, now: number): boolean {
 
 /** Test seam: the map outlives any one town, and a test must not inherit another's rail. */
 export function clearRails(): void {
-  holds.clear()
+  towns = new WeakMap()
 }

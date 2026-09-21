@@ -10,6 +10,7 @@ import {
   DEFAULT_CONFIG,
   TIE_VALENCE,
   bondId,
+  bondLevel,
   bondNote,
   decayWarmth,
   type Bond,
@@ -175,10 +176,12 @@ describe('/api/bonds — the deterministic proxy that stands in for C9 T11/T12',
     ])
   })
 
-  it('still ties a friendship from talk alone, with no C9 data at all', () => {
+  it('labels talk as observed interaction without inferring friendship warmth', () => {
     const b = find('cara', 'dan')
     expect(b?.kind).toBe('friend')
     expect(b?.recent[0]).toEqual({ tick: 10, kind: 'friend' })
+    expect(b?.warmth).toBe(0)
+    expect(b?.recent.map((h) => bondNote(h.kind))).toEqual(['were observed speaking together'])
   })
 
   it('ties no one who has done nothing together', () => {
@@ -414,19 +417,19 @@ describe('★ a tie a scene left behind is worth something to the pair', () => {
     type: 'scene_closed',
     payload: { id: 's1', summary: 'They counted the planks.', deltas, closeReason: 'ended' },
   })
-  const delta = (kind: string, settled?: true): unknown => ({
+  const delta = (kind: string, resolution?: string): unknown => ({
     agentId: 'a',
     personId: 'b',
     kind,
     text: 'the planks again',
-    ...(settled === undefined ? {} : { settled }),
+    ...(resolution === undefined ? {} : { resolution }),
   })
   const warmthOfClose = (deltas: unknown[]): number =>
     buildBonds([closed(1, 100, deltas)], 5, 100).bonds[0]?.warmth ?? 0
 
-  it('folds a slight as three off, and a promise kept as three on', () => {
+  it('folds affect without rewarding claimed fulfillment', () => {
     expect(warmthOfClose([delta('slight')])).toBe(-3)
-    expect(warmthOfClose([delta('promise', true)])).toBe(3)
+    expect(warmthOfClose([delta('promise', 'fulfilled')])).toBe(0)
     expect(warmthOfClose([delta('attraction')])).toBe(2)
     expect(warmthOfClose([delta('grudge')]), 'a grudge is a slight that stayed').toBe(-3)
     const kin = buildBonds([closed(1, 100, [delta('kin')])], 5, 100).bonds
@@ -445,8 +448,7 @@ describe('★ a tie a scene left behind is worth something to the pair', () => {
   })
 })
 
-/** A close can say a promise was kept; it has no way to say broken. The seven-day let-go is the
- *  honest producer: a promise nobody ever settled, quietly lapsing, IS a promise broken. */
+/** Historical expiry remains an event, not proof of betrayal. */
 describe('★ a promise nobody kept', () => {
   const letGo = (kind: string, tick = 100): SimEvent => ({
     seq: 1,
@@ -455,10 +457,8 @@ describe('★ a promise nobody kept', () => {
     payload: { agentId: 'a', personId: 'b', kind },
   })
 
-  it('weighs a lapsed promise as the strongest negative in the table', () => {
-    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
-    expect(b.warmth).toBe(TIE_VALENCE.promise_broken)
-    expect(b.warmth).toBe(-6)
+  it('does not call historical timer expiry a verified broken promise', () => {
+    expect(buildBonds([letGo('promise')], 5, 100).bonds).toEqual([])
   })
 
   it('weighs nothing at all when any other kind lets go', () => {
@@ -466,15 +466,32 @@ describe('★ a promise nobody kept', () => {
       expect(buildBonds([letGo(kind)], 5, 100).bonds, kind).toEqual([])
     }
   })
+})
 
-  it('claims no act the world witnessed, the way every tie does not', () => {
-    const b = buildBonds([letGo('promise')], 5, 100).bonds[0]!
-    expect([b.strength, b.recent.length, b.acts.length]).toEqual([0, 0, 0])
-    expect(b.id).toBe(bondId('a', 'b'))
-  })
-
-  it('is a type the graph actually reads off the log', () => {
-    expect(BOND_TYPES).toContain('tie_let_go')
+describe('★ observed speech is not verified friendship', () => {
+  it('many exchanged lines do not turn a quarrel into friendship', () => {
+    const events: SimEvent[] = [
+      {
+        seq: 1,
+        tick: 1,
+        type: 'action_started',
+        payload: { agentId: 'a', verb: 'attack', params: { targetId: 'b' }, duration: 1 },
+      },
+      { seq: 2, tick: 2, type: 'action_completed', payload: { agentId: 'a', verb: 'attack' } },
+      ...Array.from(
+        { length: 20 },
+        (_, i): SimEvent => ({
+          seq: i + 3,
+          tick: i + 3,
+          type: 'agent_spoke',
+          payload: { agentId: i % 2 === 0 ? 'a' : 'b', text: 'Still arguing.', x: 1, y: 1 },
+        }),
+      ),
+    ]
+    const bond = buildBonds(events, 5, 22).bonds[0]!
+    expect(bond.kind).toBe('rival')
+    expect(bond.warmth).toBeLessThan(0)
+    expect(bondLevel(bond.warmth)).not.toBe('friendly')
   })
 })
 

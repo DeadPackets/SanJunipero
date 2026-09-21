@@ -548,6 +548,27 @@ describe('makeArbiter adjudicate three-stage funnel', () => {
     expect(llm.objectCalls).toBe(0)
   })
 
+  it('does not reuse another resident’s item or destination from a mapped precedent', async () => {
+    const fresh: Verdict = {
+      kind: 'map',
+      verb: 'stow',
+      params: { ...NO_PARAMS, itemId: 'my_wood', structureId: 'my_house' },
+    }
+    const llm = new ScriptedLlm(() => fresh)
+    const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })
+    await new RulingsStore(db, embedder).record(
+      'stack wood beside hearth',
+      {
+        kind: 'map',
+        verb: 'stow',
+        params: { ...NO_PARAMS, itemId: 'their_wood', structureId: 'their_house' },
+      },
+      100,
+    )
+    expect(await arbiter.adjudicate('wood stack beside hearth', TAMAR_CTX)).toEqual(fresh)
+    expect(llm.objectCalls).toBe(1)
+  })
+
   it('stage-2 short-circuit re-checks stored map verdicts pointing at reverted recipe verbs', async () => {
     const llm = new ScriptedLlm(() => impossibleVerdict)
     const { db, arbiter, embedder } = await makeArbiterRig({ llm, embedder: new LexicalEmbedder() })

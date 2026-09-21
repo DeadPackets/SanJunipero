@@ -63,7 +63,8 @@ export type Gathering = { tick: number; participants: string[] }
 export type CandidateName = QuotedName
 export type Candidate = {
   key: string
-  anchor: { x: number; y: number }
+  anchor: { x: number; y: number } | string
+  use: Use
   participants: string[]
   firstTick: number
   gatherings: Gathering[]
@@ -79,16 +80,16 @@ export type Candidate = {
 }
 
 type Presence = { tick: number; agentId: string; x: number; y: number; ev: SimEvent }
-
-// Where a body was, from whichever events say so. Nothing here reads world state.
-function presenceOf(ev: SimEvent): Presence | null {
-  const p = ev.payload as Record<string, unknown> | null
-  if (p === null) return null
-  const id = ev.type === 'agent_moved' ? p.id : ev.type === 'item_taken' ? p.takerId : p.agentId
-  if (typeof id !== 'string' || typeof p.x !== 'number' || typeof p.y !== 'number') return null
-  if (!['agent_moved', 'agent_spoke', 'agent_expressed', 'item_taken'].includes(ev.type))
-    return null
-  return { tick: ev.tick, agentId: id, x: p.x, y: p.y, ev }
+type Position = { agentId: string; x: number; y: number; room: string | null }
+type Use = 'expressive' | 'goods' | 'gathering'
+type Occasion = {
+  tick: number
+  x: number
+  y: number
+  room: string | null
+  participants: Set<string>
+  presences: Presence[]
+  uses: Set<Use>
 }
 
 const near = (a: { x: number; y: number }, b: { x: number; y: number }): boolean =>
@@ -177,54 +178,161 @@ function nameIn(ev: SimEvent, cast: ReadonlySet<string>): QuotedName | null {
   return null
 }
 
-// Deterministic heuristics, entirely outside world state: bodies that keep coming back to the
-// same ground. Everything else the pass knows is evidence hung off that fact.
+const sameSite = (a: Occasion, b: { x: number; y: number; room: string | null }): boolean =>
+  a.room === b.room && (a.room !== null || near(a, b))
+
+const useOf = (ev: SimEvent): Use =>
+  ev.type === 'agent_expressed'
+    ? 'expressive'
+    : ev.type === 'item_moved' || ev.type === 'item_taken'
+      ? 'goods'
+      : 'gathering'
+
+// Each continuous overlap is one occasion. A day boundary cannot split it, and three bodies
+// visiting the same tile at different hours cannot create it.
 export function detectCandidates(events: SimEvent[], config: SimConfig): Candidate[] {
   const cfg = config.constructs
   if (!cfg.enabled) return []
-
-  // One occasion = bodies standing together on one day.
-  const byDay = new Map<number, Presence[]>()
+  const positions = new Map<string, Position>()
+  const completed: Occasion[] = []
+  let active: Occasion[] = []
+  const scenes = new Map<string, { occasion: Occasion; owned: boolean }>()
   const cast = new Set<string>()
-  for (const ev of events) {
-    const pr = presenceOf(ev)
-    if (pr === null) continue
-    cast.add(pr.agentId)
-    const day = Math.floor(ev.tick / MINUTES_PER_DAY)
-    const list = byDay.get(day)
-    if (list === undefined) byDay.set(day, [pr])
-    else list.push(pr)
-  }
+  for (const ev of [...events].sort((a, b) => a.tick - b.tick || a.seq - b.seq)) {
+    const p = ev.payload as Record<string, unknown> | null
+    if (p === null) continue
+    const id =
+      ev.type === 'agent_spawned' || ev.type === 'agent_moved'
+        ? p.id
+        : ev.type === 'item_taken'
+          ? p.takerId
+          : p.agentId
+    if (typeof id === 'string') cast.add(id.toLowerCase())
+    if ((ev.type === 'agent_spawned' || ev.type === 'agent_moved') && typeof id === 'string') {
+      if (typeof p.x === 'number' && typeof p.y === 'number') {
+        positions.set(id, { agentId: id, x: p.x, y: p.y, room: positions.get(id)?.room ?? null })
+      }
+    } else if (
+      ev.type === 'agent_entered' &&
+      typeof id === 'string' &&
+      typeof p.structureId === 'string'
+    ) {
+      const was = positions.get(id)
+      if (was !== undefined) positions.set(id, { ...was, room: p.structureId })
+    } else if (ev.type === 'agent_exited' && typeof id === 'string') {
+      const was = positions.get(id)
+      if (was !== undefined) positions.set(id, { ...was, room: null })
+    } else if (ev.type === 'agent_departed' && typeof id === 'string') positions.delete(id)
 
-  type Occasion = {
-    tick: number
-    x: number
-    y: number
-    participants: string[]
-    presences: Presence[]
-  }
-  const occasions: Occasion[] = []
-  for (const day of [...byDay.keys()].sort((a, b) => a - b)) {
-    for (const group of clusterBy(byDay.get(day)!)) {
-      const participants = [...new Set(group.map((p) => p.agentId))].sort()
-      if (participants.length < cfg.minParticipants) continue
+    const groups: Position[][] = []
+    const outdoors = [...positions.values()].filter((body) => body.room === null)
+    groups.push(...clusterBy(outdoors))
+    const rooms = new Map<string, Position[]>()
+    for (const body of positions.values()) {
+      if (body.room === null) continue
+      const room = rooms.get(body.room) ?? []
+      room.push(body)
+      rooms.set(body.room, room)
+    }
+    groups.push(...rooms.values())
+    const next: Occasion[] = []
+    for (const group of groups) {
+      if (group.length < cfg.minParticipants) continue
       const at = centroid(group)
-      occasions.push({
-        tick: Math.min(...group.map((p) => p.tick)),
+      const room = group[0]!.room
+      const occasion = active.find(
+        (held) => !next.includes(held) && sameSite(held, { ...at, room }),
+      ) ?? {
+        tick: ev.tick,
         ...at,
-        participants,
-        presences: group,
-      })
+        room,
+        participants: new Set<string>(),
+        presences: [],
+        uses: new Set<Use>(),
+      }
+      for (const body of group) occasion.participants.add(body.agentId)
+      if (
+        typeof id === 'string' &&
+        group.some((body) => body.agentId === id) &&
+        ['agent_spoke', 'agent_expressed', 'item_taken'].includes(ev.type)
+      ) {
+        const body = positions.get(id)!
+        occasion.presences.push({ tick: ev.tick, agentId: id, x: body.x, y: body.y, ev })
+        occasion.uses.add(useOf(ev))
+      }
+      next.push(occasion)
+    }
+    for (const held of active) if (!next.includes(held)) completed.push(held)
+    active = next
+    if (ev.type === 'scene_opened' && typeof p.id === 'string' && Array.isArray(p.participants)) {
+      const participants = p.participants.filter(
+        (person): person is string => typeof person === 'string',
+      )
+      if (participants.length >= cfg.minParticipants) {
+        const positionsOfCast = participants.flatMap((person) => {
+          const body = positions.get(person)
+          return body === undefined ? [] : [body]
+        })
+        const room = positionsOfCast[0]?.room ?? null
+        const at = positionsOfCast.length === 0 ? { x: 0, y: 0 } : centroid(positionsOfCast)
+        const occasion: Occasion = {
+          tick: ev.tick,
+          ...at,
+          room,
+          participants: new Set<string>(),
+          presences: [],
+          uses: new Set<Use>(),
+        }
+        for (const person of participants) occasion.participants.add(person)
+        occasion.uses.add('gathering')
+        scenes.set(p.id, { occasion, owned: true })
+      }
+    } else if (ev.type === 'scene_line' && typeof p.id === 'string') {
+      const scene = scenes.get(p.id)
+      if (scene !== undefined && typeof p.agentId === 'string') {
+        const body = positions.get(p.agentId)
+        scene.occasion.presences.push({
+          tick: ev.tick,
+          agentId: p.agentId,
+          x: body?.x ?? scene.occasion.x,
+          y: body?.y ?? scene.occasion.y,
+          ev,
+        })
+      }
+    } else if (ev.type === 'scene_closed' && typeof p.id === 'string') {
+      const scene = scenes.get(p.id)
+      if (scene?.owned === true) completed.push(scene.occasion)
+      scenes.delete(p.id)
     }
   }
+  completed.push(...active)
+  for (const scene of scenes.values()) if (scene.owned) completed.push(scene.occasion)
 
   const out: Candidate[] = []
-  // The same ground on later days is the same site: cluster the occasions themselves, in
-  // tick order, so the earliest gathering seeds the place.
-  for (const all of clusterBy(occasions)) {
+  const occasions = completed.filter((o) => o.presences.length > 0)
+  const sites: { room: string | null; use: Use; x: number; y: number; occasions: Occasion[] }[] = []
+  for (const occasion of occasions) {
+    for (const use of occasion.uses) {
+      const site = sites.find(
+        (held) =>
+          held.room === occasion.room &&
+          held.use === use &&
+          (held.room !== null || near(held, occasion)),
+      )
+      if (site === undefined)
+        sites.push({
+          room: occasion.room,
+          use,
+          x: occasion.x,
+          y: occasion.y,
+          occasions: [occasion],
+        })
+      else site.occasions.push(occasion)
+    }
+  }
+  for (const site of sites) {
+    const all = site.occasions
     const first = all[0]!
-    // A habit, once formed, stays one: some run of gatherings inside a single window is what
-    // makes a site, and thereafter every gathering it ever had is one of its own.
     const span = cfg.windowDays * MINUTES_PER_DAY
     const dense = all.some(
       (g) =>
@@ -245,10 +353,7 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
         tokens.set(raw, speakers)
       }
     }
-    const turns = new Map<string, number>()
-    for (const s of speech) turns.set(s.agentId, (turns.get(s.agentId) ?? 0) + 1)
-    const loudest = [...turns.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]
-    const anchor = centroid(presences)
+    const anchor = site.room ?? centroid(all)
 
     let name: CandidateName | null = null
     for (const s of speech) {
@@ -257,11 +362,15 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
     }
 
     out.push({
-      key: `construct_${first.x}_${first.y}`,
+      key:
+        site.room === null
+          ? `construct_${first.x}_${first.y}_${site.use}`
+          : `construct_room_${site.room}_${site.use}`,
       anchor,
-      participants: [...new Set(all.flatMap((g) => g.participants))].sort(),
+      use: site.use,
+      participants: [...new Set(all.flatMap((g) => [...g.participants]))].sort(),
       firstTick: first.tick,
-      gatherings: all.map((g) => ({ tick: g.tick, participants: g.participants })),
+      gatherings: all.map((g) => ({ tick: g.tick, participants: [...g.participants].sort() })),
       signals: {
         expressive: presences.filter((p) => p.ev.type === 'agent_expressed').length,
         offerings: presences.filter((p) => p.ev.type === 'item_taken').length,
@@ -269,7 +378,7 @@ export function detectCandidates(events: SimEvent[], config: SimConfig): Candida
           .filter(([, who]) => who.size > 1)
           .map(([w]) => w)
           .sort(),
-        deferredTo: loudest !== undefined && turns.size > 1 && loudest[1] > 1 ? loudest[0] : null,
+        deferredTo: null,
       },
       name,
     })
@@ -301,6 +410,7 @@ function renderCandidates(candidates: Candidate[]): string {
         `- ${c.key}`,
         `  bodies: ${c.participants.length}`,
         `  times they came back: ${c.gatherings.length}`,
+        `  observed use: ${c.use}`,
         `  acts done for their own sake: ${s.expressive}`,
         `  things left or taken there: ${s.offerings}`,
         `  words they share: ${s.sharedTokens.slice(0, 12).join(', ') || 'none'}`,
@@ -426,7 +536,12 @@ export async function runConstructPass(deps: ConstructPassDeps): Promise<Constru
     const seen = registry.find(
       (r) =>
         r.id === c.key ||
-        (typeof r.anchor === 'object' && r.anchor !== null && near(r.anchor, c.anchor)),
+        (r.id.endsWith(`_${c.use}`) &&
+          ((typeof r.anchor === 'string' && r.anchor === c.anchor) ||
+            (typeof r.anchor === 'object' &&
+              r.anchor !== null &&
+              typeof c.anchor === 'object' &&
+              near(r.anchor, c.anchor)))),
     )
     return seen === undefined ? c : { ...c, key: seen.id }
   })

@@ -19,6 +19,10 @@ function ledger() {
 
 it('publishes only aggregate totals and keeps cached/reasoning subsets out of the sum', () => {
   const db = ledger()
+  db.exec(`CREATE TABLE llm_reservations (caller TEXT, reserved_usd REAL);
+    INSERT INTO llm_reservations VALUES ('secret-caller', 77);
+    CREATE TABLE spend_limits (operator_secret TEXT);
+    INSERT INTO spend_limits VALUES ('secret-budget')`)
   const now = 200_000_000
   db.prepare('INSERT INTO llm_calls VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
     now - 1000,
@@ -41,18 +45,33 @@ it('publishes only aggregate totals and keeps cached/reasoning subsets out of th
     'another prompt',
   )
   const result = publicUsageReader(
-    () => ({ live: true, db }),
+    () => ({ live: true, mindStatus: 'active', db }),
     () => now,
   )()
   expect(PublicUsageSchema.parse(result)).toEqual({
     mode: 'live',
+    mindStatus: 'active',
     updatedAt: now,
     total: { calls: 2, usd: 2, inputTokens: 300, outputTokens: 150, cachedInputTokens: 180 },
     last24h: { calls: 1, usd: 0.5, inputTokens: 100, outputTokens: 50, cachedInputTokens: 80 },
   })
   expect(JSON.stringify(result)).not.toContain('private')
   expect(JSON.stringify(result)).not.toContain('reasoning')
+  expect(JSON.stringify(result)).not.toContain('secret')
+  expect(JSON.stringify(result)).not.toContain('reserv')
 })
+
+it.each(['active', 'delayed', 'budget-stopped'] as const)(
+  'reports %s independently of the moving world clock',
+  (mindStatus) => {
+    const db = ledger()
+    const read = publicUsageReader(
+      () => ({ live: true, db, mindStatus }),
+      () => 0,
+    )
+    expect(read()).toMatchObject({ mode: 'live', mindStatus, total: { calls: 0 } })
+  },
+)
 
 it('shares one aggregate read across viewers for ten seconds and updates the rolling window', () => {
   const db = ledger()
@@ -62,7 +81,7 @@ it('shares one aggregate read across viewers for ten seconds and updates the rol
   const read = publicUsageReader(
     () => {
       reads++
-      return { live: true, db }
+      return { live: true, mindStatus: 'active', db }
     },
     () => at,
   )
@@ -79,16 +98,22 @@ it('shares one aggregate read across viewers for ten seconds and updates the rol
 it('distinguishes a confirmed free preview from missing or unreadable live usage', () => {
   expect(
     publicUsageReader(
-      () => ({ live: false, db: null }),
+      () => ({ live: false, mindStatus: 'disabled', db: null }),
       () => 0,
     )(),
   ).toMatchObject({ mode: 'scripted', total: { calls: 0, usd: 0 } })
   expect(
     publicUsageReader(
-      () => ({ live: true, db: null }),
+      () => ({ live: true, mindStatus: 'active', db: null }),
       () => 0,
     )(),
-  ).toEqual({ mode: 'unavailable', updatedAt: 0, total: null, last24h: null })
+  ).toEqual({
+    mode: 'unavailable',
+    mindStatus: 'delayed',
+    updatedAt: 0,
+    total: null,
+    last24h: null,
+  })
   expect(
     publicUsageReader(
       () => null,
@@ -99,7 +124,7 @@ it('distinguishes a confirmed free preview from missing or unreadable live usage
   db.exec('DROP TABLE llm_calls')
   expect(
     publicUsageReader(
-      () => ({ live: true, db }),
+      () => ({ live: true, mindStatus: 'active', db }),
       () => 0,
     )().mode,
   ).toBe('unavailable')

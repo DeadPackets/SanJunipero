@@ -47,6 +47,7 @@ function gathering(day: number, who: readonly string[] = THREE, x0 = 30): SimEve
       y: 30,
       sense: 'sight',
     }),
+    ...who.map((id, i) => ev(at + 3, 'agent_moved', { id, x: x0 + i + 20, y: 30 })),
   ]
 }
 

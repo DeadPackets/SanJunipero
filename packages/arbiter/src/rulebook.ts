@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3'
+import type { Codified } from './adjudicate.js'
 
 export function normalizeIntent(text: string): string {
   return text
@@ -65,11 +66,11 @@ export type RulebookEntry = { id: string; name: string }
 export class RulebookStore {
   constructor(readonly db: Database.Database) {}
 
-  insert(recipe: RulebookEntry, tick: number): number {
+  insert(recipe: RulebookEntry, tick: number, discovery?: Codified): number {
     const res = this.db
       .prepare(
-        `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick, last_used_tick)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO rulebook (recipe_id, name, normalized_name, recipe_json, verb, tick, last_used_tick, pending_discovery)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         recipe.id,
@@ -79,8 +80,22 @@ export class RulebookStore {
         recipe.id,
         tick,
         tick,
+        discovery === undefined ? null : JSON.stringify(discovery),
       )
     return Number(res.lastInsertRowid)
+  }
+
+  publishPending(publish: ((discovery: Codified) => void) | undefined): void {
+    if (publish === undefined) return
+    const rows = this.db
+      .prepare(
+        'SELECT id, pending_discovery FROM rulebook WHERE pending_discovery IS NOT NULL ORDER BY id',
+      )
+      .all() as { id: number; pending_discovery: string }[]
+    for (const row of rows) {
+      publish(JSON.parse(row.pending_discovery) as Codified)
+      this.db.prepare('UPDATE rulebook SET pending_discovery = NULL WHERE id = ?').run(row.id)
+    }
   }
 
   byId(recipeId: string): RulebookRow | null {

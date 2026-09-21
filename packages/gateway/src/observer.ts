@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 import { MINUTES_PER_DAY } from '@sj/shared'
 
@@ -8,6 +9,7 @@ export const UNWEIGHED_IMPORTANCE = 5
 // Observer-side only (spec §5): thoughts never enter world state and are never read by fold.
 export function ensureObserverTables(db: Database.Database): void {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS observer_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS observer_thoughts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tick INTEGER NOT NULL, agent_id TEXT NOT NULL, text TEXT NOT NULL,
@@ -26,12 +28,28 @@ export function ensureObserverTables(db: Database.Database): void {
       tick INTEGER NOT NULL, agent_id TEXT NOT NULL, state TEXT NOT NULL
     );
   `)
+  db.prepare('INSERT OR IGNORE INTO observer_meta (key, value) VALUES (?, ?)').run(
+    'run_id',
+    randomUUID(),
+  )
   const cols = db.pragma('table_info(observer_thoughts)') as { name: string }[]
   if (!cols.some((c) => c.name === 'importance')) {
     db.exec(
       `ALTER TABLE observer_thoughts ADD COLUMN importance INTEGER NOT NULL DEFAULT ${UNWEIGHED_IMPORTANCE}`,
     )
   }
+}
+
+export function observerRunId(db: Database.Database): string | undefined {
+  if (
+    !db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'observer_meta'").get()
+  )
+    return undefined
+  return (
+    db.prepare("SELECT value FROM observer_meta WHERE key = 'run_id'").get() as
+      | { value: string }
+      | undefined
+  )?.value
 }
 
 type Stmts = {

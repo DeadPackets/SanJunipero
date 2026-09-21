@@ -17,5 +17,11 @@ export function usageTokens(tokens: number): string {
 
 export function usageLabel(usage: PublicUsage | null, failed = false): string {
   if (failed || !usage || usage.mode === 'unavailable') return 'Usage unavailable'
-  return `${usageMoney(usage.total.usd)} · ${usageTokens(usage.total.inputTokens + usage.total.outputTokens)} tokens`
+  const status =
+    usage.mindStatus === 'budget-stopped'
+      ? 'AI paused · '
+      : usage.mindStatus === 'delayed'
+        ? 'AI delayed · '
+        : ''
+  return `${status}${usageMoney(usage.total.usd)} · ${usageTokens(usage.total.inputTokens + usage.total.outputTokens)} tokens`
 }

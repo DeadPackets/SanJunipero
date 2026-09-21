@@ -159,6 +159,7 @@ function gathering(day: number, who: readonly string[] = THREE): SimEvent[] {
       y: 30,
       sense: 'sight',
     }),
+    ...who.map((id, i) => ev(at + 3, 'agent_moved', { id, x: 50 + i, y: 30 })),
   ]
 }
 

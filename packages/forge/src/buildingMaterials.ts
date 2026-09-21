@@ -1,10 +1,18 @@
 import { encodePng, type RawImage } from './post/raw.js'
+import { buildingAppearanceFor } from '@sj/shared'
 
 export function buildingMaterialPrompt(kind: string, slot: 'wood' | 'roof'): string {
+  const appearance = buildingAppearanceFor(kind)
   const surface =
     slot === 'wood'
-      ? 'Exterior wall material, warm cream plaster or honey timber, with fine horizontal grain.'
-      : 'Roof surface, muted warm-grey slate or weathered clay, small regular overlapping tiles.'
+      ? appearance.facade === 'timber'
+        ? 'Exterior wall material, warm honey timber with fine horizontal grain.'
+        : appearance.facade === 'stone'
+          ? 'Exterior wall material, muted warm-grey local stone with small regular courses.'
+          : 'Exterior wall material, warm cream plaster with quiet hand-finished variation.'
+      : appearance.roof === 'hip'
+        ? 'Roof surface, muted warm-grey slate, small regular overlapping tiles.'
+        : 'Roof surface, weathered clay and warm-grey slate, small regular overlapping tiles.'
   return `${surface} Appropriate to a ${kind.replace(/_/g, ' ')} in a quiet rural town. A flat seamless square of the surface alone, viewed straight on. No building silhouette, doors, windows, sky, lettering, light sources or cast shadows. Even neutral illumination, restrained contrast, warm painted pixel-art detail.`
 }
 

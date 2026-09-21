@@ -187,7 +187,9 @@ export const StructurePlanned = z
   })
   .strict()
 export const StructureProgressed = z.object({ id: z.string(), ticks: z.number() }).strict()
-export const StructureCompleted = z.object({ id: z.string() }).strict()
+export const StructureCompleted = z
+  .object({ id: z.string(), seeded: z.literal(true).optional() })
+  .strict()
 export const StructureInscribed = z
   .object({
     structureId: z.string(),
@@ -379,9 +381,15 @@ export const SceneClosed = z
             'kin',
           ]),
           text: z.string(),
-          settled: z.literal(true).optional(),
+          tieId: z.number().int().positive().optional(),
+          resolution: z.enum(['fulfilled', 'released', 'broken']).optional(),
+          evidenceSeqs: z.array(z.number().int().positive()).optional(),
+          remindAtTick: z.number().int().nonnegative().nullable().optional(),
         })
-        .strict(),
+        .strict()
+        .refine((d) => d.resolution === undefined || d.tieId !== undefined, {
+          message: 'resolution requires tieId',
+        }),
     ),
     closeReason: z.enum(['ended', 'left', 'capped', 'timeout']),
     // Optional: every log recorded before the cast rode the closing frame still parses.

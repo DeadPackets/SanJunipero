@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3'
-import { MINUTES_PER_DAY, TICK_REAL_MS } from '@sj/shared'
+import { MINUTES_PER_DAY, TICK_REAL_MS, type MindStatus } from '@sj/shared'
 import { readBody, type AdminRoute } from './adminLaws.js'
 import { writeRunTar, type ExportOpts } from './exportRun.js'
 import { sendJson } from './http.js'
@@ -44,6 +44,7 @@ const bodyJson = (text: string | null): Record<string, unknown> => {
 
 type Spend = { calls: number; usd: number }
 export type CostReport = {
+  mindStatus: MindStatus
   live: boolean
   today: Spend
   lifetime: Spend
@@ -58,7 +59,7 @@ export type CostReport = {
   answerRate: AnswerRate
 }
 
-type Money = Omit<CostReport, 'answerRate'>
+type Money = Omit<CostReport, 'answerRate' | 'mindStatus'>
 
 const NOTHING_SPENT: Spend = { calls: 0, usd: 0 }
 const NOTHING_BOUGHT: Money = {
@@ -237,6 +238,7 @@ export function adminOpsRoutes(deps: OpsDeps): AdminRoute[] {
     const ops = deps.ops()
     return {
       ...(ops === null ? NOTHING_BOUGHT : ledger(ops.opsDb, ops.caps, now)),
+      mindStatus: ops?.mindStatus() ?? 'disabled',
       answerRate: motive.rate,
     }
   }

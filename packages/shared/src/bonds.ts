@@ -66,7 +66,7 @@ export type BondsResponse = z.infer<typeof BondsResponseSchema>
 /** The six acts a tie is derived from, and the whole of them: a bond count of zero IS "none of
  *  these six". Here, not the gateway, so the viewer can name them without reading the server. */
 export const BOND_NOTES: Readonly<Record<string, string>> = {
-  spoke: 'spoke together',
+  spoke: 'were observed speaking together',
   give: 'gave something away',
   teach: 'taught something',
   attack: 'came to blows',
@@ -142,21 +142,12 @@ export const TIE_VALENCE: Readonly<Record<TieAct, number>> = {
   parted: -6,
 }
 
-/** Which of those a scene's tie delta is, or null where it says nothing about warmth: a promise
- *  newly made is neither kept nor broken, and a grudge is a slight that stayed. */
-export function tieActOf(kind: string, settled: boolean): TieAct | null {
-  if (kind === 'promise') return settled ? 'promise_kept' : null
-  if (settled) return null
+/** A private resolution is a belief, not evidence of fulfillment or betrayal. */
+export function tieActOf(kind: string, resolution?: string): TieAct | null {
+  if (resolution !== undefined || kind === 'promise') return null
   if (kind === 'slight' || kind === 'grudge') return 'slight'
   if (kind === 'attraction' || kind === 'kin') return kind
   return null
-}
-
-/** What a tie that nobody ever settled is worth when its clock runs out. A promise left to lapse
- *  IS a promise broken — the only producer of the strongest negative in the table. Anything else
- *  weighs nothing: a grudge nobody fed is a grudge forgiven, which is the point of the clock. */
-export function tieActOfLetGo(kind: string): TieAct | null {
-  return kind === 'promise' ? 'promise_broken' : null
 }
 
 /** Silence costs warmth, which is what lets a level fall without anybody doing anything wrong.
@@ -224,6 +215,8 @@ export function bondRollup(bond: Bond, kind: BondKind): BondRollup | null {
 export type BondFold = {
   /** Ticks must not go backwards — the caller reads the log in `seq` order, which is tick order. */
   add(kind: BondKind, tick: number): void
+  /** Records a witnessed interaction without inferring affection from its frequency. */
+  observe(kind: BondKind, tick: number): void
   /** A tie the minds wrote, weighed into warmth alone. It counts toward no act and names no
    *  bond kind, so the served window and its ceiling are what they were. */
   addTie(act: TieAct, tick: number): void
@@ -292,22 +285,29 @@ export function foldBond(aId: string, bId: string, asOfTick: number): BondFold {
     } else pending.push({ w, tick })
   }
 
+  const record = (k: BondKind, tick: number, valence: number): void => {
+    if (k === 'partner') partnered = true
+    else otherKind = otherKind === null ? k : strongerBondKind(otherKind, k)
+    weigh(valence, tick)
+
+    const roll = rolls.get(k)
+    if (roll === undefined) rolls.set(k, { count: 1, firstTick: tick, lastTick: tick })
+    else {
+      roll.count += 1
+      roll.lastTick = tick
+    }
+
+    recent.push({ tick, kind: k })
+    if (recent.length > BOND_RECENT_ACTS) recent.shift()
+    count += 1
+  }
+
   return {
     add(k, tick) {
-      if (k === 'partner') partnered = true
-      else otherKind = otherKind === null ? k : strongerBondKind(otherKind, k)
-      weigh(BOND_VALENCE[k], tick)
-
-      const roll = rolls.get(k)
-      if (roll === undefined) rolls.set(k, { count: 1, firstTick: tick, lastTick: tick })
-      else {
-        roll.count += 1
-        roll.lastTick = tick
-      }
-
-      recent.push({ tick, kind: k })
-      if (recent.length > BOND_RECENT_ACTS) recent.shift()
-      count += 1
+      record(k, tick, BOND_VALENCE[k])
+    },
+    observe(k, tick) {
+      record(k, tick, 0)
     },
     addTie(act, tick) {
       weigh(TIE_VALENCE[act], tick)

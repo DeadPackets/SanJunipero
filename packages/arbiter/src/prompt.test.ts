@@ -41,6 +41,17 @@ describe('canon (T20)', () => {
 })
 
 describe('mundane-vs-novel anchors (C9 batch-8 calibration)', () => {
+  it('shows the item and building IDs required to map ordinary storage', () => {
+    const blocks = fixtureBlocks()
+    blocks.agent.inventory = [{ id: 'wood_stack', kind: 'wood', qty: 10 }]
+    blocks.agent.visible = {
+      structures: [{ id: 'my_house', kind: 'house', x: 12, y: 8 }],
+      ground: ['grass'],
+    }
+    const { messages } = assembleAdjudicationPrompt(blocks)
+    expect(messages[0]?.content).toContain('wood_stack')
+    expect(messages[0]?.content).toContain('my_house')
+  })
   it('anchors the boundary with one map, one attempt and one impossible ruling', () => {
     const { system } = assembleAdjudicationPrompt(fixtureBlocks())
     const anchors = system.split('\n').filter((l) => l.startsWith('"I '))

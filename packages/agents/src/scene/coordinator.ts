@@ -27,6 +27,7 @@ import {
   type Scene,
   type SceneLlm,
   type SceneTurn,
+  type SceneExit,
   type Stance,
   type TieDelta,
 } from './scene.js'
@@ -56,6 +57,8 @@ export type SceneMind = {
   mood?(): string
   /** A line said how the speaker feels now; the runtime keeps that word. */
   feltMood?(mood: string, tick: number): void
+  commitSceneExit?(choice: SceneExit, tick: number): void
+  actionContext?(): string
 }
 
 type Proposal = NonNullable<Scene['proposal']>
@@ -272,9 +275,7 @@ export class SceneCoordinator {
     scene.kind = this.#kindAfter(scene, said, tick)
     this.#tellingIfStranger(scene)
     scene.stakes = this.#stakesOf(scene)
-    // A rule still waiting for its vote comes before any new one this room might put.
-    const voting = this.#voteIfTabled(scene, tick)
-    if (!voting && scene.kind === 'council') this.#propose(scene, agentId, said)
+    if (scene.kind === 'council') this.#propose(scene, agentId, said)
     this.#scenes.set(scene.id, scene)
     this.#announced.set(scene.id, this.#mark(scene))
     this.#bridge.announce('scene_opened', {
@@ -326,20 +327,17 @@ export class SceneCoordinator {
     this.#tellingIfStranger(scene)
     this.#standStill(agentId)
     appendLine(scene, { agentId, text: '', aside: '', move: 'none', tick, presence: 'joined' })
-    if (scene.kind !== 'council') this.#voteIfTabled(scene, tick)
     scene.stakes = this.#stakesOf(scene)
     this.#turned(scene)
   }
 
-  /** A rule an earlier council was for is voted on by the first room big enough on a later day.
-   *  One that waited too long lapses instead. A talk with a fresh rule in it is not the place: the
-   *  tabled one comes first, and the new one can be put again another time. */
-  #voteIfTabled(scene: Scene, tick: number): boolean {
-    if (!roomForACouncil(scene)) return false
+  /** Rules this room may deliberately bring back. Expired ones lapse when residents next gather. */
+  #availableTabled(tick: number): ReturnType<EngineBridge['tabledLaws']> {
     const today = Math.floor(tick / MINUTES_PER_DAY)
     const underVote = new Set(
       [...this.#scenes.values()].map((s) => s.proposal?.tabledId).filter((id) => id !== undefined),
     )
+    const available: ReturnType<EngineBridge['tabledLaws']> = []
     for (const law of this.#bridge.tabledLaws()) {
       if (underVote.has(law.id)) continue
       const day = Math.floor(law.tabledTick / MINUTES_PER_DAY)
@@ -352,18 +350,29 @@ export class SceneCoordinator {
         }
         continue
       }
-      scene.kind = 'council'
-      scene.proposal = {
-        lawText: law.text,
-        proposedBy: law.proposedBy,
-        stances: {},
-        predicate: { kind: 'none' },
-        tabledId: law.id,
-      }
-      scene.stakes = this.#stakesOf(scene)
-      return true
+      available.push(law)
     }
-    return false
+    return available
+  }
+
+  /** A resident's structured choice turns this talk into the requested vote. */
+  #reconvene(scene: Scene, proposalId: string | null | undefined, tick: number): boolean {
+    if (proposalId === null || proposalId === undefined) return false
+    if (scene.kind !== 'talk' || scene.proposal !== undefined || !roomForACouncil(scene))
+      return false
+    const law = this.#availableTabled(tick).find((candidate) => candidate.id === proposalId)
+    if (law === undefined) return false
+    scene.kind = 'council'
+    scene.proposal = {
+      lawText: law.text,
+      proposedBy: law.proposedBy,
+      stances: {},
+      predicate: { kind: 'none' },
+      tabledId: law.id,
+    }
+    scene.stakes = this.#stakesOf(scene)
+    this.#turned(scene)
+    return true
   }
 
   /** One body out of the talk, and the talk goes on without them. The anchor and the floor both
@@ -390,6 +399,10 @@ export class SceneCoordinator {
     if (mind === null) return
     const token = ++this.#token
     this.#asked.set(scene.id, token)
+    const pendingProposals =
+      scene.kind === 'talk' && roomForACouncil(scene)
+        ? this.#availableTabled(tick).map(({ id, text, proposedBy }) => ({ id, text, proposedBy }))
+        : []
     let turn: SceneTurn
     try {
       turn = await mind.llm.line({
@@ -405,6 +418,8 @@ export class SceneCoordinator {
         energy: this.#bridge.energyOf(agentId),
         physicalContext: conversationContext(this.#bridge.perception(agentId)),
         mood: mind.mood?.() ?? '',
+        actionContext: mind.actionContext?.() ?? '',
+        pendingProposals,
       })
     } catch (err) {
       this.#onError('scene_line', err instanceof Error ? err.message : String(err))
@@ -423,6 +438,7 @@ export class SceneCoordinator {
     // One mouth leaving takes itself out, not the whole talk: a goodbye is said and remembered as
     // one, a leave without a word is remembered as walking off. r18 closed 52 of 92 talks here.
     if (turn.leave) {
+      mind.commitSceneExit?.({ plan: turn.plan, reconsider_at: turn.reconsider_at }, tick)
       if (said.length > 0) {
         void this.#bridge
           .submit(agentId, { verb: 'speak', params: { text: said } })
@@ -440,7 +456,10 @@ export class SceneCoordinator {
     // and said nothing has not passed.
     const answered = this.#answer(scene, agentId, turn, tick)
     const invited = this.#askFrom(scene, agentId, turn, tick)
-    if (said.length === 0 && !answered && !invited) {
+    const reconvened =
+      pendingProposals.some((proposal) => proposal.id === turn.reconvene) &&
+      this.#reconvene(scene, turn.reconvene, tick)
+    if (said.length === 0 && !answered && !invited && !reconvened) {
       await this.#pass(scene, tick)
       return
     }
@@ -743,7 +762,19 @@ export class SceneCoordinator {
       let deltas: TieDelta[] = []
       if (teller !== null) {
         try {
-          const answer = await teller.llm.close({ scene: structuredClone(scene), cast: named })
+          const answer = await teller.llm.close({
+            scene: {
+              thread: scene.thread.map(({ agentId, text, move, tick, presence }) => ({
+                agentId,
+                text,
+                move,
+                tick,
+                ...(presence === undefined ? {} : { presence }),
+              })),
+              closeReason: reason,
+            },
+            cast: named,
+          })
           summary = answer.summary
           beat = answer.beat ?? ''
           deltas = answer.deltas
@@ -755,7 +786,17 @@ export class SceneCoordinator {
       // it, so a delta naming anyone outside the cast reaches no book and no bond graph.
       deltas = deltas.filter((d) => cast.includes(d.agentId) && cast.includes(d.personId))
       const at = this.#bridge.currentTick()
-      for (const id of cast) this.#mindFor(id)?.ties.apply(deltas, at)
+      const accepted: TieDelta[] = []
+      for (const delta of deltas) {
+        try {
+          if (delta.tieId !== undefined || delta.resolution !== undefined)
+            throw new Error('public closure cannot change an existing private tie')
+          accepted.push(...(this.#mindFor(delta.agentId)?.ties.apply([delta], at) ?? []))
+        } catch (err) {
+          this.#onError('tie_rejected', String(err))
+        }
+      }
+      deltas = accepted
       this.#bridge.announce('scene_closed', {
         id: scene.id,
         summary,
@@ -893,7 +934,11 @@ export class SceneCoordinator {
     }
     const people = peopleIn(fact)
     const partnered = this.#bridge.partnerOf(people[0]!) === people[1]
-    const deltas = tiesFor(fact, { partnered, roof: this.#bridge.roofOf(people[0]!) })
+    const deltas = tiesFor(fact, {
+      partnered,
+      roof: this.#bridge.roofOf(people[0]!),
+      tiesOf: (id) => this.#mindFor(id)?.ties.open() ?? [],
+    })
     const at = this.#bridge.currentTick()
     for (const id of people) this.#mindFor(id)?.ties.apply(deltas, at, 'relationship')
     for (const m of memoryLinesFor(fact, (id) => this.#nameOf(id) ?? id)) {

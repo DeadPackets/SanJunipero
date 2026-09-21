@@ -219,3 +219,7 @@
 @media(prefers-reduced-motion:reduce) { .stage-ring-arms button { transition:none!important; } }
 .app:not([data-broadcast=on]) .stage-plate[data-ringed=yes] { translate:-50% 10px; }
 .app:not([data-broadcast=on]):has(.camera-bookmark) .stage-live { margin-top:46px; }
+
+.person-hover-label { position:absolute; z-index:24; translate:-50% 0; padding:6px 11px; min-height:32px; color:#43394a; background:#fff6e9; border:1px solid #ad9b7e; border-radius:5px; box-shadow:0 2px #8e7c6044; font:600 12px/1.4 var(--font-body); cursor:pointer; pointer-events:auto; }
+.person-hover-label[hidden] { display:none; }
+.person-hover-label:focus-visible { outline:2px solid #946445; outline-offset:3px; }

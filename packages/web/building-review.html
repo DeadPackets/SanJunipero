@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>San Junipero · Building roles review</title>
+    <style>
+      @font-face {
+        font-family: Manrope;
+        src: url('/node_modules/@fontsource/manrope/files/manrope-latin-400-normal.woff2');
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #eee3d1; color: #493f49; font: 14px Manrope, system-ui, sans-serif; }
+      header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 28px 14px; }
+      h1 { margin: 0 0 6px; font: 600 22px Manrope, sans-serif; }
+      p { margin: 0; color: #796d69; line-height: 1.5; }
+      .quick { display: flex; gap: 8px; }
+      .tools { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+      button { border: 1px solid #c4b29c; border-radius: 9px; padding: 10px 16px; background: #fff7ea; color: inherit; font: inherit; cursor: pointer; }
+      button:hover { background: #f4e7cf; }
+      button[aria-pressed='true'] { border-color: #798b65; background: #dce6c8; color: #3e5337; }
+      .scene { position: relative; height: calc(100dvh - 220px); min-height: 390px; margin: 0 20px; overflow: hidden; border: 1px solid #aaa18e; border-radius: 18px; box-shadow: 0 5px 0 #c4b59e; }
+      .scene canvas { display: block; width: 100%; height: 100%; }
+      .labels { position: absolute; inset: auto 7% 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; pointer-events: none; }
+      .labels div { padding: 9px 12px; border-radius: 10px; background: #fff7eae8; box-shadow: 0 2px 8px #30261d33; text-align: center; }
+      .labels b { display: block; font-size: 13px; }
+      .labels span { color: #796d69; font-size: 11px; }
+      .controls { display: flex; align-items: center; gap: 14px; padding: 20px 28px 8px; }
+      input { width: 100%; accent-color: #88644c; }
+      output { min-width: 54px; font: 20px Georgia, serif; }
+      .note { padding: 0 28px 18px; font-size: 12px; }
+      @media (max-width: 720px) {
+        header { align-items: flex-start; flex-direction: column; padding: 16px; }
+        .scene { height: 58dvh; margin: 0 10px; }
+        .labels { inset: auto 8px 8px; gap: 5px; }
+        .labels div { padding: 7px 4px; }
+        .controls { padding: 16px; }
+        .note { padding: 0 16px 14px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>One footprint, three uses</h1>
+        <p>Real procedural geometry from the home, shop, and meeting-room appearance recipes.</p>
+      </div>
+      <div class="tools">
+        <div class="quick">
+          <button id="exterior" aria-pressed="true">Exterior</button>
+          <button id="interior" aria-pressed="false">Interior</button>
+        </div>
+        <div class="quick">
+          <button id="day" aria-pressed="false">Day · 12:00</button>
+          <button id="night" aria-pressed="true">Night · 21:00</button>
+        </div>
+      </div>
+    </header>
+    <div class="scene" id="scene">
+      <div class="labels">
+        <div><b>Personal home</b><span>plaster · domestic</span></div>
+        <div><b>Public shop</b><span>timber · shopfront</span></div>
+        <div><b>Meeting room</b><span>stone · assembly</span></div>
+      </div>
+    </div>
+    <div class="controls">
+      <span>00:00</span>
+      <input id="hour" type="range" min="0" max="1439" step="1" value="1260" aria-label="Time of day" />
+      <span>23:59</span>
+      <output id="time">21:00</output>
+    </div>
+    <p class="note" id="note">Review-only fixture. All three buildings occupy the same 3 × 3 physics footprint; the slider uses the town daylight and window-emission path.</p>
+    <script type="module">
+      import * as THREE from 'three'
+      import { DEFAULT_CONFIG } from '@sj/shared'
+      import { buildInteriorRoom } from '/src/render/three/interiorRoom.ts'
+      import { buildStructure } from '/src/render/three/structures.ts'
+      import { createEnvironment } from '/src/render/three/environment.ts'
+
+      const host = document.getElementById('scene')
+      const hour = document.getElementById('hour')
+      const timeOutput = document.getElementById('time')
+      const structures = [
+        { id: 'review-home', kind: 'house', name: 'Personal home', x: 1, y: 1, owner: 'amara' },
+        { id: 'review-shop', kind: 'bakery', name: 'Public shop', x: 6, y: 1 },
+        { id: 'review-meeting', kind: 'civic_hall', name: 'Meeting room', x: 11, y: 1 },
+      ].map((building) => ({
+        ...building,
+        w: 3,
+        h: 3,
+        hp: 50,
+        maxHp: 50,
+        flammable: false,
+        stage: 'complete',
+        progressTicks: 0,
+        builtBy: null,
+        burning: false,
+        burnTicks: 0,
+      }))
+      const state = {
+        tick: 1260,
+        weather: { kind: 'clear', temperatureC: 18 },
+        agents: {},
+        structures: Object.fromEntries(structures.map((building) => [building.id, building])),
+        items: {},
+        crops: {},
+        wildlife: { fish: 0, deer: 0 },
+        terrain: [],
+        counters: { nextEntityId: 1 },
+      }
+      const scene = new THREE.Scene()
+      const renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+      renderer.shadowMap.enabled = true
+      renderer.shadowMap.type = THREE.PCFShadowMap
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1
+      host.prepend(renderer.domElement)
+
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(18, 9),
+        new THREE.MeshStandardMaterial({ color: 0x8e9e72, roughness: 1 }),
+      )
+      ground.rotation.x = -Math.PI / 2
+      ground.position.set(7.5, -0.01, 2.5)
+      ground.receiveShadow = true
+      scene.add(ground)
+
+      const exteriorGroups = structures.map((building) => buildStructure(building, DEFAULT_CONFIG))
+      scene.add(...exteriorGroups)
+      const rooms = structures.map((building, index) => {
+        const room = buildInteriorRoom(building, DEFAULT_CONFIG)
+        room.group.position.set(2.5 + index * 5, 0, 2.5)
+        room.group.scale.setScalar(0.55)
+        room.group.visible = false
+        scene.add(room.group)
+        return room
+      })
+      const interiorLights = rooms.flatMap((room) => {
+        room.group.updateMatrixWorld(true)
+        return room.lampPositions.map((position, index) => {
+          const lamp = new THREE.PointLight(0xffce8e, 0, 14 * 0.55, 1.5)
+          lamp.position.copy(room.group.localToWorld(position.clone()))
+          lamp.castShadow = index === 0
+          lamp.shadow.mapSize.set(512, 512)
+          lamp.shadow.normalBias = 0.035
+          lamp.shadow.bias = -0.001
+          lamp.shadow.radius = 3
+          lamp.shadow.intensity = 0.55
+          scene.add(lamp)
+          return lamp
+        })
+      })
+      const environment = createEnvironment(scene)
+      const center = new THREE.Vector3(7.5, 0, 2.5)
+      const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 100)
+      camera.position.set(7.5, 9, 15)
+      camera.lookAt(7.5, 1.1, 2.3)
+
+      function resize() {
+        renderer.setSize(host.clientWidth, host.clientHeight)
+        camera.aspect = host.clientWidth / host.clientHeight
+        camera.updateProjectionMatrix()
+      }
+      new ResizeObserver(resize).observe(host)
+
+      function setTime(minutes) {
+        state.tick = minutes
+        hour.value = String(minutes)
+        const hours = Math.floor(minutes / 60)
+        const mins = minutes % 60
+        timeOutput.value = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+        document.getElementById('day').setAttribute('aria-pressed', String(minutes === 720))
+        document.getElementById('night').setAttribute('aria-pressed', String(minutes === 1260))
+      }
+      document.getElementById('day').onclick = () => setTime(720)
+      document.getElementById('night').onclick = () => setTime(1260)
+      hour.oninput = (event) => setTime(Number(event.target.value))
+
+      let viewMode = 'exterior'
+      function setView(next) {
+        viewMode = next
+        const inside = next === 'interior'
+        for (const group of exteriorGroups) group.visible = !inside
+        for (const room of rooms) room.group.visible = inside
+        document.getElementById('exterior').setAttribute('aria-pressed', String(!inside))
+        document.getElementById('interior').setAttribute('aria-pressed', String(inside))
+        document.getElementById('note').textContent = inside
+          ? 'Interior review assumes one awake occupant in each room, so the existing local lamps are on. It checks appearance and lighting without rendering resident sprites.'
+          : 'Review-only fixture. All three buildings occupy the same 3 × 3 physics footprint; the slider uses the town daylight and window-emission path.'
+      }
+      document.getElementById('exterior').onclick = () => setView('exterior')
+      document.getElementById('interior').onclick = () => setView('interior')
+
+      let last = performance.now()
+      function frame(now) {
+        requestAnimationFrame(frame)
+        const dt = Math.min((now - last) / 1000, 0.1)
+        last = now
+        const light = environment.update(state, DEFAULT_CONFIG, center, 18, now / 1000, dt, () => 2, false)
+        const inside = viewMode === 'interior'
+        if (inside) light.sky.intensity = 0.38 + light.sky.intensity * 0.85 + 0.35
+        for (const lamp of interiorLights) lamp.intensity = inside ? 9 - light.daylight * 4 : 0
+        for (const group of exteriorGroups) {
+          for (const material of group.userData.windows ?? []) {
+            material.emissive.set(0xffb660)
+            material.emissiveIntensity = (1 - light.daylight) * 0.75
+          }
+        }
+        for (const room of rooms) {
+          room.lampGlass.emissiveIntensity = inside ? 0.8 : 0
+          room.glass.color.copy(light.sky.color)
+          room.glass.emissive.copy(light.sun.color)
+          room.glass.emissiveIntensity = light.daylight * 0.3
+        }
+        renderer.render(scene, camera)
+      }
+      setTime(1260)
+      setView('exterior')
+      requestAnimationFrame(frame)
+    </script>
+  </body>
+</html>

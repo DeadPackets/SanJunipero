@@ -87,7 +87,10 @@ const CAST = [
   { id: AWAY, name: 'Nadia' },
 ]
 
-async function oneTurn(held: readonly { personId: string; kind: TieKind; text: string }[]) {
+async function oneTurn(
+  held: readonly { personId: string; kind: TieKind; text: string; remindAtTick?: number }[],
+  options: { ticks?: number; observed?: string[]; config?: Partial<MindConfig> } = {},
+) {
   const cfg = config()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
     Array.from({ length: 24 }, (): TileId => 0),
@@ -133,15 +136,20 @@ async function oneTurn(held: readonly { personId: string; kind: TieKind; text: s
     identity: { ...tamarIdentity, name: 'Tamar' },
     personality,
     bridge,
-    config: FAST,
+    config: { ...FAST, ...options.config },
     ties: { store: ties, cast: () => CAST },
   })
   runtime.start(TAMAR)
-  for (let i = 0; i < 40 && prompts.length === 0; i += 1) {
+  for (
+    let i = 0;
+    i < (options.ticks ?? 40) && (options.ticks !== undefined || prompts.length === 0);
+    i += 1
+  ) {
     loop.step()
     await new Promise((r) => setImmediate(r))
   }
   runtime.stop()
+  options.observed?.push(...prompts)
   return prompts[0] ?? ''
 }
 
@@ -169,6 +177,29 @@ describe('the ordinary turn knows what a mind is owed', () => {
     ])
     expect(said).toContain('a promise: bring back the long rope | a debt: two days of his work')
     expect(said).not.toContain('poor neighbour')
+  })
+
+  it('keeps kin separate and brings back an absent person’s pending promise', async () => {
+    const said = await oneTurn([
+      { personId: YUSUF, kind: 'kin', text: 'your brother' },
+      { personId: YUSUF, kind: 'slight', text: 'an old slight' },
+      { personId: YUSUF, kind: 'promise', text: 'help plant the orchard tomorrow' },
+      { personId: AWAY, kind: 'promise', text: 'return Nadia’s chisel next month' },
+    ])
+    expect(said).toContain('your brother')
+    expect(said).toContain('help plant the orchard tomorrow')
+    expect(said).toContain('return Nadia’s chisel next month')
+  })
+
+  it('a due reminder buys one reconsideration without forcing the promised action', async () => {
+    const observed: string[] = []
+    await oneTurn(
+      [{ personId: AWAY, kind: 'promise', text: 'bring Nadia a chair', remindAtTick: NOON + 10 }],
+      { ticks: 24, observed, config: { boredomTicks: 10000 } },
+    )
+    expect(observed).toHaveLength(2)
+    expect(observed[1]).toContain('bring Nadia a chair (the time you noted has come)')
+    expect(observed[1]).toContain('You may act, defer, or reconsider')
   })
 
   it('leaves a mind with no ties the prompt it always had', async () => {

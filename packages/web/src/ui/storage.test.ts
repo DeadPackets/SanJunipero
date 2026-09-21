@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { localStore, sessionStore } from './storage.js'
 import { adminToken } from './lawsModel.js'
 import { thoughtsSetting } from './thoughts.js'
@@ -32,4 +32,29 @@ describe('★ site data blocked', () => {
     // @ts-expect-error -- putting the real getter back is the whole point of the stub
     delete globalThis.localStorage
   })
+})
+
+it('holds the visit-start cursor while later snapshots update the next visit atomically', async () => {
+  vi.resetModules()
+  const saved = new Map<string, string>([
+    ['sj:lastVisit', JSON.stringify({ runId: 'town-a', seq: 5, tick: 10 })],
+  ])
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => saved.get(key) ?? null,
+    setItem: (key: string, value: string) => saved.set(key, value),
+  })
+  try {
+    const storage = await import('./storage.js')
+    storage.rememberVisit({ runId: 'town-a', seq: 50, tick: 20 })
+    expect(storage.lastVisitCursor()).toEqual({ runId: 'town-a', seq: 5, tick: 10 })
+    expect(storage.readVisitCursor()).toEqual({ runId: 'town-a', seq: 50, tick: 20 })
+    expect(storage.lastVisitTick('town-a')).toBe(10)
+    expect(storage.lastVisitTick('town-b')).toBeNull()
+    expect(storage.lastVisitTick(null)).toBeNull()
+    storage.rememberVisit({ runId: null, seq: 100, tick: 30 })
+    expect(storage.readVisitCursor()).toEqual({ runId: null, seq: null, tick: null })
+  } finally {
+    vi.unstubAllGlobals()
+    vi.resetModules()
+  }
 })

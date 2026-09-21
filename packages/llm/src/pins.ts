@@ -119,6 +119,17 @@ export function pricesFor(
     : { prices: row, source: 'provider' }
 }
 
+export function reservationPricesFor(model: string, provider: string | null): ModelPrices {
+  const { prices } = pricesFor(model, provider)
+  // Admission includes Luna's fast large-context tier and its higher cache-write price.
+  const ceiling = model === LUNA ? { input: 1, output: 3.6 } : prices
+  return {
+    input: Math.max(prices.input, ceiling.input),
+    output: Math.max(prices.output, ceiling.output),
+    cacheRead: prices.cacheRead,
+  }
+}
+
 // Every pinned caller names an effort; `enabled:false` is what the retired DeepSeek half took and
 // a caller's own override may still send.
 export type ReasoningSetting =

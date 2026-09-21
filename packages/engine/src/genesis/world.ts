@@ -185,7 +185,7 @@ export function makeGenesisWorld(
     structureIdByIndex[i] = id
     events.push({ type: 'structure_planned', payload: plannedPayload(config, s, id, anchor) })
     if (!roofFell(config, s.kind)) {
-      events.push({ type: 'structure_completed', payload: { id } })
+      events.push({ type: 'structure_completed', payload: { id, seeded: true } })
       if (config.world.layout === 'orchard' && ['lamp_post', 'fire_pit'].includes(s.kind))
         events.push({
           type: 'structure_fueled',

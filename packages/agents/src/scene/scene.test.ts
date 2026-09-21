@@ -222,6 +222,9 @@ describe('the kind a scene becomes', () => {
       text: 'He never brought the planks.',
       tick: 500,
       settledTick: null,
+      resolution: null,
+      evidenceSeqs: [],
+      remindAtTick: null,
       source: 'scene',
     },
   ]
@@ -317,10 +320,10 @@ describe('how a room counts itself', () => {
     expect(tally.passed).toBe(true)
   })
 
-  it('passes a room that is only unsure, because silence is not opposition', () => {
+  it('does not pass on the proposer alone when everybody else is unsure', () => {
     const tally = tallyCouncil(council('nadia', { omar: 'unsure', salma: 'unsure' }))
     expect(tally.unsure).toEqual(['omar', 'salma'])
-    expect(tally.passed).toBe(true)
+    expect(tally.passed).toBe(false)
   })
 
   it('fails one against two', () => {
@@ -375,6 +378,7 @@ describe('the recorded corpus', () => {
         stance: null,
         answer: null,
         ask: null,
+        reconvene: null,
         leave: line.leave,
         importance: line.importance,
         mood: null,

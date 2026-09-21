@@ -3,7 +3,8 @@ import { agentName, tickToMoment, type ChronicleEntry } from '@sj/shared'
 import { chronicleFeed, milestonesFeed, dispatchesFeed } from '../../ui/feeds.js'
 import { useFeed } from '../../ui/useEndpoint.js'
 import { editions, EMPTY_DISPATCHES } from '../../ui/dispatches.js'
-import { lastVisitTick } from '../../ui/storage.js'
+import { sinceVisit } from '../../ui/catchup.js'
+import { lastVisitCursor } from '../../ui/storage.js'
 import { pointPlay } from '../../ui/replayRun.js'
 import { momentStamp } from '../stamp.js'
 import type { PageProps } from '../pages/types.js'
@@ -108,19 +109,21 @@ export function GameChronicle(props: PageProps) {
       (range !== 'today' || tickToMoment(e.tick).day === tickToMoment(tick).day) &&
       (range !== 'following' || e.agentIds?.some((id) => following.includes(id))),
   )
-  const catchup = shown.filter((e) => e.tick > (lastVisitTick() ?? -1))
-  const list = tab === 'Timeline' ? shown : (catchup.length ? catchup : shown).slice(0, 12)
+  const catchup = sinceVisit(shown, lastVisitCursor(), store.logSeq(), store.runId())
+  const list = tab === 'Timeline' ? shown : (catchup ?? shown).slice(0, 12)
   return (
     <div>
       {tab !== 'Timeline' && (
         <div className="sj-dispatch">
           <GameIcon kind="chronicle" />
           <div>
-            <h3>{catchup.length ? 'Since your last visit' : 'The latest from town'}</h3>
+            <h3>{catchup !== null ? 'Since your last visit' : 'The latest from town'}</h3>
             <p>
-              {catchup.length
-                ? `${catchup.length} recorded moments to catch up on.`
-                : 'A few moments worth opening.'}
+              {catchup === null
+                ? 'A few moments worth opening.'
+                : catchup.length === 0
+                  ? 'No new recorded moments since your last visit.'
+                  : `${catchup.length} recent recorded moments. Older changes are in the day’s papers.`}
             </p>
           </div>
         </div>

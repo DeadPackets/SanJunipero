@@ -1,9 +1,13 @@
 import type Database from 'better-sqlite3'
-import type { PublicUsage } from '@sj/shared'
+import type { PublicUsage, MindStatus } from '@sj/shared'
 import type { Router } from './router.js'
 import { sendJson } from './http.js'
 
-export type UsageSource = () => { live: boolean; db: Database.Database | null } | null
+export type UsageSource = () => {
+  live: boolean
+  db: Database.Database | null
+  mindStatus: MindStatus
+} | null
 const CACHE_MS = 10_000
 const DAY_MS = 86_400_000
 const ZERO = { calls: 0, usd: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 }
@@ -20,6 +24,7 @@ export function publicUsageReader(
     if (cached && at >= readAt && at - readAt < CACHE_MS) return cached
     const unavailable: PublicUsage = {
       mode: 'unavailable',
+      mindStatus: 'delayed',
       updatedAt: at,
       total: null,
       last24h: null,
@@ -28,7 +33,13 @@ export function publicUsageReader(
       const current = source()
       if (!current) cached = unavailable
       else if (!current.live)
-        cached = { mode: 'scripted', updatedAt: at, total: ZERO, last24h: ZERO }
+        cached = {
+          mode: 'scripted',
+          mindStatus: 'disabled',
+          updatedAt: at,
+          total: ZERO,
+          last24h: ZERO,
+        }
       else if (!current.db) cached = unavailable
       else {
         const rows = current.db
@@ -46,7 +57,7 @@ export function publicUsageReader(
           for (const key of Object.keys(total) as (keyof Totals)[]) total[key] += row[key]
           if (recent === 1) last24h = row
         }
-        cached = { mode: 'live', updatedAt: at, total, last24h }
+        cached = { mode: 'live', mindStatus: current.mindStatus, updatedAt: at, total, last24h }
       }
     } catch {
       cached = unavailable

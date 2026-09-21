@@ -1,5 +1,13 @@
 import { STEW_KIND } from '../food.js'
-import { inputName, type RecipeDef, type SimConfig, type StructureRecipeDef } from '@sj/shared'
+import {
+  inputName,
+  ticksFor,
+  type RecipeDef,
+  type SimConfig,
+  type StructureRecipeDef,
+} from '@sj/shared'
+
+export const CRAFT_TAKES = 'half_hour' as const
 
 // An empty `inputs` marks a kind the world places and nobody raises.
 export function buildableRecipe(config: SimConfig, kind: string): StructureRecipeDef | null {
@@ -59,8 +67,8 @@ export function craftRoutes(config: SimConfig, name: string): SeedRecipe[] {
 // Off the same two tables build and craft validate against — no vocabulary of its own.
 export type MakeableRoad = { inputs: Record<string, number>; atFire?: true; water?: number }
 export type Makeables = {
-  builds: { kind: string; inputs: Record<string, number> }[]
-  crafts: { name: string; roads: MakeableRoad[] }[]
+  builds: { kind: string; inputs: Record<string, number>; durationTicks?: number }[]
+  crafts: { name: string; roads: MakeableRoad[]; durationTicks?: number }[]
 }
 
 export function makeables(config: SimConfig): Makeables {
@@ -68,7 +76,9 @@ export function makeables(config: SimConfig): Makeables {
     .sort()
     .flatMap((kind) => {
       const row = buildableRecipe(config, kind)
-      return row === null ? [] : [{ kind, inputs: row.inputs }]
+      return row === null
+        ? []
+        : [{ kind, inputs: row.inputs, durationTicks: buildTicks(config, kind) }]
     })
   // One word per product: `craftRoutes` reaches every road to it from the product's own name.
   const products = new Set<string>()
@@ -77,6 +87,7 @@ export function makeables(config: SimConfig): Makeables {
   }
   const crafts = [...products].sort().map((name) => ({
     name,
+    durationTicks: ticksFor(CRAFT_TAKES),
     roads: craftRoutes(config, name).map((r) => ({
       inputs: r.inputs,
       ...(r.atFire === true ? { atFire: true as const } : {}),

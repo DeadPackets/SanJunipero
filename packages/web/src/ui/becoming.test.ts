@@ -217,6 +217,21 @@ describe('authoredIdentityOffenders — no panel reads a handed-down identity', 
     ])
   })
 
+  it('allows terrain map origins without exempting identity reads in that renderer', () => {
+    const path = 'render/three/terrain.ts'
+    const geometry = 'previous.origin !== next.origin'
+    expect(authoredIdentityOffenders([{ path, source: geometry }])).toEqual([])
+    for (const field of AUTHORED_IDENTITY_FIELDS) {
+      expect(
+        authoredIdentityOffenders([{ path, source: `${geometry}; agent.${field}` }]),
+        field,
+      ).toEqual([path])
+    }
+    expect(authoredIdentityOffenders([{ path: 'person.ts', source: geometry }])).toEqual([
+      'person.ts',
+    ])
+  })
+
   it('a CSS property is not an identity — the scan reads FIELDS, not style keys', () => {
     expect(
       authoredIdentityOffenders([

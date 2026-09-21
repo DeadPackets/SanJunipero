@@ -92,6 +92,8 @@ type Thread = {
   beat?: string
   summary?: string
   proseAt?: number
+  proseSceneId?: string
+  sourceEventSeqs?: number[]
 }
 
 const signOf = (n: number): -1 | 0 | 1 => (n > 0 ? 1 : n < 0 ? -1 : 0)
@@ -158,6 +160,9 @@ function rowOf(t: Thread, tick: number): ThreadRow {
     ...(t.beat === undefined ? {} : { beat: t.beat }),
     ...(t.summary === undefined ? {} : { summary: t.summary }),
     ...(t.proseAt === undefined ? {} : { proseTick: t.proseAt }),
+    ...(t.proseSceneId === undefined ? {} : { proseSceneId: t.proseSceneId }),
+    sourceEventSeqs: t.sourceEventSeqs ?? [],
+    basis: 'observed-overlap',
   }
 }
 
@@ -245,9 +250,17 @@ export function makeThreads(): Threads {
       }
       for (const [key, w] of gone.cap) keep.cap.set(key, Math.max(keep.cap.get(key) ?? 0, w))
     }
-    if (keep.beat === undefined && gone.beat !== undefined) keep.beat = gone.beat
-    if (keep.summary === undefined && gone.summary !== undefined) keep.summary = gone.summary
-    if (keep.proseAt === undefined && gone.proseAt !== undefined) keep.proseAt = gone.proseAt
+    if (keep.proseAt === undefined && gone.proseAt !== undefined) {
+      if (gone.beat !== undefined) keep.beat = gone.beat
+      if (gone.summary !== undefined) keep.summary = gone.summary
+      keep.proseAt = gone.proseAt
+      if (gone.proseSceneId !== undefined) keep.proseSceneId = gone.proseSceneId
+    }
+    keep.sourceEventSeqs = [
+      ...new Set([...(keep.sourceEventSeqs ?? []), ...(gone.sourceEventSeqs ?? [])]),
+    ]
+      .sort((a, b) => a - b)
+      .slice(-12)
     merged += 1
     goodbye(gone, tick, keep.id)
     for (const [id, to] of sceneOf) if (to === gone.id) sceneOf.set(id, keep.id)
@@ -441,8 +454,12 @@ export function makeThreads(): Threads {
         const summary = typeof p.summary === 'string' && p.summary !== '' ? p.summary : undefined
         if (beat === undefined && summary === undefined) continue
         if (beat !== undefined) t.beat = beat
+        else delete t.beat
         if (summary !== undefined) t.summary = summary
+        else delete t.summary
         t.proseAt = ev.tick
+        t.proseSceneId = p.id
+        t.sourceEventSeqs = [...new Set([...(t.sourceEventSeqs ?? []), ev.seq])].slice(-12)
       }
     },
     stats: () => ({ made, merged, dropped }),

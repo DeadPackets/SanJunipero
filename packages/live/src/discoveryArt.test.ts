@@ -46,10 +46,29 @@ describe('the commission text', () => {
   it('names the building when commissioning its wall surface', () => {
     expect(buildingMaterialPrompt('meeting_hall', 'wood')).toContain('meeting hall')
     expect(buildingMaterialPrompt('meeting_hall', 'wood')).not.toContain('meeting_hall')
+    expect(buildingMaterialPrompt('meeting_hall', 'wood')).toContain('stone')
+    expect(buildingMaterialPrompt('bakery', 'wood')).toContain('timber')
+    expect(buildingMaterialPrompt('house', 'roof')).toContain('surface')
+    expect(buildingMaterialPrompt('house', 'roof')).toContain('No building silhouette')
   })
 })
 
 describe('the watcher', () => {
+  it('closes admission when the town stop signal fires', async () => {
+    const cancellation = new AbortController()
+    const commission = vi.fn().mockResolvedValue({ id: 'asset_1', status: 'ready' })
+    const watcher = watchDiscoveryArt({
+      forge: { commission },
+      codex: stubCodex([]),
+      signal: cancellation.signal,
+    })
+    watcher.onDiscovery({ name: 'first', makes: ['cord'] })
+    cancellation.abort()
+    watcher.onDiscovery({ name: 'second', makes: ['waterskin'] })
+    await watcher.settle()
+    expect(commission).toHaveBeenCalledTimes(1)
+  })
+
   it('commissions one item per undrawn kind, as class "item" on a 1×1 footprint', async () => {
     const commission = vi.fn().mockResolvedValue({ id: 'asset_1', status: 'ready' })
     const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]) })
@@ -162,17 +181,65 @@ describe('the watcher', () => {
     expect(seen).toEqual(['waterskin'])
   })
 
-  it('lets a later discovery try again for a kind whose commission failed', async () => {
-    const commission = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('provider down'))
-      .mockResolvedValueOnce({ id: 'a', status: 'ready' })
-    const w = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]), onError: () => {} })
-    w.onDiscovery({ name: 'one', makes: ['waterskin'] })
-    await w.settle()
-    w.onDiscovery({ name: 'two', makes: ['waterskin'] })
-    await w.settle()
-    expect(commission).toHaveBeenCalledTimes(2)
+  it('retries failed art without another discovery and never duplicates a queued retry', async () => {
+    vi.useFakeTimers()
+    try {
+      const commission = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('provider down'))
+        .mockResolvedValue({ id: 'a', status: 'ready' })
+      const watcher = watchDiscoveryArt({ forge: { commission }, codex: stubCodex([]) })
+      watcher.onDiscovery({ name: 'one', makes: ['waterskin'] })
+      await watcher.settle()
+      await vi.advanceTimersByTimeAsync(59_999)
+      watcher.retry()
+      expect(commission).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      watcher.retry()
+      watcher.retry()
+      await watcher.settle()
+      expect(commission).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(3_600_000)
+      watcher.retry()
+      await watcher.settle()
+      expect(commission).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('caps retry backoff at one hour and drops deferred work on stop', async () => {
+    vi.useFakeTimers()
+    try {
+      const cancellation = new AbortController()
+      const commission = vi.fn().mockRejectedValue(new Error('provider down'))
+      const watcher = watchDiscoveryArt({
+        forge: { commission },
+        codex: stubCodex([]),
+        signal: cancellation.signal,
+      })
+      watcher.onDiscovery({ name: 'one', makes: ['waterskin'] })
+      await watcher.settle()
+      let attempts = 1
+      for (const delay of [
+        60_000, 120_000, 240_000, 480_000, 960_000, 1_920_000, 3_600_000, 3_600_000,
+      ]) {
+        await vi.advanceTimersByTimeAsync(delay - 1)
+        watcher.retry()
+        expect(commission).toHaveBeenCalledTimes(attempts)
+        await vi.advanceTimersByTimeAsync(1)
+        watcher.retry()
+        await watcher.settle()
+        expect(commission).toHaveBeenCalledTimes(++attempts)
+      }
+      cancellation.abort()
+      await vi.advanceTimersByTimeAsync(3_600_000)
+      watcher.retry()
+      watcher.onDiscovery({ name: 'late', makes: ['cord'] })
+      expect(commission).toHaveBeenCalledTimes(attempts)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

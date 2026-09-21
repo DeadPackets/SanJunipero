@@ -186,7 +186,7 @@ describe('verb: take', () => {
     expect(res.state.items.item_1!.loc).toEqual({ t: 'agent', id: 'a1' })
   })
 
-  it('takes an item from an adjacent structure', () => {
+  it('takes an item from the room it entered', () => {
     let s = makeWorld()
     s = fold(
       s,
@@ -213,6 +213,8 @@ describe('verb: take', () => {
       }),
       CFG,
     )
+    s = fold(s, ev('structure_completed', { id: 'structure_1' }), CFG)
+    s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }), CFG)
     const r = submitIntent(s, CFG, 'a1', 'take', { itemId: 'item_1' })
     if (!r.ok) throw new Error(r.reason)
     s = applyAll(s, r.events)

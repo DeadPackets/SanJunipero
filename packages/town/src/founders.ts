@@ -708,7 +708,10 @@ export function makeFoundersOnTick(
           ...(s.facing === 'sw' ? {} : { facing: s.facing }),
           ...(s.name === undefined ? {} : { name: s.name }),
         })
-        emit('structure_completed', { id: s.id })
+        emit('structure_completed', {
+          id: s.id,
+          ...(config.world.layout === 'orchard' ? { seeded: true } : {}),
+        })
         if (config.world.layout === 'orchard' && ['lamp_post', 'fire_pit'].includes(s.kind))
           emit('structure_fueled', { structureId: s.id, burnsUntilTick: nextDawnTick(tick) })
       }

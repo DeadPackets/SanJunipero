@@ -98,6 +98,9 @@ describe('the court reads a rule the town agreed', () => {
     expect(court.systems[0]).toBe(COMPILE_INSTRUCTION)
     expect(court.systems[1]).toBe(COMPILE_INSTRUCTION)
     expect(court.users[0]).not.toBe(court.users[1])
+    expect(COMPILE_INSTRUCTION).toMatch(/require_before:[^\n]*breaks the rule/)
+    expect(COMPILE_INSTRUCTION).toMatch(/common:[^\n]*breaks the rule/)
+    expect(COMPILE_INSTRUCTION).toMatch(/tithe:[^\n]*breaks the rule/)
   })
 })
 

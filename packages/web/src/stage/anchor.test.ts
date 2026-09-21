@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { keepOnStage, screenAnchor } from './anchor.js'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
+import { describe, expect, it, vi } from 'vitest'
+import type { Scene } from '../render/scene.js'
+import { keepOnStage, screenAnchor, useSubjectAnchor } from './anchor.js'
+
+;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const VIEW = { x: -100, y: -50, w: 800, h: 600 }
 
@@ -26,6 +32,53 @@ describe('a mark stands where the town does', () => {
     expect(screenAnchor(VIEW, 1, 350, -51).onScreen).toBe(false)
     expect(screenAnchor(VIEW, 1, 350, 551).onScreen).toBe(false)
   })
+})
+
+it('keeps the ring arms beside the dock and follows inset changes without a render', async () => {
+  const frames: FrameRequestCallback[] = []
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => frames.push(callback))
+  vi.stubGlobal('cancelAnimationFrame', () => {})
+  const scene = {
+    viewRect: () => ({ x: -100, y: -50, w: 720, h: 450 }),
+    getZoom: () => 2,
+    pointOf: () => ({ sx: 350, sy: 175 }),
+    safeInsets: { top: 140, bottom: 82, right: 504 },
+  } as unknown as Scene
+  function Probe() {
+    const ref = useSubjectAnchor(
+      scene,
+      { id: 'dilara', kind: 'agent', name: 'Dilara' },
+      {
+        x: 145,
+        y: 150,
+      },
+    )
+    return createElement('div', { ref })
+  }
+  const host = document.createElement('div')
+  document.body.append(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => {
+      root.render(createElement(Probe))
+    })
+    frames.shift()!(0)
+    const ring = host.firstElementChild as HTMLElement
+    expect(ring.style.transform).toBe('translate(791px, 450px)')
+    expect(ring.style.visibility).toBe('visible')
+    scene.safeInsets = { top: 140, bottom: 82, right: 0 }
+    frames.shift()!(16)
+    expect(ring.style.transform).toBe('translate(900px, 450px)')
+    scene.safeInsets = { top: 400, bottom: 82, right: 504 }
+    frames.shift()!(32)
+    expect(ring.style.transform).toBe('translate(791px, 550px)')
+  } finally {
+    await act(async () => {
+      root.unmount()
+    })
+    host.remove()
+    vi.unstubAllGlobals()
+  }
 })
 
 // The ring is 124px across with an arm hung off each side, so a figure at x = 20 put its "Home"

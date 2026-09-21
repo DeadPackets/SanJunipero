@@ -368,20 +368,13 @@ describe('C1 · the focus ring is visible on every ground it sits on', () => {
   })
 })
 
-describe('C3, C4, C5 · three marks that were painted below their own floor', () => {
+describe('C3, C5 · tab and timeline marks meet their contrast floor', () => {
   it('underlines the open tab in something a reader can see', () => {
     const colour = /border-bottom-color:\s*var\(--([\w-]+)\)/.exec(
       ruleBody(CSS, '.paper-tab.on'),
     )?.[1]
     expect(colour).toBe('ink')
     expect(contrast(T.honey!, T.parchment!), 'the honey rule it replaced').toBeLessThan(3)
-  })
-
-  it('draws the grip at the 3:1 non-text floor on the parchment it lies on', () => {
-    const colour = /background:\s*var\(--([\w-]+)\)/.exec(ruleBody(CSS, '.paper-grip'))?.[1]
-    expect(colour).toBe('ink-quiet')
-    expect(contrast(T[colour!]!, T.parchment!)).toBeGreaterThanOrEqual(3)
-    expect(contrast('#B89D7E', T.parchment!), 'the bar it replaced').toBeLessThan(3)
   })
 
   it('draws the day gridlines on the cream track they cross', () => {

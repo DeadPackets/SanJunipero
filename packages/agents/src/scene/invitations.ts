@@ -1,3 +1,4 @@
+import type { Tie } from '../memory/ties.js'
 // What the five relationship events mean to the people in them: the sentence the invitee reads,
 // the ties each one leaves, and the lines that go in a book. Pure, and the only place any of it
 // is written — a leaving from an ordinary turn and a restart mid-ask land the same ties.
@@ -126,7 +127,7 @@ const pair = (a: string, b: string, kind: TieDelta['kind'], text: string): TieDe
  *  belong to each other, and `roof` names the place a bedding happened under. */
 export function tiesFor(
   fact: RelationshipFact,
-  ctx: { partnered?: boolean; roof?: string | null } = {},
+  ctx: { partnered?: boolean; roof?: string | null; tiesOf?: (id: string) => readonly Tie[] } = {},
 ): TieDelta[] {
   if (fact.type === 'invitation_accepted') {
     if (fact.verb === 'court')
@@ -150,8 +151,23 @@ export function tiesFor(
   if (fact.type === 'partnership_dissolved') {
     const left = fact.byId === fact.aId ? fact.bId : fact.aId
     return [
-      { agentId: fact.aId, personId: fact.bId, kind: 'kin', text: 'your partner', settled: true },
-      { agentId: fact.bId, personId: fact.aId, kind: 'kin', text: 'your partner', settled: true },
+      ...[fact.aId, fact.bId].flatMap((agentId) =>
+        (ctx.tiesOf?.(agentId) ?? [])
+          .filter(
+            (t) =>
+              t.kind === 'kin' &&
+              t.text === 'your partner' &&
+              t.personId === (agentId === fact.aId ? fact.bId : fact.aId),
+          )
+          .map((t) => ({
+            agentId,
+            personId: t.personId,
+            kind: t.kind,
+            text: t.text,
+            tieId: t.id,
+            resolution: 'released' as const,
+          })),
+      ),
       { agentId: left, personId: fact.byId, kind: 'grudge', text: 'left you' },
     ]
   }

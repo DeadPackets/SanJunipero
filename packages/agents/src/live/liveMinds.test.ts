@@ -304,7 +304,7 @@ describe('★ kin are ties from the first tick', () => {
 // Dusk of day 7: the first night a tie opened on the founding tick is older than its clock.
 const DUSK_DAY_7 = 7 * 1440 + 1200
 
-describe('★ a tie nobody has touched for seven sim-days is let go', () => {
+describe('affect fades while unresolved obligations survive seven sim-days', () => {
   const letGoRows = (db: Database.Database): { text: string }[] =>
     db.prepare("SELECT text FROM memories WHERE text LIKE 'You have let go%'").all() as {
       text: string
@@ -324,7 +324,7 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
       [{ agentId: AGENT, personId: 'omar', kind: 'debt', text: 'Two planks.' }],
       DUSK_DAY_7,
     )
-    await stepUntil(loop, () => letGoRows(mindDb).length >= 2, 600)
+    await stepUntil(loop, () => letGoRows(mindDb).length >= 1, 600)
     booted.stop()
 
     // Only Tamar has a body in this world, so the other two are named by the id the tie carries.
@@ -332,18 +332,13 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
       letGoRows(mindDb)
         .map((r) => r.text)
         .sort(),
-    ).toEqual([
-      'You have let go of what was between you and nadia: She took the last loaf.',
-      'You have let go of what was between you and omar: A day on the well gate.',
-    ])
+    ).toEqual(['You have let go of what was between you and nadia: She took the last loaf.'])
     expect(
       ties.open().map((t) => t.kind),
-      'today’s debt is not stale',
-    ).toEqual(['debt'])
+      'promises and debts remain open',
+    ).toEqual(['promise', 'debt'])
   })
 
-  // A close can say a promise was kept; only this can say broken. The world witnesses it and
-  // folds it to nothing, so the log it lands in still replays to the state it always reached.
   it('announces the lapse to the world, and the log still replays byte for byte', async () => {
     const h = await bootOne({ startTick: DUSK_DAY_7 })
     const ties = new TieStore(h.mindDb, AGENT)
@@ -355,17 +350,14 @@ describe('★ a tie nobody has touched for seven sim-days is let go', () => {
       0,
     )
     // An announcement rides the NEXT tick, so the log is what this waits on, not the memory row.
-    await stepUntil(h.loop, () => h.store.readTypeFrom(0, 'tie_let_go').length >= 2, 600)
+    await stepUntil(h.loop, () => h.store.readTypeFrom(0, 'tie_let_go').length >= 1, 600)
     h.booted.stop()
 
     const log = h.store.readFrom(0)
     const said = log
       .filter((e) => e.type === 'tie_let_go')
       .map((e) => e.payload as { agentId: string; personId: string; kind: string })
-    expect(said.map((p) => `${p.personId}:${p.kind}`).sort()).toEqual([
-      'nadia:grudge',
-      'omar:promise',
-    ])
+    expect(said.map((p) => `${p.personId}:${p.kind}`).sort()).toEqual(['nadia:grudge'])
     expect(new Set(said.map((p) => p.agentId))).toEqual(new Set([AGENT]))
 
     // The whole log, from genesis, through the fold that has to know the type.
@@ -385,8 +377,11 @@ const SCENE_TURN = {
   stance: null,
   answer: null,
   ask: null,
+  reconvene: null,
   leave: false,
   importance: 4,
+  plan: null,
+  reconsider_at: null,
 }
 
 describe('a town that is closing waits on the talk it is paying for', () => {

@@ -533,7 +533,7 @@ describe('a law the town wrote', () => {
     expect(r.ok && r.events.map((e) => e.type)).toEqual(['action_started'])
   })
 
-  it('require_before refuses in the town’s own words until the thing asked for is done today', () => {
+  it('require_before records a violation until the expected act is done today', () => {
     let s = lawWorld()
     s = shelve(s, 'item_1', 'bread', { t: 'tile', x: 4, y: 6 })
     const text = 'Sleep before you lift a thing.'
@@ -550,26 +550,28 @@ describe('a law the town wrote', () => {
       ),
     )
 
-    expect(submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })).toEqual({
-      ok: false,
-      reason: `the town agreed: ${text}`,
-    })
+    const before = submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(before.ok && before.events.map((e) => e.type)).toEqual(['action_started', 'law_broken'])
 
     const slept = finished(at(s, NOON), 'sleep', {}, NOON)
     expect(slept.agents.a1!.lawMarks).toEqual({ sleep: NOON })
-    expect(
-      submitIntent(at(slept, NOON + 60), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }).ok,
-    ).toBe(true)
+    const complied = submitIntent(at(slept, NOON + 60), DEFAULT_CONFIG, 'a1', 'take', {
+      itemId: 'item_1',
+    })
+    expect(complied.ok && complied.events.map((e) => e.type)).toEqual(['action_started'])
     // A night's sleep does not carry: the rule asks again the next morning.
-    expect(
-      submitIntent(at(slept, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
-        itemId: 'item_1',
-      }).ok,
-    ).toBe(false)
+    const nextDay = submitIntent(at(slept, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
+      itemId: 'item_1',
+    })
+    expect(nextDay.ok && nextDay.events.map((e) => e.type)).toEqual([
+      'action_started',
+      'law_broken',
+    ])
   })
 
-  it('common lets you take your first from the store and refuses the second', () => {
+  it('common lets the second take happen and records the violation', () => {
     let s = lawWorld()
+    s = fold(s, lawEv('agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = shelve(s, 'item_1', 'bread', { t: 'structure', id: 'structure_1' })
     const text = 'One loaf each from the store.'
     s = fold(
@@ -590,13 +592,15 @@ describe('a law the town wrote', () => {
     )
 
     const holding = shelve(s, 'item_2', 'bread', { t: 'agent', id: 'a1' })
-    expect(
-      submitIntent(at(holding, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }),
-    ).toEqual({ ok: false, reason: `the town agreed: ${text}` })
+    const second = submitIntent(at(holding, NOON), DEFAULT_CONFIG, 'a1', 'take', {
+      itemId: 'item_1',
+    })
+    expect(second.ok && second.events.map((e) => e.type)).toEqual(['action_started', 'law_broken'])
   })
 
-  it('tithe refuses the take until the shelving is paid for, and asks again next period', () => {
+  it('tithe records unpaid takes, compliance, and a new violation next period', () => {
     let s = lawWorld()
+    s = fold(s, lawEv('agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = shelve(s, 'item_1', 'wood', { t: 'structure', id: 'structure_1' })
     s = shelve(s, 'item_2', 'wood', { t: 'agent', id: 'a1' })
     const text = 'A log in before a log out.'
@@ -615,10 +619,8 @@ describe('a law the town wrote', () => {
       ),
     )
 
-    expect(submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })).toEqual({
-      ok: false,
-      reason: `the town agreed: ${text}`,
-    })
+    const unpaid = submitIntent(at(s, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' })
+    expect(unpaid.ok && unpaid.events.map((e) => e.type)).toEqual(['action_started', 'law_broken'])
 
     const paid = finished(
       at(s, NOON),
@@ -627,14 +629,17 @@ describe('a law the town wrote', () => {
       NOON,
     )
     expect(paid.agents.a1!.lawMarks).toEqual({ law_1: 0 })
-    expect(
-      submitIntent(at(paid, NOON), DEFAULT_CONFIG, 'a1', 'take', { itemId: 'item_1' }).ok,
-    ).toBe(true)
-    expect(
-      submitIntent(at(paid, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
-        itemId: 'item_1',
-      }).ok,
-    ).toBe(false)
+    const settled = submitIntent(at(paid, NOON), DEFAULT_CONFIG, 'a1', 'take', {
+      itemId: 'item_1',
+    })
+    expect(settled.ok && settled.events.map((e) => e.type)).toEqual(['action_started'])
+    const nextDay = submitIntent(at(paid, NOON + MINUTES_PER_DAY), DEFAULT_CONFIG, 'a1', 'take', {
+      itemId: 'item_1',
+    })
+    expect(nextDay.ok && nextDay.events.map((e) => e.type)).toEqual([
+      'action_started',
+      'law_broken',
+    ])
   })
 
   it('a walk composed to reach the thing breaks nothing; the act at the end of it does, once', () => {

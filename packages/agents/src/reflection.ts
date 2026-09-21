@@ -1,4 +1,4 @@
-import { PLAIN_SPEECH } from '@sj/shared'
+import { PLAIN_SPEECH, MINUTES_PER_DAY } from '@sj/shared'
 import { z } from 'zod'
 import { BudgetExceededError, type LlmClient, type LlmMessage } from '@sj/llm'
 import type { MemoryRow, MemoryStore } from './memory/store.js'
@@ -11,8 +11,8 @@ import {
   type PersonalityStore,
   type PersonalityEdit,
 } from './personality.js'
-import { TIE_KINDS, type TieDelta } from './scene/scene.js'
-import type { TieStore } from './memory/ties.js'
+import { TIE_KINDS, TieAnswerFields, type TieDelta } from './scene/scene.js'
+import type { Tie, TieStore } from './memory/ties.js'
 
 export type ReflectionLlm = GistLlm & {
   extractFacts(
@@ -23,12 +23,14 @@ export type ReflectionLlm = GistLlm & {
   ): Promise<{ title: string; text: string; memoryIds: number[] }[]>
   summarizeDay(
     scenes: { title: string; text: string }[],
-  ): Promise<{ title: string; text: string; standing: string[] }>
+    previousGoals: readonly string[],
+  ): Promise<z.infer<typeof DAY_SUMMARY_SCHEMA>>
   updateLedger(personName: string, existing: string | null, relevant: MemoryRow[]): Promise<string>
   listTies(
     dayMemories: MemoryRow[],
     people: readonly string[],
-  ): Promise<{ about: string; kind: TieDelta['kind']; text: string; settled: boolean }[]>
+    openTies: readonly Tie[],
+  ): Promise<z.infer<typeof TIES_SCHEMA>['ties']>
   autobiographyParagraph(daySummary: string, doc: PersonalityDoc): Promise<string>
   proposeEdit(
     daySummary: string,
@@ -63,10 +65,7 @@ export type ReflectionTies = {
 }
 
 /** Names back to ids off the closed roll, dropping the mind itself and anyone it invented. */
-function tiesFrom(
-  answer: readonly { about: string; kind: TieDelta['kind']; text: string; settled: boolean }[],
-  ties: ReflectionTies,
-): TieDelta[] {
+function tiesFrom(answer: z.infer<typeof TIES_SCHEMA>['ties'], ties: ReflectionTies): TieDelta[] {
   const agentId = ties.store.agentId
   const idOf = new Map<string, string>()
   for (const p of ties.cast) {
@@ -83,7 +82,10 @@ function tiesFrom(
       personId,
       kind: t.kind,
       text: t.text.trim(),
-      ...(t.settled ? { settled: true as const } : {}),
+      ...(t.tieId === null ? {} : { tieId: t.tieId }),
+      ...(t.resolution === null ? {} : { resolution: t.resolution }),
+      remindAtTick: t.remindAtTick,
+      evidenceSeqs: [],
     })
   }
   return out
@@ -96,14 +98,17 @@ const CHANGED_BY_ACT_IMPORTANCE = 6
 const CONFLICT_TIES: readonly TieDelta['kind'][] = ['slight', 'grudge']
 
 /** Whether the day held what the nightly edit asks about. Its own prompt says "most days hold
- *  nothing like that", and over r13 an act this big landed on 14 mind-days in 40. A collapse and
- *  a death are NOT caught here: every perception is written at a flat importance of 3. */
+ *  nothing like that". Consequential witnessed memories can matter without an act of one’s own. */
 function heldSomethingToChangeFor(
   dayMemories: readonly MemoryRow[],
   ties: readonly TieDelta[],
 ): boolean {
-  if (ties.some((t) => t.settled !== true && CONFLICT_TIES.includes(t.kind))) return true
-  return dayMemories.some((m) => m.kind === 'action' && m.importance >= CHANGED_BY_ACT_IMPORTANCE)
+  if (ties.some((t) => t.resolution === undefined && CONFLICT_TIES.includes(t.kind))) return true
+  return dayMemories.some(
+    (m) =>
+      (m.kind === 'action' && m.importance >= CHANGED_BY_ACT_IMPORTANCE) ||
+      ((m.kind === 'speech_heard' || m.kind === 'perception') && m.importance >= 9),
+  )
 }
 
 // A well-formed edit to a part of the doc the window keeps shut tonight is set aside without a
@@ -167,21 +172,7 @@ export async function runSleepReflection(deps: {
     }
   }
 
-  // Facts first, before any summarizing: a hallucinated `src_memory_id` trips the FK and
-  // aborts the pipeline mid-write, so keep only facts that cite today's memories.
-  const facts = (await step(() => llm.extractFacts(dayMemories))) ?? []
-  const todayIds = new Set(dayMemories.map((m) => m.id))
-  const insertedFacts = facts.filter((f) => todayIds.has(f.srcMemoryId))
-  for (const f of insertedFacts) {
-    mem.insertFact({
-      day,
-      subject: f.subject,
-      predicate: f.predicate,
-      object: f.object,
-      srcMemoryId: f.srcMemoryId,
-    })
-  }
-  const factCount = insertedFacts.length
+  const factCount = 0
 
   // 3. Scene summaries.
   const scenes = (await step(() => llm.summarizeScenes(dayMemories))) ?? []
@@ -209,17 +200,34 @@ export async function runSleepReflection(deps: {
       llm.listTies(
         dayMemories,
         ties.cast.map((p) => p.name),
+        ties.store.open(),
       ),
     )
     tieDeltas = listed === null ? [] : tiesFrom(listed, ties)
-    ties.store.apply(tieDeltas, ties.tick, 'reflection')
+    const accepted: TieDelta[] = []
+    for (const delta of tieDeltas) {
+      try {
+        accepted.push(...ties.store.apply([delta], ties.tick, 'reflection'))
+      } catch (err) {
+        alert?.('tie_rejected', String(err))
+      }
+    }
+    tieDeltas = accepted
   }
   const tiesWritten = tieDeltas.length
 
   // 4. Day node with child scene ids — mechanical when the night went dark.
-  const daySummary = await step(() =>
-    llm.summarizeDay(scenes.map((s) => ({ title: s.title, text: s.text }))),
-  )
+  const previousGoals = personality.current().doc.current.goals
+  const daySummary = await step(async () => {
+    const summary = DAY_SUMMARY_SCHEMA.parse(
+      await llm.summarizeDay(
+        scenes.map((s) => ({ title: s.title, text: s.text })),
+        previousGoals,
+      ),
+    )
+    revisedGoals(previousGoals, summary)
+    return summary
+  })
   mem.insertSummaryNode({
     level: 'day',
     day,
@@ -229,13 +237,24 @@ export async function runSleepReflection(deps: {
     memoryIds: [],
   })
   const daySummaryText = daySummary?.text ?? ''
-  // What the mind is about rides the fluid layer of its own doc, beside its mood: one nightly
-  // want-list in the stable prefix, not two.
-  // r39 and r41 both: a mind wrote its want about itself in the third person. Kamal wanted Kamal
-  // to ask him first, Farida wanted to be the one Farida calls. A night that comes back with that
-  // leaves yesterday's want standing rather than putting nonsense on the person's own page.
-  if (daySummary !== null && !namesSelf(daySummary.standing[0], selfName)) {
-    personality.updateCurrent({ ...personality.current().doc.current, goals: daySummary.standing })
+  if (daySummary !== null) {
+    const goals = revisedGoals(previousGoals, daySummary)
+    if (!goals.some((goal) => namesSelf(goal, selfName))) {
+      personality.updateCurrent({ ...personality.current().doc.current, goals })
+      for (const revision of daySummary.revisions) {
+        if (revision.decision === 'retain') continue
+        await mem.insertMemory({
+          tick: (day + 1) * MINUTES_PER_DAY - 1,
+          kind: 'reflection',
+          text:
+            revision.decision === 'resolve'
+              ? `I set aside this intention: ${revision.previous} My reason: ${revision.reason}`
+              : `I changed this intention: ${revision.previous} Now: ${revision.text}`,
+          importance: 5,
+          tags: { people: [], place: null, objects: [], topics: ['intentions'] },
+        })
+      }
+    }
   }
 
   // 5. Ledgers — once per distinct person tag in the day's memories.
@@ -373,12 +392,19 @@ export function gistPrompt(text: string): LlmPrompt {
   return { system: GIST_SYSTEM, messages: [{ role: 'user', content: text }] }
 }
 
-export function summarizeDayPrompt(scenes: { title: string; text: string }[]): LlmPrompt {
+export function summarizeDayPrompt(
+  scenes: { title: string; text: string }[],
+  previousGoals: readonly string[] = [],
+): LlmPrompt {
   return {
     system: [
       'Before sleep, you look back over the whole day.',
       'Give the day one title and a short account that ties its scenes together.',
-      'Then name what you carry into tomorrow, as `standing`: at most three short lines, one each',
+      'In revisions, review previous goals by their exact text. Omitted goals remain pending.',
+      'Use retain, update with new text, or resolve with your reason for choosing to stop pursuing it.',
+      'Resolution is your decision, not proof of completion. No event ledger is supplied: evidenceSeqs must be empty.',
+      'A quiet day is not a reason to discard an intention. Do not replace goals just to make room.',
+      'Then name only new intentions, as `standing`: at most three short lines, one each',
       'for what you want, what you promised or owe, and what you are in the middle of making.',
       'The first line is what you want for yourself, in your own life, said the way you would say',
       'it to a friend in a dozen words. It is about one person, one place, one thing you are',
@@ -402,7 +428,12 @@ export function summarizeDayPrompt(scenes: { title: string; text: string }[]): L
       'on, not as a report of the day.',
       PLAIN_SPEECH,
     ].join('\n'),
-    messages: [{ role: 'user', content: `The day held these scenes:\n${JSON.stringify(scenes)}` }],
+    messages: [
+      {
+        role: 'user',
+        content: `Previous goals: ${JSON.stringify(previousGoals)}\nThe day held these scenes:\n${JSON.stringify(scenes)}`,
+      },
+    ],
   }
 }
 
@@ -456,13 +487,20 @@ export function updateLedgerPrompt(
   }
 }
 
-export function listTiesPrompt(dayMemories: MemoryRow[], people: readonly string[]): LlmPrompt {
+export function listTiesPrompt(
+  dayMemories: MemoryRow[],
+  people: readonly string[],
+  openTies: readonly Tie[] = [],
+): LlmPrompt {
   return nightPrompt(dayMemories, [
     'Before sleep, you go over what the day left between you and other people.',
     'A tie is one thing YOU now hold about one of them: a promise you made or they made you, a',
     'debt, a slight, a grudge, an attraction, a secret, an alliance.',
-    'Write one only where today actually made it or paid it off, and mark it settled when the day',
-    'cleared something that was already owed. Most days leave one or two, and many leave none.',
+    'Write one only where today made it or changed it. Use null tieId and resolution for a new tie.',
+    'To resolve an existing tie, copy its tieId and use fulfilled, released or broken as your own judgment, not an established world fact.',
+    'Separate obligations remain separate. Reuse an existing ID for a restatement. A reminder is not a deadline.',
+    'Use null remindAtTick unless an exact time was supplied. No event ledger is supplied: evidenceSeqs must be empty.',
+    `Your existing ties: ${JSON.stringify(openTies)}`,
     people.length === 0
       ? 'Name nobody: you were alone today.'
       : `Name only these people: ${people.join(', ')}.`,
@@ -555,9 +593,51 @@ export const DAY_SUMMARY_SCHEMA = z
   .object({
     title: z.string().min(1),
     text: z.string().min(1),
-    standing: z.array(z.string().min(1)).max(3),
+    standing: z.array(z.string().trim().min(1).max(300)).max(3),
+    revisions: z.array(
+      z.union([
+        z.object({ previous: z.string().min(1), decision: z.literal('retain') }).strict(),
+        z
+          .object({
+            previous: z.string().min(1),
+            decision: z.literal('update'),
+            text: z.string().trim().min(1).max(300),
+          })
+          .strict(),
+        z
+          .object({
+            previous: z.string().min(1),
+            decision: z.literal('resolve'),
+            reason: z.string().trim().min(1),
+            evidenceSeqs: z.array(z.number().int().positive()).max(0),
+          })
+          .strict(),
+      ]),
+    ),
   })
   .strict()
+function revisedGoals(
+  previous: readonly string[],
+  summary: z.infer<typeof DAY_SUMMARY_SCHEMA>,
+): string[] {
+  const revisions = new Map<string, z.infer<typeof DAY_SUMMARY_SCHEMA>['revisions'][number]>()
+  for (const revision of summary.revisions) {
+    if (!previous.includes(revision.previous) || revisions.has(revision.previous))
+      throw new Error('goal revision must name one existing intention exactly once')
+    revisions.set(revision.previous, revision)
+  }
+  const goals = previous.flatMap((goal) => {
+    const revision = revisions.get(goal)
+    if (revision?.decision === 'resolve') return []
+    return [revision?.decision === 'update' ? revision.text : goal]
+  })
+  for (const goal of summary.standing) {
+    if (goals.length >= Math.max(3, previous.length)) break
+    if (!goals.includes(goal)) goals.push(goal)
+  }
+  return [...new Set(goals)]
+}
+
 export const LEDGER_SCHEMA = z.object({ doc: z.string() }).strict()
 // Six is what a whole scene may name; a day is longer, and eight is the runaway stop rather
 // than the ask, which the prose above puts at one or two.
@@ -570,7 +650,7 @@ export const TIES_SCHEMA = z
             about: z.string().min(1),
             kind: z.enum(TIE_KINDS),
             text: z.string().min(1),
-            settled: z.boolean(),
+            ...TieAnswerFields,
           })
           .strict(),
       )
@@ -635,8 +715,8 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
       })
       return value.scenes
     },
-    async summarizeDay(scenes) {
-      const p = summarizeDayPrompt(scenes)
+    async summarizeDay(scenes, previousGoals) {
+      const p = summarizeDayPrompt(scenes, previousGoals)
       const { value } = await client.object({
         system: p.system,
         messages: p.messages,
@@ -653,8 +733,8 @@ export function makeReflectionLlm(client: LlmClient): ReflectionLlm {
       })
       return value.doc
     },
-    async listTies(dayMemories, people) {
-      const p = listTiesPrompt(dayMemories, people)
+    async listTies(dayMemories, people, openTies) {
+      const p = listTiesPrompt(dayMemories, people, openTies)
       const { value } = await client.object({
         system: p.system,
         messages: p.messages,

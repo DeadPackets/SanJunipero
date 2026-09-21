@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { SimConfigSchema, makeCityTemplate } from '@sj/shared'
+import {
+  SimConfigSchema,
+  buildingAppearanceFor,
+  buildingWindowMask,
+  frontDoorFraction,
+  makeCityTemplate,
+  type BuildingAppearanceRecipe,
+} from '@sj/shared'
 import type { Structure } from '@sj/engine/state'
 import { buildStructure, structureKey } from './structures.js'
 import { effectiveConfig } from '@sj/engine/laws'
@@ -42,6 +49,67 @@ function expectInside(group: THREE.Group, s: Structure): void {
 }
 
 describe('town structure geometry', () => {
+  it('renders home, shop, and meeting identities on one authoritative footprint', () => {
+    const examples = [
+      structure('house', { w: 3, h: 3, owner: 'amara' }),
+      structure('bakery', { w: 3, h: 3 }),
+      structure('civic_hall', { w: 3, h: 3 }),
+    ]
+    const groups = examples.map((example) => buildStructure(example, config))
+    const appearances = groups.map((group) => group.userData.appearance as BuildingAppearanceRecipe)
+    const masks = groups.map(
+      (group) => group.userData.windowMask as ReturnType<typeof buildingWindowMask>,
+    )
+    const windows = groups.map((group) => group.userData.windows as THREE.MeshStandardMaterial[])
+
+    expect(appearances.map((appearance) => appearance.use)).toEqual([
+      'personal-home',
+      'public-shop',
+      'public-meeting',
+    ])
+    expect(masks).toEqual(
+      examples.map((example) =>
+        buildingWindowMask(buildingAppearanceFor(example.kind), example.w, false),
+      ),
+    )
+    expect(windows.map((materials) => materials.length)).toEqual([3, 3, 4])
+
+    for (let i = 0; i < examples.length; i++) {
+      const example = examples[i]!
+      const group = groups[i]!
+      expectInside(group, example)
+      const door = group.getObjectByName('door')!.getWorldPosition(new THREE.Vector3())
+      expect(door.x).toBeCloseTo(example.x + frontDoorFraction(example.w) * example.w)
+      expect(windows[i]!.every((window) => window.emissiveIntensity === 0)).toBe(true)
+    }
+
+    for (const window of windows[2]!) window.emissiveIntensity = 0.8
+    expect(windows[2]!.every((window) => window.emissiveIntensity === 0.8)).toBe(true)
+    expect(appearances[2]!.use).toBe('public-meeting')
+  })
+
+  it('keeps a turned meeting hall window mask equal to its rendered panes', () => {
+    const s = structure('civic_hall', { facing: 'se', w: 3, h: 4 })
+    const group = buildStructure(s, config)
+    const mask = buildingWindowMask(buildingAppearanceFor(s.kind), s.h, true)
+    expect(group.userData.windowMask).toEqual(mask)
+    expect(group.userData.windows).toHaveLength(mask.front.length + mask.side.length)
+  })
+
+  it('keeps an unknown roofed kind coherent on the generic fallback', () => {
+    const invented = effectiveConfig(config, {
+      'structures.recipes.observatory': { ...config.structures.recipes.house!, roofed: true },
+    })
+    const s = structure('observatory', { w: 3, h: 3 })
+    const group = buildStructure(s, invented)
+    const appearance = group.userData.appearance as BuildingAppearanceRecipe
+    expect(appearance).toEqual(buildingAppearanceFor('observatory'))
+    expect(appearance.use).toBe('generic')
+    expect(group.getObjectByName('door')).toBeDefined()
+    expect(group.getObjectByName('roof')).toBeDefined()
+    expectInside(group, s)
+  })
+
   it('draws every authored and buildable kind inside its state footprint', () => {
     const kinds = new Set([
       ...Object.keys(config.structures.recipes),

@@ -18,22 +18,48 @@ export function localStore(): Storage | null {
   }
 }
 
-/** The tick this browser had watched up to when the tab OPENED. `socket.ts` overwrites
- *  `sj:lastSeenTick` on the first snapshot, so anything that wants to know what the viewer
- *  missed has to have read it before that — which is what this module-load capture is for. */
-const VISIT_WATERMARK: number | null = (() => {
-  try {
-    const raw = localStore()?.getItem('sj:lastSeenTick')
-    if (raw === null || raw === undefined) return null
-    const n = Math.floor(Number(raw))
-    return Number.isFinite(n) && n >= 0 ? n : null
-  } catch {
-    return null
-  }
-})()
+export type VisitCursor = { runId: string | null; seq: number | null; tick: number | null }
+const EMPTY_VISIT: VisitCursor = { runId: null, seq: null, tick: null }
+const VISIT_KEY = 'sj:lastVisit'
 
-export function lastVisitTick(): number | null {
-  return VISIT_WATERMARK
+export function readVisitCursor(): VisitCursor {
+  try {
+    const raw = localStore()?.getItem(VISIT_KEY)
+    if (!raw) return EMPTY_VISIT
+    const value = JSON.parse(raw) as VisitCursor
+    if (
+      typeof value.runId !== 'string' ||
+      !value.runId ||
+      !Number.isSafeInteger(value.seq) ||
+      value.seq === null ||
+      value.seq < 0 ||
+      !Number.isSafeInteger(value.tick) ||
+      value.tick === null ||
+      value.tick < 0
+    )
+      return EMPTY_VISIT
+    return { runId: value.runId, seq: value.seq, tick: value.tick }
+  } catch {
+    return EMPTY_VISIT
+  }
+}
+
+export function rememberVisit(cursor: VisitCursor): void {
+  try {
+    localStore()?.setItem(VISIT_KEY, JSON.stringify(cursor))
+  } catch {
+    /* site data blocked */
+  }
+}
+
+// Capture before the first snapshot updates storage; reconnecting must not move this visit's start.
+const VISIT_CURSOR = readVisitCursor()
+export function lastVisitCursor(): VisitCursor {
+  return VISIT_CURSOR
+}
+
+export function lastVisitTick(runId: string | null): number | null {
+  return runId !== null && runId === VISIT_CURSOR.runId ? VISIT_CURSOR.tick : null
 }
 
 /** One remembered word: the same try/catch on both sides, because reading the storage property

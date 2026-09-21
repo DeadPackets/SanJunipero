@@ -137,6 +137,19 @@ describe('vision judge', () => {
     expect(Object.keys(verdict.criteria).sort()).toEqual([...CRITERIA].sort())
   })
 
+  it('reports a billed invalid verdict before schema parsing throws', async () => {
+    const { gen } = spy(() => ({}), { openrouter: { usage: { cost: 0.03 } } })
+    const charges: number[] = []
+    const judge = makeVisionJudge({
+      apiKey: 'k',
+      refs: [],
+      generateFn: gen,
+      onCharge: (_model, usd) => charges.push(usd),
+    })
+    await expect(judge(ARGS)).rejects.toThrow()
+    expect(charges).toEqual([0.03])
+  })
+
   it('costs the estimate without reported usage and the reported figure with it', async () => {
     const a = spy(scored(9))
     expect(

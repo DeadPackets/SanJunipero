@@ -45,6 +45,7 @@ const MAP = (n = 24): TileId[][] => grid(n)
 type Box = { id: string; kind: string; x: number; y: number; w: number; h: number }
 const HOUSE: Box = { id: 'structure_1', kind: 'house', x: 4, y: 4, w: 2, h: 2 } // door (4,6)
 const STORE: Box = { id: 'structure_2', kind: 'storehouse', x: 10, y: 4, w: 2, h: 2 } // door (10,6)
+const STALL: Box = { id: 'structure_3', kind: 'standing_stone', x: 10, y: 4, w: 2, h: 2 }
 
 function raise(s: WorldState, config: SimConfig, box: Box, owner?: string): WorldState {
   const planned = fold(
@@ -215,10 +216,10 @@ describe('G9a-2: conception, gestation and a child born at twelve', () => {
 })
 
 describe('G9a-3: the ownership chain — craft, give, and a taking the town can see', () => {
-  // 24x24 of grass; the storehouse at (10,4) is the shelf everything moves through.
+  // 24x24 of grass; the open stall at (10,4) keeps every transfer in public view.
   function town(): WorldState {
     let s = raise(genesisState(CFG, MAP()), CFG, HOUSE)
-    s = raise(s, CFG, STORE)
+    s = raise(s, CFG, STALL)
     s = spawn(s, CFG, { id: 'maker', x: 8, y: 5 })
     s = spawn(s, CFG, { id: 'owner', x: 9, y: 5 })
     s = spawn(s, CFG, { id: 'taker', x: 11, y: 5 })
@@ -261,10 +262,10 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
     expect(s.items[plank.id]!.crafterMark).toBe('maker') // a mark is not a title; it never moves
 
     // stow → onto the shelf, still the owner's.
-    const stowParams = { itemId: plank.id, structureId: STORE.id }
+    const stowParams = { itemId: plank.id, structureId: STALL.id }
     expect(submitIntent(s, CFG, 'owner', 'stow', stowParams).ok).toBe(true)
     s = apply(s, CFG, VERBS.stow!.onComplete(s, CFG, 'owner', stowParams, RNG))
-    expect(s.items[plank.id]!.loc).toEqual({ t: 'structure', id: STORE.id })
+    expect(s.items[plank.id]!.loc).toEqual({ t: 'structure', id: STALL.id })
     expect(s.items[plank.id]!.owner).toBe('owner')
 
     // take → the engine blocks nothing; it only makes the taking public.
@@ -276,8 +277,8 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
       kind: 'plank',
       takerId: 'taker',
       ownerId: 'owner',
-      x: STORE.x,
-      y: STORE.y,
+      x: STALL.x,
+      y: STALL.y,
     })
     expect(takeEvents.some((e) => e.type === 'item_owner_changed')).toBe(false) // taking is not title
     s = apply(s, CFG, takeEvents)
@@ -316,7 +317,7 @@ describe('G9a-3: the ownership chain — craft, give, and a taking the town can 
         id: 'item_9',
         kind: 'bread',
         qty: 1,
-        loc: { t: 'structure', id: STORE.id },
+        loc: { t: 'structure', id: STALL.id },
         owner: 'owner',
       }),
       CFG,
@@ -375,6 +376,7 @@ describe('G9a-5: a shelf buys time', () => {
   function larder(): WorldState {
     let s = raise(genesisState(CFG, MAP()), CFG, STORE)
     s = spawn(s, CFG, { id: 'cook', x: 9, y: 5 })
+    s = indoors(s, CFG, 'cook', STORE)
     s = fold(
       s,
       ev('item_spawned', {

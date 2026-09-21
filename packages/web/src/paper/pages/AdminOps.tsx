@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MindStatus } from '@sj/shared'
 import { OutOfReach } from '../../ui/OutOfReach.js'
 import { momentStamp } from '../stamp.js'
 
@@ -10,6 +11,7 @@ export const SPEED_STOPS = [0.5, 1, 2, 4, 8] as const
 export type ClockState = { paused: boolean; speed: number; tick: number }
 type Spend = { calls: number; usd: number }
 export type CostReport = {
+  mindStatus: MindStatus
   live: boolean
   today: Spend
   lifetime: Spend

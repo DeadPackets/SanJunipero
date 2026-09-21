@@ -37,6 +37,7 @@ import {
   lineCapFor,
   type SceneAsk,
   type SceneClose,
+  type SceneCloseAsk,
   type SceneLlm,
   type SceneTurn,
   type Stance,
@@ -64,6 +65,7 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
     stance: null,
     answer: null,
     ask: null,
+    reconvene: null,
     leave: line.leave,
     importance: line.importance,
     mood: null,
@@ -75,6 +77,7 @@ function fromCorpus(i: number, over: Partial<SceneTurn> = {}): SceneTurn {
  *  where a test needs a silence, a leaving or a stall no recording has. */
 class FakeSceneLlm implements SceneLlm {
   readonly asks: SceneAsk[] = []
+  readonly closeAsks: SceneCloseAsk[] = []
   /** Lines the test hands back by hand, so one can land after the floor has moved off it. */
   readonly held: ((turn: SceneTurn) => void)[] = []
   closes = 0
@@ -94,7 +97,8 @@ class FakeSceneLlm implements SceneLlm {
     return answer
   }
 
-  async close(): Promise<SceneClose> {
+  async close(ask: SceneCloseAsk): Promise<SceneClose> {
+    this.closeAsks.push(structuredClone(ask))
     this.closes += 1
     return this.closer()
   }
@@ -789,6 +793,36 @@ describe('what a close leaves behind', () => {
     ],
   }
 
+  it('hands an exit plan only to the resident who chose it', async () => {
+    const chosen: unknown[] = []
+    const h = harness({
+      script: () => () =>
+        fromCorpus(0, {
+          leave: true,
+          speech: 'I will go to the river.',
+          plan: [{ verb: 'walk', params: { x: 9, y: 9 } }],
+          reconsider_at: '14:00',
+        }),
+    })
+    h.minds.get(OMAR)!.commitSceneExit = (choice, tick) =>
+      chosen.push({ agentId: OMAR, choice, tick })
+    h.minds.get(NADIA)!.commitSceneExit = (choice, tick) =>
+      chosen.push({ agentId: NADIA, choice, tick })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Shall we go?', NOON)
+    const author = h.coordinator.open()[0]!.floor!
+    await h.coordinator.takeFloor(author, NOON + 1)
+    expect(chosen).toEqual([
+      {
+        agentId: author,
+        tick: NOON + 1,
+        choice: {
+          plan: [{ verb: 'walk', params: { x: 9, y: 9 } }],
+          reconsider_at: '14:00',
+        },
+      },
+    ])
+  })
+
   it('gives every participant one memory at the scene’s stakes, and each their own tie', async () => {
     const h = harness({
       script: () => () => fromCorpus(0, { speech: null }),
@@ -812,6 +846,40 @@ describe('what a close leaves behind', () => {
         .ties.open()
         .map((t) => t.kind),
     ).toEqual(['debt'])
+  })
+
+  it('passes only public lines to closure while preserving private per-resident threads', async () => {
+    const h = harness({
+      script: () => () =>
+        fromCorpus(0, { speech: 'I will bring the planks.', thought: 'PRIVATE_ASIDE_ONLY' }),
+      closer: () => CLOSE,
+    })
+    h.minds
+      .get(NADIA)!
+      .ties.apply(
+        [{ agentId: NADIA, personId: OMAR, kind: 'secret', text: 'PRIVATE_TIE_ONLY' }],
+        NOON,
+      )
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON)
+    h.loop.step()
+    const requests = [...h.llms.values()].flatMap((llm) => llm.closeAsks)
+    expect(requests).toHaveLength(1)
+    expect(JSON.stringify(requests)).not.toContain('PRIVATE_ASIDE_ONLY')
+    expect(JSON.stringify(requests)).not.toContain('PRIVATE_TIE_ONLY')
+    expect(JSON.stringify(requests)).toContain('I will bring the planks.')
+    expect(
+      [...h.llms.values()].some((llm) =>
+        llm.asks.some((ask) =>
+          ask.thread.some(
+            (line) => line.agentId === ask.agentId && line.aside === 'PRIVATE_ASIDE_ONLY',
+          ),
+        ),
+      ),
+    ).toBe(true)
+    const event = sceneEvents(h.engineDb).find((e) => e.type === 'scene_closed')!
+    expect(JSON.stringify(event)).not.toContain('PRIVATE_')
+    expect(h.remembered.some((r) => r.text === CLOSE.summary)).toBe(true)
   })
 
   it('writes no tie for a body that only overheard it, and announces none either', async () => {
@@ -845,6 +913,27 @@ describe('what a close leaves behind', () => {
       NADIA,
       OMAR,
     ])
+  })
+
+  it('rejects an invalid resolution but still closes and publishes valid new ties', async () => {
+    const errors: string[] = []
+    const h = harness({
+      script: () => () => fromCorpus(0, { speech: null }),
+      closer: () => ({
+        ...CLOSE,
+        deltas: [{ ...CLOSE.deltas[0]!, tieId: 999, resolution: 'fulfilled' }, CLOSE.deltas[1]!],
+      }),
+      onError: (kind) => errors.push(kind),
+    })
+    h.coordinator.noteSpoken(NADIA, 'Omar. Six planks.', NOON)
+    await play(h, NOON)
+    h.loop.step()
+    expect(errors).toContain('tie_rejected')
+    expect(h.minds.get(NADIA)!.ties.all()).toEqual([])
+    const event = sceneEvents(h.engineDb).find((e) => e.type === 'scene_closed')!
+    const deltas = (event.payload as { deltas: TieDelta[] }).deltas
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0]).toMatchObject({ agentId: OMAR, kind: 'debt', tieId: 1 })
   })
 
   it('asks for one close and no more, however the scene ended', async () => {
@@ -1108,7 +1197,7 @@ async function council(h: Harness, tick: number, said = PROPOSAL): Promise<void>
   }
 }
 
-/** The next day's first room of three: it votes on whatever the last council tabled. */
+/** A later room explicitly chooses the tabled proposal offered in its request. */
 async function vote(h: Harness, tick: number): Promise<void> {
   await council(h, tick, 'Morning, all.')
 }
@@ -1125,12 +1214,13 @@ async function lawPassed(h: Harness, tick: number, said = PROPOSAL): Promise<voi
 const stanced =
   (stances: Record<string, Stance | null>, to: Record<string, string> = {}) =>
   (agentId: string) =>
-  (): SceneTurn =>
+  (ask: SceneAsk): SceneTurn =>
     fromCorpus(0, {
       speech: 'That is where I stand.',
       leave: false,
       stance: stances[agentId] ?? null,
       to: to[agentId] ?? null,
+      reconvene: ask.pendingProposals?.[0]?.id ?? null,
     })
 
 /** A rule needs a room of three; Salma stands in earshot and says where she stands. */
@@ -1217,8 +1307,8 @@ describe('a town writes its own rule', () => {
     expect(scene.proposal?.stances).toEqual({ [OMAR]: 'against' })
   })
 
-  // The owner's ruling: a law is built over days. The room that hears a rule tables it; the
-  // first room of three on a later day votes it in or out.
+  // A law is built over days. The room that hears a rule tables it; a resident in a later room
+  // must deliberately bring it back before the room can vote it in or out.
   it('★ closes the talk and tables the rule the room was for, asking the court nothing yet', async () => {
     const { seam, asks } = court()
     const h = harness({
@@ -1241,7 +1331,7 @@ describe('a town writes its own rule', () => {
     expect(h.bridge.tabledLines()[0]).toContain(`"${PROPOSAL}"`)
   })
 
-  it('★ the same day’s next room does not vote; the next day’s first room ratifies with the court’s reading', async () => {
+  it('★ an explicit later choice reconvenes the proposal and ratifies it', async () => {
     const { seam, asks } = court()
     const h = harness({
       who: THREE,
@@ -1266,6 +1356,44 @@ describe('a town writes its own rule', () => {
     expect(asks, 'one call, and only for the vote that passed').toHaveLength(1)
     expect(asks[0]!.text).toBe(PROPOSAL)
     expect(h.bridge.tabledLaws()).toHaveLength(0)
+  })
+
+  it('★ an ordinary later gathering does not vote without a resident choosing the proposal', async () => {
+    const h = harness({
+      who: THREE,
+      script: () => () => fromCorpus(0, { speech: 'Morning.', leave: false }),
+      laws: court().seam,
+    })
+    h.emitNext('law_tabled', {
+      lawId: 'law_waiting',
+      agentId: NADIA,
+      text: PROPOSAL,
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    h.loop.step()
+    h.coordinator.noteSpoken(NADIA, 'Morning, all.', NOON + MINUTES_PER_DAY)
+    await h.coordinator.takeFloor(OMAR, NOON + MINUTES_PER_DAY)
+    expect(h.coordinator.open()[0]?.kind).toBe('talk')
+    expect(lawEvents(h.engineDb).map((e) => e.type)).toEqual(['law_tabled'])
+  })
+
+  it('★ ignores a reconvene id that was not offered to this resident and room', async () => {
+    const h = harness({
+      who: THREE,
+      script: () => () =>
+        fromCorpus(0, { speech: 'Let us settle it.', leave: false, reconvene: 'law_other' }),
+      laws: court().seam,
+    })
+    h.emitNext('law_tabled', {
+      lawId: 'law_waiting',
+      agentId: NADIA,
+      text: PROPOSAL,
+      votes: { for: [NADIA, OMAR], against: [] },
+    })
+    h.loop.step()
+    h.coordinator.noteSpoken(NADIA, 'Morning, all.', NOON + MINUTES_PER_DAY)
+    await h.coordinator.takeFloor(OMAR, NOON + MINUTES_PER_DAY)
+    expect(h.coordinator.open()[0]?.kind).toBe('talk')
   })
 
   it('★ a room that gathers the same day is only a talk: the vote waits for tomorrow', async () => {
@@ -1631,6 +1759,8 @@ describe('an ask opens a scene of its own', () => {
       who: ADULTS,
       script: (id) => (id === NADIA ? () => 'hold' : (_a, n) => fromCorpus(n, { leave: false })),
     })
+    const exits: unknown[] = []
+    h.minds.get(NADIA)!.commitSceneExit = (choice) => exits.push(choice)
     h.coordinator.noteSpoken(OMAR, 'Nadia. Six planks.', NOON)
     const inFlight = h.coordinator.takeFloor(NADIA, NOON)
     expect(h.coordinator.open()[0]?.floor).toBe(NADIA)
@@ -1640,8 +1770,15 @@ describe('an ask opens a scene of its own', () => {
     expect(scene.invitation?.from, 'the ask took the floor over').toBe(OMAR)
     const said = scene.thread.length
 
-    h.llms.get(NADIA)!.held[0]!(fromCorpus(0, { leave: false, speech: 'Six, then.' }))
+    h.llms.get(NADIA)!.held[0]!(
+      fromCorpus(0, {
+        leave: true,
+        speech: 'Six, then.',
+        plan: [{ verb: 'walk', params: { x: 9, y: 9 } }],
+      }),
+    )
     await inFlight
+    expect(exits).toEqual([])
     expect(scene.thread.length, 'the line came back to a floor that had already moved').toBe(said)
     expect(scene.invitation, 'and it did not answer for her either').not.toBeUndefined()
   })

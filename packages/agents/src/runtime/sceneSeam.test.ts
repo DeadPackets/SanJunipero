@@ -69,6 +69,7 @@ function sceneTurn(i: number): SceneTurn {
     stance: null,
     answer: null,
     ask: null,
+    reconvene: null,
     leave: false,
     importance: line.importance,
     mood: null,

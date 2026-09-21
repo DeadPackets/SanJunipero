@@ -15,6 +15,8 @@ type P = Record<string, unknown>
 export function eventAgentIds(ev: SimEvent): string[] {
   const p = (ev.payload ?? {}) as P
   const ids: string[] = []
+  if (ev.type.startsWith('scene_') && Array.isArray(p.participants))
+    ids.push(...p.participants.filter((id): id is string => typeof id === 'string'))
   if (typeof p.agentId === 'string') ids.push(p.agentId)
   if (ID_IS_AGENT.has(ev.type) && typeof p.id === 'string') ids.push(p.id)
   if (ev.type === 'structure_planned' && typeof p.builderId === 'string') ids.push(p.builderId)

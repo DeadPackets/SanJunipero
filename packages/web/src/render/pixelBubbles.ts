@@ -43,6 +43,32 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     reactId: string | null = null,
     reactScene: string | null = null
   const reduced = matchMedia('(prefers-reduced-motion: reduce)')
+  let dimensions = { w: 0, h: 0 }
+  let measureNeeded = true
+  const resized = new ResizeObserver(() => {
+    measureNeeded = true
+  })
+  resized.observe(scene.app.canvas)
+  const fontsReady = () => {
+    measureNeeded = true
+  }
+  document.fonts.addEventListener('loadingdone', fontsReady)
+  const measure = () => {
+    balloon.getAnimations().forEach((animation) => {
+      animation.cancel()
+    })
+    balloon.style.width = ''
+    const range = document.createRange()
+    range.selectNodeContents(reserved)
+    const lines = [...range.getClientRects()].map((rect) => rect.width)
+    if (lines.length) {
+      const textWidth = Math.max(...lines)
+      const nameWidth = name.getBoundingClientRect().width + 24
+      balloon.style.width = `${Math.ceil(Math.max(textWidth + 22, nameWidth))}px`
+    }
+    dimensions = { w: balloon.offsetWidth, h: balloon.offsetHeight }
+    measureNeeded = false
+  }
   const clear = () => {
     queue = []
     active = null
@@ -81,8 +107,8 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       queue = queue.filter((line) => line.agentId !== agentId)
       if (active?.isThought && active.agentId === agentId) active = null
     } else {
-      queue = queue.filter((line) => !line.isThought)
-      if (active?.isThought) active = null
+      queue = []
+      active = null
     }
     queue.push({ agentId, text, sceneId: room?.id ?? null, isThought })
     if (queue.length > 12) queue.shift()
@@ -103,6 +129,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       gateThoughts()
     },
     tick(now) {
+      let entering = false
       const tick = store.getTick(),
         live = store.getMode().live
       if (tick < lastTick || live !== lastLive || !store.timeMoving()) clear()
@@ -132,28 +159,27 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
         balloon.dataset.kind = active.isThought ? 'thought' : 'speech'
         ring.hidden = active.isThought
         reserved.textContent = active.text
+        measureNeeded = true
         written.textContent = ''
         balloon.dataset.tint = tintOf(active.agentId)
         ring.dataset.tint = tintOf(active.agentId)
-        balloon.getAnimations().forEach((animation) => {
-          animation.cancel()
-        })
-        if (!reduced.matches)
-          balloon.animate(
-            [
-              { opacity: 0, scale: '.96', translate: '0 5px' },
-              { opacity: 1, scale: '1', translate: '0 0' },
-            ],
-            { duration: 220, easing: 'cubic-bezier(.16,1,.3,1)' },
-          )
+        entering = true
       }
       const at = active ? anchor(active.agentId) : null
       root.hidden = !at
       root.dataset.agentId = active?.agentId ?? ''
       if (!active || !at) return
       balloon.hidden = scene.getZoom() <= 0.5 && !scene.interior?.isActive()
-      const w = balloon.offsetWidth,
-        h = balloon.offsetHeight
+      if (measureNeeded && !balloon.hidden) measure()
+      if (entering && !reduced.matches)
+        balloon.animate(
+          [
+            { opacity: 0, scale: '.96', translate: '0 5px' },
+            { opacity: 1, scale: '1', translate: '0 0' },
+          ],
+          { duration: 220, easing: 'cubic-bezier(.16,1,.3,1)' },
+        )
+      const { w, h } = dimensions
       const width = scene.app.screen.width
       const x = Math.max(12, Math.min(width - w - 12, at.x - w / 2))
       const top = (scene.safeInsets?.top ?? 0) + 24
@@ -166,7 +192,7 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
       const n =
         reduced.matches || active.isThought
           ? active.text.length
-          : Math.min(active.text.length, Math.floor((now - born) / 30))
+          : Math.min(active.text.length, Math.ceil(active.text.length * ((now - born) / 300)))
       if (n !== typed) {
         written.textContent = active.text.slice(0, n)
         typed = n
@@ -181,6 +207,8 @@ export function createPixelBubbles(scene: Scene, store: WorldStore): BubbleLayer
     },
     destroy() {
       off()
+      resized.disconnect()
+      document.fonts.removeEventListener('loadingdone', fontsReady)
       root.remove()
     },
   }

@@ -230,7 +230,10 @@ export function wakeReasons(
   // mind with company never reaches the threshold, so the rung is only ever billed to the lonely.
   if (gatheringDue(cfg, clock, tick, belonging)) reasons.push('gathering')
 
-  if (sinceLast < cfg.idleGapTicks) return reasons
+  if (sinceLast < cfg.idleGapTicks) {
+    if (plan.lastResult === 'done') reasons.push('plan_done')
+    return reasons
+  }
 
   // Merely noticed: a word overheard, a face arriving or going. The scene machine is what
   // answers speech now — a mind spoken to becomes a participant and gets the floor, which is

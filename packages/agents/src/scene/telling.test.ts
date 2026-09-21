@@ -24,6 +24,7 @@ const QUIET: SceneTurn = {
   stance: null,
   answer: null,
   ask: null,
+  reconvene: null,
   leave: false,
   importance: 5,
   mood: null,

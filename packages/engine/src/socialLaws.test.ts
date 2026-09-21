@@ -3,7 +3,6 @@ import {
   ADULT_AGE_DAYS,
   DEFAULT_CONFIG,
   MINUTES_PER_DAY,
-  scanPromptForGlassLeak,
   stateHash,
   type SimEvent,
 } from '@sj/shared'
@@ -217,7 +216,7 @@ describe('who saw it', () => {
 })
 
 describe('a refusal in the town’s own words', () => {
-  it('quotes the sentence and never the id it is filed under, and is clean through the glass', () => {
+  it('reports the broken rule by id without refusing the physical act', () => {
     let s = world([{ id: 'a1', x: 1, y: 1 }])
     const text = 'Nobody fills before they have slept.'
     s = fold(
@@ -233,10 +232,7 @@ describe('a refusal in the town’s own words', () => {
       ),
     )
     const judged = judgeLaws(s, DEFAULT_CONFIG, 'a1', 'fill', {}, NOON)
-    expect(judged).toEqual({ refusal: `the town agreed: ${text}` })
-    const reason = judged !== null && 'refusal' in judged ? judged.refusal : ''
-    expect(reason).not.toContain('law_')
-    expect(scanPromptForGlassLeak(reason)).toEqual([])
+    expect(judged).toEqual({ broken: ['law_well_order'] })
   })
 })
 

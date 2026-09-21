@@ -1,6 +1,11 @@
 import * as THREE from 'three'
 import type { Structure } from '@sj/engine/state'
-import type { SimConfig } from '@sj/shared'
+import {
+  buildingAppearanceFor,
+  buildingWindowMask,
+  frontDoorFraction,
+  type SimConfig,
+} from '@sj/shared'
 import { PERSONAL_HOMES } from './personalHomes'
 
 const C = {
@@ -74,10 +79,19 @@ export function structureKey(s: Structure, config: SimConfig): string {
 }
 
 export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
+  const appearance = buildingAppearanceFor(s.kind)
   const home = ['house', 'cottage', 'cabin', 'farmhouse'].includes(s.kind)
     ? PERSONAL_HOMES[s.owner ?? '']
     : undefined
-  const colors = home ? { ...C, cream: home.wall, slate: home.roof, trim: home.trim } : C
+  const roleColors =
+    appearance.use === 'public-shop'
+      ? { ...C, cream: 0xd8be91, slate: 0x796b5c, trim: 0x6f725e }
+      : appearance.use === 'public-meeting'
+        ? { ...C, cream: 0xbdb9aa, slate: 0x696f72, trim: 0x777565 }
+        : C
+  const colors = home
+    ? { ...roleColors, cream: home.wall, slate: home.roof, trim: home.trim }
+    : roleColors
   const root = new THREE.Group()
   root.name = s.name ?? s.kind
   root.position.set(s.x, 0, s.y)
@@ -86,12 +100,15 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   const roofs: THREE.Group[] = []
   root.userData.windows = windows
   root.userData.roofs = roofs
+  root.userData.appearance = appearance
   const body = new THREE.Group()
   body.position.set(s.w / 2, 0, s.h / 2)
   const turned = s.facing === 'se'
   // State dimensions already include facing; turn a canonical local footprint exactly once.
   const w = turned ? s.h : s.w
   const d = turned ? s.w : s.h
+  const windowMask = buildingWindowMask(appearance, w, turned)
+  root.userData.windowMask = windowMask
   if (turned) body.rotation.y = Math.PI / 2
   root.add(body)
   let wood: ReturnType<typeof woodMaps> | undefined
@@ -101,11 +118,11 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
     if (!result) {
       result = new THREE.MeshStandardMaterial({ color, roughness: 0.86 })
       if (color === colors.cream) {
-        wood ??= woodMaps(home?.plaster)
+        wood ??= woodMaps(home?.plaster ?? appearance.facade !== 'timber')
         result.map = wood.color
         result.bumpMap = wood.height
         result.bumpScale = 0.035
-        if (home) result.userData.baseColorTint = home.wall
+        result.userData.baseColorTint = colors.cream
       }
       materials.set(color, result)
     }
@@ -457,7 +474,8 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   ]
   for (const wall of walls) wall.userData.materialSlot = 'wood'
   const seamColor = home ? home.trim : cabin ? 0xcdb48e : 0xe4d5c1
-  for (let y = 0.36; !home?.plaster && y < height + 0.1; y += cabin ? 0.17 : 0.24) {
+  const plaster = home?.plaster ?? appearance.facade !== 'timber'
+  for (let y = 0.36; !plaster && y < height + 0.1; y += cabin ? 0.17 : 0.24) {
     box(body, 0, y, facade + 0.003, width, 0.012, 0.012, seamColor, false)
     box(body, right + 0.003, y, (back + facade) / 2, 0.012, 0.012, shellDepth, seamColor, false)
     box(body, left - 0.003, y, (back + facade) / 2, 0.012, 0.012, shellDepth, seamColor, false)
@@ -466,11 +484,14 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
     for (const z of [back + 0.045, facade - 0.045])
       box(body, x, height / 2 + 0.19, z, 0.1, height + 0.04, 0.1, colors.trim, false)
   box(body, 0, 0.3, facade + 0.018, width, 0.07, 0.045, colors.trim, false)
+  const doorFraction = frontDoorFraction(w)
   const doorX = Math.max(
     left + 0.27,
-    Math.min(right - 0.27, (turned ? -1 : 1) * (Math.floor(w / 2 - 0.5) + 0.5 - w / 2)),
+    Math.min(right - 0.27, (turned ? 0.5 - doorFraction : doorFraction - 0.5) * w),
   )
-  const doorWidth = Math.min(storage ? 0.7 : 0.43, width * 0.65)
+  const roleDoorWidth =
+    appearance.use === 'public-shop' ? 0.56 : appearance.use === 'public-meeting' ? 0.5 : 0.43
+  const doorWidth = Math.min(storage ? 0.7 : roleDoorWidth, width * 0.65)
   const door = box(body, doorX, 0.82, facade + 0.025, doorWidth + 0.08, 1.27, 0.06, colors.trim)
   door.name = 'door'
   box(body, doorX, 0.8, facade + 0.038, doorWidth, 1.17, 0.02, C.wood, false)
@@ -488,24 +509,26 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   )
 
   const window = (x: number, y: number, z: number, side: boolean): void => {
+    const paneWidth = appearance.use === 'public-shop' ? 0.47 : 0.31
+    const paneHeight = appearance.use === 'public-meeting' ? 0.58 : 0.46
     const group = new THREE.Group()
     group.position.set(x, y, z)
     group.scale.z = 0.55
     if (side) group.rotation.y = Math.PI / 2
     body.add(group)
-    box(group, 0, 0, 0, 0.4, 0.57, 0.035, colors.trim, false)
-    glow(box(group, 0, 0, 0.024, 0.31, 0.46, 0.015, C.glass, false))
-    box(group, 0, 0, 0.039, 0.026, 0.48, 0.016, colors.trim, false)
-    box(group, 0, 0, 0.04, 0.34, 0.025, 0.016, colors.trim, false)
-    box(group, 0, -0.31, 0.035, 0.44, 0.05, 0.11, colors.trim, false)
+    box(group, 0, 0, 0, paneWidth + 0.09, paneHeight + 0.11, 0.035, colors.trim, false)
+    glow(box(group, 0, 0, 0.024, paneWidth, paneHeight, 0.015, C.glass, false))
+    box(group, 0, 0, 0.039, 0.026, paneHeight + 0.02, 0.016, colors.trim, false)
+    box(group, 0, 0, 0.04, paneWidth + 0.03, 0.025, 0.016, colors.trim, false)
+    box(group, 0, -(paneHeight + 0.16) / 2, 0.035, paneWidth + 0.13, 0.05, 0.11, colors.trim, false)
   }
-  for (const fraction of farm ? [0.15, 0.38, 0.7, 0.88] : [0.22, 0.76]) {
+  for (const fraction of farm ? [0.15, 0.38, 0.7, 0.88] : windowMask.front) {
     const x = left + width * fraction
     if (Math.abs(x - doorX) > 0.45 && width > 1) window(x, 1.25, facade + 0.005, false)
     if (farm) window(x, 2.85, facade + 0.005, false)
   }
   if (shellDepth > 0.75)
-    for (const fraction of shellDepth > 1.3 ? [0.28, 0.73] : [0.5])
+    for (const fraction of windowMask.side)
       window(right + 0.005, 1.25, back + shellDepth * fraction, true)
   if (farm) box(body, 0, 2.12, facade + 0.025, width, 0.1, 0.06, colors.trim, false)
 
@@ -520,7 +543,10 @@ export function buildStructure(s: Structure, config: SimConfig): THREE.Group {
   const eave = height + 0.24
   const peak = eave + (cabin ? 0.57 : 0.76)
   const midZ = (z0 + z1) / 2
-  const hip = farm || home?.detail === 'storage' ? Math.min(0.65, width * 0.2) : 0
+  const hip =
+    farm || home?.detail === 'storage' || appearance.roof === 'hip'
+      ? Math.min(0.65, width * 0.2)
+      : 0
   box(roof, 0, eave - 0.03, midZ, x1 - x0, 0.09, z1 - z0, 0x5d5751)
   surface(
     roof,
