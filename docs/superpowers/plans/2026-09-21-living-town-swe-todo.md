@@ -56,7 +56,7 @@ Status vocabulary: `OPEN`, `IN PROGRESS`, `IMPLEMENTED / VERIFY`, `DONE`, `EXPER
 | Narration, journal and keepsakes | N1–N2 | IMPLEMENTED / LOCAL CHECKS | M1, C1/C2, G2 | Source-linked context and run-scoped return cursor |
 | Arbiter, Forge and functional venues | F1–F3 | F1 REJECTED TRIAL; F2 PROTOTYPE VERIFIED; F3 VISUALLY VERIFIED | O1/O2, P1, M1/M3 | Existing reasoning retained; autonomous shop adoption unproven |
 | Jev evaluation | J1–J2 | DEFERRED | O1/O3, M3, R1 baseline | No adapter/adoption trial; default unchanged |
-| Integration, rehearsal and release | R1–R3 | R1 VERIFIED; R2 OFFLINE ONLY; R3 OPEN | Relevant components above | Real local day complete; final suite/release and human checks pending |
+| Integration, rehearsal and release | R1–R3 | R1 VERIFIED; R2 OFFLINE ONLY; R3 LOCAL RELEASE VERIFIED | Relevant components above | Real day and full suite complete; human outcome checks remain open |
 
 Execution waves:
 
@@ -91,7 +91,7 @@ The angle-bracket arguments above denote the explicit paths under each item, not
 
 ### O1 — Atomic town-wide spending reservations
 
-Status: IMPLEMENTED / VERIFIED LOCALLY. Integration commit deferred to root. Priority: first wave.
+Status: IMPLEMENTED / VERIFIED LOCALLY. Integrated locally in `b3f18dc2`. Priority: first wave.
 
 Files: modify `packages/llm/src/callLog.ts`, `packages/llm/src/rails.ts`, `packages/live/src/liveWorld.ts`, `packages/live/src/discoveryArt.ts`, `packages/live/src/castArt.ts`. Tests: extend `packages/llm/src/rails.test.ts`, `packages/live/src/liveWorld.test.ts`; create `packages/llm/src/budgetReservations.test.ts`.
 
@@ -106,7 +106,7 @@ Post-rehearsal follow-up: 224 tests passed in eight files, including all 14 new 
 
 The operations database is the sole town authority. Unknown dispatched charges retain uncertain reservations across restart; only authoritative reconciliation can clear them. Luna admission bounds use serialized prompt/schema UTF-8 bytes plus 1024, enforced output caps, and $1/M input + $3.6/M output across current listed tiers. Historical actual rows and billing estimates are unchanged. Image/review reservations are estimates ($0.045/$0.0055), and unexpected actual overruns remain recorded and alerted; no provider-invoice guarantee is claimed.
 
-- [ ] Root integration commit after final checks. Worker commits were explicitly prohibited.
+- [x] Integrated locally in `b3f18dc2` after the full check. Worker commits were explicitly prohibited.
 
 Original proposed internal contract, implemented alongside the existing ledger rather than as a second database:
 
@@ -124,7 +124,7 @@ type SpendAllowance = {
 
 ### O2 — Forge cancellation and database lifetime
 
-Status: IMPLEMENTED / VERIFIED LOCALLY. Integration commit deferred to root. Files: `packages/live/src/{liveWorld,discoveryArt,castArt}.ts`, `packages/forge/src/{imageClient,characterCommission}.ts`. Tests: existing `liveWorld.test.ts`, `discoveryArt.test.ts`, `castArt.test.ts`, `packages/forge/src/imageClient.test.ts`.
+Status: IMPLEMENTED / VERIFIED LOCALLY. Integrated locally in `b3f18dc2`. Files: `packages/live/src/{liveWorld,discoveryArt,castArt}.ts`, `packages/forge/src/{imageClient,characterCommission}.ts`. Tests: existing `liveWorld.test.ts`, `discoveryArt.test.ts`, `castArt.test.ts`, `packages/forge/src/imageClient.test.ts`.
 
 - [x] Hold a fake image request open, start shutdown and attempt to enqueue another commission. Check that no new request starts.
 - [x] Pass the town stop signal through image work. Stop queue admission first; drain or cancel in-flight work within the existing shutdown deadline before closing asset, world and operations stores.
@@ -135,7 +135,7 @@ Evidence: abort-respecting and abort-ignoring fake image calls, late charge befo
 
 - [x] Verify startup cleanup: preflight/embedder failure closes live initialization handles; cast-factory/attachment failure stops pacing and closes the world store/database. Four regressions pass in the post-rehearsal 224-test run. If cast cancellation fails to settle, stores remain open for live writers; root owns the standalone runner's 20-second exit grace.
 
-- [ ] Root integration commit after final checks. Lifecycle and art appearance are documented separately; shared worker files remain uncommitted.
+- [x] Integrated locally in `b3f18dc2`. Lifecycle and art appearance are documented separately.
 
 ### O3 — Honest mind health and bounded art retries
 
@@ -163,13 +163,13 @@ Evidence: seven new crash-boundary tests plus all 63 liveWorld tests pass (70 to
 
 Growth command: `pnpm exec tsx scripts/audit-town-growth.ts`. Four synthetic fixtures: 1,024–65,536 cells, 136–1,076 entities, at most 20 agents. Largest: world DB 462,848 bytes; arbiter DB 151,552 bytes; snapshot 230,303 JSON / 10,743 gzip bytes; 128 active rules ≈1,879 roster tokens; 64 image decodes total 67,108,864 RGBA bytes. Of 64 path queries, 49 returned capped partial routes and none returned null under the unchanged 6,000-node bound. Raw results: private `O4-growth.json`; assumptions and limitations: `O4-report.md`.
 
-Decoded bytes measure RGBA storage for fixture assets resident together, excluding GPU copies, mipmaps and browser/Pixi overhead. This is not production-art browser-heap or viewer capacity evidence. Exception injection plus database reopen is not host power-failure testing. Existing local WAL/synchronous-NORMAL durability remains an accepted tradeoff; recent commits can be lost on power failure. Root integration commit remains deferred.
+Decoded bytes measure RGBA storage for fixture assets resident together, excluding GPU copies, mipmaps and browser/Pixi overhead. This is not production-art browser-heap or viewer capacity evidence. Exception injection plus database reopen is not host power-failure testing. Existing local WAL/synchronous-NORMAL durability remains an accepted tradeoff; recent commits can be lost on power failure. Root integration commit: `b3f18dc2`.
 
 ## P. Engine and physical world
 
 ### P1 — Consistent room-aware reach and transfer completion
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Files: `packages/engine/src/verbs/{index,common}.ts`, `packages/engine/src/{interiors,intent}.ts`. Tests: `packages/engine/src/{interiors,survival}.test.ts`; create `packages/engine/src/roomReach.test.ts`.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Files: `packages/engine/src/verbs/{index,common}.ts`, `packages/engine/src/{interiors,intent}.ts`. Tests: `packages/engine/src/{interiors,survival}.test.ts`; create `packages/engine/src/roomReach.test.ts`.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/P1-report.md`; 334 engine tests passed. Subsequent town/workspace typechecks passed after concurrent seams were resolved.
 
@@ -195,7 +195,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/P2-report.md`; 161 d
 
 ### M1 — Give commitments identity and honest resolution
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Files: `packages/agents/src/memory/{schema,ties}.ts`, `packages/agents/src/scene/{scene,sceneLlm,coordinator}.ts`, `packages/agents/src/reflection.ts`, `packages/shared/src/bonds.ts`, `packages/gateway/src/bonds.ts`. Tests: ties, reflection, scene/coordinator, shared/gateway bonds tests.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Files: `packages/agents/src/memory/{schema,ties}.ts`, `packages/agents/src/scene/{scene,sceneLlm,coordinator}.ts`, `packages/agents/src/reflection.ts`, `packages/shared/src/bonds.ts`, `packages/gateway/src/bonds.ts`. Tests: ties, reflection, scene/coordinator, shared/gateway bonds tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M1-report.md`; 287 focused tests and independently run gateway bond tests passed. M4 supersedes the early producer contract: only private reflection receives existing private tie IDs; shared closure cannot resolve them. No commit or public verified-fulfillment mechanism is claimed.
 
@@ -239,7 +239,7 @@ expect(ties.letGo(7 * MINUTES_PER_DAY)).toEqual([])
 
 ### M2 — Preserve intentions through ordinary turns and night reflection
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Depends: M1. Files: `packages/agents/src/{reflection,personality}.ts`, `packages/agents/src/runtime/agentRuntime.ts`, `packages/agents/src/prompt/assemble.ts`. Tests: reflection, personality and runtime tests.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Depends: M1. Files: `packages/agents/src/{reflection,personality}.ts`, `packages/agents/src/runtime/agentRuntime.ts`, `packages/agents/src/prompt/assemble.ts`. Tests: reflection, personality and runtime tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M2-report.md`; 187 focused tests passed, including two quiet nights, reopened storage, absent counterparts, bounded selection and voluntary reminder reconsideration. The real day exposed a provider rejection of nested `oneOf`; revisions now serialize as supported `anyOf`. A copy-only production reflection probe then completed all ten reached calls without fallback. Conditional personality edits and new gist generation were not reached and are not claimed as live-tested; see `docs/reviews/2026-09-21-v3-model-probes.md`.
 
@@ -262,7 +262,7 @@ type GoalRevision =
 
 ### M3 — Hand off conversation to the existing physical plan
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Depends: M1/M2/P1. Files: `packages/agents/src/scene/{scene,sceneLlm,coordinator}.ts`, `packages/agents/src/runtime/agentRuntime.ts`, existing turn/intent schemas and checkpoint serializers. Tests: scene LLM, coordinator and runtime suites.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Depends: M1/M2/P1. Files: `packages/agents/src/scene/{scene,sceneLlm,coordinator}.ts`, `packages/agents/src/runtime/agentRuntime.ts`, existing turn/intent schemas and checkpoint serializers. Tests: scene LLM, coordinator and runtime suites.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M3-report.md`; 452 affected tests passed. Later R1 found and fixed the running-plan restart marker; both queued-before-start and already-running restart checks pass. Interleaved speech no longer overwrites a physical completion target. See `docs/reviews/2026-09-21-continuity-rehearsal.md`.
 
@@ -274,7 +274,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M3-report.md`; 452 a
 
 ### M4 — Public scene summaries must exclude private asides
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Files: `packages/agents/src/scene/{sceneLlm,coordinator,scene}.ts`; tests: scene LLM/coordinator tests.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Files: `packages/agents/src/scene/{sceneLlm,coordinator,scene}.ts`; tests: scene LLM/coordinator tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M4-report.md`; 197 tests passed. R1 additionally checks the private-aside sentinel is absent from public closure input and reconnect transcripts.
 
@@ -298,7 +298,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M5-report.md`; 195 f
 
 ### M6 — Reconcile current identity and document inheritance
 
-Status: LOCAL VERIFIED / UNCOMMITTED. Files: `packages/agents/src/runtime/agentRuntime.ts`, `packages/agents/src/live/{liveMinds,newborn,resolveCast}.ts`, `packages/agents/src/family/{derivePersona,memorySeed}.ts`, `packages/agents/src/prompt/assemble.ts`. Extend runtime, resolveCast, newborn and memorySeed tests.
+Status: LOCAL VERIFIED / INTEGRATED LOCALLY. Files: `packages/agents/src/runtime/agentRuntime.ts`, `packages/agents/src/live/{liveMinds,newborn,resolveCast}.ts`, `packages/agents/src/family/{derivePersona,memorySeed}.ts`, `packages/agents/src/prompt/assemble.ts`. Extend runtime, resolveCast, newborn and memorySeed tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M6-report.md` and `docs/reviews/2026-09-21-identity-and-inheritance.md`. The final combined 287-test run and town typecheck passed. Both prompt types read body age across the configured adulthood boundary and runtime restart; newborn repair tests retain deterministic isolated seeding.
 
@@ -311,7 +311,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/M6-report.md` and `d
 
 ### C1 — Detect actual co-presence and keep interpretations separate
 
-Status: DONE, local and uncommitted. Files: `packages/arbiter/src/constructs.ts`, `packages/live/src/liveWorld.ts`, `packages/agents/src/runtime/agentRuntime.ts`, `packages/gateway/src/constructs.ts`. Tests: arbiter constructs/g11.constructs and `packages/live/src/constructs.test.ts`.
+Status: DONE, local and committed. Files: `packages/arbiter/src/constructs.ts`, `packages/live/src/liveWorld.ts`, `packages/agents/src/runtime/agentRuntime.ts`, `packages/gateway/src/constructs.ts`. Tests: arbiter constructs/g11.constructs and `packages/live/src/constructs.test.ts`.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C1-report.md`. The current six-file focused run passed 126 tests, including non-overlapping 06:00/10:00/14:00 visits, simultaneous controls, separate rooms, midnight, departure, scene evidence, stable legacy observations and unchanged world hash. Observer habit/custom prompt injection was removed; ordinary witnessed memory and resident-given names remain.
 
@@ -323,7 +323,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C1-report.md`. The c
 
 ### C2 — Ground voice, bonds and claims in the right evidence
 
-Status: DONE, local and uncommitted. Depends: M1/M4. Files: `packages/agents/src/prompt/rulesOfBeing.ts`, `packages/shared/src/bonds.ts`, `packages/gateway/src/bonds.ts`, `packages/narrator/src/institutions.ts`; extend their tests.
+Status: DONE, local and committed. Depends: M1/M4. Files: `packages/agents/src/prompt/rulesOfBeing.ts`, `packages/shared/src/bonds.ts`, `packages/gateway/src/bonds.ts`, `packages/narrator/src/institutions.ts`; extend their tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C2-report.md`. The current combined C2/C3 run passed 392 tests in 11 files. Present health, dated history, resident claims, speech-only bonds and inferred institutions now retain their distinct evidence status.
 
@@ -334,7 +334,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C2-report.md`. The c
 
 ### C3 — Voluntary councils and social enforcement
 
-Status: DONE, local and uncommitted. Files: `packages/engine/src/socialLaws.ts`, `packages/agents/src/scene/{scene,coordinator,sceneLlm}.ts`, associated law compiler and prompt paths. Tests: engine socialLaws, scene and coordinator suites.
+Status: DONE, local and committed. Files: `packages/engine/src/socialLaws.ts`, `packages/agents/src/scene/{scene,coordinator,sceneLlm}.ts`, associated law compiler and prompt paths. Tests: engine socialLaws, scene and coordinator suites.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C3-report.md`. The current combined 392-test run covers explicit reconvening, stale and guessed proposal rejection, support thresholds, abstention and social-rule compliance/violation. Replay retains past ratifications; the engine adds no automatic guard, punishment or relationship result.
 
@@ -347,7 +347,7 @@ Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/C3-report.md`. The c
 
 ### G1 — Complete scene state on join, restart and resync
 
-Status: LOCALLY VERIFIED; final integration suite pending. Files: `packages/gateway/src/{scenes,server}.ts`, `packages/gateway/src/replay.test.ts`, `packages/web/src/state/worldStore.ts`. Tests: scenes/server/replay/worldStore suites.
+Status: LOCALLY VERIFIED; full integration suite passed. Files: `packages/gateway/src/{scenes,server}.ts`, `packages/gateway/src/replay.test.ts`, `packages/web/src/state/worldStore.ts`. Tests: scenes/server/replay/worldStore suites.
 
 Execution evidence: Implemented in 800bbddf and 155417f7. Join/restart/replay/live/static scrub restore scene context; independent review found and fixed future-scene leakage and pending-scrub races. Latest root gateway/replay/hub: 31 tests pass.
 
@@ -369,7 +369,7 @@ type SceneRelay = {
 
 ### G2 — Bounded transcript independent of camera visibility
 
-Status: LOCALLY VERIFIED; final integration suite pending. Depends: G1. Files: `packages/gateway/src/{scenes,server}.ts`, `packages/shared/src` existing server-frame schema, `packages/web/src/state/worldStore.ts`, `packages/web/src/stage/LivingScene.tsx`. Create `packages/gateway/src/sceneTranscript.test.ts`.
+Status: LOCALLY VERIFIED; full integration suite passed. Depends: G1. Files: `packages/gateway/src/{scenes,server}.ts`, `packages/shared/src` existing server-frame schema, `packages/web/src/state/worldStore.ts`, `packages/web/src/stage/LivingScene.tsx`. Create `packages/gateway/src/sceneTranscript.test.ts`.
 
 Execution evidence: Implemented in 800bbddf. Public transcripts use seq IDs, 100 lines per scene and 8 client scenes, explicit catch-up, historical cutoff, closed-scene endpoint. Gateway/store tests pass. Root observed an 11-line conversation after late camera arrival in the isolated real-day viewer; see `docs/reviews/2026-09-21-v3-viewer-verification.md`.
 
@@ -448,7 +448,7 @@ Status: DEFERRED by the v3 execution override. The original experiment below is 
 
 ### N1 — Source-linked context across days
 
-Status: LOCALLY VERIFIED; final integration suite pending. Depends: M1/C1/C2/G2. Files: `packages/gateway/src/{threads,stakes}.ts`, `packages/narrator/src/{chronicle,canon,institutions}.ts`, `packages/shared/src/threads.ts`, existing web story models. Extend their tests.
+Status: LOCALLY VERIFIED; full integration suite passed. Depends: M1/C1/C2/G2. Files: `packages/gateway/src/{threads,stakes}.ts`, `packages/narrator/src/{chronicle,canon,institutions}.ts`, `packages/shared/src/threads.ts`, existing web story models. Extend their tests.
 
 - [x] Use one pair with two unrelated promises and a later callback. Check that cast overlap does not merge the obligations into one claimed causal story.
 - [x] Attach existing commitment identity or explicit source events when available. Retain thread heat for editorial ranking, but separate an inferred thread from a verified project or obligation.
@@ -500,7 +500,7 @@ Novel consumables are a follow-on only when an observed invention needs them. Re
 
 ### F3 — Building design recipe and Forge lifecycle
 
-Status: VERIFIED LOCALLY AND VISUALLY; final integration suite pending. Depends: O1/O2/F2. Files: `packages/forge/src/buildingMaterials.ts`, `packages/live/src/discoveryCommission.ts`, `packages/shared/src/interiorMeta.ts`, `packages/web/src/render/three/{structures,interiorRoom,materials}.ts`, corresponding tests.
+Status: VERIFIED LOCALLY AND VISUALLY; full integration suite passed. Depends: O1/O2/F2. Files: `packages/forge/src/buildingMaterials.ts`, `packages/live/src/discoveryCommission.ts`, `packages/shared/src/interiorMeta.ts`, `packages/web/src/render/three/{structures,interiorRoom,materials}.ts`, corresponding tests.
 
 Evidence: `.superpowers/sdd/2026-09-21-living-town-swe-todo/F3-report.md`. Six focused files pass 71 tests, including the southeast-facing door/window-mask regression. `packages/web/building-review.html` is the smallest existing-preview-style fixture: it renders the three real 3 × 3 exteriors and their `buildInteriorRoom` results with day/night lighting. Interior mode is explicitly labeled as an awake, occupied lighting state; it does not render resident sprites or test occupancy detection. Root visually checked all three home, bakery/shop and civic/meeting recipes in day/night and exterior/interior modes, with zero console errors.
 
@@ -572,12 +572,12 @@ Offline evidence: `docs/reviews/2026-09-21-continuity-rehearsal.md`; 11,880 actu
 
 ### R3 — Reviewable local release and recovery
 
-Status: OPEN. Depends: all selected implementation items; experiments may finish as documented rejection. Files: affected migration/tests, `deploy/` release notes and the rehearsal report. Preserve unrelated pre-existing release-document edits.
+Status: LOCAL CANDIDATE VERIFIED AND COMMITTED. Depends: all selected implementation items; experiments may finish as documented rejection. Files: affected migration/tests, `deploy/` release notes and the rehearsal report. Preserve unrelated pre-existing release-document edits.
 
-- [ ] Run full integration checks with no rehearsal competing for resources. Verify a fresh v3 database, current snapshots, persisted v3 restart and replay. Keep production history untouched; old-binary compatibility is explicitly out of scope.
-- [ ] Build the viewer before starting the local rehearsal service. Verify first load, empty/failed assets, hidden-tab behavior, mobile drawer, sound, public usage and current-scene catch-up.
-- [ ] Prepare a local release manifest containing the exact implementation commit, schema/protocol changes, feature defaults, measured spend and recovery procedure. Recover by checking out the recorded baseline with a separate local database; do not claim old binaries can consume v3 state. No production image or deployment is part of this task.
-- [ ] Review the completed checklist and unproven areas. Merge/push/deploy only when separately requested for the concrete release; this planning request makes no production change.
+- [x] Run full integration checks with no rehearsal competing for resources. Verify a fresh v3 database, current snapshots, persisted v3 restart and replay. Keep production history untouched; old-binary compatibility is explicitly out of scope.
+- [x] Build before local serving; verify first load, asset-failure and hidden-tab lifecycle tests, mobile drawer, public usage and scene catch-up. Sound has automated source/lifecycle checks only; human listening remains open under V1.
+- [x] Prepare a local release manifest containing the exact implementation commit, schema/protocol changes, feature defaults, measured spend and recovery procedure. Recover by checking out the recorded baseline with a separate local database; do not claim old binaries can consume v3 state. No production image or deployment is part of this task.
+- [x] Review the completed checklist and unproven areas. Merge/push/deploy only when separately requested for the concrete release; this local implementation makes no production change.
 
 ```sh
 pnpm check
@@ -651,3 +651,11 @@ Status: EXPERIMENT COMPLETE; streaming adoption rejected for now.
 - [x] Keep complete-response execution and current provider defaults. Do not treat streaming as a fix for time before the request begins.
 
 Evidence: `docs/reviews/2026-09-21-v3-streaming.md`. The separate lower-reasoning arbiter experiment also finished as rejection because it lost one useful ruling; F1 records that decision.
+
+## Final local candidate
+
+Implementation: `b3f18dc2`. `pnpm check` exited 0: 536 files, 8,859 tests passed in 203.28 seconds for the test phase. Typecheck, lint (0 errors, existing warnings), formatting and knip passed. Viewer build passed; its existing large-chunk warning remains. All final source edits preceded this frozen check. Docs-only release updates followed it.
+
+The independent runtime review found and closed the late-answer completion-loss and stale-checkpoint duplication bugs, including the engine’s deferred walk-first action. Source, fixtures and local browser evidence are committed. Release and recovery details are in `deploy/RELEASE-V3-LOCAL-2026-09-21.md`. Production is unchanged.
+
+Remaining unchecked observations above are explicit limits or deferred experiments, not completed work: human audio listening, matched power profiling, full visual-case matrix, simultaneous-popup browser observation, autonomous shop adoption and audience comprehension/retention. No claim of production perfection, battery improvement or retained audience follows from this engineering result.
