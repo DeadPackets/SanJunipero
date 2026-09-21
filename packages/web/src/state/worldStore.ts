@@ -7,6 +7,7 @@ import {
   type ServerMsg,
   type ServerScene,
   type ServerThreads,
+  type ServerTranscript,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -61,6 +62,7 @@ export type WorldStore = {
   recentEvents: () => SimEvent[]
   /** The scene the town holds under this id, open or standing on the summary its closing frame
    *  carried. The town runs many at once, so nobody may ask it for "the scene". */
+  transcript: (id: string) => ServerTranscript | null
   sceneById: (id: string) => TownScene | null
   /** Every scene open right now, in the order the town opened them. */
   openScenes: () => readonly TownScene[]
@@ -117,6 +119,21 @@ export function createWorldStore(): WorldStore {
   const moods = new Map<string, string>()
   const events: SimEvent[] = []
   const scenes = new Map<string, TownScene>()
+  const transcripts = new Map<string, ServerTranscript>()
+  const holdTranscript = (next: ServerTranscript): void => {
+    const previous = transcripts.get(next.sceneId)
+    const merged = new Map((previous?.lines ?? []).map((line) => [line.seq, line]))
+    for (const line of next.lines) merged.set(line.seq, line)
+    const lines = [...merged.values()].sort((a, b) => a.seq - b.seq)
+    transcripts.delete(next.sceneId)
+    transcripts.set(next.sceneId, {
+      ...next,
+      atTick: Math.max(previous?.atTick ?? 0, next.atTick),
+      lines: lines.slice(-100),
+      truncated: next.truncated || previous?.truncated === true || lines.length > 100,
+    })
+    if (transcripts.size > 8) transcripts.delete(transcripts.keys().next().value!)
+  }
   let openList: readonly TownScene[] = NO_SCENES
   let director: ServerDirector | null = null
   let threads: ServerThreads | null = null
@@ -141,6 +158,7 @@ export function createWorldStore(): WorldStore {
   let shotSceneId: string | null = null
   const forgetScenes = (): void => {
     scenes.clear()
+    transcripts.clear()
     openList = NO_SCENES
     shotSceneId = null
     tension.forget()
@@ -175,6 +193,7 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
+    transcript: (id) => transcripts.get(id) ?? null,
     sceneById: (id) => scenes.get(id) ?? null,
     openScenes: () => openList,
     // The director owns this, because a viewer's own pin is client state the wire never carries.
@@ -218,6 +237,10 @@ export function createWorldStore(): WorldStore {
           laws = msg.laws
           paused = msg.paused ?? false
           mode = { live: true }
+          forgetScenes()
+          director = null
+          board = null
+          threads = null
           break
         }
         case 'paused':
@@ -252,6 +275,18 @@ export function createWorldStore(): WorldStore {
             for (const ev of msg.events) if (isNarratable(ev)) events.push(ev)
             if (events.length > RECENT_EVENTS_CAP)
               events.splice(0, events.length - RECENT_EVENTS_CAP)
+            for (const ev of msg.events) {
+              if (ev.type !== 'scene_line') continue
+              const p = ev.payload as { id: string; agentId: string; text: string }
+              holdTranscript({
+                t: 'transcript',
+                sceneId: p.id,
+                atTick: ev.tick,
+                catchup: true,
+                truncated: false,
+                lines: [{ seq: ev.seq, tick: ev.tick, agentId: p.agentId, text: p.text }],
+              })
+            }
             for (const fn of eventSubs) fn(msg.events)
           }
           break
@@ -299,6 +334,9 @@ export function createWorldStore(): WorldStore {
           assetsReady = true
           records.push(...msg.records)
           assetsSeq += msg.records.length
+          break
+        case 'transcript':
+          if (msg.atTick <= (mode.live ? (state?.tick ?? 0) : mode.tick)) holdTranscript(msg)
           break
         case 'scene':
           // Only the newest close is ever on screen, so an older one goes rather than sit here

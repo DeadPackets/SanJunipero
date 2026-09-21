@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import Database from 'better-sqlite3'
 import { ServerScene, type SimEvent } from '@sj/shared'
-import { makeSceneRelay } from './scenes.js'
+import { makeSceneRelay, scenesAt } from './scenes.js'
 
 let seq = 0
 const ev = (type: string, payload: unknown): SimEvent => ({ seq: ++seq, tick: 720, type, payload })
@@ -14,13 +15,32 @@ const OPENED = {
 }
 
 describe('the scene frame', () => {
+  it('restores a conversation across midnight and respects the requested historical tick', () => {
+    const db = new Database(':memory:')
+    db.exec('CREATE TABLE events (seq INTEGER PRIMARY KEY, tick INTEGER, type TEXT, payload TEXT)')
+    const insert = db.prepare('INSERT INTO events VALUES (?, ?, ?, ?)')
+    insert.run(1, 1435, 'scene_opened', JSON.stringify(OPENED))
+    insert.run(2, 1441, 'scene_turned', JSON.stringify({ ...OPENED, kind: 'council' }))
+    insert.run(3, 1450, 'scene_closed', JSON.stringify({ id: OPENED.id, summary: 'Done.' }))
+    expect(scenesAt(db, 1439).snapshot()[0]?.scene.kind).toBe('quarrel')
+    expect(scenesAt(db, 1445).snapshot()[0]?.scene.kind).toBe('council')
+    expect(scenesAt(db, 1450).snapshot()).toEqual([])
+    db.close()
+  })
+  it('keeps the current open scenes for late viewers without replaying closed ones', () => {
+    const relay = makeSceneRelay()
+    relay.fold([ev('scene_opened', OPENED)])
+    expect(relay.snapshot()).toEqual([{ t: 'scene', scene: { ...OPENED, open: true } }])
+    relay.fold([ev('scene_closed', { id: OPENED.id, summary: 'Done.' })])
+    expect(relay.snapshot()).toEqual([])
+  })
   it('opens on scene_opened and closes with the summary', () => {
     const relay = makeSceneRelay()
-    const [open] = relay([ev('scene_opened', OPENED)])
+    const [open] = relay.fold([ev('scene_opened', OPENED)])
     expect(ServerScene.safeParse(open).success).toBe(true)
     expect(open?.scene).toEqual({ ...OPENED, open: true })
 
-    const [closed] = relay([
+    const [closed] = relay.fold([
       ev('scene_closed', {
         id: OPENED.id,
         summary: 'She got a day out of him.',
@@ -34,8 +54,8 @@ describe('the scene frame', () => {
 
   it('re-sends the scene when the talk turns, with the new kind, cast and stakes', () => {
     const relay = makeSceneRelay()
-    relay([ev('scene_opened', OPENED)])
-    const [turned] = relay([
+    relay.fold([ev('scene_opened', OPENED)])
+    const [turned] = relay.fold([
       ev('scene_turned', {
         id: OPENED.id,
         kind: 'council',
@@ -52,7 +72,7 @@ describe('the scene frame', () => {
       open: true,
     })
     // and the close carries the turn forward, not the opening pair
-    const [closed] = relay([
+    const [closed] = relay.fold([
       ev('scene_closed', { id: OPENED.id, summary: 'A rule.', deltas: [], closeReason: 'ended' }),
     ])
     expect(closed?.scene.participants).toEqual(['nadia', 'omar', 'salma'])
@@ -60,7 +80,7 @@ describe('the scene frame', () => {
 
   it('says nothing about a turn in a scene it never saw open', () => {
     expect(
-      makeSceneRelay()([
+      makeSceneRelay().fold([
         ev('scene_turned', { id: OPENED.id, kind: 'quarrel', participants: ['a'], stakes: 7 }),
       ]),
     ).toEqual([])
@@ -68,9 +88,9 @@ describe('the scene frame', () => {
 
   it('sends no frame for a line — the words already reach a viewer as speech', () => {
     const relay = makeSceneRelay()
-    relay([ev('scene_opened', OPENED)])
+    relay.fold([ev('scene_opened', OPENED)])
     expect(
-      relay([
+      relay.fold([
         ev('scene_line', {
           id: OPENED.id,
           agentId: 'omar',
@@ -89,17 +109,17 @@ describe('the scene frame', () => {
       deltas: [],
       closeReason: 'ended',
     })
-    expect(relay([close])).toEqual([])
-    relay([ev('scene_opened', OPENED)])
-    expect(relay([close])).toHaveLength(1)
-    expect(relay([close])).toEqual([])
+    expect(relay.fold([close])).toEqual([])
+    relay.fold([ev('scene_opened', OPENED)])
+    expect(relay.fold([close])).toHaveLength(1)
+    expect(relay.fold([close])).toEqual([])
   })
 
   it('carries two scenes at once without crossing them', () => {
     const relay = makeSceneRelay()
     const second = { ...OPENED, id: 'scene_800_deadbeef', participants: ['salma', 'yusuf'] }
-    relay([ev('scene_opened', OPENED), ev('scene_opened', second)])
-    const [closed] = relay([
+    relay.fold([ev('scene_opened', OPENED), ev('scene_opened', second)])
+    const [closed] = relay.fold([
       ev('scene_closed', {
         id: second.id,
         summary: 'By the fire.',

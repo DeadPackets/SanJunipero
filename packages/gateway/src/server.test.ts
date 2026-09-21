@@ -64,6 +64,86 @@ describe('gateway server', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('restores active scenes on startup, replay entry, reconnect and return to live', async () => {
+    const dbPath = join(dir, 'scene-catchup.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('scene-catchup'),
+      snapshotEveryTicks: 5,
+      onTick: ({ tick, emit }) => {
+        if (tick === 2)
+          emit('scene_opened', {
+            id: 'active',
+            kind: 'talk',
+            participants: ['a', 'b'],
+            topic: 'The garden',
+            stakes: 2,
+          })
+        if (tick === 4)
+          emit('scene_turned', {
+            id: 'active',
+            kind: 'quarrel',
+            participants: ['a', 'b', 'c'],
+            stakes: 5,
+          })
+        if (tick === 3 || tick === 5)
+          emit('scene_line', { id: 'active', agentId: 'a', text: `Line at ${tick}`, move: 'tell' })
+        if (tick === 8)
+          emit('scene_closed', {
+            id: 'active',
+            summary: 'They leave.',
+            deltas: [],
+            closeReason: 'ended',
+          })
+      },
+    })
+    for (let i = 0; i < 5; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    const currentScene = () =>
+      frames.map((f) => ServerMsg.parse(JSON.parse(f))).find((f) => f.t === 'scene')
+    await hello(sock)
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.participants).toEqual(['a', 'b', 'c'])
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'replay', from: 3, reqId: 1 }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.participants).toEqual(['a', 'b'])
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'live' }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.kind).toBe('quarrel')
+    const transcriptResponse = await fetch(
+      `http://127.0.0.1:${gw.port}/api/scenes/active/transcript?atTick=3`,
+    )
+    expect(await transcriptResponse.json()).toMatchObject({
+      catchup: true,
+      lines: [{ text: 'Line at 3' }],
+    })
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'scrub', tick: 3, reqId: 2 }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.kind).toBe('talk')
+    frames.length = 0
+    for (let i = 0; i < 3; i++) loop.step()
+    gw.pump()
+    await wait(30)
+    expect(frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+    const late = await connect(gw.port)
+    open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(30)
+    expect(lateFrames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+  })
+
   it('speaks the observatory protocol end to end', async () => {
     const dbPath = join(dir, 'world.db')
     openForgeDb(dbPath).close() // forge tables share the world db in this fixture

@@ -163,6 +163,28 @@ export const ServerScene = z
   })
   .strict()
 export type ServerScene = z.infer<typeof ServerScene>
+export const ServerTranscript = z
+  .object({
+    t: z.literal('transcript'),
+    sceneId: z.string().min(1),
+    atTick: tick,
+    catchup: z.literal(true),
+    truncated: z.boolean(),
+    lines: z
+      .array(
+        z
+          .object({
+            seq: z.number().int().positive(),
+            tick,
+            agentId: z.string().min(1),
+            text: z.string(),
+          })
+          .strict(),
+      )
+      .max(100),
+  })
+  .strict()
+export type ServerTranscript = z.infer<typeof ServerTranscript>
 // What the camera is on and why. `score` is the gateway's own unbounded number and NOT the
 // scene frame's 0-10 stakes: one is what the town has riding on a talk, the other is how that
 // talk ranks against a death two streets away.
@@ -245,6 +267,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerMood,
   ServerAssets,
   ServerScene,
+  ServerTranscript,
   ServerDirector,
   ServerBoard,
   ServerThreads,

@@ -276,6 +276,37 @@ describe('worldStore', () => {
     ).toEqual(['sc_2'])
   })
 
+  it('drops stale scenes when a fresh snapshot replaces missed history', () => {
+    const store = createWorldStore()
+    store.applyServer({ t: 'scene', scene: scene('stale') })
+    store.applyServer(makeSnapshot())
+    expect(store.openScenes()).toEqual([])
+    expect(store.sceneById('stale')).toBeNull()
+  })
+
+  it('stores public transcript catch-up without emitting speech and rejects a stale response after rewinding', () => {
+    const store = createWorldStore()
+    const snapshot = makeSnapshot()
+    store.applyServer({ ...snapshot, tick: 1, state: { ...snapshot.state, tick: 1 } })
+    const events: SimEvent[] = []
+    store.onEvents((batch) => events.push(...batch))
+    const transcript = {
+      t: 'transcript' as const,
+      sceneId: 'scene',
+      atTick: 1,
+      catchup: true as const,
+      truncated: false,
+      lines: [{ seq: 1, tick: 1, agentId: 'walker', text: 'Hello' }],
+    }
+    store.applyServer(transcript)
+    store.applyServer(transcript)
+    expect(store.transcript('scene')?.lines).toHaveLength(1)
+    expect(events).toEqual([])
+    store.applyServer({ t: 'scrubbed', reqId: 1, tick: 0, state: makeSnapshot().state })
+    store.applyServer(transcript)
+    expect(store.transcript('scene')).toBeNull()
+  })
+
   it('answers a scene by id, and hands the same open list back until one changes', () => {
     const store = createWorldStore()
     store.applyServer({ t: 'scene', scene: scene('sc_1') })

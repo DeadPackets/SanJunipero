@@ -7,7 +7,12 @@ export type HubSocket = {
 }
 export const OPEN = 1
 
-type Member = { sock: HubSocket; onResync: () => string; lagging: boolean; muted: boolean }
+type Member = {
+  sock: HubSocket
+  onResync: () => readonly string[]
+  lagging: boolean
+  muted: boolean
+}
 
 /** What the hub says out loud. Injectable so a test can read the sentence instead of stderr. */
 export type HubReport = (line: string) => void
@@ -26,7 +31,7 @@ export class SocketHub {
     this.#report = report
   }
 
-  add(sock: HubSocket, onResync: () => string): () => void {
+  add(sock: HubSocket, onResync: () => readonly string[]): () => void {
     const m: Member = { sock, onResync, lagging: false, muted: false }
     this.#members.add(m)
     return () => {
@@ -65,7 +70,7 @@ export class SocketHub {
     for (const m of this.#members) {
       if (m.muted || !m.lagging || m.sock.readyState !== OPEN) continue
       if (m.sock.bufferedAmount >= RESUME_BELOW) continue
-      m.sock.send(m.onResync())
+      for (const frame of m.onResync()) m.sock.send(frame)
       m.lagging = false
       this.#say('caught up and was resynced', m.sock.bufferedAmount)
     }

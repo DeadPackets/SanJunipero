@@ -14,10 +14,20 @@ function fakeSocket(opts: { buffered?: number; readyState?: number } = {}) {
 }
 
 describe('SocketHub', () => {
+  it('restores scene context with the world before sending further deltas', () => {
+    const hub = new SocketHub(() => {})
+    const s = fakeSocket({ buffered: MAX_BUFFERED + 1 })
+    hub.add(s, () => ['SNAP', 'SCENE'])
+    hub.broadcast('missed')
+    s.bufferedAmount = 0
+    hub.resyncDrained()
+    hub.broadcast('next')
+    expect(s.sent).toEqual(['SNAP', 'SCENE', 'next'])
+  })
   it('healthy socket receives every broadcast in order', () => {
     const hub = new SocketHub()
     const s = fakeSocket()
-    hub.add(s, () => '{"t":"snapshot"}')
+    hub.add(s, () => ['{"t":"snapshot"}'])
     hub.broadcast('a')
     hub.broadcast('b')
     hub.broadcast('c')
@@ -30,7 +40,7 @@ describe('SocketHub', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
     expect(s.bufferedAmount).toBeGreaterThan(MAX_BUFFERED)
-    hub.add(s, () => 'SNAP')
+    hub.add(s, () => ['SNAP'])
     hub.broadcast('a')
     hub.broadcast('b')
     expect(s.sent).toEqual([])
@@ -40,7 +50,7 @@ describe('SocketHub', () => {
   it('drained lagging socket is resynced by resyncDrained(), and lagging clears', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
-    hub.add(s, () => 'SNAP')
+    hub.add(s, () => ['SNAP'])
     hub.broadcast('a') // marks lagging, drops
     expect(s.sent).toEqual([])
     s.bufferedAmount = 0
@@ -55,7 +65,7 @@ describe('SocketHub', () => {
   it('still-buffered lagging socket keeps dropping', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
-    hub.add(s, () => 'SNAP')
+    hub.add(s, () => ['SNAP'])
     hub.broadcast('a')
     s.bufferedAmount = RESUME_BELOW + 1 // not drained enough
     hub.resyncDrained()
@@ -70,7 +80,7 @@ describe('SocketHub', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
     let folded = 0 // the mirror's seq, which the snapshot reads live
-    hub.add(s, () => `SNAP@${folded}`)
+    hub.add(s, () => [`SNAP@${folded}`])
 
     folded = 1
     hub.broadcast('tick1') // lagging: dropped
@@ -86,7 +96,7 @@ describe('SocketHub', () => {
   it('closed socket is skipped and removed on next broadcast', () => {
     const hub = new SocketHub()
     const s = fakeSocket({ readyState: 3 })
-    hub.add(s, () => 'SNAP')
+    hub.add(s, () => ['SNAP'])
     expect(hub.size()).toBe(1)
     hub.broadcast('a')
     expect(s.sent).toEqual([])
@@ -96,7 +106,7 @@ describe('SocketHub', () => {
   it('remove() unsubscribes', () => {
     const hub = new SocketHub()
     const s = fakeSocket()
-    const remove = hub.add(s, () => 'SNAP')
+    const remove = hub.add(s, () => ['SNAP'])
     hub.broadcast('a')
     remove()
     hub.broadcast('b')
@@ -111,7 +121,7 @@ describe('★ the stream says when a viewer falls behind', () => {
     const lines: string[] = []
     const hub = new SocketHub((l) => lines.push(l))
     const s = fakeSocket({ buffered: 2 * 1024 * 1024 })
-    hub.add(s, () => '{"t":"snapshot"}')
+    hub.add(s, () => ['{"t":"snapshot"}'])
 
     hub.broadcast('a')
     expect(lines).toHaveLength(1)
@@ -139,7 +149,7 @@ describe('★ the stream says when a viewer falls behind', () => {
   it('a healthy viewer never produces a line', () => {
     const lines: string[] = []
     const hub = new SocketHub((l) => lines.push(l))
-    hub.add(fakeSocket(), () => '{}')
+    hub.add(fakeSocket(), () => ['{}'])
     for (let i = 0; i < 50; i++) hub.broadcast('x')
     expect(lines).toEqual([])
   })
