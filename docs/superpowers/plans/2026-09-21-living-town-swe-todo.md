@@ -21,6 +21,12 @@ The owner now authorizes local end-to-end implementation and refactoring, with t
 - Add S2: measure whether streaming improves time to useful visible output. Evaluate complete validated fields and provider timing before changing the request contract; never execute partial JSON or turn unvalidated tokens into world facts.
 - Paid calls are root-controlled only. Workers use fake providers unless assigned a written sub-budget. Five completed root-controlled local runs booked $1.1424164895 in total, with no unsettled holds. The $100 ceiling was not approached. No further paid run is queued. Provider-invoice finality is not inferred from the local ledger.
 
+## Viewing redesign proposal reopened — 2026-09-21
+
+The owner requested a full redesign proposal and explicitly permits radical alternatives. The [saved proposal](../../proposals/2026-09-21-watchable-town/PROPOSAL.md) recommends a coherent Watch experience, causal story following, selected systemic repairs and a shared-commons experiment. Three isolated concept studies use the same recorded exchange with illustrative staging. They do not replace the town frontend.
+
+V3 is now in design review. Its required matched ten-minute viewing experiment has **not** been completed: the concepts are a 32-second compressed excerpt for choosing the product model. V4 implementation remains pending design selection. Jev adoption remains deferred. No production change or new inference spending occurred for this proposal.
+
 ## Global constraints
 
 - “Physics, never outcomes.” Residents choose their goals, relationships, participation and responses. A reminder cannot force compliance. No fabricated events, dialogue, private knowledge or narrator-authored motives.
