@@ -212,12 +212,12 @@ describe('★ the card is struck at the cut and never re-read', () => {
 })
 
 describe('the ledger a talk leaves behind, which nothing has ever drawn', () => {
-  const delta = (kind: string, text: string, settled?: true): unknown => ({
+  const delta = (kind: string, text: string, resolution?: 'fulfilled'): unknown => ({
     agentId: 'nadia',
     personId: 'yusuf',
     kind,
     text,
-    ...(settled === undefined ? {} : { settled }),
+    ...(resolution === undefined ? {} : { resolution, tieId: 1 }),
   })
 
   /** The socket, and the page's one fold of what comes down it. Both stand before any card
@@ -297,15 +297,16 @@ describe('the ledger a talk leaves behind, which nothing has ever drawn', () => 
     ])
   })
 
-  it('colours a chip by what the town’s own table says that tie is worth', () => {
+  it('colours observed ties while keeping a private resolution neutral and attributed', () => {
     const h = harness()
     h.close('sc_1', [
       delta('slight', 'He took the water.'),
       delta('attraction', 'She liked him for it.'),
       delta('promise', 'He said he would come back.'),
-      delta('promise', 'He came back.', true),
+      delta('promise', 'He came back.', 'fulfilled'),
     ])
-    expect(h.book().sc_1?.chips.map((c) => c.tone)).toEqual(['cost', 'gain', 'plain', 'gain'])
+    expect(h.book().sc_1?.chips.map((c) => c.tone)).toEqual(['cost', 'gain', 'plain', 'plain'])
+    expect(h.book().sc_1?.chips[3]?.text).toBe('They consider this fulfilled: He came back.')
   })
 
   it('shows no chip at all for a close that changed nothing, and no placeholder for one', () => {

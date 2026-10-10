@@ -3,12 +3,14 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/*.mjs"
+        "scripts/*.mjs",
+        "scripts/*.ts"
       ],
       "project": [
         "*.ts",
         "*.js",
-        "scripts/*.mjs"
+        "scripts/*.mjs",
+        "scripts/*.ts"
       ]
     },
     "packages/*": {
@@ -50,10 +52,12 @@
     },
     "packages/llm": {
       "entry": [
-        "src/**/*.test.ts"
+        "src/**/*.test.ts",
+        "scripts/*.ts"
       ],
       "project": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "scripts/**/*.ts"
       ]
     },
     "packages/gateway": {

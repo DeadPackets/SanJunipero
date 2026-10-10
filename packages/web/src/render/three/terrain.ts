@@ -73,6 +73,7 @@ export function createTerrain(scene: THREE.Scene): {
   sync(state: WorldState, records: AssetRecord[]): void
   tick(seconds: number, wet: boolean, motion: boolean): void
   destroy(): void
+  isReady(): boolean
   occluders(): THREE.Group[]
 } {
   const chunks = new Map<string, Chunk>()
@@ -674,6 +675,7 @@ export function createTerrain(scene: THREE.Scene): {
   }
   return {
     sync,
+    isReady: () => pending.size === 0,
     tick(seconds, wet, motion) {
       const now = performance.now()
       if (motion) waterTime.value += Math.min(0.1, Math.max(0, (now - lastWaterAt) / 1000))
@@ -706,4 +708,14 @@ export function createTerrain(scene: THREE.Scene): {
       for (const material of [trunkMat, leafMat, rockMat, grassMat]) material.dispose()
     },
   }
+}
+
+export function terrainNeedsSync(previous: WorldState | null, next: WorldState): boolean {
+  return (
+    previous?.terrain !== next.terrain ||
+    previous.structures !== next.structures ||
+    previous.townLayout !== next.townLayout ||
+    previous.origin !== next.origin ||
+    previous.weather.kind !== next.weather.kind
+  )
 }

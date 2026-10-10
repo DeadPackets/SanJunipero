@@ -1,58 +1,58 @@
-import { type EventStore } from '@sj/engine/store'
+import type { PerceptionPacket as EnginePerceptionPacket, Law, Makeables } from '@sj/engine'
 import {
   AgentArrived,
   ambientTempAt,
   composePerception,
-  effectiveConfig,
-  headcount,
-  mintId,
-  roadRimOf,
-  spoilageFor,
   daysUntilNewGround,
-  groundForBuilding,
-  hears,
-  spokenTo,
-  townSquareOf,
-  unfinishedWork,
-  type StandingWalls,
+  distantWater,
+  effectiveConfig,
   FORAGEABLE_YIELD,
+  FUEL_KIND,
+  firstReachable,
+  groundForBuilding,
+  headcount,
+  hears,
   insulationOf,
   isExposed,
   isFoodKind,
-  FUEL_KIND,
   isPassable,
   LAWS_SHOWN,
   loneCandidateFor,
-  distantWater,
-  firstReachable,
   makeables,
+  mintId,
   naturalPlaces,
   placeName,
   recipeTileKind,
+  roadRimOf,
   SQUARE_RADIUS,
+  type StandingWalls,
+  spoilageFor,
+  spokenTo,
   standingLaws,
-  tabledLaws,
-  type TabledLaw,
   submitIntent,
-  walkDestination,
-  waterWithinReach,
-  WELL_KIND,
+  type TabledLaw,
   type TickHandler,
   type TickLoop,
+  tabledLaws,
+  townSquareOf,
+  unfinishedWork,
+  WELL_KIND,
   type WorldState,
+  walkDestination,
+  waterWithinReach,
 } from '@sj/engine'
-import type { Law, Makeables, PerceptionPacket as EnginePerceptionPacket } from '@sj/engine'
+import { type EventStore } from '@sj/engine/store'
 import {
   isHearthKind,
   isWet,
   isWoody,
-  T_FOREST,
-  T_WATER,
   MINUTES_PER_DAY,
   PRESENCE_EVENT_TYPES,
   RELATIONSHIP_EVENT_TYPES,
   type SimConfig,
   type SimEvent,
+  T_FOREST,
+  T_WATER,
   weekdayFromTick,
 } from '@sj/shared'
 import type {
@@ -79,7 +79,13 @@ export type SubmitResult = { ok: true; settled?: true } | { ok: false; reason: s
 
 /** An act the world finished for a body. `settled` as above; `made` is the kind of thing this
  *  body's hands brought into the world on the same tick, when they did. */
-export type FinishedAct = { seq: number; verb: string; settled: boolean; made?: string }
+export type FinishedAct = {
+  seq: number
+  verb: string
+  settled: boolean
+  made?: string
+  params?: Record<string, unknown>
+}
 
 // How many candidate tiles of a kind get asked for footing before the road gives up on it.
 const FOOTING_TRIES = 12
@@ -727,13 +733,25 @@ export class EngineBridge {
 
   // Body facts perception does not carry, for the arbiter seam: who is asking
   // and what their hands already know. Read-only; skills are copied out.
-  agentFacts(agentId: string): { name: string; skills: Record<string, number> } | null {
+  agentFacts(
+    agentId: string,
+  ): { name: string; ageDays: number; skills: Record<string, number> } | null {
     const body = this.#loop.state.agents[agentId]
-    return body === undefined ? null : { name: body.name, skills: { ...body.skills } }
+    return body === undefined
+      ? null
+      : { name: body.name, ageDays: body.ageDays, skills: { ...body.skills } }
   }
 
   onTick(cb: (tick: number) => void): void {
     this.#tickCallbacks.push(cb)
+  }
+
+  currentAction(agentId: string): {
+    verb: string
+    params: Record<string, unknown>
+    then?: { verb: string; params: Record<string, unknown> }
+  } | null {
+    return this.#loop.state.agents[agentId]?.activity ?? null
   }
 
   currentTick(): number {
@@ -888,16 +906,17 @@ export class EngineBridge {
 
   /** Acts of this body the world has finished since `afterSeq`, oldest first. Read off the same
    *  window perception is composed from, so nothing reaches a mind before it could have felt it. */
-  completedSince(agentId: string, afterSeq: number): FinishedAct[] {
+  completedSince(agentId: string, afterSeq: number, fromLog = false): FinishedAct[] {
     const done: (FinishedAct & { tick: number })[] = []
     // What the hands brought into the world, by tick: a catch is logged after the cast completes.
     const madeAt = new Map<number, string>()
-    let lastStartLength: unknown
-    for (const ev of this.#window) {
+    const pending = new Map<string, { duration: unknown; params?: Record<string, unknown> }>()
+    for (const ev of fromLog ? this.#store.readFrom(afterSeq) : this.#window) {
       const p = ev.payload as {
         agentId?: unknown
         verb?: unknown
         duration?: unknown
+        params?: Record<string, unknown>
         madeBy?: unknown
         kind?: unknown
       }
@@ -906,13 +925,35 @@ export class EngineBridge {
         continue
       }
       if (p.agentId !== agentId) continue
-      if (ev.type === 'action_started') {
-        lastStartLength = p.duration
+      if (ev.type === 'action_started' && typeof p.verb === 'string') {
+        pending.set(p.verb, {
+          duration: p.duration,
+          ...(p.params === undefined ? {} : { params: p.params }),
+        })
         continue
       }
-      if (ev.type !== 'action_completed' || ev.seq <= afterSeq || typeof p.verb !== 'string')
+      if (ev.type === 'action_interrupted') {
+        pending.clear()
         continue
-      done.push({ seq: ev.seq, verb: p.verb, settled: lastStartLength === 0, tick: ev.tick })
+      }
+      if (ev.type !== 'action_completed' || typeof p.verb !== 'string') continue
+      if (ev.seq <= afterSeq) {
+        pending.delete(p.verb)
+        continue
+      }
+      const started =
+        pending.get(p.verb) ??
+        (this.#store.actionStartBefore(agentId, p.verb, ev.seq)?.payload as
+          | { duration: unknown; params?: Record<string, unknown> }
+          | undefined)
+      pending.delete(p.verb)
+      done.push({
+        seq: ev.seq,
+        verb: p.verb,
+        settled: started?.duration === 0,
+        tick: ev.tick,
+        ...(started?.params === undefined ? {} : { params: started.params }),
+      })
     }
     return done.map(({ tick, ...act }) => {
       const made = madeAt.get(tick)

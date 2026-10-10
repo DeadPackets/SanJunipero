@@ -166,7 +166,7 @@ export function beatViewOf(args: BeatArgs): BeatView | null {
     kind: scene.kind,
     eyebrow: WHY_PHRASE[scene.kind],
     tone: VALENCE_TONE[`${VALENCE[scene.kind]}`],
-    head: own ?? threadLine(thread, args.now),
+    head: own ?? (thread?.proseSceneId === scene.id ? threadLine(thread, args.now) : null),
     rows,
     chips: args.rows.chips,
     cast: scene.participants.slice(0, BEAT_BUST_CAP),

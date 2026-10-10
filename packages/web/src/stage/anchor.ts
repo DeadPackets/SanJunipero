@@ -14,10 +14,21 @@ export type Reach = { x: number; y: number }
 
 /** A mark wider than the body it hangs off runs out of the picture near an edge: the ring round
  *  a figure at x = 20 puts its left arm at x = -55. It slides in far enough to stay whole. */
-export function keepOnStage(a: StageAnchor, w: number, h: number, reach: Reach): StageAnchor {
-  const hold = (v: number, span: number, pad: number): number =>
-    span < pad * 2 ? span / 2 : Math.min(Math.max(v, pad), span - pad)
-  return { ...a, x: hold(a.x, w, reach.x), y: hold(a.y, h, reach.y) }
+export function keepOnStage(
+  a: StageAnchor,
+  w: number,
+  h: number,
+  reach: Reach,
+  insets?: Scene['safeInsets'],
+): StageAnchor {
+  const hold = (v: number, start: number, end: number, pad: number): number =>
+    end - start < pad * 2 ? (start + end) / 2 : Math.min(Math.max(v, start + pad), end - pad)
+  const top = Math.min(h, insets?.top ?? 0)
+  return {
+    ...a,
+    x: hold(a.x, 0, Math.max(0, w - (insets?.right ?? 0)), reach.x),
+    y: hold(a.y, top, Math.max(top, h - (insets?.bottom ?? 0)), reach.y),
+  }
 }
 
 /** World point → CSS pixels inside the stage element, and whether the camera can see it.
@@ -93,7 +104,7 @@ export function useSubjectAnchor(
         const view = scene.viewRect()
         const zoom = scene.getZoom()
         a = screenAnchor(view, zoom, at.sx, at.sy)
-        if (a.onScreen) a = keepOnStage(a, view.w * zoom, view.h * zoom, reach)
+        if (a.onScreen) a = keepOnStage(a, view.w * zoom, view.h * zoom, reach, scene.safeInsets)
       }
       const was = last.current
       if (a.x === was.x && a.y === was.y && a.onScreen === was.shown) return

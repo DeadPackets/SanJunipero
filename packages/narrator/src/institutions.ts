@@ -94,7 +94,7 @@ export function detectInstitutions(
     out.push({
       kind: 'role',
       name: `the ${label}`,
-      description: `${nameOf(agentId)} has ${verbPhrasePast(verb)} ${seqs.length} times`,
+      description: `Observed pattern: ${nameOf(agentId)} has ${verbPhrasePast(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [agentId],
       sourceEventIds: seqs,
@@ -141,7 +141,7 @@ export function detectInstitutions(
     out.push({
       kind: 'group',
       name: named.join(' & '),
-      description: `${named.join(' & ')} are often seen together`,
+      description: `Observed pattern: ${named.join(' & ')} were repeatedly recorded together`,
       foundingSceneIndex: foundingIdx,
       memberIds: members,
       sourceEventIds: foundingIdx === -1 ? [] : scenes[foundingIdx]!.eventIds,
@@ -163,7 +163,7 @@ export function detectInstitutions(
     out.push({
       kind: 'rule',
       name: `people ${verbPhrase(verb)}`,
-      description: `${agents.size} people have ${verbPhrasePast(verb)} ${seqs.length} times`,
+      description: `Observed pattern: ${agents.size} people have ${verbPhrasePast(verb)} ${seqs.length} times`,
       foundingSceneIndex: sceneOf(seqs[0]!),
       memberIds: [...agents].sort(),
       sourceEventIds: seqs,

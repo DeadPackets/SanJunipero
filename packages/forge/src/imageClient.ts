@@ -1,4 +1,4 @@
-import type { BudgetGuard } from './budget.js'
+import type { BudgetGuard, ReserveCharge } from './budget.js'
 import { BudgetExceededError } from './budget.js'
 
 export const IMAGE_MODEL_PRIMARY = 'google/gemini-3.1-flash-image'
@@ -31,19 +31,31 @@ export function makeImageClient(opts: {
   apiKey: string
   fetchFn?: typeof fetch
   budget?: BudgetGuard
+  reserveCharge?: ReserveCharge
+  signal?: AbortSignal
   /** A reply that was billed but carried no image: the row no candidate will ever book. */
   onCharge?: (model: string, costUsd: number) => void
 }): ImageClient {
   const doFetch = opts.fetchFn ?? fetch
 
   async function generateOne(model: string, prompt: string, refs: Buffer[]): Promise<Candidate> {
+    opts.signal?.throwIfAborted()
     // Reserve BEFORE firing so a crossed cap blocks the request; throws BudgetExceededError.
     opts.budget?.spend(EST_COST_PER_IMAGE)
     let billed = false
+    let sent = false
+    let uncertain = false
+    let costUsd = EST_COST_PER_IMAGE
+    let reservation: ReturnType<ReserveCharge> | undefined
     try {
+      reservation = opts.reserveCharge?.(model, EST_COST_PER_IMAGE)
+      sent = true
       const res = await doFetch(ENDPOINT, {
         method: 'POST',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.any([
+          AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          ...(opts.signal ? [opts.signal] : []),
+        ]),
         headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model,
@@ -67,16 +79,36 @@ export function makeImageClient(opts: {
         usage?: { cost?: number }
       }
       const b64 = json.data?.[0]?.b64_json
-      const costUsd = json.usage?.cost ?? EST_COST_PER_IMAGE
+      const reported = json.usage?.cost
+      costUsd =
+        typeof reported === 'number' && Number.isFinite(reported) && reported >= 0
+          ? reported
+          : EST_COST_PER_IMAGE
+      reservation?.settle(costUsd)
+      opts.signal?.throwIfAborted()
       if (!b64) {
         opts.onCharge?.(model, costUsd)
         throw new ImageGenError(model, res.status, 'no data[0].b64_json in response')
       }
-      // Reconcile upward only: an actual under the reserve leaves the reserve booked.
       if (costUsd > EST_COST_PER_IMAGE) opts.budget?.spend(costUsd - EST_COST_PER_IMAGE)
+      else opts.budget?.release(EST_COST_PER_IMAGE - costUsd)
       return { png: Buffer.from(b64, 'base64'), model, costUsd }
+    } catch (err) {
+      const unbilled =
+        err instanceof ImageGenError &&
+        err.status >= 400 &&
+        err.status < 500 &&
+        err.status !== 408 &&
+        err.status !== 499
+      if (sent && !billed && !unbilled) {
+        uncertain = true
+        reservation?.retainUncertain()
+      }
+      throw err
     } finally {
-      if (!billed) opts.budget?.release(EST_COST_PER_IMAGE)
+      if (billed) reservation?.settle(costUsd)
+      else if (!uncertain) opts.budget?.release(EST_COST_PER_IMAGE)
+      reservation?.release()
     }
   }
 
@@ -86,6 +118,7 @@ export function makeImageClient(opts: {
       try {
         return await generateOne(model, prompt, refs)
       } catch (e) {
+        opts.signal?.throwIfAborted()
         if (e instanceof BudgetExceededError) throw e
         lastErr = e instanceof ImageGenError ? e : new ImageGenError(model, 0, String(e))
       }

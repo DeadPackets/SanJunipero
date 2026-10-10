@@ -6,6 +6,7 @@ import {
   T_ROCK,
   T_SAND,
   T_WATER,
+  GENESIS_BUILDER_ID,
   sanitizeSpokenText,
   type InvitationVerb,
   type IndoorDestination,
@@ -18,7 +19,7 @@ import type { FaunaKind } from './data/faunaDefs.js'
 import type { ForageableKind } from './data/forageables.js'
 import type { Law, TabledLaw } from './lawShapes.js'
 
-export type { TileId }
+export { GENESIS_BUILDER_ID, type TileId }
 
 // The ground a recipe is allowed to name, and the one table for it. Road, path, sapling and
 // channel are deliberately absent — a rule may not ask for ground the town has no word for.
@@ -140,10 +141,6 @@ export type AgentBody = {
   collapsedSinceTick: number | null
   zeroHungerSinceTick: number | null
 }
-
-/** Who the world itself builds as. Lives here and not in `genesis/world.ts` because `fold` has
- *  to tell the founding town from what a person adds, and cannot import the genesis module. */
-export const GENESIS_BUILDER_ID = 'genesis'
 
 export type Structure = {
   id: string

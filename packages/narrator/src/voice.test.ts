@@ -105,6 +105,12 @@ describe('applyFootnotes', () => {
     const chapter = await renderChapter({
       store,
       llm: llmSaying('A day.\nSeen: 1, 4, 99'),
+      moments: [
+        [
+          { n: 1, text: 'First event.' },
+          { n: 4, text: 'Later event.' },
+        ],
+      ],
       day: 1,
       scenes,
       alert,

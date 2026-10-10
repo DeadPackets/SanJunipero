@@ -1,3 +1,4 @@
+import { fromClosed } from '../turn.js'
 // The two prompts a scene makes: one line by the mouth that holds the floor, and one closing
 // account of the whole thing. The system prefix is the ordinary turn's, byte for byte, so a
 // scene line lands on the cache the mind's own turns keep warm.
@@ -17,7 +18,9 @@ import { TIE_PHRASE, type Tie } from '../memory/ties.js'
 import { askPhrase } from './invitations.js'
 import {
   SceneTurnSchema,
+  StrictSceneTurnSchema,
   TIE_KINDS,
+  TieAnswerFields,
   type Scene,
   type SceneAsk,
   type SceneClose,
@@ -31,6 +34,7 @@ import {
  *  the personality and a birth or a death rewrites the cast. */
 export type SceneVoice = {
   identity: IdentityCore
+  currentIdentity?: () => IdentityCore
   personality: () => { doc: PersonalityDoc; autobiography: string[] }
   roster?: () => readonly RosterEntry[]
   /** The town's own names for its habits, from the same seam the ordinary turn reads. */
@@ -79,7 +83,7 @@ export function sceneWordUsual(voice: IdentityCore['voiceCard']): number {
 
 // CAPABILITIES tells every prompt to name an act. A scene line is not an act, and this is the
 // one place that has to say so.
-export const SCENE_ANSWER = `Your turn to talk. This answer supplies words, not a new physical action. Your current surroundings and activity are given below.
+export const SCENE_ANSWER = `Your turn to talk. While you stay, your committed work continues. When you choose leave:true, you may supply a plan of ordinary physical acts to do next and reconsider_at for when to think again. Null leaves your current plan unchanged. An empty plan clears only queued steps, not work already under way. Use the same verbs and parameters as an ordinary turn. The world still validates them. Saying you will act never means the act has happened. Your current surroundings and activity are given below.
 
 Leave speech empty when you have nothing to add, and the conversation ends there. Set leave to true if you walk off. What you say in the same answer is said before you go. Put the name of the person you are talking to in "to", picked from the people named at the end of this, or leave it empty to talk to whoever is listening.
 
@@ -87,12 +91,15 @@ move says what this line is doing. tell: bring up something new, like news, a pl
 
 To ask the person you are talking to for something, put court, propose or lie_with in "ask". Otherwise leave it empty. If you were asked such a thing, put accept or refuse in "answer".
 
+If the prompt lists a tabled proposal and you choose to bring it back before this room, put its exact id in "reconvene". Otherwise leave reconvene empty. Your speech remains your own words.
+
 thought is one short line nobody else hears. mood is how you feel right now, in one or two plain words of your own, and null unless it has changed.`
 
 const CLOSE_REASON_PHRASE: Record<NonNullable<Scene['closeReason']>, string> = {
   ended: 'It ended because they had said what they had to say.',
   left: 'It ended because somebody walked away.',
-  capped: 'It ended while it was still going. There was more to say.',
+  capped:
+    'This conversation reached its turn limit. Infer any unresolved matter only from what was said.',
   timeout: 'It ended because nobody said anything more.',
 }
 
@@ -116,7 +123,9 @@ function renderKnown(known: readonly { name: string; doc: string }[]): string {
 
 function renderTies(ties: readonly Tie[], nameOf: (id: string) => string): string {
   if (ties.length === 0) return ''
-  const rows = ties.map((t) => `${nameOf(t.personId)}, ${TIE_PHRASE[t.kind]}: ${t.text}`)
+  const rows = ties.map(
+    (t) => `Tie ${t.id}, ${nameOf(t.personId)}, ${TIE_PHRASE[t.kind]}: ${t.text}`,
+  )
   return ['What already stands between you:', ...rows].join('\n')
 }
 
@@ -224,6 +233,18 @@ function renderProposal(scene: Scene, agentId: string, nameOf: (id: string) => s
   return `${nameOf(proposal.proposedBy)} has proposed a rule to everyone here: "${proposal.lawText}" ${stand}`
 }
 
+function renderPending(
+  scene: Scene,
+  proposals: SceneAsk['pendingProposals'],
+  nameOf: (id: string) => string,
+): string {
+  if (scene.kind !== 'talk' || proposals === undefined || proposals.length === 0) return ''
+  return [
+    'Rules an earlier room left on the table. You may choose one to bring before this room:',
+    ...proposals.map((p) => `- ${p.id}, put by ${nameOf(p.proposedBy)}: "${p.text}"`),
+  ].join('\n')
+}
+
 /** Who is here and whose turn it is, in one block AFTER the thread. It sits last because it is
  *  the one part a join or a leave rewrites, and every byte above it stays cached. */
 function renderFloor(opts: {
@@ -242,7 +263,7 @@ function renderFloor(opts: {
       ? `${them} just spoke.`
       : `${opts.lastSpeaker} just spoke.`
   const ask = opts.wrapUp
-    ? 'This has gone on a while. Say your last thing and let it end.'
+    ? 'This has gone on a while. Say your last thing, or say nothing. If you choose to go and act, set leave:true and supply the supported physical steps in plan. Saying you will do it does not queue them. Use your current surroundings and known condition. Do not invent an inspection result or completed work. You may instead leave with no new plan or stay to answer something that still matters.'
     : `Say what you would actually say next, or say nothing and let it end. You do not have to answer what ${them} said. You can ask something, bring up your own thing, or change the subject.`
   return [
     opts.others.length === 0 ? '' : `Standing with you: ${opts.others.join(', ')}.`,
@@ -284,6 +305,7 @@ export function sceneBlock(
   const parts = [
     SCENE_ANSWER,
     ask.physicalContext ?? '',
+    ask.actionContext ?? '',
     castLaw(voice.livingCast()),
     renderKnown(voice.known?.(rest.map((p) => p.name)) ?? []),
     renderTies(ask.ties, nameOf),
@@ -294,6 +316,7 @@ export function sceneBlock(
     ask.mood.length === 0 ? '' : `How you are right now: ${ask.mood}.`,
     renderInvitation(ask.scene.invitation, ask.agentId, nameOf),
     renderTelling(ask.scene, ask.agentId, nameOf),
+    renderPending(ask.scene, ask.pendingProposals, nameOf),
     renderProposal(ask.scene, ask.agentId, nameOf),
     renderFloor({
       lastSpeaker: spoken.length === 0 ? null : nameOf(spoken[spoken.length - 1]!.agentId),
@@ -318,7 +341,7 @@ function sceneSystem(voice: SceneVoice): string {
     ...(voice.habits === undefined ? {} : { habits: voice.habits() }),
     ...(voice.laws === undefined ? {} : { laws: voice.laws() }),
     ...(voice.frontier === undefined ? {} : { frontier: voice.frontier() }),
-    identity: voice.identity,
+    identity: voice.currentIdentity?.() ?? voice.identity,
     personality: voice.personality(),
     journal: [],
     scene: { ledgers: [], memories: [] },
@@ -339,7 +362,9 @@ ${PLAIN_SPEECH}
 
 Write nothing, in the beat or the summary, about how or why the conversation ended.
 
-Then the ties. A tie is one thing one person now holds about another: a promise, a debt, a slight, a grudge, an attraction, a secret, an alliance, or being family. Write one only where the talk itself made it or paid it off. Most conversations make none, and an invented tie is worse than a missing one. Mark a tie settled when the talk cleared something that was already owed.
+Use only what was publicly said or witnessed. Do not infer hidden thoughts or beliefs.
+
+Then the ties. A tie is one thing one person now holds about another: a promise, a debt, a slight, a grudge, an attraction, a secret, an alliance, or being family. Write a new tie only when the public words establish it. Most conversations make none, and an invented tie is worse than a missing one. You cannot change or settle existing private ties. Use null tieId and null resolution. Each person reviews their own commitments privately. Keep separate promises separate. A reminder is not a deadline or evidence of failure. Use null remindAtTick unless an exact time was supplied. No ledger events are supplied here: evidenceSeqs must be empty.
 
 Name nobody who was not in the conversation.`
 
@@ -354,7 +379,7 @@ export const CloseAnswerSchema = z
           about: z.string(),
           kind: z.enum(TIE_KINDS),
           text: z.string(),
-          settled: z.boolean(),
+          ...TieAnswerFields,
         })
         .strict(),
     ),
@@ -368,12 +393,11 @@ const MAX_TIES = 6
 function closeMessage(ask: SceneCloseAsk): string {
   const names = new Map(ask.cast.map((p) => [p.id, p.name]))
   const nameOf = (id: string): string => names.get(id) ?? id
-  const rows = ask.scene.thread.flatMap((l) => {
-    const said = `${nameOf(l.agentId)}: "${sanitizeSpokenText(l.text)}"`
-    return l.aside.length === 0
-      ? [said]
-      : [said, `  (${nameOf(l.agentId)} was thinking: ${l.aside})`]
-  })
+  const rows = ask.scene.thread.map((l) =>
+    l.presence === undefined
+      ? `${nameOf(l.agentId)}: "${sanitizeSpokenText(l.text)}"`
+      : `${nameOf(l.agentId)} ${l.presence}.`,
+  )
   const reason = ask.scene.closeReason
   return [
     `Who was there: ${ask.cast.map((p) => p.name).join(', ')}.`,
@@ -400,13 +424,14 @@ function deltasFrom(
     const agentId = idOf.get(t.holder.trim().toLowerCase())
     const personId = idOf.get(t.about.trim().toLowerCase())
     if (agentId === undefined || personId === undefined || agentId === personId) continue
-    if (t.text.trim().length === 0) continue
+    if (t.text.trim().length === 0 || t.tieId !== null || t.resolution !== null) continue
     out.push({
       agentId,
       personId,
       kind: t.kind,
       text: t.text.trim(),
-      ...(t.settled ? { settled: true as const } : {}),
+      remindAtTick: t.remindAtTick,
+      evidenceSeqs: [],
     })
   }
   return out
@@ -431,10 +456,10 @@ export function makeSceneLlm(client: LlmClient, voice: SceneVoice): SceneLlm {
       const { value } = await client.object({
         system,
         messages: [{ role: 'user', content: block }],
-        schema: SceneTurnSchema,
+        schema: StrictSceneTurnSchema,
         bill,
       })
-      return value
+      return SceneTurnSchema.parse(fromClosed(value))
     },
     async close(ask): Promise<SceneClose> {
       const message = closeMessage(ask)

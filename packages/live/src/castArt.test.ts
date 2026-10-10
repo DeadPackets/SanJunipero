@@ -2,11 +2,11 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CharacterAtlasManifestSchema, DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
-import { migrateLlmTables } from '@sj/llm'
+import { configureSpendLimits, migrateLlmTables } from '@sj/llm'
 import {
   AssetCodex,
   CAST_CONTENT_DIR,
@@ -23,9 +23,8 @@ import {
   CHAR_CELL_PX,
   type RawImage,
 } from '@sj/forge'
-import { LIVE_ART_DAILY_USD, noCastArt, type NewPerson } from './castArt.js'
+import { LIVE_ART_DAILY_USD, noCastArt, watchCastArt, type NewPerson } from './castArt.js'
 import { FORGE_CALLER, artSpentUsd, createCastArt, lookOf } from './discoveryCommission.js'
-import { ledgerTotalUsd } from './liveWorld.js'
 
 const GRASS: TileId[][] = Array.from({ length: 8 }, () => Array.from({ length: 8 }, () => 0))
 /** What one 2048² generation bills at. Eight of them is the ~$1.15 a person costs. */
@@ -77,11 +76,11 @@ describe('★ a face for a person the town made, out of the minds’ own wallet'
       .prepare('SELECT cost_usd FROM llm_calls WHERE caller = ? ORDER BY id')
       .all(FORGE_CALLER) as { cost_usd: number }[]
 
-  const artFor = (over: { artDailyUsd?: number; runUsd?: number } = {}) =>
-    createCastArt({
+  const artFor = (over: { artDailyUsd?: number; runUsd?: number } = {}) => {
+    configureSpendLimits(opsDb, { lifetimeUsd: over.runUsd ?? 3, rollingDayUsd: over.runUsd ?? 3 })
+    return createCastArt({
       codex,
       opsDb,
-      spendableUsd: () => (over.runUsd ?? 3) - ledgerTotalUsd(opsDb),
       apiKey: 'not-a-key',
       fetchFn: fakeFetch,
       onError: (k, e) => {
@@ -92,6 +91,7 @@ describe('★ a face for a person the town made, out of the minds’ own wallet'
       },
       ...(over.artDailyUsd === undefined ? {} : { artDailyUsd: over.artDailyUsd }),
     })
+  }
 
   beforeEach(async () => {
     bought = []
@@ -217,7 +217,7 @@ describe('★ a face for a person the town made, out of the minds’ own wallet'
   })
 
   it('a run with no API key draws nothing at all', () => {
-    const art = createCastArt({ codex, opsDb, spendableUsd: () => 3, apiKey: undefined })
+    const art = createCastArt({ codex, opsDb, apiKey: undefined })
     art.onPerson(person('agent_41'))
     expect(bought).toEqual([])
     expect(codex.listSince(0)).toEqual([])
@@ -283,3 +283,58 @@ async function pairPng(cell: (name: string) => RawImage): Promise<Buffer> {
   }
   return encodePng(onMagenta(pair))
 }
+
+describe('cast commission admission', () => {
+  it('does not start queued or new faces after cancellation', async () => {
+    const cancellation = new AbortController()
+    const drawn: string[] = []
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const watcher = watchCastArt({
+      codex: { listSince: () => [], onAssetReady: () => {} },
+      artSpendableUsd: () => 3,
+      signal: cancellation.signal,
+      draw: async (p) => {
+        drawn.push(p.id)
+        await gate
+      },
+    })
+    watcher.onPerson(person('one'))
+    watcher.onPerson(person('two'))
+    await Promise.resolve()
+    expect(drawn).toEqual(['one'])
+    cancellation.abort()
+    watcher.onPerson(person('three'))
+    release()
+    await watcher.settle()
+    expect(drawn).toEqual(['one'])
+  })
+})
+
+it('retries a face after its allowance returns without another arrival', async () => {
+  vi.useFakeTimers()
+  try {
+    const drawn: string[] = []
+    let left = 0
+    const watcher = watchCastArt({
+      codex: { listSince: () => [], onAssetReady: () => {} },
+      artSpendableUsd: () => left,
+      draw: async (p) => {
+        drawn.push(p.id)
+      },
+    })
+    watcher.onPerson(person('one'))
+    await watcher.settle()
+    expect(drawn).toEqual([])
+    left = 1
+    await vi.advanceTimersByTimeAsync(60_000)
+    watcher.retry()
+    watcher.retry()
+    await watcher.settle()
+    expect(drawn).toEqual(['one'])
+  } finally {
+    vi.useRealTimers()
+  }
+})

@@ -368,7 +368,7 @@ describe('★ a born mind survives a restart', () => {
     await t.reboot()
 
     expect(memoryTexts(t.dbFor(CHILD), CHILD)).toContain(
-      'You were born to your mother and your father, in this town.',
+      'On day 1: You were born to your mother and your father, in this town.',
     )
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(t.booted.runtimes.has(CHILD)).toBe(true)
@@ -454,7 +454,9 @@ describe('★ a child born in the town gets a mind, a database and a name', () =
     expect(readdirSync(t.dir)).toContain(`${CHILD}.db`)
 
     const seeded = memoryTexts(t.dbFor(CHILD), CHILD)
-    expect(seeded).toContain('You were born to your mother and your father, in this town.')
+    expect(seeded).toContain(
+      'On day 1: You were born to your mother and your father, in this town.',
+    )
 
     expect(socialNames(t.opsDb)).toEqual([{ agentId: CHILD, socialName: SOCIAL_NAME }])
     expect(callersIn(t.opsDb)).toContain('naming')

@@ -7,6 +7,12 @@ import {
   parseLibraryItemManifest,
   resolveFurnishingKind,
   FURNISHING_KIND_ALIASES,
+  BUILDING_APPEARANCE_PROTOTYPES,
+  BuildingAppearanceRecipeSchema,
+  FALLBACK_BUILDING_APPEARANCE,
+  buildingAppearanceFor,
+  buildingWindowMask,
+  frontDoorFraction,
 } from './interiorMeta.js'
 
 const BED = {
@@ -125,5 +131,49 @@ describe('resolveFurnishingKind', () => {
     expect(resolveFurnishingKind('tools')).toBe('anvil')
     expect(resolveFurnishingKind('bed')).toBe('bed')
     expect(Object.keys(FURNISHING_KIND_ALIASES)).toEqual(['tools'])
+  })
+})
+
+describe('building appearance recipes', () => {
+  it('keeps three distinct uses on the same physical footprint contract', () => {
+    expect(Object.values(BUILDING_APPEARANCE_PROTOTYPES).map((recipe) => recipe.use)).toEqual([
+      'personal-home',
+      'public-shop',
+      'public-meeting',
+    ])
+    for (const recipe of Object.values(BUILDING_APPEARANCE_PROTOTYPES)) {
+      expect(BuildingAppearanceRecipeSchema.parse(recipe)).toEqual(recipe)
+      expect(recipe).not.toHaveProperty('footprint')
+      expect(recipe).not.toHaveProperty('mesh')
+    }
+  })
+
+  it('uses one coherent fallback and rejects geometry or invented placement fields', () => {
+    expect(buildingAppearanceFor('observatory')).toBe(FALLBACK_BUILDING_APPEARANCE)
+    expect(() =>
+      BuildingAppearanceRecipeSchema.parse({
+        ...FALLBACK_BUILDING_APPEARANCE,
+        mesh: 'arbitrary.glb',
+      }),
+    ).toThrow()
+    expect(() =>
+      BuildingAppearanceRecipeSchema.parse({
+        ...FALLBACK_BUILDING_APPEARANCE,
+        door: 'back-left',
+      }),
+    ).toThrow()
+  })
+
+  it('derives the door lane and emission mask from the recipe', () => {
+    expect(frontDoorFraction(3)).toBe(0.5)
+    expect(frontDoorFraction(4)).toBe(0.375)
+    expect(buildingWindowMask(BUILDING_APPEARANCE_PROTOTYPES.meeting, 4, false)).toEqual({
+      front: [0.13, 0.62, 0.87],
+      side: [0.28, 0.72],
+    })
+    expect(buildingWindowMask(BUILDING_APPEARANCE_PROTOTYPES.meeting, 4, true)).toEqual({
+      front: [0.13, 0.38, 0.87],
+      side: [0.28, 0.72],
+    })
   })
 })

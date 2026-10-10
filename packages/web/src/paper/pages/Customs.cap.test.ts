@@ -14,6 +14,7 @@ const custom = (n: number): ConstructRecord => ({
   firstDay: n,
   gatherings: 2,
   anchor: { x: n, y: n },
+  place: null,
   quote: null,
   saidBy: null,
 })

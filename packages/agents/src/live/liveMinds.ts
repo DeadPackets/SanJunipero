@@ -154,8 +154,6 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
     }
   }
   const roster = opts.arbiter?.roster
-  const customs = opts.arbiter?.customs
-  const habits = opts.arbiter?.habits
   const frontier = opts.arbiter?.frontier
   const boot = (spec: MindSpec): void => {
     const db = opts.dbFor(spec.id)
@@ -168,13 +166,12 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
       const mem = new MemoryStore(db, spec.id, opts.embedder)
       const voice = makeSceneLlm(sceneClient(spec.id), {
         identity: spec.identity,
+        currentIdentity: () => runtimes.get(spec.id)?.currentIdentity() ?? spec.identity,
         personality: () => ({
           doc: personality.current().doc,
           autobiography: mem.autobiography(),
         }),
         ...(roster === undefined ? {} : { roster }),
-        ...(customs === undefined ? {} : { customs }),
-        ...(habits === undefined ? {} : { habits }),
         laws: () => opts.bridge.lawTexts(),
         ...(frontier === undefined ? {} : { frontier }),
         livingCast,
@@ -200,6 +197,8 @@ export function bootMinds(opts: BootMindsOpts): BootedMinds {
         feed: (occasions, tick) => runtimes.get(spec.id)?.feedWants(occasions, tick),
         mood: () => runtimes.get(spec.id)?.moodWord() ?? '',
         feltMood: (mood, tick) => runtimes.get(spec.id)?.feltMood(mood, tick),
+        commitSceneExit: (choice, tick) => runtimes.get(spec.id)?.commitSceneExit(choice, tick),
+        actionContext: () => runtimes.get(spec.id)?.actionContext() ?? '',
       })
     }
     const runtime = new AgentRuntime({

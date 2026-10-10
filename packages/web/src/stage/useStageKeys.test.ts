@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cameraActionFor } from '../render/cameraNav.js'
 import { FpsOverlay } from '../ui/FpsOverlay.js'
 import { KEY_MAP_KEY } from './KeyMap.js'
-import { stageKeyAllowed, stageKeyFor } from './useStageKeys.js'
+import { stageKeyAllowed, stageKeyFor, useStageKeys } from './useStageKeys.js'
 
 describe('the five keys the stage itself owns', () => {
   it('maps S, Esc, F, D and T, in either case', () => {
@@ -86,6 +86,88 @@ describe('★ no other window listener in the tree claims a stage key', () => {
       for (const root of roots.splice(0)) root.unmount()
     })
     document.body.replaceChildren()
+  })
+
+  it('leaves native dialog Escape to the browser without closing the town underneath', async () => {
+    const onEscape = vi.fn()
+    const onDirector = vi.fn()
+    function Keys() {
+      useStageKeys({ onEscape, onDirector })
+      return null
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(Keys))
+    })
+    const dialog = document.createElement('dialog')
+    document.body.append(dialog)
+    dialog.showModal()
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    dialog.dispatchEvent(escape)
+    await press('d')
+    expect(onEscape).not.toHaveBeenCalled()
+    expect(onDirector).not.toHaveBeenCalled()
+    expect(escape.defaultPrevented).toBe(false)
+    dialog.close()
+    await press('Escape')
+    expect(onEscape).toHaveBeenCalledOnce()
+  })
+
+  it('permits only the close ladder while the mobile journal owns input', async () => {
+    const onEscape = vi.fn()
+    const onDirector = vi.fn()
+    function Keys() {
+      useStageKeys({ onEscape, onDirector })
+      return null
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(Keys))
+    })
+    const paper = document.createElement('section')
+    paper.className = 'paper'
+    paper.dataset.open = 'yes'
+    paper.setAttribute('aria-modal', 'true')
+    document.body.append(paper)
+    await press('d')
+    await press('Escape')
+    expect(onDirector).not.toHaveBeenCalled()
+    expect(onEscape).toHaveBeenCalledOnce()
+    paper.setAttribute('aria-modal', 'false')
+    await press('d')
+    expect(onDirector).toHaveBeenCalledOnce()
+  })
+
+  it('ignores global keys until the loading card starts its dismissal', async () => {
+    const onEscape = vi.fn()
+    const onDirector = vi.fn()
+    function Keys() {
+      useStageKeys({ onEscape, onDirector })
+      return null
+    }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(Keys))
+    })
+    const loader = document.createElement('div')
+    loader.id = 'first-frame'
+    document.body.append(loader)
+    await press('d')
+    await press('Escape')
+    expect(onDirector).not.toHaveBeenCalled()
+    expect(onEscape).not.toHaveBeenCalled()
+    loader.classList.add('gone')
+    await press('d')
+    expect(onDirector).toHaveBeenCalledOnce()
   })
 
   it('★ leaves the frame meter on a key the stage does not own', async () => {

@@ -171,10 +171,9 @@ export function submitIntent(
       return walkFirst(state, config, agentId, verb, p, cause)
     }
   }
-  // The town's own rules, judged where the world's are: a rule the town can hold somebody to
-  // refuses in the town's words, and a rule it only forbids lets the act through witnessed.
+  // The town's own rules are judged where the world's are, but they do not stop a body. Breaking
+  // one is an observable event; physical possibility, possession and consent remain authoritative.
   const judged = judgeLaws(state, config, agentId, verb, p, state.tick)
-  if (judged !== null && 'refusal' in judged) return { ok: false, reason: judged.refusal }
   const witnessed: PendingEvent[] =
     judged === null
       ? []

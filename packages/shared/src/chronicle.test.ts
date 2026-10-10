@@ -20,7 +20,7 @@ import {
   faunaSightingLine,
   type ChronicleLookup,
 } from './chronicle.js'
-import type { SimEvent } from './events.js'
+import { isSeededStructureEvent, type SimEvent } from './events.js'
 
 const NAMES: Record<string, string> = { a1: 'Rahel', a2: 'Tomas', a3: 'Mira' }
 const KINDS: Record<string, string> = { s1: 'house', s2: 'storehouse' }
@@ -146,6 +146,17 @@ describe('chronicleLine', () => {
         look,
       ),
     ).toBe('New words carved on the storehouse.')
+  })
+
+  it('keeps the founding roofs out of the public story', () => {
+    const planned = ev('structure_planned', { id: 's1', builderId: 'genesis' })
+    const completed = ev('structure_completed', { id: 's1', seeded: true })
+    expect(isSeededStructureEvent(planned)).toBe(true)
+    expect(isSeededStructureEvent(completed)).toBe(true)
+    expect(chronicleLine(completed, look)).toBeNull()
+    expect(chronicleLine(ev('structure_completed', { id: 's1' }), look)).toBe(
+      'The house is finished.',
+    )
   })
 
   it('names an unknown id rather than inventing a person or a building', () => {

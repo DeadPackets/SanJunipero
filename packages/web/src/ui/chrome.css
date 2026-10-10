@@ -1,3 +1,5 @@
+@import './stacking.css';
+
 /* Observatory chrome: chunky stepped frames over the night backdrop. World art renders
    pixelated; chrome itself is crisp. */
 :root {
@@ -174,7 +176,7 @@ body {
 
 /* the stage fills its cell; canvas is a block so no inline descender gap seeds resizeTo */
 .stage-mount { position: absolute; inset: 0; overflow: hidden; touch-action: none; }
-.stage-mount canvas { display: block; }
+.stage-mount canvas { display: block; position: relative; z-index: var(--layer-world); }
 .stage-mount:focus-visible { outline: 2px solid var(--honey); outline-offset: -2px; }
 
 /* ── fps overlay: the town's health meter (toggle Shift+P) ── */
@@ -182,7 +184,7 @@ body {
    head row stayed 0 and the meter hung 64px down over the shot board that owns `right-1`. */
 .fps-overlay {
   grid-area: head;
-  justify-self: end; align-self: start; z-index: 30;
+  justify-self: end; align-self: start; z-index: var(--layer-debug);
   display: grid; gap: var(--s-1); justify-items: start;
   padding: var(--s-1) var(--s-2);
   font-family: var(--font-px); font-size: var(--f-2);
@@ -1019,7 +1021,7 @@ body {
 
 /* Figures mounts one tab stop per visible person, so the arms are up to forty presses away. */
 .skip {
-  position: absolute; z-index: 40; top: 0; left: 0; translate: 0 -110%;
+  position: absolute; z-index: var(--layer-skip); top: 0; left: 0; translate: 0 -110%;
   display: grid; align-content: center; min-height: 44px;
   padding: var(--s-4) var(--s-5);
   font-family: var(--font-px); font-size: var(--f-2);
@@ -1029,6 +1031,7 @@ body {
 .skip:focus-visible { translate: 0 0; }
 
 .stage-plate {
+  z-index: var(--layer-world-label);
   position: absolute; left: 0; top: 0;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
   /* Clear of the ring's lowest arm: both are placed off the same anchor (chromeCss.test). */
@@ -1045,8 +1048,8 @@ body {
 }
 @keyframes stage-plate-in { to { opacity: 1; } }
 
-/* Above `.town-dim` (z 20): a focus ring behind a scrim is not a focus ring. */
-.stage-figures { position: absolute; inset: 0; z-index: 21; pointer-events: none; }
+/* World focus targets stay below navigation and reading panels. */
+.stage-figures { position: absolute; inset: 0; z-index: var(--layer-world-action); pointer-events: none; }
 /* Sized and placed by the stage loop: only it knows how big a body is drawn at this zoom. */
 .stage-figure {
   position: absolute; left: 0; top: 0; padding: 0;
@@ -1057,6 +1060,7 @@ body {
 .stage-figure:focus-visible { outline: 2px solid var(--honey); outline-offset: 2px; }
 
 .stage-ring {
+  z-index: var(--layer-world-action);
   position: absolute; left: 0; top: 0;
   visibility: hidden;   /* until anchor.ts has a camera to place it against */
   /* centred on the figure's middle, not its feet — the anchor is where a body stands */
@@ -1094,11 +1098,11 @@ body {
 }
 
 .day-bar {
-  grid-area: bar; grid-column: edge-start / dock-end; grid-row: 1 / bar-end; z-index: 21;
+  grid-area: bar; grid-column: edge-start / dock-end; grid-row: 1 / bar-end; z-index: var(--layer-chrome);
 }
 
 .stage-cue {
-  grid-area: cue; justify-self: center; align-self: end; z-index: 21; margin: 0;
+  grid-area: cue; justify-self: center; align-self: end; z-index: var(--layer-chrome); margin: 0;
   /* 60ch is the SENTENCE's measure. A variant that stands something beside it says how much
      room that thing takes, so the reading width is the same line to line. */
   --cue-aside: 0px;
@@ -1168,7 +1172,7 @@ body {
    it up: on a landscape phone the row it used to take was 164px of a 544px window. */
 .scene-card {
   grid-area: left-2; grid-row: left-2-start / open-end;
-  justify-self: start; align-self: start; z-index: 21;
+  justify-self: start; align-self: start; z-index: var(--layer-chrome);
   margin-top: var(--s-3);
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3);
   max-width: 38ch;
@@ -1212,7 +1216,7 @@ body {
    camera is on is talking. The ghost holds the box at the width of the finished line so the
    slab does not grow a letter at a time under the words arriving in it. */
 .lower-third {
-  grid-area: third; justify-self: center; align-self: end; z-index: 26; margin: 0;
+  grid-area: third; justify-self: center; align-self: end; z-index: var(--layer-notice); margin: 0;
   display: flex; align-items: stretch; gap: var(--s-3);
   max-width: min(46ch, 100%);
   padding: var(--s-3);
@@ -1251,7 +1255,7 @@ body {
 .lower-third-typed { position: absolute; inset: 0; }
 
 .stage-exit, .stage-live {
-  grid-area: left-1; justify-self: start; align-self: start; z-index: 25;
+  grid-area: left-1; justify-self: start; align-self: start; z-index: var(--layer-chrome);
   min-height: 44px; padding: 0 var(--s-5); cursor: pointer;
   font-family: var(--font-px); font-size: var(--f-2); letter-spacing: 0.03em;
   color: var(--cream); background: var(--ink);
@@ -1307,6 +1311,7 @@ body {
    `clip`, never `hidden`: `hidden` is still a scroll container, and a `.focus()` inside the
    sheet walked up to it and carried the whole town with it. */
 .app {
+  isolation: isolate;
   position: relative; height: 100%; overflow: clip;
   background: var(--night); user-select: none;
   --cue-floor: calc(4 * 1.5 * var(--f-2) + var(--s-4));
@@ -1357,7 +1362,7 @@ body {
 
 
 .town-dim {
-  position: absolute; inset: 0; z-index: 20;
+  position: absolute; inset: 0; z-index: var(--layer-scrim);
   background: var(--deep); opacity: 0; pointer-events: none;
   transition: opacity var(--t-slow) var(--ease-enter);
 }
@@ -1367,7 +1372,7 @@ body {
   /* The row starts under the band and the arms, so the sheet measures both instead of summing
      them: `100dvh - 64px` and `100dvh - 106px` were that sum, written twice and differently. */
   grid-column: edge; grid-row: head-end / -1;
-  justify-self: center; align-self: end; z-index: 30;
+  justify-self: center; align-self: end; z-index: var(--layer-panel);
   width: var(--paper-w); height: var(--paper-h);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr);
   transform: translateY(102%);
@@ -1404,17 +1409,6 @@ body {
   .paper { --paper-w: min(78%, 1040px); }
 }
 
-.paper-grip {
-  position: relative; justify-self: center;
-  width: 44px; height: 5px; margin: var(--s-3) 0;
-  /* 5.83:1 on parchment: the one "drag me down" affordance, well past the 3:1 floor. */
-  background: var(--ink-quiet);
-  cursor: grab; touch-action: none;
-}
-.paper-grip::before { content: ''; position: absolute; inset: var(--reach-44) 0; }
-.paper-grip:active { cursor: grabbing; }
-
-/* ── the broadsheet head: a masthead, then a dated rule with the sections along it ── */
 .paper-head { display: grid; gap: var(--s-3); padding: var(--s-5) var(--s-6) 0; }
 /* The masthead. Fraunces at its heaviest and tightest, centred: the one place on the sheet
    where the type is the ornament. */
@@ -1841,7 +1835,7 @@ body {
 /* The one mark that is centred over the picture: a modal sheet over the whole app, not a mark
    standing in the town. Everything else in this sheet names a cell of the frame. */
 .key-map {
-  position: fixed; inset: 0; z-index: 45;
+  position: fixed; inset: 0; z-index: var(--layer-help);
   /* the one inset every other mark over the town hangs off, not a second percentage */
   display: grid; place-items: center; padding: var(--mark-inset);
   /* the town keeps living, and a click that misses the sheet still reaches it */
@@ -1953,7 +1947,7 @@ body {
 }
 
 [data-broadcast='on'] .stage-ticker {
-  grid-column: edge; grid-row: -2 / -1; align-self: end; z-index: 26;
+  grid-column: edge; grid-row: -2 / -1; align-self: end; z-index: var(--layer-notice);
   display: flex; align-items: center; height: 56px;
   overflow: hidden; white-space: nowrap;
   background: var(--ink);
@@ -1978,7 +1972,7 @@ body {
    `backdrop-filter` grades on the compositor, so the desaturation costs the 40ms/s tick budget
    nothing — a Pixi ColorMatrixFilter would copy the whole stage inside the app's own frame. */
 .replay-grade {
-  position: absolute; inset: 0; z-index: 18;
+  position: absolute; inset: 0; z-index: var(--layer-world-effect);
   pointer-events: none; visibility: hidden;
   backdrop-filter: saturate(0.9);
   -webkit-backdrop-filter: saturate(0.9);
@@ -1992,7 +1986,7 @@ body {
 /* The dip is written by rAF (stage/ReplayScene), so it carries no transition of its own: a
    transition on top of a per-frame write fights it and lands the curtain late. */
 .replay-dip {
-  position: absolute; inset: 0; z-index: 27;
+  position: absolute; inset: 0; z-index: var(--layer-world-effect);
   pointer-events: none; opacity: 0;
   background: var(--deep);
 }
@@ -2000,7 +1994,7 @@ body {
 /* Three rows, bottom up: the strip, the town's own cue, and the narrator's plate over both.
    Ranged left, not centred: the plate carries a paragraph more often than a title. */
 .replay-card {
-  grid-area: third; justify-self: center; align-self: end; z-index: 24;
+  grid-area: third; justify-self: center; align-self: end; z-index: var(--layer-notice);
   max-width: min(46ch, 100%);
   text-align: start;
   margin: 0; padding: var(--s-4) var(--s-5);
@@ -2185,7 +2179,7 @@ body {
   --story-paper: #fff6e9; --story-card: #f8eedc; --story-ink: #43394a;
   --story-muted: #766b62; --story-edge: #b9ac93; --story-gold: #f8e7bf;
   --story-active: #e5ecd8; --story-active-ink: #466037;
-  grid-area: strip; grid-column: edge; z-index: 21; min-width: 0; container: stories / inline-size;
+  grid-area: strip; grid-column: edge; z-index: var(--layer-chrome); min-width: 0; container: stories / inline-size;
   display: flex; align-items: center; gap: 18px;
   padding: 12px max(20px, env(safe-area-inset-right)) 12px max(20px, env(safe-area-inset-left));
   background: var(--story-paper); color: var(--story-ink); border-top: 2px solid var(--story-edge);
@@ -2270,7 +2264,7 @@ body {
    the board, filling what is left up to its cap, so it can never leave that band at any height. */
 .beat-card {
   grid-area: right-2; grid-row: right-2-start / open-end;
-  justify-self: end; align-self: stretch; z-index: 22;
+  justify-self: end; align-self: stretch; z-index: var(--layer-chrome);
   box-sizing: border-box; width: min(380px, 34vw); max-height: 240px;
   display: flex; flex-direction: column; gap: var(--s-3);
   padding: var(--s-4) var(--s-5);
@@ -2388,7 +2382,7 @@ body {
    Both reorder by translating absolutely placed rows, never by moving them in flow: the rail
    restacks every few seconds and this box has no GPU to spend on a layout pass. */
 .shot-board {
-  grid-area: right-1; justify-self: end; align-self: start; z-index: 22;
+  grid-area: right-1; justify-self: end; align-self: start; z-index: var(--layer-chrome);
   box-sizing: border-box; width: min(300px, 30vw); height: 116px;
   padding: var(--s-2) var(--s-4);
   background: var(--deep) var(--grain);
@@ -2430,7 +2424,7 @@ body {
 
 .dossier-rail {
   grid-area: left-1; grid-row: left-1-start / open-end;
-  justify-self: start; align-self: stretch; z-index: 22;
+  justify-self: start; align-self: stretch; z-index: var(--layer-chrome);
   box-sizing: border-box; width: min(300px, 26vw);
   padding: var(--s-3) 0;
   background: color-mix(in srgb, var(--deep) 94%, transparent);
@@ -2544,14 +2538,14 @@ body {
    frame and stand in their own areas. Below it they are one sheet, mounted exactly once. */
 .drawer-sheet {
   grid-column: edge; grid-row: open-start / foot-left-start;
-  align-self: end; z-index: 26;
+  align-self: end; z-index: var(--layer-panel);
   display: contents;
 }
 .drawer-body { display: contents; }
 .drawer-handle {
   /* The row is the corner cluster's, the column is the window's: centred in the `foot-left`
      column the bar sat at x=97 of 390, over the help button rather than under the picture. */
-  grid-area: foot-left; grid-column: edge; justify-self: center; align-self: end; z-index: 25;
+  grid-area: foot-left; grid-column: edge; justify-self: center; align-self: end; z-index: var(--layer-chrome);
   display: none;
 }
 .drawer-scrim { display: none; }
@@ -2649,21 +2643,11 @@ body {
 .record-range-pick:hover { color: var(--ink); }
 .record-range-pick[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
 
-.paper-dock {
-  min-height: 44px; padding: 0 var(--s-3) 0 var(--s-2); display: none;
-  font-family: var(--font-px); font-size: var(--f-1); letter-spacing: 0.04em;
-  color: var(--ink-quiet); background: none; cursor: pointer;
-  border: 0; border-bottom: 2px solid transparent;
-}
-.paper-dock:hover { color: var(--ink); }
-.paper-dock[aria-pressed='true'] { color: var(--ink); border-bottom-color: var(--ink); }
-
 /* ── THE DOCK: the Almanac as a column beside the town rather than a sheet over it ───────────
    The frame grows a sixth track outside its own right gutter, so the band, the strip and the
    three deck surfaces reflow off the column instead of being covered by it. The world is not
    dimmed here: reading and watching stop being exclusive. A phone has the drawer instead. */
 @media (min-width: 1000px) {
-  .paper-dock { display: block; }
   .app:has(> .paper[data-dock='on'][data-open='yes']) { --dock-w: 380px; }
   .town-dim[data-open='yes'][data-dock='on'] { opacity: 0; pointer-events: none; }
   .paper[data-dock='on'] {
@@ -2674,8 +2658,6 @@ body {
     transform: translateX(102%);
   }
   .paper[data-dock='on'][data-open='yes'] { transform: translateX(0); }
-  /* The grip pulls a sheet DOWN, and a column has nowhere down to go. */
-  .paper[data-dock='on'] .paper-grip { display: none; }
   /* A 380px column is narrower than the tabs at any viewport, so the dateline takes the shape
      the sheet takes under 1920: tabs on a second row that scrolls, the marginalia beside the day. */
   .paper[data-dock='on'] .paper-dateline { grid-template-columns: auto minmax(0, 1fr); padding-bottom: 0; }

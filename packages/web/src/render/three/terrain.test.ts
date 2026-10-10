@@ -2,7 +2,7 @@ import type { WorldState } from '@sj/engine/state'
 import type { AssetRecord } from '@sj/shared'
 import * as THREE from 'three'
 import { describe, expect, it, vi } from 'vitest'
-import { createTerrain } from './terrain.js'
+import { createTerrain, terrainNeedsSync } from './terrain.js'
 
 function world(width: number, height: number): WorldState {
   return {
@@ -214,4 +214,17 @@ describe('Three terrain', () => {
     expect(JSON.stringify(state)).toBe(before)
     terrain.destroy()
   })
+})
+
+it('skips terrain scans for mind, movement and clock updates, but preserves land and weather changes', () => {
+  const state = world(4, 4)
+  expect(terrainNeedsSync(null, state)).toBe(true)
+  expect(terrainNeedsSync(state, { ...state, tick: 10, agents: {} })).toBe(false)
+  expect(terrainNeedsSync(state, { ...state, terrain: state.terrain.map((row) => [...row]) })).toBe(
+    true,
+  )
+  expect(terrainNeedsSync(state, { ...state, structures: {} })).toBe(true)
+  expect(terrainNeedsSync(state, { ...state, weather: { ...state.weather, kind: 'storm' } })).toBe(
+    true,
+  )
 })

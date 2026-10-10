@@ -96,6 +96,14 @@ describe('makeGenesisWorld: the ground', () => {
 })
 
 describe('makeGenesisWorld: the town', () => {
+  it('marks every roof the world starts with as seeded provenance', () => {
+    const completions = makeGenesisWorld(DEFAULT_CONFIG).events.filter(
+      (event) => event.type === 'structure_completed',
+    )
+    expect(completions.length).toBeGreaterThan(0)
+    for (const event of completions) expect(event.payload).toMatchObject({ seeded: true })
+  })
+
   it('plants exactly seven houses, each owned by the founder whose seat it is', () => {
     const s = foldAll()
     const houses = Object.values(s.structures).filter((x) => x.kind === 'house')

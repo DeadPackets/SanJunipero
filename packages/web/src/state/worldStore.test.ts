@@ -233,6 +233,14 @@ describe('worldStore', () => {
     expect(store.thoughtsLog()).toHaveLength(200)
   })
 
+  it('waits for the catalog frame, including an empty catalog', () => {
+    const store = createWorldStore()
+    expect(store.assetsReady()).toBe(false)
+    store.applyServer({ t: 'assets', records: [] })
+    expect(store.assetsReady()).toBe(true)
+    expect(store.assetsSeq()).toBe(0)
+  })
+
   it('asset frames bump assetsSeq and accumulate records', () => {
     const store = createWorldStore()
     expect(store.assetsSeq()).toBe(0)
@@ -266,6 +274,37 @@ describe('worldStore', () => {
       store.openScenes().map((s) => s.id),
       'and it is no longer open',
     ).toEqual(['sc_2'])
+  })
+
+  it('drops stale scenes when a fresh snapshot replaces missed history', () => {
+    const store = createWorldStore()
+    store.applyServer({ t: 'scene', scene: scene('stale') })
+    store.applyServer(makeSnapshot())
+    expect(store.openScenes()).toEqual([])
+    expect(store.sceneById('stale')).toBeNull()
+  })
+
+  it('stores public transcript catch-up without emitting speech and rejects a stale response after rewinding', () => {
+    const store = createWorldStore()
+    const snapshot = makeSnapshot()
+    store.applyServer({ ...snapshot, tick: 1, state: { ...snapshot.state, tick: 1 } })
+    const events: SimEvent[] = []
+    store.onEvents((batch) => events.push(...batch))
+    const transcript = {
+      t: 'transcript' as const,
+      sceneId: 'scene',
+      atTick: 1,
+      catchup: true as const,
+      truncated: false,
+      lines: [{ seq: 1, tick: 1, agentId: 'walker', text: 'Hello' }],
+    }
+    store.applyServer(transcript)
+    store.applyServer(transcript)
+    expect(store.transcript('scene')?.lines).toHaveLength(1)
+    expect(events).toEqual([])
+    store.applyServer({ t: 'scrubbed', reqId: 1, tick: 0, state: makeSnapshot().state })
+    store.applyServer(transcript)
+    expect(store.transcript('scene')).toBeNull()
   })
 
   it('answers a scene by id, and hands the same open list back until one changes', () => {
@@ -586,4 +625,30 @@ describe('the reveal', () => {
     store.setDressed()
     expect(woke).toBe(1)
   })
+})
+
+it('replaces run identity on reconnect without putting observer metadata into world state', () => {
+  const store = createWorldStore()
+  const snapshot = makeSnapshot()
+  const hash = stateHash(snapshot.state)
+  store.applyServer({ ...snapshot, runId: 'cc6e6ed2-f68d-43eb-b195-19c882a0a1ff' })
+  expect(store.runId()).toBe('cc6e6ed2-f68d-43eb-b195-19c882a0a1ff')
+  store.applyServer({ ...snapshot, seq: 500, runId: '32a926e2-844e-4543-b2f7-85ded478206a' })
+  expect(store.runId()).toBe('32a926e2-844e-4543-b2f7-85ded478206a')
+  expect(stateHash(store.getState())).toBe(hash)
+  store.applyServer(snapshot)
+  expect(store.runId()).toBeNull()
+})
+
+it('advances the view reset sequence on forward replay seeks, not normal clock ticks', () => {
+  const store = createWorldStore()
+  const snapshot = makeSnapshot()
+  store.applyServer(snapshot)
+  const before = store.viewSeq()
+  store.applyServer({ t: 'replaying', reqId: 1, tick: 100, seq: 100, state: snapshot.state })
+  expect(store.viewSeq()).toBe(before + 1)
+  store.applyServer({ t: 'replaying', reqId: 2, tick: 200, seq: 200, state: snapshot.state })
+  expect(store.viewSeq()).toBe(before + 2)
+  store.applyServer({ t: 'paused', paused: true })
+  expect(store.viewSeq()).toBe(before + 2)
 })

@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export type StageKey =
-  | 'signpost'
-  | 'escape'
-  | 'fullscreen'
-  | 'director'
-  | 'thoughts'
-  | 'density'
-  | 'dock'
+export type StageKey = 'signpost' | 'escape' | 'fullscreen' | 'director' | 'thoughts' | 'density'
 
 export type StageKeyHandlers = {
   onSignpost?: () => void
@@ -16,10 +9,9 @@ export type StageKeyHandlers = {
   onDirector?: () => void
   onThoughts?: () => void
   onDensity?: () => void
-  onDock?: () => void
 }
 
-/** The seven keys the stage itself owns. The arrows, `+` and `-` are NOT here: StageMount binds
+/** The six keys the stage itself owns. The arrows, `+` and `-` are NOT here: StageMount binds
  *  them to the camera already, and a second binding would pan twice. */
 export function stageKeyFor(key: string): StageKey | null {
   // `toLowerCase`, so Caps Lock keeps the keys; the SHIFT key is what the listener refuses,
@@ -37,8 +29,6 @@ export function stageKeyFor(key: string): StageKey | null {
       return 'thoughts'
     case '[':
       return 'density'
-    case 'a':
-      return 'dock'
     default:
       return null
   }
@@ -47,6 +37,13 @@ export function stageKeyFor(key: string): StageKey | null {
 /** Typing an `s` into a field is a letter, never a signpost. */
 export function stageKeyAllowed(tagName: string, editable: boolean): boolean {
   return !editable && !/^(INPUT|TEXTAREA|SELECT)$/.test(tagName)
+}
+
+export function stageInputBlocked(paperEscape = false): boolean {
+  if (document.querySelector('dialog[open], #first-frame:not(.gone)')) return true
+  return (
+    !paperEscape && document.querySelector('.paper[data-open="yes"][aria-modal="true"]') !== null
+  )
 }
 
 /** A browser may refuse it (no user gesture, an iframe without the permission); the stage stays
@@ -70,7 +67,6 @@ const HANDLER: Readonly<Record<StageKey, keyof StageKeyHandlers>> = {
   director: 'onDirector',
   thoughts: 'onThoughts',
   density: 'onDensity',
-  dock: 'onDock',
 }
 
 export function useStageKeys(handlers: StageKeyHandlers): void {
@@ -83,6 +79,7 @@ export function useStageKeys(handlers: StageKeyHandlers): void {
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.defaultPrevented) return
       const t = e.target as HTMLElement | null
       const key = stageKeyFor(e.key)
+      if (stageInputBlocked(key === 'escape')) return
       if (key !== 'escape' && !stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false))
         return
       if (key === null) return

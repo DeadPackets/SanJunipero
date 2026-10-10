@@ -1,3 +1,5 @@
+import { agentScreenAnchor } from '../agentAnchor.js'
+import { personHit, personHoverPosition } from '../personHit.js'
 import { createThreeInterior } from './interior.js'
 import { createOrchardGardens } from './orchard.js'
 import { effectiveConfig } from '@sj/engine/laws'
@@ -33,7 +35,8 @@ import { entersOnClick, type WorldPick } from '../entities.js'
 import { rendersOnMap, type CharacterLayer } from '../characters.js'
 import { buildStructure, structureKey } from './structures.js'
 import { syncBuildingFire } from './buildingFire.js'
-import { createTerrain } from './terrain.js'
+import { createTerrain, terrainNeedsSync } from './terrain.js'
+import type { WorldState } from '@sj/engine/state'
 import { createOcclusionFader } from './occlusion.js'
 import { createEnvironment } from './environment.js'
 import { createNightBackdrop } from './nightBackdrop.js'
@@ -110,6 +113,7 @@ export function createThreeWorld(
   composer.addPass(output)
   let dirty = true
   let artSeq = -1
+  let terrainState: WorldState | null = null
   let width = 0
   let height = 0
   let seconds = 0
@@ -199,13 +203,50 @@ export function createThreeWorld(
       y,
       width,
       height,
+      view.safeInsets ?? { top: 0, bottom: 0 },
     )
+  }
+  const personTag = document.createElement('button')
+  personTag.type = 'button'
+  personTag.className = 'person-hover-label'
+  personTag.hidden = true
+  root.append(personTag)
+  let hoveredPerson: string | null = null
+  let pressedPerson: string | null = null
+  personTag.onclick = () => {
+    if (hoveredPerson) callbacks.select(hoveredPerson)
+  }
+  personTag.onpointerleave = () => {
+    hoveredPerson = null
+    personTag.hidden = true
+  }
+  const updatePersonTag = () => {
+    const at = hoveredPerson ? agentScreenAnchor(view, store, hoveredPerson) : null
+    personTag.hidden = !at || !!view.interior?.isActive()
+    if (!at || !hoveredPerson) return
+    const label = store.getState()?.agents[hoveredPerson]?.name ?? ''
+    if (personTag.textContent !== label) personTag.textContent = label
+    const point = personHoverPosition(
+      at,
+      { width, height },
+      { width: personTag.offsetWidth, height: personTag.offsetHeight },
+      view.safeInsets ?? { top: 0, bottom: 0 },
+    )
+    personTag.hidden = !point || !!view.interior?.isActive()
+    if (point)
+      personTag.style.transform = `translate(${Math.round(point.x)}px,${Math.round(point.y)}px)`
   }
   const ray = new Raycaster()
   const hitAt = (
     x: number,
     y: number,
   ): { kind: 'agent' | WorldPick['kind']; id: string } | null => {
+    const targets = Object.keys(store.getState()?.agents ?? {}).flatMap((id) => {
+      const at = agentScreenAnchor(view, store, id)
+      return at ? [{ id, ...at }] : []
+    })
+    const person = personHit(targets, x, y)
+    if (person) return { kind: 'agent', id: person }
     ray.setFromCamera(new Vector2((x / width) * 2 - 1, 1 - (y / height) * 2), camera)
     const hits = ray.intersectObjects(
       [
@@ -227,7 +268,11 @@ export function createThreeWorld(
   }
   const pick = (event: FederatedPointerEvent) => {
     if (event.target !== view.app.stage || view.wasDrag() || view.interior?.isActive()) return
-    const chosen = hitAt(event.global.x, event.global.y)
+    const chosen =
+      pressedPerson && agentScreenAnchor(view, store, pressedPerson)
+        ? { kind: 'agent' as const, id: pressedPerson }
+        : hitAt(event.global.x, event.global.y)
+    pressedPerson = null
     if (!chosen) callbacks.ground()
     else if (chosen.kind === 'agent') callbacks.select(chosen.id)
     else if (
@@ -250,10 +295,14 @@ export function createThreeWorld(
   const hover = (event: FederatedPointerEvent) => {
     if (event.target !== view.app.stage || event.buttons !== 0 || view.interior?.isActive()) {
       hideBuildingTag()
+      hoveredPerson = null
+      personTag.hidden = true
       view.tags.hide('hover')
       return
     }
     const chosen = hitAt(event.global.x, event.global.y)
+    hoveredPerson = chosen?.kind === 'agent' ? chosen.id : null
+    updatePersonTag()
     view.app.canvas.style.cursor = chosen ? 'pointer' : 'grab'
     if (chosen?.kind === 'structure') {
       view.tags.hide('hover')
@@ -275,9 +324,18 @@ export function createThreeWorld(
     )
   }
   const leave = () => {
+    if (!personTag.matches(':hover')) {
+      hoveredPerson = null
+      personTag.hidden = true
+    }
     hideBuildingTag()
     view.tags.hide('hover')
   }
+  const press = (event: FederatedPointerEvent) => {
+    const chosen = hitAt(event.global.x, event.global.y)
+    pressedPerson = chosen?.kind === 'agent' ? chosen.id : null
+  }
+  view.app.stage.on('pointerdown', press)
   view.app.stage.on('pointermove', hover)
   view.app.canvas.addEventListener('pointerleave', leave)
   view.app.stage.on('pointertap', pick)
@@ -287,6 +345,7 @@ export function createThreeWorld(
     tick(dtMs: number) {
       if (destroyed) return
       updateBuildingTag()
+      updatePersonTag()
       const state = store.getState()
       if (!state) return
       const config = effectiveConfig(store.getConfig() ?? DEFAULT_CONFIG, state.laws)
@@ -309,7 +368,8 @@ export function createThreeWorld(
         const records = store.assetRecords()
         const changedArt = artSeq !== store.assetsSeq()
         artSeq = store.assetsSeq()
-        terrain.sync(state, records)
+        if (changedArt || terrainNeedsSync(terrainState, state)) terrain.sync(state, records)
+        terrainState = state
         gardens.sync(state)
         resources.sync(state, records)
         for (const [id, entry] of structures)
@@ -332,7 +392,6 @@ export function createThreeWorld(
         weather.sync([...structures.values()].map((e) => e.group))
         fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
       }
-      fader.sync([...structures.values()].map((e) => e.group).concat(terrain.occluders()))
       const center = syncCamera(
         camera,
         width,
@@ -428,10 +487,12 @@ export function createThreeWorld(
       root.dataset.structures = String(structures.size)
       root.dataset.faded = String(faded)
       root.dataset.drawCalls = String(renderer.info.render.calls)
-      store.setDressed()
+      if (terrain.isReady() && library.isReady() && resources.isReady()) store.setDressed()
     },
     destroy() {
       buildingTag.destroy()
+      personTag.remove()
+      view.app.stage.off('pointerdown', press)
       if (destroyed) return
       destroyed = true
       interior.destroy()

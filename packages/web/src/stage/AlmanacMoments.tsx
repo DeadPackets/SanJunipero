@@ -3,6 +3,7 @@ import { MINUTES_PER_DAY } from '@sj/shared'
 import { GameIcon } from '../paper/game/shared.js'
 import { stamp } from '../paper/stamp.js'
 import type { Mark } from '../ui/timelineMarks.js'
+import { stageInputBlocked } from './useStageKeys.js'
 
 const categories: Record<Mark['kind'], { icon: string; label: string; tint: string }> = {
   death: { icon: 'moon', label: 'Remembering', tint: 'chapter' },
@@ -71,7 +72,12 @@ export function AlmanacMoments({
     if (!selection) return
     card.current?.querySelector<HTMLButtonElement>('[data-primary]')?.focus()
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (
+        event.key === 'Escape' &&
+        !event.defaultPrevented &&
+        !stageInputBlocked() &&
+        !document.querySelector('.key-map:not([hidden])')
+      ) {
         event.preventDefault()
         close(true)
       }

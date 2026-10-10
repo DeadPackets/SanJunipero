@@ -20,6 +20,7 @@ const html = (node: Parameters<typeof renderToStaticMarkup>[0]): string =>
 
 const COST: CostReport = {
   live: true,
+  mindStatus: 'active',
   today: { calls: 40, usd: 0.4123 },
   lifetime: { calls: 900, usd: 7.5412 },
   projection: { usdPerSimDay: 1.64, windowRealMinutes: 15, sampledCalls: 12 },

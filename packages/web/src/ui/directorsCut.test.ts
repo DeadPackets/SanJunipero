@@ -14,14 +14,19 @@ import { App, wayBack } from '../App.js'
 import { ReplayScene } from '../stage/ReplayScene.js'
 import { SCENE_IN_MS, SCENE_OUT_MS, SCENE_TOTAL_MS, SCENES } from './sceneTransition.js'
 import { TITLE_CARD_MS, castNames, dipAlpha, pointPlay } from './replayRun.js'
-import { paperDock, rememberPaperDock } from './storage.js'
 
 // happy-dom's own `URL` resolves a bare path against localhost, so a file read has to be a path.
 const src = (f: string): string => readFileSync(join(import.meta.dirname, f), 'utf8')
 const CSS = src('./chrome.css')
 
 // The canvas wants WebGL and the socket wants a server. Everything else in the tree is real.
-vi.mock('../render/StageMount.js', () => ({ StageMount: () => null }))
+let showInterior: ((id: string | null) => void) | null = null
+vi.mock('../render/StageMount.js', () => ({
+  StageMount: ({ onInterior }: { onInterior: (id: string | null) => void }) => {
+    showInterior = onInterior
+    return null
+  },
+}))
 let world: WorldStore | null = null
 vi.mock('../net/socket.js', () => ({
   connectObservatory: (opts: { store: WorldStore }) => {
@@ -385,19 +390,29 @@ describe('★ what the App puts on the glass, driven by the world', () => {
   })
 })
 
-// ★ The dock was a button inside the sheet, so the one thing that had to know where the Almanac
-// stands — Watch, which put it away on every play — could not ask.
-describe('★ the Almanac stands where App says it stands, and one key moves it', () => {
-  it('★ docks on `a`, and the next visit opens where this one left it', async () => {
+describe('the journal only uses an edge-attached panel', () => {
+  it('ignores the old floating preference and the retired dock shortcut', async () => {
+    localStorage.setItem('sj.paperDock', 'sheet')
     const host = await mount(createElement(App))
     townArrives(world!)
-    expect(host.querySelector<HTMLElement>('.paper')?.dataset.dock).toBe('off')
+    expect(host.querySelector<HTMLElement>('.paper')?.dataset.dock).toBe('on')
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }))
     })
     expect(host.querySelector<HTMLElement>('.paper')?.dataset.dock).toBe('on')
-    expect(host.querySelector<HTMLElement>('.town-dim[data-dock]')?.dataset.dock).toBe('on')
-    expect(paperDock(localStorage)).toBe('docked')
-    rememberPaperDock(localStorage, 'sheet')
+    expect(host.querySelector('.paper-dock')).toBeNull()
+    localStorage.removeItem('sj.paperDock')
+  })
+})
+
+describe('interior navigation replaces the outdoor camera bookmark', () => {
+  it('does not stack the follow control over a building header', async () => {
+    const host = await mount(createElement(App))
+    await act(async () => {
+      townArrives(world!)
+      showInterior?.('house')
+    })
+    expect(host.querySelector('.app')?.getAttribute('data-interior')).toBe('on')
+    expect(host.querySelector('.camera-bookmark')).toBeNull()
   })
 })

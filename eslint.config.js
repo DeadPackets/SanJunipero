@@ -58,7 +58,10 @@ export default tseslint.config(
   },
   {
     // The project service only ever looks for tsconfig.json, and the scripts live in a sibling one.
-    files: ['packages/{agents,arbiter,forge,gateway,narrator,town}/scripts/**/*.ts'],
+    files: [
+      'packages/{agents,arbiter,forge,gateway,llm,narrator,town}/scripts/**/*.ts',
+      'scripts/**/*.ts',
+    ],
     languageOptions: {
       parserOptions: {
         projectService: false,

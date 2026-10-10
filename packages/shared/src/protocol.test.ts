@@ -84,8 +84,8 @@ describe('protocol', () => {
     expect(() => ServerMsg.parse({ ...msg, importance: 11 })).toThrow()
   })
 
-  it('is at version 8: a v7 viewer polls a heat the town no longer keeps', () => {
-    expect(PROTOCOL_VERSION).toBe(8)
+  it('is at version 9: snapshots identify the current town run', () => {
+    expect(PROTOCOL_VERSION).toBe(9)
     const snapshot = { t: 'snapshot', tick: 0, seq: 0, state: {}, config: {}, live: true }
     expect(() => ServerMsg.parse(snapshot)).toThrow()
     expect(ServerMsg.parse({ ...snapshot, laws: {} })).toEqual({ ...snapshot, laws: {} })
@@ -133,8 +133,7 @@ describe('protocol', () => {
     expect(tickToMoment(41 * 1440 + 870)).toEqual({ day: 41, time: '14:30' })
     expect(momentToTick(41, '24:00')).toBeNaN() // invalid time → NaN, caller rejects
   })
-  // ★ Additive, and PROTOCOL_VERSION stays at 8: a stale bundle drops a frame it cannot read
-  // (socket.ts) rather than dying, which is the whole reason a new frame may ship without a bump.
+  // Optional fields remain valid for snapshots from the current protocol.
   it('★ takes a cut with a beat mark, and the same cut without one', () => {
     const cut = {
       t: 'director',

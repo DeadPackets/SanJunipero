@@ -6,7 +6,7 @@
   align-self: end;
   width: 210px;
   height: 54px;
-  z-index: 25;
+  z-index: var(--layer-chrome);
 }
 .journal-frame {
   position: absolute;
@@ -112,7 +112,7 @@
   grid-area: foot-left;
   justify-self: start;
   align-self: end;
-  z-index: 25;
+  z-index: var(--layer-chrome);
 }
 .thoughts-button { grid-area: wisp; margin-bottom: 8px; }
 .sound-button { grid-area: sound; margin-bottom: 8px; }
@@ -199,3 +199,5 @@
 @media (prefers-reduced-motion: reduce) {
   .journal-option:hover, .journal-option:active { translate: none; transition: none; }
 }
+
+.signpost:has(.journal-toggle[aria-expanded=true], .pocket-toggle[aria-expanded=true]) { z-index: var(--layer-popover); }

@@ -196,6 +196,21 @@ async function retrieve(
     for (const r of rows) candidates.add(r.id)
   }
 
+  let formativeId: number | undefined
+  if (mode === 'ambient' && qTags.size > 0 && k > 0) {
+    const placeholders = [...qTags].map(() => '?').join(', ')
+    const row = db
+      .prepare(`SELECT DISTINCT m.id FROM memories m
+      JOIN memory_tags t ON t.memory_id = m.id
+      WHERE m.agent_id = ? AND m.tick <= ? AND m.importance >= 8
+        AND m.kind IN ('action', 'speech_heard', 'perception')
+        AND t.tag IN (${placeholders})${notDayLog('m.')}
+      ORDER BY m.importance DESC, m.tick DESC, m.id ASC LIMIT 1`)
+      .get(agentId, nowTick, ...qTags, ...dayArgs) as { id: number } | undefined
+    formativeId = row?.id
+    if (formativeId !== undefined) candidates.add(formativeId)
+  }
+
   const scored: ScoredMemory[] = store.getMemories([...candidates]).map((row) => {
     const memoryTags = new Set(flattenTags(row.tags))
     let tag = 0
@@ -217,6 +232,11 @@ async function retrieve(
 
   scored.sort((a, b) => b.score - a.score)
   const top = scored.slice(0, k)
+  if (formativeId !== undefined && !top.some((m) => m.id === formativeId)) {
+    const formative = scored.find((m) => m.id === formativeId)!
+    if (top.length >= k) top.pop()
+    top.push(formative)
+  }
 
   const topScore = top.length > 0 ? top[0]!.score : null
   if (topScore === null || topScore < MISS_TOP_SCORE || top.length < MISS_MIN_RESULTS) {

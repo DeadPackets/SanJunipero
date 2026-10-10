@@ -69,6 +69,9 @@ describe('detectInstitutions', () => {
     expect(group!.name).toBe('Omar & Yusuf')
     expect(group!.foundingSceneIndex).toBe(0) // earliest shared scene
     expect(group!.sourceEventIds).toEqual([1, 2]) // founding scene's eventIds
+    expect(group!.description).toBe(
+      'Observed pattern: Omar & Yusuf were repeatedly recorded together',
+    )
   })
 
   it('emits the people-court rule with 2 members and 5 source events', () => {
@@ -153,9 +156,9 @@ describe('detectInstitutions', () => {
       (i) => i.kind === 'role',
     )
     const descs = roles.map((r) => r.description)
-    expect(descs).toContain('Omar has taught 3 times')
-    expect(descs).toContain('Yusuf has built 3 times')
-    expect(descs).toContain('Nadia has foraged 3 times')
+    expect(descs).toContain('Observed pattern: Omar has taught 3 times')
+    expect(descs).toContain('Observed pattern: Yusuf has built 3 times')
+    expect(descs).toContain('Observed pattern: Nadia has foraged 3 times')
     expect(descs.join(' ')).not.toMatch(/teached|builded|foragee?ed/)
   })
 
@@ -220,6 +223,6 @@ describe('past participles in institution descriptions', () => {
 
   it('the rule description uses the participle', () => {
     const rule = detectInstitutions(scenes, events).find((i) => i.kind === 'rule')
-    expect(rule!.description).toBe('2 people have courted 5 times')
+    expect(rule!.description).toBe('Observed pattern: 2 people have courted 5 times')
   })
 })

@@ -8,6 +8,7 @@ import type {
   NarratorLlm,
   SceneDigest,
   SceneSegment,
+  PublicRecord,
 } from './types.js'
 
 // Every line here is a rule against inventing: hurt is never a number, sickness never a
@@ -249,6 +250,7 @@ export async function renderChapter(deps: {
   store: NarratorStore
   llm: NarratorLlm
   day: number
+  priorEvents?: readonly PublicRecord[]
   scenes: SceneSegment[]
   /** The day's moments, index-aligned with `scenes`. Picked where the heat is known. */
   moments?: Moment[][] | undefined
@@ -265,16 +267,18 @@ export async function renderChapter(deps: {
     sceneDigests(scenes, deps.look ?? {}, deps.moments ?? []),
     deps.cast ?? [],
     prior,
+    deps.priorEvents ?? [],
   )
-  const valid = new Set(scenes.flatMap((s) => s.eventIds))
+  const valid = new Set([
+    ...(deps.moments ?? []).flatMap((ms) => ms.map((m) => m.n)),
+    ...(deps.priorEvents ?? []).map((e) => e.eventSeq),
+  ])
   const seen = applyFootnotes(summary.text, summary.citations, valid)
   if (seen.dangling.length > 0)
     deps.alert?.(
       `dangling_citation: chapter for day ${day} cited unknown ledger numbers ${seen.dangling.join(', ')}`,
     )
-  let citations = seen.citations
-  if (citations.length === 0)
-    citations = scenes.map((s) => s.eventIds[0]).filter((id): id is number => id !== undefined)
+  const citations = seen.citations
   const grounded = withoutStrangers(deps, `chapter for day ${day}`, seen.text, deps.cast ?? [])
   const text = publishClean(deps, `chapter for day ${day}`, grounded)
   const sceneIds = store.insertScenes(scenes)

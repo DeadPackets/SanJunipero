@@ -16,7 +16,7 @@ import {
 } from './sceneLlm.js'
 import { openScene, SceneTurnSchema, type SceneAsk, type SceneLine } from './scene.js'
 import { readFileSync } from 'node:fs'
-import { PLAIN_SPEECH, scanPromptForGlassLeak } from '@sj/shared'
+import { PLAIN_SPEECH, scanPromptForGlassLeak, NO_PARAMS } from '@sj/shared'
 import { askPhrase } from './invitations.js'
 
 const ZERO_USAGE = {
@@ -128,9 +128,12 @@ const TURN = JSON.stringify({
   stance: null,
   answer: null,
   ask: null,
+  reconvene: null,
   leave: false,
   importance: 4,
   mood: null,
+  plan: null,
+  reconsider_at: null,
 })
 
 describe('the scene turn keeps the cached prefix', () => {
@@ -346,7 +349,11 @@ describe('a join does not throw the cached prefix away', () => {
 
   it('asks for an answer or a silence, and on the wrap-up cue asks for the last word', () => {
     expect(block()).toContain('You do not have to answer what Yusuf said')
-    expect(block(ask({ wrapUp: true }))).toContain('Say your last thing and let it end.')
+    const finalTurn = block(ask({ wrapUp: true }))
+    expect(finalTurn).toContain('If you choose to go and act, set leave:true')
+    expect(finalTurn).toContain('supply the supported physical steps in plan')
+    expect(finalTurn).toContain('Do not invent an inspection result or completed work')
+    expect(finalTurn).toContain('stay to answer something that still matters')
   })
 
   it('renders open ties by name, and nothing at all when there are none', () => {
@@ -358,6 +365,9 @@ describe('a join does not throw the cached prefix away', () => {
         text: 'he owes you a day on the well gate',
         tick: 300,
         settledTick: null,
+        resolution: null,
+        evidenceSeqs: [],
+        remindAtTick: null,
         source: 'scene',
       },
     ]
@@ -371,8 +381,9 @@ describe('a join does not throw the cached prefix away', () => {
     expect(block(ask(), withWant)).toContain('What you want most: a roof that holds the winter')
   })
 
-  it('tells the mind this moment is not an act', () => {
-    expect(block()).toContain('This answer supplies words, not a new physical action.')
+  it('distinguishes public words from optional physical steps chosen on leaving', () => {
+    expect(block()).toContain('When you choose leave:true')
+    expect(block()).toContain('Saying you will act never means the act has happened.')
   })
 })
 
@@ -414,6 +425,36 @@ describe('the hour, and the body that has to sit through it', () => {
 })
 
 describe('the line call', () => {
+  it.each([false, true])('keeps the resident’s final-turn leave choice: %s', async (leave) => {
+    const { model, prompts } = answering(
+      JSON.stringify({
+        ...JSON.parse(TURN),
+        leave,
+        plan: leave ? [{ verb: 'walk', params: { ...NO_PARAMS, x: 9, y: 8 } }] : null,
+      }),
+    )
+    const result = await makeSceneLlm(client(model), voice()).line(ask({ wrapUp: true }))
+    expect(result.leave).toBe(leave)
+    expect(result.plan).toEqual(leave ? [{ verb: 'walk', params: { x: 9, y: 8 } }] : null)
+    expect(prompts[0]).toContain('Saying you will do it does not queue them')
+  })
+
+  it('decodes an exit plan through the ordinary action and reminder grammar', async () => {
+    const { model } = answering(
+      JSON.stringify({
+        ...JSON.parse(TURN),
+        leave: true,
+        plan: [{ verb: 'walk', params: { ...NO_PARAMS, x: 9, y: 8 } }],
+        reconsider_at: { time: null, day: 8, phase: 'day' },
+      }),
+    )
+    const result = await makeSceneLlm(client(model), voice()).line(
+      ask({ actionContext: 'Your chosen work remains unfinished.' }),
+    )
+    expect(result.plan).toEqual([{ verb: 'walk', params: { x: 9, y: 8 } }])
+    expect(result.reconsider_at).toEqual({ day: 8, phase: 'day' })
+  })
+
   it('is one call, billed to the caller that pays for a scene', async () => {
     const { model, prompts } = answering(TURN)
     const llm = makeSceneLlm(client(model), voice())
@@ -464,13 +505,29 @@ describe('the close', () => {
       ties,
     })
 
-  it('reads the whole thread with everybody’s asides, and why it ended', async () => {
+  it('closes from public speech without anyone’s private aside or tie text', async () => {
     const { model, prompts } = answering(answer([]))
     const llm = makeSceneLlm(client(model), voice())
-    await llm.close(closed())
-    expect(prompts[0]).toContain('(Yusuf was thinking: she will hold me to it)')
+    const request = {
+      ...closed(),
+      ties: [{ agentId: 'yusuf', tie: { text: 'PRIVATE_TIE_SECRET' } }],
+    }
+    await llm.close(request)
+    expect(prompts[0]).not.toContain('she will hold me to it')
+    expect(prompts[0]).not.toContain('PRIVATE_TIE_SECRET')
+    expect(prompts[0]).toContain('I will cut you a third loaf tomorrow.')
     expect(prompts[0]).toContain('It ended because they had said what they had to say.')
     expect(prompts[0]).toContain('Who was there: Tamar, Yusuf.')
+  })
+
+  it('does not make a capped conversation evidence of unfinished business', async () => {
+    const { model, prompts } = answering(answer([]))
+    const request = closed()
+    request.scene.closeReason = 'capped'
+    await makeSceneLlm(client(model), voice()).close(request)
+    expect(prompts[0]).toContain('Infer any unresolved matter only from what was said.')
+    expect(prompts[0]).not.toContain('There was more to say')
+    expect(prompts[0]).toContain('Tomorrow, then.')
   })
 
   // Every mind reads the beat back as fact, so an ailment named in its examples becomes one the
@@ -488,7 +545,16 @@ describe('the close', () => {
   it('turns the names it was given back into ids', async () => {
     const { model } = answering(
       answer([
-        { holder: 'Tamar', about: 'Yusuf', kind: 'promise', text: 'a third loaf', settled: false },
+        {
+          holder: 'Tamar',
+          about: 'Yusuf',
+          kind: 'promise',
+          text: 'a third loaf',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
       ]),
     )
     const llm = makeSceneLlm(client(model), voice())
@@ -496,34 +562,84 @@ describe('the close', () => {
     expect(out.summary).toBe('Yusuf promised Tamar a third loaf.')
     expect(out.beat).toBe('Yusuf owes Tamar a third loaf.')
     expect(out.deltas).toEqual([
-      { agentId: 'tamar', personId: 'yusuf', kind: 'promise', text: 'a third loaf' },
+      {
+        agentId: 'tamar',
+        personId: 'yusuf',
+        kind: 'promise',
+        text: 'a third loaf',
+        evidenceSeqs: [],
+        remindAtTick: null,
+      },
     ])
   })
 
   it('drops a tie about somebody who was not there, and a tie about oneself', async () => {
     const { model } = answering(
       answer([
-        { holder: 'Tamar', about: 'Kepler', kind: 'grudge', text: 'invented', settled: false },
-        { holder: 'Tamar', about: 'Tamar', kind: 'secret', text: 'her own', settled: false },
-        { holder: 'Yusuf', about: 'Tamar', kind: 'debt', text: 'a loaf', settled: false },
+        {
+          holder: 'Tamar',
+          about: 'Kepler',
+          kind: 'grudge',
+          text: 'invented',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
+        {
+          holder: 'Tamar',
+          about: 'Tamar',
+          kind: 'secret',
+          text: 'her own',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
+        {
+          holder: 'Yusuf',
+          about: 'Tamar',
+          kind: 'debt',
+          text: 'a loaf',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
       ]),
     )
     const llm = makeSceneLlm(client(model), voice())
     const out = await llm.close(closed())
     expect(out.deltas).toEqual([
-      { agentId: 'yusuf', personId: 'tamar', kind: 'debt', text: 'a loaf' },
+      {
+        agentId: 'yusuf',
+        personId: 'tamar',
+        kind: 'debt',
+        text: 'a loaf',
+        evidenceSeqs: [],
+        remindAtTick: null,
+      },
     ])
   })
 
-  it('carries a settled tie through as settled', async () => {
+  it('rejects an attempted private resolution from the shared public summary', async () => {
     const { model } = answering(
       answer([
-        { holder: 'Tamar', about: 'Yusuf', kind: 'debt', text: 'the well gate', settled: true },
+        {
+          holder: 'Tamar',
+          about: 'Yusuf',
+          kind: 'debt',
+          text: 'the well gate',
+          tieId: 1,
+          resolution: 'fulfilled',
+          evidenceSeqs: [999999],
+          remindAtTick: null,
+        },
       ]),
     )
     const llm = makeSceneLlm(client(model), voice())
     const out = await llm.close(closed())
-    expect(out.deltas[0]?.settled).toBe(true)
+    expect(out.deltas).toEqual([])
   })
 
   it('keeps at most six ties out of one scene', async () => {
@@ -532,7 +648,10 @@ describe('the close', () => {
       about: 'Yusuf',
       kind: 'slight',
       text: `slight ${i}`,
-      settled: false,
+      tieId: null,
+      resolution: null,
+      evidenceSeqs: [],
+      remindAtTick: null,
     }))
     const { model } = answering(answer(many))
     const llm = makeSceneLlm(client(model), voice())
@@ -579,6 +698,7 @@ describe('what a scene turn may name', () => {
     stance: null,
     answer: null,
     ask: null,
+    reconvene: null,
     leave: false,
     importance: 4,
     mood: null,
@@ -591,6 +711,32 @@ describe('what a scene turn may name', () => {
     }
     expect(SceneTurnSchema.safeParse(turn({ ask: 'marry' })).success).toBe(false)
     expect(SceneTurnSchema.safeParse(turn({ ask: undefined })).success).toBe(false)
+  })
+
+  it('takes an offered proposal id as an explicit reconvene choice', () => {
+    expect(SceneTurnSchema.safeParse(turn({ reconvene: 'law_waiting' })).success).toBe(true)
+    expect(SceneTurnSchema.safeParse(turn({ reconvene: null })).success).toBe(true)
+    expect(SceneTurnSchema.safeParse(turn({ reconvene: '' })).success).toBe(false)
+  })
+})
+
+describe('a tabled proposal may be deliberately brought back', () => {
+  it('lists the available id and leaves the resident’s speech freeform', () => {
+    const said = block(
+      ask({
+        audience: [{ id: 'salma', name: 'Salma' }],
+        pendingProposals: [
+          { id: 'law_waiting', text: 'We share the well at dawn.', proposedBy: 'yusuf' },
+        ],
+      }),
+    )
+    expect(said).toContain('law_waiting, put by Yusuf: "We share the well at dawn."')
+    expect(said).toContain('put its exact id in "reconvene"')
+    expect(said).toContain('Your speech remains your own words')
+  })
+
+  it('lists no pending choice when none is available', () => {
+    expect(block()).not.toContain('Rules an earlier room left on the table')
   })
 })
 

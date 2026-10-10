@@ -15,9 +15,6 @@ import { KEY_MAP_ID, KEY_MAP_KEY, KeyMap } from '../stage/KeyMap.js'
 import { households } from './families.js'
 import {
   ARMS,
-  GRIP_CLOSE_PX,
-  GRIP_FLING_PX_MS,
-  gripDismiss,
   PAGE_TABS,
   PAGE_TITLE,
   firstTab,
@@ -53,9 +50,7 @@ const sheetOf = (over: Partial<Parameters<typeof Paper>[0]> = {}): ReactElement 
     operatorToken: null,
     insideId: null,
     gapTicks: null,
-    dock: 'sheet',
     onTab: () => {},
-    onDock: () => {},
     onClose: () => {},
     onBrowse: () => {},
     onWatch: () => {},
@@ -99,17 +94,6 @@ async function live(over: Partial<Parameters<typeof Paper>[0]> = {}): Promise<Li
     },
     el: (sel: string): HTMLElement | null => host.querySelector<HTMLElement>(sel),
   }
-}
-
-/** happy-dom has no PointerEvent, and React reads `clientY`, `pointerId` and `timeStamp` off
- *  whatever native event arrives under the name. */
-function pointer(el: Element, type: string, clientY: number, at = 0): void {
-  const ev = new MouseEvent(type, { clientY, bubbles: true }) as MouseEvent & {
-    pointerId: number
-  }
-  Object.defineProperty(ev, 'pointerId', { value: 1 })
-  Object.defineProperty(ev, 'timeStamp', { value: at })
-  el.dispatchEvent(ev)
 }
 
 afterEach(async () => {
@@ -339,12 +323,12 @@ describe('the paper', () => {
     expect(html).toContain('>Amara<')
   })
 
-  it('offers the way out in words, and a grip to pull it down by', () => {
+  it('offers an explicit close control without a floating-sheet grip', () => {
     const html = paper({ page: 'folk', tab: 'People' })
     expect(html).toContain('close')
     // a phone is not told to press a key it does not have (@media (hover: none))
     expect(html).toContain('class="paper-close-key"> · Esc<')
-    expect(html).toContain('class="paper-grip"')
+    expect(html).not.toContain('class="paper-grip"')
   })
 
   // ★ 4A — the head dated itself off the town's clock until phase 4 gave the Day Bar the one
@@ -445,55 +429,6 @@ describe('★ every way the paper goes down, and where focus lands', () => {
       p.el('.town-dim')?.click()
     })
     expect(shut).toHaveLength(2)
-  })
-
-  it(`closes on a grip drag of more than ${GRIP_CLOSE_PX}px, or on a throw`, () => {
-    expect(GRIP_CLOSE_PX).toBe(40)
-    expect(gripDismiss(GRIP_CLOSE_PX + 1, 0)).toBe(true)
-    expect(gripDismiss(GRIP_CLOSE_PX, 0)).toBe(false)
-    // a fast 25px flick is a dismissal; waiting for 40px is not
-    expect(gripDismiss(25, GRIP_FLING_PX_MS + 0.1)).toBe(true)
-    expect(gripDismiss(25, GRIP_FLING_PX_MS)).toBe(false)
-    // and an upward throw is never one
-    expect(gripDismiss(-60, 2)).toBe(false)
-  })
-
-  it(`★ goes down on a drag past ${GRIP_CLOSE_PX}px and comes back from a shorter one`, async () => {
-    const far: string[] = []
-    const p = await live({ ...OPEN, onClose: () => far.push('down') })
-    const grip = p.el('.paper-grip')!
-    pointer(grip, 'pointerdown', 100, 0)
-    pointer(grip, 'pointermove', 100 + GRIP_CLOSE_PX + 1, 400)
-    pointer(grip, 'pointerup', 100 + GRIP_CLOSE_PX + 1, 400)
-    expect(far).toEqual(['down'])
-
-    const near: string[] = []
-    const q = await live({ ...OPEN, onClose: () => near.push('down') })
-    const hold = q.el('.paper-grip')!
-    pointer(hold, 'pointerdown', 100, 0)
-    pointer(hold, 'pointermove', 100 + GRIP_CLOSE_PX - 1, 400)
-    pointer(hold, 'pointerup', 100 + GRIP_CLOSE_PX - 1, 400)
-    expect(near).toEqual([])
-    // and the sheet is handed back to its own CSS rather than left where the finger left it
-    expect(q.el('.paper')?.style.transform ?? '').toBe('')
-  })
-
-  it('★ follows the finger, rubber-banded upward, and brightens the town under it', async () => {
-    const p = await live(OPEN)
-    const grip = p.el('.paper-grip')!
-    const sheet = p.el('.paper')!
-    const dim = p.el('.town-dim')!
-    Object.defineProperty(sheet, 'offsetHeight', { value: 600, configurable: true })
-    pointer(grip, 'pointerdown', 200, 0)
-    pointer(grip, 'pointermove', 290, 16)
-    expect(sheet.style.transform).toBe('translateY(90px)')
-    // ...and upward it gives a third of the throw, because it is already at the top of its travel
-    pointer(grip, 'pointermove', 110, 32)
-    expect(sheet.style.transform).toBe('translateY(-30px)')
-    // the scrim fades with the sheet, so the town brightens under the finger
-    pointer(grip, 'pointermove', 500, 48)
-    expect(Number(dim.style.opacity)).toBeLessThan(1)
-    pointer(grip, 'pointercancel', 500, 48)
   })
 
   // The sheet is inert while it is down, so its 300ms of held content is not a tab trap in
@@ -775,24 +710,70 @@ describe('★ the Almanac shell', () => {
     expect(html.match(/aria-pressed="true"/g)).toHaveLength(1)
   })
 
-  // The sheet asks and does not decide: Watch has to know where the Almanac stands before it
-  // can stop putting it away, so App owns the answer and the storage that remembers it.
-  it('★ docks as a column and stops dimming the town, on the word of whoever owns it', async () => {
-    const asked: string[] = []
-    const p = await live({
-      page: 'chronicle',
-      tab: 'Record',
-      onDock: () => asked.push('dock'),
-    })
-    expect(p.el('.paper')?.dataset.dock).toBe('off')
-    expect(p.el('.town-dim')?.dataset.dock).toBe('off')
-    await act(async () => {
-      p.el('.paper-dock')?.click()
-    })
-    expect(asked, 'the sheet docked itself').toEqual(['dock'])
-    await p.again({ dock: 'docked' })
+  it('keeps keyboard focus within the full-screen mobile drawer', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    } as unknown as MediaQueryList)
+    try {
+      const p = await live({ page: 'folk', tab: 'Everyone' })
+      expect(p.el('.paper')?.getAttribute('aria-modal')).toBe('true')
+      const first = p.el('.sj-books button')!
+      const buttons = [...p.host.querySelectorAll<HTMLElement>('button')].filter(
+        (el) => el.tabIndex >= 0,
+      )
+      const last = buttons.at(-1)!
+      first.focus()
+      first.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }),
+      )
+      expect(document.activeElement).toBe(last)
+      last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+      expect(document.activeElement).toBe(first)
+    } finally {
+      matchMedia.mockRestore()
+    }
+  })
+
+  it('always attaches the journal to the edge with no undock or drag controls', async () => {
+    const p = await live({ page: 'folk', tab: 'Everyone' })
     expect(p.el('.paper')?.dataset.dock).toBe('on')
-    expect(p.el('.town-dim')?.dataset.dock).toBe('on')
-    expect(p.el('.paper-dock')?.getAttribute('aria-pressed')).toBe('true')
+    expect(p.el('.paper-dock')).toBeNull()
+    expect(p.el('.paper-grip')).toBeNull()
+    expect(p.el('.paper-close')?.textContent).toContain('Close')
+  })
+
+  it('blocks mobile background siblings and restores them on close and desktop resize', async () => {
+    const query = Object.assign(new EventTarget(), { matches: true })
+    const media = vi.spyOn(window, 'matchMedia').mockReturnValue(query as MediaQueryList)
+    try {
+      const p = await live()
+      const background = document.createElement('button')
+      const alreadyInert = document.createElement('div')
+      alreadyInert.inert = true
+      p.host.append(background, alreadyInert)
+      await p.again({ page: 'folk', tab: 'Everyone' })
+      expect(background.inert).toBe(true)
+      expect(p.el('.paper')?.inert).toBe(false)
+      const late = document.createElement('button')
+      p.host.append(late)
+      await act(async () => {})
+      expect(late.inert).toBe(true)
+      await p.again({ page: null })
+      expect(background.inert).toBe(false)
+      expect(late.inert).toBe(false)
+      expect(alreadyInert.inert).toBe(true)
+      await p.again({ page: 'folk', tab: 'Everyone' })
+      await act(async () => {
+        query.matches = false
+        query.dispatchEvent(new Event('change'))
+      })
+      expect(p.el('.paper')?.getAttribute('aria-modal')).toBe('false')
+      expect(background.inert).toBe(false)
+      expect(alreadyInert.inert).toBe(true)
+    } finally {
+      media.mockRestore()
+    }
   })
 })

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef } from 'react'
-import { stageKeyAllowed } from './useStageKeys.js'
+import { stageInputBlocked, stageKeyAllowed } from './useStageKeys.js'
 
 /** The key that opens it — where a person looks for exactly this, which is why the frame meter
  *  had to move off it (`ui/FpsOverlay.tsx`). */
@@ -10,7 +10,7 @@ export const KEY_MAP_KEY = '?'
 export const KEY_MAP_ID = 'key-map-sheet'
 
 /** Every key the town answers to, in the order a hand finds them. Read off the bindings, not off
- *  a document: `useStageKeys` owns S/F/D/T/A/[/Esc, `render/cameraNav.ts` owns the camera. */
+ *  a document: `useStageKeys` owns S/F/D/T/[/Esc, `render/cameraNav.ts` owns the camera. */
 export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
   { keys: ['S'], says: 'the town journal' },
   { keys: ['Tab'], says: 'step through the chrome' },
@@ -23,7 +23,6 @@ export const KEY_MAP: readonly { keys: readonly string[]; says: string }[] = [
   { keys: ['D'], says: 'the director' },
   { keys: ['T'], says: 'thought bubbles' },
   { keys: ['['], says: 'more of the story, or less' },
-  { keys: ['A'], says: 'the Almanac beside the town, or over it' },
   { keys: ['?'], says: 'this sheet' },
   { keys: ['⇧', 'P'], says: 'the frame meter' },
 ]
@@ -43,6 +42,7 @@ export function KeyMap({
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== KEY_MAP_KEY || e.altKey || e.ctrlKey || e.metaKey || e.defaultPrevented) return
+      if (stageInputBlocked()) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
       e.preventDefault()
@@ -54,10 +54,15 @@ export function KeyMap({
     }
   }, [open, onOpenChange])
 
+  useEffect(() => {
+    if (open && stageInputBlocked()) onOpenChange(false)
+  })
+
   // A click on the town is the fourth way down, the same as the paper's.
   useEffect(() => {
     if (!open) return
     const onDown = (e: PointerEvent): void => {
+      if (stageInputBlocked()) return
       const t = e.target as HTMLElement | null
       // Whatever opened this is not "outside": closing here and reopening on its own click
       // would leave a control that cannot put down what it puts up. Asked of the DOM through
@@ -73,6 +78,7 @@ export function KeyMap({
 
   useEffect(() => {
     if (open) {
+      if (stageInputBlocked()) return
       opener.current = document.activeElement
       sheet.current?.focus()
       return
@@ -90,11 +96,11 @@ export function KeyMap({
         id={KEY_MAP_ID}
         ref={sheet}
         role="dialog"
-        aria-label="What the town answers to"
+        aria-label="Controls"
         tabIndex={-1}
       >
         <div className="key-map-head">
-          <h2 className="key-map-title">What the town answers to</h2>
+          <h2 className="key-map-title">Controls</h2>
           <button
             type="button"
             className="paper-close"

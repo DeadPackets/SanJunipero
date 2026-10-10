@@ -1,6 +1,9 @@
 export { MIND_MODEL, PROVIDER_ORDER, FALLBACK_MODELS, PRICE_PER_M } from './pins.js'
 export {
   migrateLlmTables,
+  configureSpendLimits,
+  makeBudgetGuard,
+  sumReserved,
   alertsSince,
   insertAlert,
   insertLlmCall,
@@ -46,3 +49,4 @@ export {
   type ReasoningSetting,
 } from './client.js'
 export { Embedder } from './embedder.js'
+export { heldCallers } from './rails.js'

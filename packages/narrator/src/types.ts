@@ -104,6 +104,7 @@ export type NarratorLlm = {
     scenes: SceneDigest[],
     cast?: readonly CastMember[],
     priorTitles?: readonly string[],
+    priorEvents?: readonly PublicRecord[],
   ): Promise<ChapterSummary>
   summarizeEra(chapters: ChapterDigest[]): Promise<EraSummary>
   newspaperCopy(

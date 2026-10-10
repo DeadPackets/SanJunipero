@@ -5,7 +5,7 @@ import { STAKE_TERMS } from './stakes.js'
 import { BOARD_TOP_N, THREAD_STATES, THREAD_TOP_N } from './threads.js'
 import { MINUTES_PER_DAY } from './time.js'
 
-export const PROTOCOL_VERSION = 8 // 8: the director's cut and act ride the socket; a v7 viewer polls a heat that no longer exists
+export const PROTOCOL_VERSION = 9 // v9 snapshots identify the town run; older strict decoders must reload.
 
 /** The close code for a hello the server does not recognise. Here rather than in the gateway
  *  because the viewer has to be able to tell it apart from a dropped connection. */
@@ -37,6 +37,7 @@ export type ClientMsg = z.infer<typeof ClientMsg>
 export const ServerSnapshot = z
   .object({
     t: z.literal('snapshot'),
+    runId: z.uuid().optional(),
     tick,
     seq: z.number().int().nonnegative(),
     state: z.unknown(),
@@ -163,6 +164,28 @@ export const ServerScene = z
   })
   .strict()
 export type ServerScene = z.infer<typeof ServerScene>
+export const ServerTranscript = z
+  .object({
+    t: z.literal('transcript'),
+    sceneId: z.string().min(1),
+    atTick: tick,
+    catchup: z.literal(true),
+    truncated: z.boolean(),
+    lines: z
+      .array(
+        z
+          .object({
+            seq: z.number().int().positive(),
+            tick,
+            agentId: z.string().min(1),
+            text: z.string(),
+          })
+          .strict(),
+      )
+      .max(100),
+  })
+  .strict()
+export type ServerTranscript = z.infer<typeof ServerTranscript>
 // What the camera is on and why. `score` is the gateway's own unbounded number and NOT the
 // scene frame's 0-10 stakes: one is what the town has riding on a talk, the other is how that
 // talk ranks against a death two streets away.
@@ -222,6 +245,9 @@ export const ThreadRowSchema = z
     beat: z.string().min(1).optional(),
     summary: z.string().min(1).optional(),
     proseTick: tick.optional(),
+    proseSceneId: z.string().min(1).optional(),
+    sourceEventSeqs: z.array(z.number().int().nonnegative()).max(12).optional(),
+    basis: z.literal('observed-overlap').optional(),
   })
   .strict()
 export type ThreadRow = z.infer<typeof ThreadRowSchema>
@@ -245,6 +271,7 @@ export const ServerMsg = z.discriminatedUnion('t', [
   ServerMood,
   ServerAssets,
   ServerScene,
+  ServerTranscript,
   ServerDirector,
   ServerBoard,
   ServerThreads,

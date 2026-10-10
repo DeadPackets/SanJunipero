@@ -43,10 +43,12 @@ export function createBuildingLabel(root: HTMLElement) {
       y: number,
       width: number,
       height: number,
+      safe: { top: number; right?: number; bottom: number },
     ) {
       const label = buildingLabel(structure, config)
       const key = JSON.stringify(label)
-      const measure = key !== previous || width !== viewportWidth
+      const availableWidth = width - (safe.right ?? 0)
+      const measure = key !== previous || availableWidth !== viewportWidth
       if (key !== previous) {
         previous = key
         node.dataset.kind = label.kind
@@ -56,15 +58,22 @@ export function createBuildingLabel(root: HTMLElement) {
         icon.style.backgroundPosition = `${((label.icon % 4) * 100) / 3}% ${(Math.floor(label.icon / 4) * 100) / 3}%`
       }
       node.hidden = false
+      node.style.maxWidth = `${Math.max(0, availableWidth - 16)}px`
       if (measure) {
         measuredWidth = node.offsetWidth
         measuredHeight = node.offsetHeight
-        viewportWidth = width
+        viewportWidth = availableWidth
       }
       const w = measuredWidth,
         h = measuredHeight
-      node.style.left = `${Math.max(8, Math.min(width - w - 8, x - w / 2))}px`
-      node.style.top = `${Math.max(8, Math.min(height - h - 8, y + 8))}px`
+      const top = safe.top + 8
+      const bottom = height - safe.bottom - h - 8
+      if (w + 16 > availableWidth || bottom < top) {
+        node.hidden = true
+        return
+      }
+      node.style.left = `${Math.max(8, Math.min(availableWidth - w - 8, x - w / 2))}px`
+      node.style.top = `${Math.max(top, Math.min(bottom, y + 8))}px`
     },
     hide() {
       node.hidden = true

@@ -48,4 +48,33 @@ describe('an opened almanac moment', () => {
     expect(document.activeElement).toBe(opener)
     expect(opener.getAttribute('aria-expanded')).toBe('false')
   })
+
+  it('leaves Escape to Controls while its moment card stays selected', async () => {
+    const host = document.createElement('div')
+    host.className = 'almanac'
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    const mark: Mark = { tick: 100, kind: 'built', words: 'A house was built', weight: 8 }
+    await act(async () => {
+      root.render(createElement(AlmanacMoments, { marks: [mark], onWatch: () => {} }))
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.almanac-event')?.click()
+    })
+    const controls = document.createElement('div')
+    controls.className = 'key-map'
+    document.body.append(controls)
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    await act(async () => {
+      controls.dispatchEvent(escape)
+    })
+    expect(escape.defaultPrevented).toBe(false)
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull()
+    controls.remove()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(host.querySelector('[role="dialog"]')).toBeNull()
+  })
 })

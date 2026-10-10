@@ -73,6 +73,7 @@ export function createMaterialLibrary() {
     return pending
   }
   return {
+    isReady: () => pendingLoads.size === 0,
     async apply(group: Object3D, kind: string, records: AssetRecord[]) {
       if (disposed) return
       const version = Symbol()

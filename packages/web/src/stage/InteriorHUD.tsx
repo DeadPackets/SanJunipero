@@ -1,9 +1,10 @@
-import { useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { DEFAULT_CONFIG, isHearthKind, kindWords, roomCapacity, structureTitle } from '@sj/shared'
 import { roomStateOf } from '../ui/interiorModel.js'
 import type { WorldStore } from '../state/worldStore.js'
 import { GameIcon, Portrait } from '../paper/game/shared.js'
 import { resolveAssetId } from '../render/textures.js'
+import { stageInputBlocked } from './useStageKeys.js'
 
 export function InteriorHUD({
   store,
@@ -20,6 +21,37 @@ export function InteriorHUD({
   useSyncExternalStore(store.subscribe, store.assetsSeq)
   const [contents, setContents] = useState(false)
   const contentsButton = useRef<HTMLButtonElement>(null)
+  const contentsPanel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!contents) return
+    const outside = (event: Event) => {
+      if (stageInputBlocked()) return
+      const target = event.target as Node
+      if (!contentsButton.current?.contains(target) && !contentsPanel.current?.contains(target))
+        setContents(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        stageInputBlocked() ||
+        document.querySelector('.key-map:not([hidden])')
+      )
+        return
+      event.preventDefault()
+      event.stopPropagation()
+      setContents(false)
+      contentsButton.current?.focus()
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('focusin', outside)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('focusin', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [contents])
   const building = state?.structures[id]
   if (!state || !building) return null
   const occupants = Object.values(state.agents)
@@ -31,17 +63,7 @@ export function InteriorHUD({
   const hearth = isHearthKind(store.getConfig() ?? DEFAULT_CONFIG, building.kind)
   const lit = (building.fueledUntilTick ?? 0) > state.tick
   return (
-    <section
-      className="interior-hud"
-      aria-label="Inside this building"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && contents) {
-          event.stopPropagation()
-          setContents(false)
-          contentsButton.current?.focus()
-        }
-      }}
-    >
+    <section className="interior-hud" aria-label="Inside this building">
       <div className="interior-heading">
         <button type="button" className="interior-back" aria-label="Back to town" onClick={onExit}>
           <span aria-hidden="true">←</span>
@@ -99,7 +121,7 @@ export function InteriorHUD({
         </button>
       </div>
       {contents && (
-        <div id="interior-contents" className="interior-contents">
+        <div id="interior-contents" className="interior-contents" ref={contentsPanel}>
           <div className="interior-contents-title">
             <h3>
               <GameIcon kind="note" /> Belongings

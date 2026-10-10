@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { stageKeyAllowed } from '../stage/useStageKeys.js'
+import { stageInputBlocked, stageKeyAllowed } from '../stage/useStageKeys.js'
 
 const FPS_WINDOW_MS = 60_000
 const FPS_SAMPLE_MS = 500
@@ -14,6 +14,7 @@ export function FpsOverlay() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (!e.shiftKey || e.key.toLowerCase() !== 'p' || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.defaultPrevented || stageInputBlocked()) return
       const t = e.target as HTMLElement | null
       if (!stageKeyAllowed(t?.tagName ?? '', t?.isContentEditable ?? false)) return
       setVisible((v) => !v)

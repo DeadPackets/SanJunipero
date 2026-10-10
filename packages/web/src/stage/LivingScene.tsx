@@ -1,54 +1,77 @@
-import { useEffect, useRef, useState } from 'react'
-import { agentName } from '@sj/shared'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { agentName, ServerTranscript } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
 import type { SceneStage } from '../ui/stageCue.js'
 import { GameIcon } from '../paper/game/shared.js'
 
-type Turn = { seq: number; sceneId: string; agentId: string; text: string }
-
 export function LivingScene({ store, stage }: { store: WorldStore; stage: SceneStage | null }) {
-  const [turns, setTurns] = useState<Turn[]>([])
   const dialog = useRef<HTMLDialogElement>(null)
+  const request = useRef<AbortController | null>(null)
+  const [failed, setFailed] = useState(false)
+  const sceneId = stage?.scene.id ?? null
+  const transcript = useSyncExternalStore(store.subscribe, () =>
+    sceneId === null ? null : store.transcript(sceneId),
+  )
   useEffect(() => {
     let tick = store.getTick(),
       live = store.getMode().live
-    const offStore = store.subscribe(() => {
+    const off = store.subscribe(() => {
       const nextTick = store.getTick(),
         nextLive = store.getMode().live
       if (nextTick < tick || live !== nextLive) {
-        setTurns([])
+        request.current?.abort()
         dialog.current?.close()
       }
       tick = nextTick
       live = nextLive
     })
-    const offEvents = store.onEvents((events) => {
-      const lines = events
-        .filter((ev) => ev.type === 'scene_line')
-        .map((ev) => {
-          const p = ev.payload as { id: string; agentId: string; text: string }
-          return { seq: ev.seq, sceneId: p.id, agentId: p.agentId, text: p.text }
-        })
-      if (lines.length) setTurns((was) => [...was, ...lines].slice(-200))
-    })
     return () => {
-      offStore()
-      offEvents()
+      off()
+      request.current?.abort()
     }
   }, [store])
   useEffect(() => {
+    request.current?.abort()
     dialog.current?.close()
-  }, [stage?.scene.id])
+  }, [sceneId])
+  const openTranscript = async (): Promise<void> => {
+    if (sceneId === null) return
+    dialog.current?.showModal()
+    setFailed(false)
+    request.current?.abort()
+    const controller = new AbortController()
+    request.current = controller
+    try {
+      const response = await fetch(
+        `/api/scenes/${encodeURIComponent(sceneId)}/transcript?atTick=${store.getTick()}`,
+        { signal: controller.signal },
+      )
+      if (!response.ok) throw new Error('transcript unavailable')
+      const frame = ServerTranscript.parse(await response.json())
+      if (!controller.signal.aborted) store.applyServer(frame)
+    } catch {
+      if (!controller.signal.aborted) setFailed(true)
+    }
+  }
   if (!stage) return null
   const scene = stage.scene
-  const lines = turns.filter((line) => line.sceneId === scene.id)
+  const lines = transcript?.lines ?? []
   const names = scene.participants.map((id) => agentName(store.getState()?.agents, id)).join(' & ')
   return (
     <>
       <div className="living-scene" data-ended={stage.phase === 'summary'}>
         <GameIcon kind={stage.phase === 'summary' ? 'note' : 'people'} />
-        {stage.phase === 'summary' ? <p>{scene.summary}</p> : <span>{names}</span>}
-        <button type="button" onClick={() => dialog.current?.showModal()}>
+        {stage.phase === 'summary' ? (
+          <p>{scene.summary}</p>
+        ) : (
+          <span>In conversation · {names}</span>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            void openTranscript()
+          }}
+        >
           Read conversation
         </button>
       </div>
@@ -69,7 +92,10 @@ export function LivingScene({ store, stage }: { store: WorldStore; stage: SceneS
           </button>
         </header>
         <p className="transcript-note">
-          Public lines received during this visit. Earlier turns may not be available.
+          {transcript?.truncated
+            ? 'Showing the latest 100 spoken turns.'
+            : 'Public words spoken in this conversation.'}
+          {failed && ' Earlier turns could not load. Close and reopen to retry.'}
         </p>
         {lines.length ? (
           <ol>

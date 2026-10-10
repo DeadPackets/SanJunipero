@@ -8,12 +8,12 @@ export type AdjudicationBlocks = {
   agent: {
     name: string
     skills: Record<string, number>
-    inventory: { kind: string; qty: number }[]
+    inventory: { id?: string; kind: string; qty: number }[]
     position: { x: number; y: number }
     // What stands around the asker and what the ground is. Rendered into the asker block,
     // never into the cache-stable system prefix: it changes with every step taken.
     visible?: {
-      structures: { kind: string; x: number; y: number }[]
+      structures: { id?: string; kind: string; x: number; y: number }[]
       ground: string[]
     }
     people?: { id: string; name: string }[]
@@ -94,6 +94,7 @@ export const ADJUDICATION_INSTRUCTION = `You are the physics judge of San Junipe
 "attempt" if the action is new but the agent can physically try it with the town's fire, current, wood, fiber, stone, the stock and scrap its sheds already hold, and the river. Whether it succeeds is decided later, never by you.
 "impossible" only if the action cannot even be started because it needs something the town wholly lacks.
 ${VERB_ROSTER}
+Use the itemId and structureId shown in the asker block for ordinary transfers and storage. Arranging or counting existing stock does not discover a new craft or create replacement goods. A claimed defect or damage is not a world fact merely because the asker describes it.
 Between attempt and impossible, decide by whether the first step can be taken with what the town has at hand. A craft is not impossible merely because no one has done it yet.
 The judgement word must agree with the reasoning that reached it: if your own reasoning concludes the action can be begun, the judgement is "attempt" and no other word will do.
 The line naming what stands within reach lists crafts nobody here has earned, each one resting on a craft the town already practices: an action that would reach one of those can be begun, so it is "attempt", never "impossible".
@@ -131,7 +132,9 @@ function renderAgent(agent: AdjudicationBlocks['agent']): string {
   const skills = Object.entries(agent.skills)
     .map(([track, level]) => `  ${track}: ${level}`)
     .join('\n')
-  const inventory = agent.inventory.map((item) => `  ${item.qty} ${item.kind}`).join('\n')
+  const inventory = agent.inventory
+    .map((item) => `  ${item.qty} ${item.kind}${item.id === undefined ? '' : ` (${item.id})`}`)
+    .join('\n')
   return [
     `Agent: ${agent.name}`,
     'Skills:',
@@ -157,7 +160,9 @@ function renderPeople(people: AdjudicationBlocks['agent']['people']): string[] {
 // a word the ruling may use, so it goes into the enforced vocabulary too (canon-vocabulary law).
 function renderVisible(visible: AdjudicationBlocks['agent']['visible']): string[] {
   if (visible === undefined) return []
-  const standing = visible.structures.map((s) => `a ${s.kind} at (${s.x}, ${s.y})`).join(', ')
+  const standing = visible.structures
+    .map((s) => `a ${s.kind}${s.id === undefined ? '' : ` (${s.id})`} at (${s.x}, ${s.y})`)
+    .join(', ')
   return [
     `Standing nearby: ${standing.length > 0 ? standing : 'nothing but open ground'}`,
     `The ground here: ${visible.ground.join(', ')}`,

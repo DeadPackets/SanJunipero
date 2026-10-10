@@ -83,8 +83,11 @@ const SCENE_TURN = {
   answer: null,
   ask: null,
   leave: false,
+  plan: null,
+  reconsider_at: null,
   importance: 5,
   mood: null,
+  reconvene: null,
 }
 const SCENE_CLOSE = { summary: 'They talked at the well.', ties: [] }
 

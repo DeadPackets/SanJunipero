@@ -47,6 +47,31 @@ function townAtTick1(): WorldState {
   return state
 }
 
+it('marks the orchard roofs as seeded while it leaves scripted completions ordinary', () => {
+  const state = townAtTick1()
+  const eventsFor = (layout: 'orchard' | 'showcase') => {
+    const config =
+      layout === 'orchard'
+        ? {
+            ...SHOWCASE_CONFIG,
+            world: { ...SHOWCASE_CONFIG.world, layout: 'orchard' as const },
+          }
+        : SHOWCASE_CONFIG
+    const events: { type: string; payload: unknown }[] = []
+    makeFoundersOnTick(config, new RngStreams(`founders-${layout}`), () => state, {
+      founders: [],
+      structures: townStructuresFor(layout),
+      minds: true,
+    })({ tick: 1, emit: (type, payload) => events.push({ type, payload }) })
+    return events.filter((event) => event.type === 'structure_completed')
+  }
+
+  const orchard = eventsFor('orchard')
+  expect(orchard.length).toBeGreaterThan(0)
+  for (const event of orchard) expect(event.payload).toMatchObject({ seeded: true })
+  for (const event of eventsFor('showcase')) expect(event.payload).not.toHaveProperty('seeded')
+})
+
 const spend = (state: WorldState, id: string, energy: number): WorldState => ({
   ...state,
   agents: {

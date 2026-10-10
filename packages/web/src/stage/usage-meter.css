@@ -1,0 +1,14 @@
+.usage-meter { position: relative; margin-top: 4px; color: var(--a-fg); font: 600 10px/1.4 Manrope, sans-serif; text-align: right; }
+.usage-meter summary { display: inline-block; padding: 2px 6px; border: 1px solid var(--a-stroke); border-radius: 4px; background: var(--a-gold); cursor: pointer; list-style: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.usage-meter summary::-webkit-details-marker { display: none; }
+.usage-meter summary:hover, .usage-meter[open] summary { border-color: var(--a-fg); }
+.usage-meter summary:focus-visible { outline: 2px solid var(--a-fg); outline-offset: 3px; }
+.usage-meter-paper { position: absolute; z-index: 2; top: calc(100% + 8px); right: 0; width: min(340px, calc(100vw - 32px)); box-sizing: border-box; padding: 16px; border: 2px solid var(--a-stroke); border-radius: 8px; background: var(--a-surface); box-shadow: 0 4px 0 var(--a-stroke); text-align: left; font: 400 12px/1.5 Manrope, sans-serif; }
+.usage-meter-paper h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 14px; }
+.usage-meter-paper h3 .sj-icon { width: 24px; height: 24px; }
+.almanac-weather .usage-meter-paper p { margin: 8px 0; text-transform: none; }
+.usage-meter table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.usage-meter th, .usage-meter td { padding: 5px 2px; border-bottom: 1px solid var(--a-stroke); text-align: right; }
+.usage-meter th:first-child { text-align: left; }
+.usage-meter-note { color: var(--a-quiet); font-size: 10px; }
+@media (max-width: 700px) { .usage-meter { font-size: 9px; margin-top: 2px; } .usage-meter summary { padding: 1px 4px; } .usage-meter-paper { position: fixed; top: calc(85px + env(safe-area-inset-top, 0px)); right: 16px; } }

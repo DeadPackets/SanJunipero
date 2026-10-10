@@ -1,6 +1,6 @@
 import { gunzipSync, gzipSync } from 'node:zlib'
-import type Database from 'better-sqlite3'
 import { EventEnvelope, type SimEvent } from '@sj/shared'
+import type Database from 'better-sqlite3'
 import type { RngState } from './rng.js'
 
 const CHECKPOINT_EVERY_MS = 5_000
@@ -20,6 +20,7 @@ export class EventStore {
   private selFrom
   private selRange
   private selTypeFrom
+  private selActionBefore
   private selLast
   private selLastThroughTick
   private insertSnap
@@ -39,6 +40,13 @@ export class EventStore {
     this.selTypeFrom = db.prepare(
       'SELECT seq, tick, type, payload FROM events WHERE seq > ? AND type = ? ORDER BY seq',
     )
+    this.selActionBefore = db.prepare(`
+      SELECT seq, tick, type, payload FROM events
+      WHERE seq < ? AND json_extract(payload, '$.agentId') = ?
+        AND (type = 'action_interrupted' OR
+          (type IN ('action_started', 'action_completed') AND json_extract(payload, '$.verb') = ?))
+      ORDER BY seq DESC LIMIT 1
+    `)
     this.selLast = db.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM events')
     this.selLastThroughTick = db.prepare(
       'SELECT COALESCE(MAX(seq), 0) AS m FROM events WHERE tick <= ?',
@@ -100,6 +108,12 @@ export class EventStore {
   /** Only one kind of event. A tail that wants one rare type pays nothing to parse the rest. */
   readTypeFrom(seqExclusive: number, type: string): SimEvent[] {
     return (this.selTypeFrom.all(seqExclusive, type) as never[]).map(this.parseRow)
+  }
+  actionStartBefore(agentId: string, verb: string, beforeSeq: number): SimEvent | undefined {
+    const row = this.selActionBefore.get(beforeSeq, agentId, verb) as
+      | { seq: number; tick: number; type: string; payload: string }
+      | undefined
+    return row?.type === 'action_started' ? this.parseRow(row) : undefined
   }
   readRange(from: number, to: number): SimEvent[] {
     return (this.selRange.all(from, to) as never[]).map(this.parseRow)

@@ -37,6 +37,18 @@ function scriptedWorld(dbPath: string, withDiscoveries = true): Database.Databas
     snapshotEveryTicks: 25,
     onTick: ({ tick, emit }) => {
       if (tick === 1) {
+        emit('structure_planned', {
+          id: 'seeded_house',
+          kind: 'house',
+          x: 20,
+          y: 20,
+          w: 1,
+          h: 1,
+          maxHp: 50,
+          flammable: true,
+          builderId: 'genesis',
+        })
+        emit('structure_completed', { id: 'seeded_house', seeded: true })
         emit('agent_spawned', { id: 'alice', name: 'Alice', x: 0, y: 0, ageDays: ADULT_AGE_DAYS })
         emit('agent_spawned', { id: 'bob', name: 'Bob', x: 0, y: 1, ageDays: ADULT_AGE_DAYS })
         emit('agent_spawned', { id: 'cara', name: 'Cara', x: 5, y: 5, ageDays: ADULT_AGE_DAYS })
@@ -276,6 +288,9 @@ describe('narrator-backed observer apis, with a narrator.db', () => {
 
   it('keeps only what the town would remember, in the order it happened', async () => {
     const entries = await chronicle()
+    expect(entries.some((entry) => entry.tick === 1 && entry.type === 'structure_completed')).toBe(
+      false,
+    )
     expect(entries.map((e) => [e.tick, e.type])).toEqual([
       [18, 'scene_closed'],
       [20, 'structure_completed'],

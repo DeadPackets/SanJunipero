@@ -1,4 +1,12 @@
-import { isBeddedKind, isHearthKind, roomCapacity, type SimConfig } from '@sj/shared'
+import {
+  buildingAppearanceFor,
+  buildingWindowMask,
+  frontDoorFraction,
+  isBeddedKind,
+  isHearthKind,
+  roomCapacity,
+  type SimConfig,
+} from '@sj/shared'
 import type { Structure } from '@sj/engine/state'
 import {
   BoxGeometry,
@@ -20,11 +28,16 @@ import { woodMaps } from './structures.js'
 
 export function buildInteriorRoom(s: Structure, config: SimConfig) {
   const group = new Group()
+  const appearance = buildingAppearanceFor(s.kind)
   const profile = ['house', 'cottage', 'cabin', 'farmhouse'].includes(s.kind)
     ? PERSONAL_HOMES[s.owner ?? '']
     : undefined
   const w = Math.max(6, s.w * 2.6),
     d = Math.max(6, s.h * 2.6)
+  const faceSpan = s.facing === 'se' ? s.h : s.w
+  const windowMask = buildingWindowMask(appearance, faceSpan, s.facing === 'se')
+  group.userData.appearance = appearance
+  group.userData.windowMask = windowMask
   const detail = profile?.detail
   const readingRoom = detail === 'quiet' || detail === 'tailor'
   const wallHeight = 2.8
@@ -34,12 +47,20 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
   const material = (color: number) => new MeshStandardMaterial({ color, roughness: 0.94 })
   const wood = material(0x977450),
     darkWood = material(0x65503c)
-  const wall = material(profile?.wall ?? 0xf6e8d5),
-    trim = material(profile?.trim ?? 0x82917b)
-  const wallMaps = woodMaps(profile?.plaster)
+  const roleWall =
+    appearance.use === 'public-shop'
+      ? 0xd8be91
+      : appearance.use === 'public-meeting'
+        ? 0xbdb9aa
+        : 0xf6e8d5
+  const roleTrim = appearance.use === 'public-meeting' ? 0x777565 : 0x82917b
+  const wall = material(profile?.wall ?? roleWall),
+    trim = material(profile?.trim ?? roleTrim)
+  const plaster = profile?.plaster ?? appearance.facade !== 'timber'
+  const wallMaps = woodMaps(plaster)
   wall.map = wallMaps.color
   wall.bumpMap = wallMaps.height
-  wall.bumpScale = profile?.plaster ? 0.018 : 0.035
+  wall.bumpScale = plaster ? 0.018 : 0.035
   const grain = woodMaps(false)
   for (const timber of [wood, darkWood]) {
     timber.map = grain.color
@@ -62,7 +83,7 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
     mesh.position.set(x, y, z)
     if (m === wall) {
       mesh.userData.materialSlot = 'interior-wall'
-      m.userData.baseColorTint = profile?.wall ?? 0xf6e8d5
+      m.userData.baseColorTint = profile?.wall ?? roleWall
       const pos = mesh.geometry.attributes.position!,
         normal = mesh.geometry.attributes.normal!,
         uv = mesh.geometry.attributes.uv!
@@ -98,7 +119,7 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
   canvas.width = 256
   canvas.height = 256
   const ctx = canvas.getContext('2d')!
-  const stone = s.kind === 'storehouse' || s.kind === 'shed'
+  const stone = s.kind === 'storehouse' || s.kind === 'shed' || appearance.facade === 'stone'
   let seed = 7
   for (const c of s.id) seed = (seed * 31 + c.charCodeAt(0)) >>> 0
   const noise = (n: number) => {
@@ -172,7 +193,7 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
   box(-w / 2 + 0.13, 0.83, 0, 0.13, 0.08, d, wood)
   box(-w / 2 + 0.14, 0.09, 0, 0.14, 0.16, d, darkWood)
   for (let z = -d / 2; z < d / 2; z += 0.48) box(-w / 2 + 0.145, 0.43, z, 0.04, 0.72, 0.025, wood)
-  const windowXs = [-w * 0.18, w * 0.3]
+  const windowXs = windowMask.front.map((fraction) => -w / 2 + w * fraction)
   const glass = new MeshStandardMaterial({
     color: 0x9dac9b,
     emissive: 0xb1c7b4,
@@ -521,10 +542,11 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
   }
   const stored = new Group()
   group.add(stored)
+  const doorFraction = frontDoorFraction(faceSpan)
   const entry = new Vector3(
-    s.facing === 'se' ? w / 2 - 0.45 : 0,
+    s.facing === 'se' ? w / 2 - 0.45 : -w / 2 + w * doorFraction,
     0,
-    s.facing === 'se' ? 0 : d / 2 - 0.45,
+    s.facing === 'se' ? -d / 2 + d * doorFraction : d / 2 - 0.45,
   )
   box(
     entry.x,
@@ -551,5 +573,7 @@ export function buildInteriorRoom(s: Structure, config: SimConfig) {
     lampPositions,
     entry,
     obstacles,
+    appearance,
+    windowMask,
   }
 }

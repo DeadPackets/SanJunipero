@@ -1,0 +1,19 @@
+.conversation-presence { position: absolute; inset: 0; z-index: var(--layer-conversation); pointer-events: none; overflow: hidden; }
+.conversation-presence[hidden] { display: none; }
+.conversation-caption { position: absolute; top: 0; left: 0; width: max-content; max-width: 248px; translate: -50% 0; min-width: 148px; padding: 7px 12px 7px 39px; background: #fff4dc; color: #514334; border: 2px solid #a79268; box-shadow: 0 3px 0 #6d60444d; text-align: center; font: 12px/1.45 Manrope, sans-serif; animation: conversation-arrive 220ms ease-out; }
+.conversation-caption strong { display: block; font-size: 13px; }
+.conversation-caption span { color: #73644f; }
+.conversation-caption i { display: inline-block; width: 17px; margin-left: 4px; font-style: normal; letter-spacing: 2px; animation: conversation-breathe 1600ms ease-in-out infinite; }
+.conversation-person { position: absolute; top: -8px; left: -25px; width: 50px; height: 17px; border: 2px solid #f8e6b4; border-radius: 50%; background: #f8e6b421; box-shadow: 0 0 0 1px #655a4266; transition: background 200ms, border-color 200ms, opacity 200ms; }
+.conversation-person[data-role='speaking'] { background: #f4ce7370; border-color: #fff7de; box-shadow: 0 0 0 3px #d8ac4b50; }
+.conversation-person[data-role='listening'] { border-style: dashed; }
+.conversation-presence[data-speaking='true'] .conversation-caption i { visibility: hidden; }
+.conversation-presence[data-paused='true'] .conversation-caption i { animation-play-state: paused; }
+.conversation-presence[data-phase='ended'] { animation: conversation-depart 1000ms ease-in forwards; }
+.conversation-presence[data-phase='ended'] .conversation-caption i { display: none; }
+@keyframes conversation-arrive { from { opacity: 0; translate: -50% 4px; } to { opacity: 1; translate: -50% 0; } }
+@keyframes conversation-depart { 0%, 50% { opacity: 1; } to { opacity: 0; } }
+@keyframes conversation-breathe { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .conversation-presence, .conversation-caption, .conversation-caption i { animation: none !important; } .conversation-person { transition: none; } }
+
+.conversation-icon { position: absolute; top: 50%; left: 10px; translate: 0 -50%; width: 22px; height: 22px; background-size: 400% 400%; background-position: 100% 66.666667%; image-rendering: pixelated; }

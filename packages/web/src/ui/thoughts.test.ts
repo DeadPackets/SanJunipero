@@ -265,7 +265,7 @@ describe('the thoughts button', () => {
   // ★ `--deep-l` was used here and declared nowhere: an unresolved var makes the declaration
   // invalid at computed-value time, so the slab's ground fell out to transparent on hover.
   it('★ every token the cluster names is a token the sheet declares', () => {
-    const css = src('./chrome.css') + src('./corner-controls.css')
+    const css = src('./stacking.css') + src('./chrome.css') + src('./corner-controls.css')
     const block = src('./corner-controls.css')
     expect(block).not.toBe('')
     for (const [, name] of block.matchAll(/var\((--[\w-]+)\)/g)) {

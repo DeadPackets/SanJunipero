@@ -52,7 +52,7 @@ function requestSchema(naFor: readonly string[]) {
 function reportedCost(providerMetadata: unknown): number | undefined {
   const cost = (providerMetadata as { openrouter?: { usage?: { cost?: unknown } } } | undefined)
     ?.openrouter?.usage?.cost
-  return typeof cost === 'number' ? cost : undefined
+  return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : undefined
 }
 
 export function makeVisionJudge(opts: {
@@ -61,6 +61,8 @@ export function makeVisionJudge(opts: {
   refs: Buffer[]
   config?: ForgeConfig
   generateFn?: VisionGenerateFn
+  onCharge?: (model: string, costUsd: number) => void
+  signal?: AbortSignal
 }): VisionJudgeFn {
   const config = opts.config ?? DEFAULT_FORGE_CONFIG
   const modelName = opts.model ?? config.visionQa.model
@@ -71,12 +73,24 @@ export function makeVisionJudge(opts: {
         model: args.model as LanguageModel,
         messages: args.messages as NonNullable<Parameters<typeof generateText>[0]['messages']>,
         output: Output.object({ schema: args.schema as z.ZodType }),
+        maxRetries: 0,
+        abortSignal: AbortSignal.any([
+          AbortSignal.timeout(90_000),
+          ...(opts.signal ? [opts.signal] : []),
+        ]),
+        onStepFinish: (step) => {
+          opts.onCharge?.(
+            modelName,
+            reportedCost(step.providerMetadata) ?? EST_COST_PER_VISION_CALL,
+          )
+        },
       })
       return { object: r.output, providerMetadata: r.finalStep.providerMetadata }
     })
   const model = opts.generateFn ? null : createOpenRouter({ apiKey: opts.apiKey }).chat(modelName)
 
   return async (a) => {
+    opts.signal?.throwIfAborted()
     const naFor = NA_CRITERIA_BY_CLASS[a.klass] ?? []
     const schema = requestSchema(naFor)
     const text = buildRubricPrompt({
@@ -122,6 +136,8 @@ export function makeVisionJudge(opts: {
         },
       ],
     })
+    if (opts.generateFn !== undefined)
+      opts.onCharge?.(modelName, reportedCost(providerMetadata) ?? EST_COST_PER_VISION_CALL)
     // `overall` is never the model's to give: parsing through the ask-schema drops it, then code derives it.
     const { feedback, ...asked } = schema.parse(object)
     const criteria = {

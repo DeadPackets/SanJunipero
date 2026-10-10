@@ -1,3 +1,4 @@
+import * as commissions from './discoveryCommission.js'
 // Every row here must FAIL against a scripted cast: a test that passes whether or not a mind is
 // behind the body proves nothing about the seam.
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
@@ -9,12 +10,15 @@ import Database from 'better-sqlite3'
 import { EngineBridge, FOUNDER_MINDS, OPAQUE_REFUSAL, openAgentDb, type MindSpec } from '@sj/agents'
 import {
   LlmClient,
+  Embedder,
+  BudgetExceededError,
+  makeBudgetGuard,
   insertAlert,
   insertTurnOutcome,
   migrateLlmTables,
   PROVIDER_ORDER,
 } from '@sj/llm'
-import { FakeEmbedder } from '@sj/llm/testutil'
+import { FakeEmbedder, mockModel } from '@sj/llm/testutil'
 import {
   DAYS_PER_YEAR,
   FOUNDER_IDS,
@@ -560,6 +564,26 @@ describe('★ the money, inside the served world', () => {
 
   // The total cap stops a lane's mistake and cannot stop a leak on a process meant to run for
   // weeks. This row thinks FAR UNDER the cap and fast, the exact shape the cap is blind to.
+  it('shares the configured daily ceiling across image holds and injected text clients before a tick', async () => {
+    const { opsDb } = await liveWorld({ dir: tmp(), spendCapUsd: 10, spendDailyUsd: 1 })
+    const image = makeBudgetGuard(opsDb, 'forge')
+    const held = image.reserve(0.75, null, null)
+    expect(held).toHaveProperty('id')
+    const client = new LlmClient({
+      db: opsDb,
+      caller: 'test-town',
+      model: mockModel([{ text: 'hello' }]),
+      expectedCallCostUsd: 0.75,
+    })
+    await expect(
+      client.text({ messages: [{ role: 'user', content: 'hello' }] }),
+    ).rejects.toBeInstanceOf(BudgetExceededError)
+    if ('id' in held) image.release(held.id)
+    await expect(
+      client.text({ messages: [{ role: 'user', content: 'hello' }] }),
+    ).resolves.toMatchObject({ text: 'hello' })
+  })
+
   it('★ stops a town thinking too fast even though it is nowhere near its cap', async () => {
     const stops: { spent: number; cap: number }[] = []
     const dir = tmp()
@@ -973,6 +997,150 @@ describe('★ the cap is per town, not per process', () => {
   })
 })
 
+it('closes the ops ledger and cancels preflight clients when preflight refuses startup', async () => {
+  vi.stubEnv('OPENROUTER_API_KEY', 'test-only')
+  const clients: LlmClient[] = []
+  const ledgers: Database.Database[] = []
+  try {
+    await expect(
+      createLiveCast({
+        agentDbDir: tmp(),
+        minds: TWO,
+        embedder: new FakeEmbedder(),
+        log: () => {},
+        makeClient: (db, _caller, agentId) => {
+          ledgers.push(db)
+          const client = fakeLlm(db, agentId ?? null, SILENT_TURN)
+          clients.push(client)
+          return client
+        },
+      }),
+    ).rejects.toThrow()
+    expect(ledgers).toHaveLength(1)
+    expect(ledgers[0]!.open).toBe(false)
+    expect(clients[0]!.signal.aborted).toBe(true)
+  } finally {
+    vi.unstubAllEnvs()
+  }
+})
+
+it('closes both acquired databases when embedder startup fails', async () => {
+  const dir = tmp()
+  const close = vi.spyOn(Database.prototype, 'close')
+  const embedding = vi
+    .spyOn(Embedder, 'create')
+    .mockRejectedValue(new Error('embedder unavailable'))
+  try {
+    await expect(
+      createLiveCast({
+        agentDbDir: dir,
+        narratorDbPath: join(dir, 'narrator.db'),
+        preflight: false,
+        log: () => {},
+      }),
+    ).rejects.toThrow('embedder unavailable')
+    const closed = close.mock.contexts as Database.Database[]
+    expect(closed.map((db) => db.name).sort()).toEqual(
+      [join(dir, LIVE_OPS_DB), join(dir, 'narrator.db')].sort(),
+    )
+    expect(closed.every((db) => !db.open)).toBe(true)
+  } finally {
+    embedding.mockRestore()
+    close.mockRestore()
+  }
+})
+
+it('reports actual mind evidence and keeps the global budget stop latched', async () => {
+  const { world, opsDb, cast } = await liveWorld({ dir: tmp(), spendDailyUsd: 1 })
+  expect(cast.ops!.mindStatus()).toBe('delayed')
+  billTo(opsDb, Date.now(), 0.01)
+  expect(cast.ops!.mindStatus()).toBe('active')
+  opsDb.prepare('UPDATE llm_calls SET ok = 0').run()
+  expect(cast.ops!.mindStatus()).toBe('delayed')
+  billTo(opsDb, Date.now(), 0.01)
+  expect(cast.ops!.mindStatus()).toBe('active')
+  opsDb.prepare('UPDATE llm_calls SET ts = ?').run(Date.now() - 300_001)
+  expect(cast.ops!.mindStatus()).toBe('active')
+  billTo(opsDb, Date.now(), 0.01)
+  const pending = makeBudgetGuard(opsDb, 'turn').reserve(0.1, null, null)
+  opsDb.prepare("UPDATE llm_reservations SET ts = ? WHERE status = 'held'").run(Date.now() - 60_001)
+  expect(cast.ops!.mindStatus()).toBe('delayed')
+  if ('id' in pending) makeBudgetGuard(opsDb, 'turn').release(pending.id)
+  expect(cast.ops!.mindStatus()).toBe('active')
+  billTo(opsDb, Date.now(), 2)
+  await run(world, 10)
+  expect(cast.ops!.mindStatus()).toBe('budget-stopped')
+  opsDb.prepare('UPDATE llm_calls SET ts = ?').run(Date.now() - 86_400_001)
+  await run(world, 10)
+  expect(cast.ops!.mindStatus()).toBe('budget-stopped')
+})
+
+it.each(['lifetime', 'rolling-day'])(
+  'latches a %s admission refusal before billed spend reaches the cap',
+  async (window) => {
+    const onSpendStop = vi.fn()
+    const { world, opsDb, cast } = await liveWorld({
+      dir: tmp(),
+      spendCapUsd: window === 'lifetime' ? 1 : 10,
+      spendDailyUsd: window === 'rolling-day' ? 1 : 10,
+      onSpendStop,
+    })
+    billTo(opsDb, Date.now(), 0.01)
+    expect(cast.ops!.mindStatus()).toBe('active')
+    const guard = makeBudgetGuard(opsDb, 'forge')
+    const held = guard.reserve(0.75, null, null)
+    if (!('id' in held)) throw new Error('first reservation refused')
+    guard.retainUncertain(held.id)
+    expect(makeBudgetGuard(opsDb, 'turn').reserve(0.5, null, null)).toHaveProperty('held', 'budget')
+    expect(cast.ops!.mindStatus()).toBe('budget-stopped')
+    await run(world, 1)
+    expect(onSpendStop).toHaveBeenCalledExactlyOnceWith(0.01, 1)
+    expect(guard.sumReserved()).toBe(0.75)
+    opsDb.prepare('UPDATE llm_calls SET ts = ?').run(Date.now() - 86_400_001)
+    await run(world, 10)
+    expect(cast.ops!.mindStatus()).toBe('budget-stopped')
+    expect(onSpendStop).toHaveBeenCalledTimes(1)
+    expect(guard.sumReserved()).toBe(0.75)
+  },
+)
+
+it('keeps a caller allowance refusal recoverable without stopping the town', async () => {
+  const onSpendStop = vi.fn()
+  const { world, opsDb, cast } = await liveWorld({ dir: tmp(), onSpendStop })
+  billTo(opsDb, Date.now(), 0.01)
+  expect(
+    makeBudgetGuard(opsDb, 'turn').reserve(0.5, null, { usd: 0.1, sinceMs: 0 }),
+  ).toHaveProperty('held', 'rail')
+  await run(world, 10)
+  expect(cast.ops!.mindStatus()).toBe('active')
+  expect(onSpendStop).not.toHaveBeenCalled()
+})
+
+it('reports a held mind caller as delayed and recovers after its own window', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  try {
+    const onSpendStop = vi.fn()
+    const { opsDb, cast } = await liveWorld({ dir: tmp(), onSpendStop })
+    billTo(opsDb, Date.now(), 0.01)
+    const client = new LlmClient({
+      db: opsDb,
+      caller: 'dream',
+      model: mockModel([{ text: 'unused' }]),
+      expectedCallCostUsd: 0.5,
+      maxRetries: 0,
+    })
+    await expect(client.text({ messages: [{ role: 'user', content: 'hello' }] })).rejects.toThrow(
+      'caller rail',
+    )
+    expect(cast.ops!.mindStatus()).toBe('delayed')
+    vi.setSystemTime(Date.now() + 86_400_001)
+    expect(cast.ops!.mindStatus()).toBe('active')
+    expect(onSpendStop).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 it('cancels ordinary requests and waits for their cleanup before closing the ledger', async () => {
   let entered = 0
   let aborted = 0
@@ -1007,6 +1175,104 @@ it('cancels ordinary requests and waits for their cleanup before closing the led
   expect(completed).toBe(entered)
   expect(ledgerOpen).toBe(true)
   expect(opsDb.open).toBe(false)
+}, 15_000)
+
+it('ticks deferred art on one bounded timer and stops that timer at shutdown', async () => {
+  vi.useFakeTimers({
+    toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+  })
+  const retries: { art?: ReturnType<typeof vi.spyOn>; faces?: ReturnType<typeof vi.spyOn> } = {}
+  const createArt = commissions.createDiscoveryArt
+  const createFaces = commissions.createCastArt
+  const artFactory = vi.spyOn(commissions, 'createDiscoveryArt').mockImplementation((opts) => {
+    const art = createArt({ ...opts, apiKey: undefined })
+    retries.art = vi.spyOn(art, 'retry')
+    return art
+  })
+  const facesFactory = vi.spyOn(commissions, 'createCastArt').mockImplementation((opts) => {
+    const faces = createFaces({ ...opts, apiKey: undefined })
+    retries.faces = vi.spyOn(faces, 'retry')
+    return faces
+  })
+  try {
+    const { world } = await liveWorld({ dir: tmp() })
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(retries.art).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(retries.art).toHaveBeenCalledTimes(1)
+    expect(retries.faces).toHaveBeenCalledTimes(1)
+    worlds.splice(worlds.indexOf(world), 1)
+    const stopping = world.stop()
+    await vi.advanceTimersByTimeAsync(1000)
+    await stopping
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(retries.art).toHaveBeenCalledTimes(1)
+    expect(retries.faces).toHaveBeenCalledTimes(1)
+  } finally {
+    artFactory.mockRestore()
+    facesFactory.mockRestore()
+    vi.useRealTimers()
+  }
+})
+
+it('keeps the ledger open for a late image charge and closes art admission before shutdown', async () => {
+  const dir = tmp()
+  let release!: () => void
+  let entered!: () => void
+  let requests = 0
+  const waiting = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const saved: { art?: ReturnType<typeof commissions.createDiscoveryArt> } = {}
+  const create = commissions.createDiscoveryArt
+  const spy = vi.spyOn(commissions, 'createDiscoveryArt').mockImplementation((opts) => {
+    const art = create({
+      ...opts,
+      apiKey: 'test-key',
+      fetchFn: async () => {
+        requests++
+        entered()
+        await gate
+        return new Response(
+          JSON.stringify({ data: [{ b64_json: 'aW1hZ2U=' }], usage: { cost: 0.04 } }),
+          { status: 200 },
+        )
+      },
+    })
+    saved.art = art
+    return art
+  })
+  try {
+    const { world, opsDb } = await liveWorld({ dir })
+    saved.art!.onDiscovery({ name: 'cord', makes: ['cord'] })
+    await waiting
+    worlds.splice(worlds.indexOf(world), 1)
+    const stopping = world.stop()
+    saved.art!.onDiscovery({ name: 'late', makes: ['waterskin'] })
+    expect(opsDb.open).toBe(true)
+    release()
+    await stopping
+    expect(opsDb.open).toBe(false)
+    expect(requests).toBe(1)
+    const billed = new Database(join(dir, 'minds', LIVE_OPS_DB), { readonly: true })
+    expect(
+      billed
+        .prepare("SELECT SUM(cost_usd) AS usd, COUNT(*) AS n FROM llm_calls WHERE caller = 'forge'")
+        .get(),
+    ).toEqual({ usd: 0.04, n: 1 })
+    billed.close()
+    const worldDb = new Database(join(dir, 'world.db'), { readonly: true })
+    expect(
+      worldDb.prepare("SELECT COUNT(*) AS n FROM assets WHERE kind IN ('cord', 'waterskin')").get(),
+    ).toEqual({ n: 0 })
+    worldDb.close()
+  } finally {
+    release()
+    spy.mockRestore()
+  }
 }, 15_000)
 
 it('persists a conversation closure delivered during cancellation before closing the world', async () => {
@@ -1499,6 +1765,73 @@ describe('★ a mind attempts what the engine has no verb for, and a god rules o
       arb.close()
     }
   }, 45_000)
+
+  it('requeues missing discovered art after a restart without another discovery', async () => {
+    const dir = tmp()
+    const first = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+    await run(first.world, 8)
+    await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
+    const onDiscovery = vi.fn()
+    const factory = vi.spyOn(commissions, 'createDiscoveryArt').mockReturnValue({
+      onDiscovery,
+      retry() {},
+      async settle() {},
+    })
+    try {
+      await liveWorld({ dir })
+      expect(onDiscovery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: SMOKE_RECIPE.name,
+          makes: ['smoked_fish'],
+        }),
+      )
+    } finally {
+      factory.mockRestore()
+    }
+  }, 30_000)
+
+  it.each([false, true])(
+    'publishes a pending discovery durably before the first resumed tick (published=%s)',
+    async (published) => {
+      const dir = tmp()
+      const first = await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+      await run(first.world, 8)
+      await worlds.splice(worlds.indexOf(first.world), 1)[0]!.stop()
+      const worldDb = new Database(join(dir, 'world.db'))
+      const arbiterDb = new Database(join(dir, 'minds', '_arbiter.db'))
+      try {
+        arbiterDb.prepare('UPDATE rulebook SET pending_discovery = ? WHERE recipe_id = ?').run(
+          JSON.stringify({
+            recipeId: SMOKE_RECIPE.id,
+            name: SMOKE_RECIPE.name,
+            kind: 'craft',
+            makes: ['smoked_fish'],
+            raises: [],
+            credit: { agentId: 'amara', intent: 'smoke the fish', saying: 'Keep the fire low.' },
+          }),
+          SMOKE_RECIPE.id,
+        )
+        if (!published) worldDb.prepare("DELETE FROM events WHERE type = 'discovery_made'").run()
+      } finally {
+        worldDb.close()
+        arbiterDb.close()
+      }
+      unregisterVerb(SMOKE_RECIPE.id)
+      await liveWorld({ dir, turn: INVENTING_TURN, verdict: SMOKE_VERDICT })
+      expect(eventsOf(dir, 'discovery_made')).toHaveLength(1)
+      const recovered = new Database(join(dir, 'minds', '_arbiter.db'))
+      try {
+        expect(
+          recovered
+            .prepare('SELECT pending_discovery FROM rulebook WHERE recipe_id = ?')
+            .get(SMOKE_RECIPE.id),
+        ).toEqual({ pending_discovery: null })
+      } finally {
+        recovered.close()
+      }
+    },
+    30_000,
+  )
 
   it('★ SJ_ARBITER=0 leaves no god and no database, and the turn still lands', async () => {
     const dir = tmp()

@@ -1,3 +1,4 @@
+import { MINUTES_PER_DAY } from '@sj/shared'
 import type { EventStore } from '@sj/engine/store'
 
 export type SeedEntry = { text: string; importance: number; tags: string[] }
@@ -147,16 +148,23 @@ export function buildHouseholdSeed(store: EventStore, opts: HouseholdSeedOpts): 
   const window = SEED_TYPES.flatMap((t) => store.readTypeFrom(0, t))
     .filter((ev) => ev.tick <= opts.upToTick)
     .sort((a, b) => a.seq - b.seq)
-  const out: SeedEntry[] = []
+  const out: { seq: number; entry: SeedEntry }[] = []
   for (const ev of window) {
     const said = PHRASINGS[ev.type]!(ev.payload as Record<string, unknown>, ctx)
     if (said === null) continue
     out.push({
-      text: said.text,
-      importance: said.importance,
-      tags: [...new Set(['household', `event:${ev.seq}`, ...said.tags])],
+      seq: ev.seq,
+      entry: {
+        text: `On day ${Math.floor(ev.tick / MINUTES_PER_DAY) + 1}: ${said.text}`,
+        importance: said.importance,
+        tags: [...new Set(['household', `event:${ev.seq}`, ...said.tags])],
+      },
     })
   }
   const max = opts.max ?? DEFAULT_HOUSEHOLD_SEED_MAX
-  return out.length <= max ? out : out.slice(out.length - max)
+  return out
+    .sort((a, b) => b.entry.importance - a.entry.importance || b.seq - a.seq)
+    .slice(0, max)
+    .sort((a, b) => a.seq - b.seq)
+    .map(({ entry }) => entry)
 }

@@ -17,7 +17,6 @@ import {
   foldBond,
   strongerBondKind,
   tieActOf,
-  tieActOfLetGo,
   type Bond,
   type BondAct,
 } from './bonds.js'
@@ -93,6 +92,17 @@ describe('BondsResponseSchema', () => {
 })
 
 describe('what a tie is worth', () => {
+  it('records observed speech without treating repeated speech as friendship warmth', () => {
+    const fold = foldBond('alice', 'bob', 120)
+    fold.observe('friend', 30)
+    fold.observe('friend', 60)
+    const b = fold.bond()
+    expect(b.strength).toBe(2)
+    expect(b.acts).toEqual([{ kind: 'friend', count: 2, firstTick: 30, lastTick: 60 }])
+    expect(b.warmth).toBe(0)
+    expect(bondNote('friend')).toBe('were observed speaking together')
+  })
+
   it('prices the six the minds can write, and leaves the act window alone', () => {
     expect(TIE_VALENCE).toEqual({
       slight: -3,
@@ -106,20 +116,19 @@ describe('what a tie is worth', () => {
   })
 
   it('reads a delta: a promise kept, a grudge that is a slight, a promise merely made', () => {
-    expect(tieActOf('promise', true)).toBe('promise_kept')
-    expect(tieActOf('promise', false)).toBeNull()
-    expect(tieActOf('slight', false)).toBe('slight')
-    expect(tieActOf('grudge', false)).toBe('slight')
-    expect(tieActOf('attraction', false)).toBe('attraction')
-    expect(tieActOf('kin', false)).toBe('kin')
-    expect(tieActOf('secret', false)).toBeNull()
-    expect(tieActOf('slight', true), 'a slight squared is not a slight taken').toBeNull()
+    expect(tieActOf('promise', 'fulfilled')).toBeNull()
+    expect(tieActOf('promise', undefined)).toBeNull()
+    expect(tieActOf('slight', undefined)).toBe('slight')
+    expect(tieActOf('grudge', undefined)).toBe('slight')
+    expect(tieActOf('attraction', undefined)).toBe('attraction')
+    expect(tieActOf('kin', undefined)).toBe('kin')
+    expect(tieActOf('secret', undefined)).toBeNull()
+    expect(tieActOf('slight', 'released'), 'a slight squared is not a slight taken').toBeNull()
   })
 
-  it('reads a lapse: only a promise left to rot is a promise broken', () => {
-    expect(tieActOfLetGo('promise')).toBe('promise_broken')
-    for (const kind of ['grudge', 'slight', 'debt', 'attraction', 'secret', 'alliance', 'kin'])
-      expect(tieActOfLetGo(kind), `${kind} nobody fed is ${kind} forgiven`).toBeNull()
+  it('does not treat a private resolution as an observed fulfillment or breach', () => {
+    expect(tieActOf('promise', 'fulfilled')).toBeNull()
+    expect(tieActOf('promise', 'broken')).toBeNull()
   })
 
   it('moves warmth without becoming an act, so the served window is what it was', () => {

@@ -18,6 +18,7 @@ export const BOTTOM_BAND: readonly string[] = [
   '.signpost',
   '.keepsake',
 ]
+const DOCK = '.paper[data-dock="on"]'
 
 type Box = { top: number; bottom: number; height: number }
 
@@ -59,15 +60,51 @@ export function useSafeInsets(scene: Scene | null): void {
     const measure = (): void => {
       raf = 0
 
-      scene.safeInsets = insetsOf(boxOf(scene.app.canvas), boxes(TOP_BAND), boxes(BOTTOM_BAND))
+      const dock = root.querySelector(`${DOCK}[data-open="yes"][aria-modal="false"]`)
+      scene.safeInsets = {
+        ...insetsOf(boxOf(scene.app.canvas), boxes(TOP_BAND), boxes(BOTTOM_BAND)),
+        right: dock?.getBoundingClientRect().width ?? 0,
+      }
     }
     const ask = (): void => {
       if (raf === 0) raf = requestAnimationFrame(measure)
     }
     const ro = new ResizeObserver(ask)
-    ro.observe(root)
-    const mo = new MutationObserver(ask)
-    mo.observe(root, { childList: true, subtree: true, characterData: true, attributes: true })
+    const selector = [...TOP_BAND, ...BOTTOM_BAND, DOCK].join(',')
+    const observed = new Set<Element>()
+    const observeBands = (): void => {
+      const bands = new Set<Element>([root, ...root.querySelectorAll(selector)])
+      for (const el of observed) {
+        if (!bands.has(el)) {
+          ro.unobserve(el)
+          observed.delete(el)
+        }
+      }
+      for (const el of bands) {
+        if (!observed.has(el)) {
+          ro.observe(el)
+          observed.add(el)
+        }
+      }
+    }
+    observeBands()
+    const mo = new MutationObserver((changes) => {
+      const bandChanged = changes.some((change) => {
+        const target = change.target
+        if (change.type === 'attributes')
+          return target === root || (target instanceof Element && target.closest(selector) !== null)
+        return [...change.addedNodes, ...change.removedNodes].some(
+          (node) =>
+            node instanceof Element &&
+            (node.matches(selector) || node.querySelector(selector) !== null),
+        )
+      })
+      if (bandChanged) {
+        observeBands()
+        ask()
+      }
+    })
+    mo.observe(root, { childList: true, subtree: true, attributes: true })
     ask()
     return () => {
       ro.disconnect()

@@ -286,8 +286,11 @@ describe('eat: a last-day meal and the pale mushroom', () => {
       )
       const done = fold(s, ev(4, 'structure_completed', { id: 'structure_1' }))
       return fold(
-        done,
-        ev(5, 'item_moved', { id: 'item_1', loc: { t: 'structure', id: 'structure_1' } }),
+        fold(
+          done,
+          ev(5, 'item_moved', { id: 'item_1', loc: { t: 'structure', id: 'structure_1' } }),
+        ),
+        ev(6, 'agent_entered', { agentId: 'a1', structureId: 'structure_1' }),
       )
     }
 
@@ -308,7 +311,7 @@ describe('eat: a last-day meal and the pale mushroom', () => {
       expect(out.map((e) => e.type)).toContain('needs_changed')
     })
 
-    it('a loaf on a shelf the body stands beside is the same', () => {
+    it('a loaf on a shelf in the same room is the same', () => {
       expect(submitIntent(shelf(), DEFAULT_CONFIG, 'a1', 'eat', { itemId: 'item_1' }).ok).toBe(true)
     })
 

@@ -462,7 +462,7 @@ function Firsts({ store, onPlay, onSubject }: PageProps) {
       read={read}
       viewTick={mode.live ? null : mode.tick}
       edge={edge}
-      lastVisit={lastVisitTick()}
+      lastVisit={lastVisitTick(store.runId())}
       people={state?.agents}
       records={dressed ? records : NO_RECORDS}
       onPlay={onPlay}

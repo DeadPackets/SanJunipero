@@ -36,6 +36,27 @@ describe('SPEECH_RULES', () => {
     expect(SPEECH_RULES).not.toContain('in the words they said it')
   })
 
+  it('allows personal wordplay without turning one phrase into a loop', () => {
+    expect(SPEECH_RULES).toMatch(/wordplay.*own voice/i)
+    expect(SPEECH_RULES).toMatch(/Do not.*repeat the same turn of phrase/i)
+    expect(SPEECH_RULES).not.toMatch(
+      /No proverbs|no sayings you made up|No punchlines, no wordplay/i,
+    )
+  })
+
+  it('keeps current health authoritative while allowing dated illness history', () => {
+    expect(SPEECH_RULES).toMatch(/what the page says it is now/i)
+    expect(SPEECH_RULES).toMatch(/dated memory or something you witnessed/i)
+    expect(SPEECH_RULES).toMatch(/recovered.*does not create symptoms today/i)
+    expect(SPEECH_RULES).not.toMatch(/well today and you were well yesterday/i)
+  })
+
+  it('keeps a claim or lie distinct from world fact', () => {
+    expect(SPEECH_RULES).toMatch(/somebody says is their claim, not a change to the world/i)
+    expect(SPEECH_RULES).toMatch(/may be mistaken.*may lie/i)
+    expect(SPEECH_RULES).toMatch(/not a world fact unless the page or your own memory/i)
+  })
+
   it('aims a line at one person, lets it end, and keeps the counting out of it', () => {
     expect(SPEECH_RULES).toMatch(/one person at a time/)
     expect(SPEECH_RULES).toMatch(/do not have to get the last word/)
@@ -404,11 +425,10 @@ describe('a mind in a talk is told so', () => {
 })
 
 describe('★ the body on the page is the only body', () => {
-  it('a mind may not invent an ailment for itself or anyone else', () => {
-    expect(SPEECH_RULES).toContain('Your body is what the page says it is, and nothing else.')
-    expect(SPEECH_RULES).toContain(
-      'another person is ill or hurt only when the page says so beside their name',
-    )
+  it('a mind treats the present page as authoritative without erasing dated evidence', () => {
+    expect(SPEECH_RULES).toContain('Your body is what the page says it is now, and nothing else.')
+    expect(SPEECH_RULES).toContain('A dated memory or something you witnessed')
+    expect(SPEECH_RULES).toContain('history does not create symptoms today')
   })
 
   // r45 invented a back and r47 a cough. The cough came from this very rule, which used to say
@@ -421,9 +441,9 @@ describe('★ the body on the page is the only body', () => {
 
   // The loophole that let it last seven days: a condition the world cannot hold can never be
   // cured, so the scenes about it never stop.
-  it('★ allows no long-carried trouble the world has no way to end', () => {
+  it('★ does not turn an old condition into a current symptom', () => {
     expect(SPEECH_RULES).not.toContain('plus whatever has always been true of you')
-    expect(SPEECH_RULES).toContain('there is no old trouble you have carried for years either')
+    expect(SPEECH_RULES).toContain('Do not invent a current ailment from an old one')
   })
 })
 

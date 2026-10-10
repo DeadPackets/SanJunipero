@@ -120,7 +120,10 @@ export function migrateAgentTables(db: Database.Database): void {
       text TEXT NOT NULL,
       tick INTEGER NOT NULL,
       settled_tick INTEGER,
-      source TEXT NOT NULL
+      source TEXT NOT NULL,
+      resolution TEXT,
+      evidence_seqs TEXT NOT NULL DEFAULT '[]',
+      remind_at_tick INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_ties_agent_person ON ties(agent_id, person_id);
 
@@ -146,4 +149,14 @@ export function migrateAgentTables(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_personality_versions_agent_day
       ON personality_versions(agent_id, day);
   `)
+  const columns = new Set(
+    (db.prepare('PRAGMA table_info(ties)').all() as { name: string }[]).map((c) => c.name),
+  )
+  for (const [name, definition] of [
+    ['resolution', 'TEXT'],
+    ['evidence_seqs', "TEXT NOT NULL DEFAULT '[]'"],
+    ['remind_at_tick', 'INTEGER'],
+  ] as const) {
+    if (!columns.has(name)) db.exec(`ALTER TABLE ties ADD COLUMN ${name} ${definition}`)
+  }
 }

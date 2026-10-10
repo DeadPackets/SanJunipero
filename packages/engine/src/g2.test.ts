@@ -215,7 +215,11 @@ describe('GATE G2: 3-day scripted world run', () => {
     // The bed law: the Builder steps through his own door and lies down inside it.
     const entered = evs.filter((e) => e.type === 'agent_entered')
     expect(entered.map((e) => (e.payload as Payload).agentId)).toContain(BUILDER)
-    const inside = entered.find((e) => (e.payload as Payload).agentId === BUILDER)!
+    const inside = entered.find(
+      (e) =>
+        (e.payload as Payload).agentId === BUILDER &&
+        (e.payload as Payload).structureId === house.id,
+    )!
     const slept = evs.find(
       (e) => e.type === 'agent_slept' && (e.payload as Payload).agentId === BUILDER,
     )

@@ -32,7 +32,11 @@ const ev = (tick: number, type: string, payload: unknown): SimEvent => ({
 
 const gathering = (day: number): SimEvent[] => {
   const at = day * MINUTES_PER_DAY + 19 * 60
-  return THREE.map((id, i) => ev(at, 'agent_moved', { id, x: 20 + i, y: 20 }))
+  return [
+    ...THREE.map((id, i) => ev(at, 'agent_moved', { id, x: 20 + i, y: 20 })),
+    ev(at + 1, 'agent_spoke', { agentId: 'ada', text: 'We meet here.', x: 20, y: 20 }),
+    ...THREE.map((id, i) => ev(at + 3, 'agent_moved', { id, x: 40 + i, y: 20 })),
+  ]
 }
 
 const naming = (day: number): SimEvent =>
@@ -135,13 +139,14 @@ describe('★ the recognizer, from a repeated gathering to the observatory', () 
   it('and the route serves it: what it is, who kept it, when it started, and the evidence', async () => {
     expect(await served()).toEqual([
       {
-        id: 'construct_21_20',
+        id: 'construct_21_20_gathering',
         type: 'festival',
         name: 'Long Table',
         members: [...THREE].sort(),
         firstDay: 0,
         gatherings: 3,
         anchor: { x: 21, y: 20 },
+        place: null,
         quote: NAMING,
         saidBy: 'bex',
       },

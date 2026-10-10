@@ -1,3 +1,4 @@
+import { artRetries } from './artRetry.js'
 import { characterKind, type AssetCodex } from '@sj/forge'
 
 // A person the town made gets the same sheet the founders have. Like `discoveryArt.ts`, this
@@ -24,6 +25,7 @@ export type CastArtWatcher = {
   onPerson(p: NewPerson): void
   /** Awaits everything in flight. Tests only — the live run never waits on art. */
   settle(): Promise<void>
+  retry(): void
 }
 
 export function watchCastArt(deps: {
@@ -33,39 +35,48 @@ export function watchCastArt(deps: {
   /** Dollars the DAY may still put into art. `<= 0` puts the person back in the queue. */
   artSpendableUsd: () => number
   onError?: (agentId: string, err: unknown) => void
-  /** A person the day's art money could not reach. The next arrival, or the next boot, tries. */
+  signal?: AbortSignal
+  /** A person whose commission is deferred until the next bounded retry. */
   onDeferred?: (agentId: string) => void
 }): CastArtWatcher {
+  const retries = artRetries(deps.signal)
   const known = new Set<string>()
-  for (const rec of deps.codex.listSince(0)) if (rec.kind !== null) known.add(rec.kind)
+  for (const rec of deps.codex.listSince(0))
+    if (rec.kind !== null && rec.status === 'ready') known.add(rec.kind)
   deps.codex.onAssetReady((rec) => {
-    if (rec.kind !== null) known.add(rec.kind)
+    if (rec.kind !== null && rec.status === 'ready') {
+      known.add(rec.kind)
+      retries.forget(rec.kind)
+    }
   })
 
   const inFlight = new Set<Promise<unknown>>()
-  // One at a time: side by side two commissions would each read the same balance and each spend
-  // it. Art is fire-and-forget, so the queue costs nothing anyone waits on.
+  // One commission at a time bounds image processing memory.
   let queue: Promise<unknown> = Promise.resolve()
-  const deferred = new Map<string, NewPerson>()
 
   const claim = (p: NewPerson): void => {
+    if (deps.signal?.aborted) return
     const kind = characterKind(p.id)
     if (known.has(kind)) return
     // Claimed BEFORE the await, so two arrivals in one breath do not pay for one face twice.
     known.add(kind)
     const give = (): void => {
       known.delete(kind)
-      deferred.set(p.id, p)
+      retries.defer(kind, () => {
+        claim(p)
+      })
       deps.onDeferred?.(p.id)
     }
     const mine: Promise<unknown> = queue
       .then(async () => {
+        if (deps.signal?.aborted) return
         // Read inside the queue, not when the person walked in: the person ahead has spent by now.
         if (deps.artSpendableUsd() <= 0) {
           give()
           return
         }
         await deps.draw(p)
+        retries.forget(kind)
       })
       .catch((err: unknown) => {
         // A gate that refuses the sheet does not throw — it just draws nothing. A throw is the
@@ -82,12 +93,9 @@ export function watchCastArt(deps: {
   }
 
   return {
+    retry: retries.retry,
     onPerson(p) {
-      // Whoever the money could not reach goes back in the queue ahead of the newcomer, so a
-      // deferred face is drawn the moment the window rolls rather than waiting for a restart.
-      const waiting = [...deferred.values()]
-      deferred.clear()
-      for (const q of waiting) claim(q)
+      if (deps.signal?.aborted || retries.has(characterKind(p.id))) return
       claim(p)
     },
     async settle() {
@@ -99,6 +107,9 @@ export function watchCastArt(deps: {
 /** A watcher that draws nothing: a run with no image budget must still let people arrive. */
 export function noCastArt(): CastArtWatcher {
   return {
+    retry() {
+      /* no deferred faces */
+    },
     onPerson() {
       /* the placeholder the gateway serves for any known agent is the face */
     },

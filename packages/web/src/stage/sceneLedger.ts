@@ -16,13 +16,16 @@ export const NO_BOOK: SceneBook = {}
 /** Two rooms run at once and a card reads one of them, so a handful covers every cut. */
 const LEDGER_SCENES = 8
 
-type Delta = { kind: string; text: string; settled?: true }
+type Delta = { kind: string; text: string; resolution?: string }
 
 /** Cost, gain or neither, off the town's own table of what a tie between two people is worth. */
 function chipOf(delta: Delta): SceneChip {
-  const act = tieActOf(delta.kind, delta.settled === true)
+  const act = tieActOf(delta.kind, delta.resolution)
   const worth = act === null ? 0 : TIE_VALENCE[act]
-  return { tone: worth < 0 ? 'cost' : worth > 0 ? 'gain' : 'plain', text: delta.text }
+  return {
+    tone: worth < 0 ? 'cost' : worth > 0 ? 'gain' : 'plain',
+    text: delta.resolution ? `They consider this ${delta.resolution}: ${delta.text}` : delta.text,
+  }
 }
 
 export function createSceneLedger(store: Pick<WorldStore, 'getState' | 'onEvents' | 'tension'>): {

@@ -1,7 +1,7 @@
 import { CLOSE_BAD_HELLO, PROTOCOL_VERSION, ServerMsg } from '@sj/shared'
 import type { WorldStore } from '../state/worldStore.js'
+import { readVisitCursor, rememberVisit } from '../ui/storage.js'
 
-const LAST_SEEN_KEY = 'sj:lastSeenTick'
 const STALE_BUNDLE_KEY = 'sj:reloadedForStale'
 const GAP_TICKS = 1440 // more than a missed day → offer the digest
 const BACKOFF_MIN_MS = 1_000
@@ -40,23 +40,8 @@ export function connectObservatory(opts: {
     opts.onStatus?.(next)
   }
 
-  const readLastSeen = (): number | null => {
-    try {
-      const v = localStorage.getItem(LAST_SEEN_KEY)
-      if (v === null) return null
-      const n = Math.floor(Number(v))
-      // a corrupt stored value must never brick the hello (schema wants a nonnegative int)
-      return Number.isFinite(n) && n >= 0 ? n : null
-    } catch {
-      return null
-    }
-  }
   const writeLastSeen = (tick: number): void => {
-    try {
-      localStorage.setItem(LAST_SEEN_KEY, String(tick))
-    } catch {
-      /* private mode */
-    }
+    rememberVisit({ runId: opts.store.runId(), seq: opts.store.logSeq(), tick })
   }
 
   /** One reload per page load. A bundle a cache still serves is refused again after the reload,
@@ -85,7 +70,9 @@ export function connectObservatory(opts: {
     sock.onopen = () => {
       backoffMs = BACKOFF_MIN_MS
       setStatus('online')
-      sock?.send(JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: readLastSeen() }))
+      sock?.send(
+        JSON.stringify({ t: 'hello', v: PROTOCOL_VERSION, lastSeenTick: readVisitCursor().tick }),
+      )
     }
     sock.onmessage = (e: MessageEvent) => {
       let msg
@@ -103,8 +90,14 @@ export function connectObservatory(opts: {
       // viewer asked for next — and would put the view back on a minute they have left.
       if ((msg.t === 'scrubbed' || msg.t === 'replaying') && msg.reqId !== reqId) return
       if (msg.t === 'snapshot') {
-        const last = readLastSeen()
-        if (last !== null && msg.tick - last > GAP_TICKS) opts.onGap?.(msg.tick - last)
+        const last = readVisitCursor()
+        if (
+          msg.runId &&
+          msg.runId === last.runId &&
+          last.tick !== null &&
+          msg.tick - last.tick > GAP_TICKS
+        )
+          opts.onGap?.(msg.tick - last.tick)
       }
       const trouble = opts.store.applyServer(msg)
       if (trouble === 'reload') {

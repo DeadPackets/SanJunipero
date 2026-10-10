@@ -58,7 +58,20 @@ describe('renderChapter', () => {
   it('strips dangling citations, alerts once, persists the resolved set', async () => {
     const store = memStore()
     const alert = vi.fn()
-    const chapter = await renderChapter({ store, llm: llmWith([1, 3, 99]), day: 1, scenes, alert })
+    const chapter = await renderChapter({
+      store,
+      llm: llmWith([1, 3, 99]),
+      day: 1,
+      scenes,
+      moments: [
+        [
+          { n: 1, text: 'Blows.' },
+          { n: 3, text: 'The quarrel.' },
+        ],
+        [{ n: 4, text: 'Work.' }],
+      ],
+      alert,
+    })
     expect(chapter.citations).toEqual([1, 3])
     expect(chapter.sceneIds).toEqual([1, 2])
     expect(chapter.day).toBe(1)
@@ -70,13 +83,26 @@ describe('renderChapter', () => {
     expect(persisted[0]!.sceneIds).toEqual([1, 2])
   })
 
-  it('falls back to citing the first event of each scene on zero citations, no alert', async () => {
+  it('does not attach unrelated event citations when the model cites nothing', async () => {
     const store = memStore()
     const alert = vi.fn()
-    const chapter = await renderChapter({ store, llm: llmWith([]), day: 1, scenes, alert })
-    expect(chapter.citations).toEqual([1, 4])
+    const chapter = await renderChapter({
+      store,
+      llm: llmWith([]),
+      day: 1,
+      scenes,
+      moments: [
+        [
+          { n: 1, text: 'Blows.' },
+          { n: 3, text: 'The quarrel.' },
+        ],
+        [{ n: 4, text: 'Work.' }],
+      ],
+      alert,
+    })
+    expect(chapter.citations).toEqual([])
     expect(alert).not.toHaveBeenCalled()
-    expect(store.chaptersForDay(1)[0]!.citations).toEqual([1, 4])
+    expect(store.chaptersForDay(1)[0]!.citations).toEqual([])
   })
 })
 
@@ -201,6 +227,7 @@ describe('the prose-id guard at publish time', () => {
       llm: leaking('The mill turned. They met at the well (3, 4).\nSeen: 1'),
       day: 1,
       scenes,
+      moments: [[{ n: 1, text: 'The mill turned.' }], []],
       alert,
     })
     expect(chapter.text).toBe('The mill turned.\nSeen: 1')
@@ -222,5 +249,28 @@ describe('the prose-id guard at publish time', () => {
       scenes,
     })
     expect(alerts()).toEqual([])
+  })
+})
+
+describe('provided source evidence', () => {
+  it('rejects an existing event omitted from the actual source packet', async () => {
+    const chapter = await renderChapter({
+      store: memStore(),
+      llm: llmWith([1, 3]),
+      day: 1,
+      scenes,
+      moments: [[{ n: 3, text: 'A blow was witnessed.' }], []],
+    })
+    expect(chapter.citations).toEqual([3])
+  })
+  it('does not invent evidence when a source packet has no moments', async () => {
+    const chapter = await renderChapter({
+      store: memStore(),
+      llm: llmWith([]),
+      day: 1,
+      scenes,
+      moments: [[], []],
+    })
+    expect(chapter.citations).toEqual([])
   })
 })

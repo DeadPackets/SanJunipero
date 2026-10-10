@@ -1,3 +1,4 @@
+import { mountPublicUsage, type UsageSource } from './publicUsage.js'
 import { createServer } from 'node:http'
 import Database from 'better-sqlite3'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -23,6 +24,7 @@ import { WorldMirror } from './worldMirror.js'
 import { MAX_BUFFERED, OPEN, SocketHub } from './hub.js'
 import {
   latestMoods,
+  observerRunId,
   maxMindId,
   type MindRow,
   mindsSince,
@@ -30,7 +32,8 @@ import {
   moodsSince,
   thoughtsSince,
 } from './observer.js'
-import { makeSceneRelay } from './scenes.js'
+import { makeSceneRelay, scenesAt } from './scenes.js'
+import { transcriptAt } from './sceneTranscript.js'
 import { makeDirector, PRIMED_TYPES } from './stakes.js'
 import { makeThreads } from './threads.js'
 import { mountAssetRoutes } from './assetsHttp.js'
@@ -64,6 +67,7 @@ export type GatewayOpts = {
    *  absent, `SJ_ADMIN_TOKEN`/`SJ_ADMIN_PORT` decide. */
   adminPort?: number | null
   paused?: () => boolean // the world clock's own state; absent → the town is always running
+  usageSource?: UsageSource
   onViewers?: (count: number) => void // live viewer count, as one greets and as one leaves
   scrubBudgetMsPerS?: number // default SCRUB_BUDGET_MS_PER_S
   replayMsPerTick?: number // default TICK_REAL_MS — the cadence a replay plays the past back at
@@ -102,6 +106,7 @@ const MEMORY_TYPES: readonly string[] = [
   'scene_opened',
   'scene_turned',
   'scene_line',
+  'scene_ended',
   'scene_closed',
   ...PRIMED_TYPES,
 ]
@@ -115,6 +120,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const ownsDb = opts.db === undefined
   // Read-only law: without an in-process handle the world DB is opened readonly — no write path exists.
   const db = opts.db ?? new Database(opts.dbPath, { readonly: true, fileMustExist: true })
+  const runId = observerRunId(db)
   const mirror = new WorldMirror({ db, config, terrain: opts.terrain })
   const hub = new SocketHub()
   const hasTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
@@ -152,6 +158,16 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     knowsAgent: (id) => personAt(mirror.state().agents, id) !== undefined,
     kinOf: (id) => forebears(mirror.state().agents, id),
   })
+  router.route('GET', '/api/scenes/:id/transcript', (req, res, params) => {
+    const raw = parseTarget(req.url)?.searchParams.get('atTick')
+    const requested = raw === null || raw === undefined ? mirror.state().tick : Number(raw)
+    if (!Number.isSafeInteger(requested) || requested < 0) {
+      sendJson(res, { error: 'invalid tick' }, 400)
+      return
+    }
+    sendJson(res, transcriptAt(db, params.id!, Math.min(requested, mirror.state().tick)))
+  })
+  mountPublicUsage(router, opts.usageSource ?? (() => null))
   const closeDataApi = mountDataApi(router, { db, mirror, config, agentDbDir: opts.agentDbDir })
   mountNarratorApi(router, { db, mirror, narratorDb, agentDbDir: opts.agentDbDir })
   const moments = makeMomentsReader({ db, mirror, narratorDb })
@@ -241,6 +257,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   const snapshotJson = (): string => {
     snapJson ??= JSON.stringify({
       t: 'snapshot',
+      runId,
       tick: mirror.state().tick,
       seq: mirror.seq(),
       state: mirror.state(),
@@ -324,6 +341,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     let replayAt = 0 // last opened replay: the same floor, because it pays the same fold
     let pendingScrub: { tick: number; reqId: number } | null = null
     let scrubTimer: ReturnType<typeof setTimeout> | null = null
+    const cancelScrub = (): void => {
+      pendingScrub = null
+      if (scrubTimer !== null) clearTimeout(scrubTimer)
+      scrubTimer = null
+    }
 
     const answerScrub = (req: { tick: number; reqId: number }): void => {
       scrubAt = Date.now()
@@ -342,17 +364,21 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         tick = mirror.state().tick // clamp, never error the socket
         state = mirror.state()
       }
+      endReplay(sock)
+      hub.setMuted(sock, true)
       sock.send(JSON.stringify({ t: 'scrubbed', reqId: req.reqId, tick, state }))
+      const historical = scenesAt(db, tick)
+      for (const frame of [...historical.snapshot(), ...historical.transcripts(tick)])
+        sock.send(JSON.stringify(frame))
       scrubTokens -= performance.now() - startedAt
     }
 
     const answerReplay = (req: { from: number; reqId: number }): void => {
-      // First, whatever this socket was already playing: every path below leaves it somewhere
-      // else, and a cursor left running would send minutes into a view that has moved on.
-      endReplay(sock)
       // Nothing recorded to play: the town has not lived that minute yet, so it hands back now.
       if (req.from >= mirror.state().tick) {
-        sock.send(snapshotJson())
+        endReplay(sock)
+        hub.setMuted(sock, false)
+        sendCurrent(sock)
         return
       }
       if (!takeScrubBudget()) {
@@ -360,6 +386,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         return
       }
       const startedAt = performance.now()
+      endReplay(sock)
       const at = mirror.snapshotAt(req.from)
       sock.send(
         JSON.stringify({
@@ -371,11 +398,14 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         }),
       )
       scrubTokens -= performance.now() - startedAt
+      const replayScenes = scenesAt(db, req.from)
+      for (const frame of [...replayScenes.snapshot(), ...replayScenes.transcripts(req.from)])
+        sock.send(JSON.stringify(frame))
       hub.setMuted(sock, true)
       replays.set(sock, {
         tick: req.from,
         nextAtMs: Date.now() + replayMsPerTick,
-        scenes: makeSceneRelay(),
+        scenes: replayScenes,
       })
     }
 
@@ -393,11 +423,11 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           return
         }
         greeted = true
-        removers.set(sock, hub.add(sock, snapshotJson))
+        removers.set(sock, hub.add(sock, currentFrames))
         // Ahead of the first frame, so a waking town is already at full speed inside it. Counted
         // at the hello, so the number means watchers, not sockets.
         opts.onViewers?.(hub.size())
-        sock.send(snapshotJson())
+        sendCurrent(sock)
         // asset catch-up: late joiners must not render placeholders the codex already replaced
         const cdx = getCodex()
         if (cdx) {
@@ -406,11 +436,9 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
             catchUp.push(record)
             catchUpJson = null
           }
-          if (catchUp.length > 0) {
-            catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
-            sock.send(catchUpJson)
-          }
         }
+        catchUpJson ??= JSON.stringify({ t: 'assets', records: catchUp })
+        sock.send(catchUpJson)
         // The word each mind holds about itself, so a late roster does not guess from the body.
         if (observerSeen) for (const m of latestMoods(db)) sock.send(moodJson(m))
         // Whoever is mid-turn right now. A turn runs ten to ninety seconds, so a viewer that
@@ -420,9 +448,6 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
         }
         // The shot the town is already on. A replaying socket never gets one: a moment's own
         // cast owns that camera.
-        if (directorJson !== null) sock.send(directorJson)
-        if (boardJson !== null) sock.send(boardJson)
-        if (threadsJson !== null) sock.send(threadsJson)
         return
       }
       if (msg.t === 'scrub') {
@@ -440,20 +465,23 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
           if (next !== null && sock.readyState === OPEN) answerScrub(next)
         }, SCRUB_MIN_MS - since)
       } else if (msg.t === 'replay') {
+        cancelScrub()
         const now = Date.now()
         if (now - replayAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED) return
         replayAt = now
         answerReplay(msg)
       } else if (msg.t === 'live') {
+        cancelScrub()
         // A full snapshot per 40-byte frame, otherwise: the same floor a scrub gets, on its own
         // clock so ending a drag is never the ask that gets dropped.
         const now = Date.now()
         // A replay ends on this frame and nothing follows it — the floor may drop a spare `live`,
         // never the one that hands a viewer back the live town.
-        const ending = endReplay(sock)
+        const ending = endReplay(sock) || hub.isMuted(sock)
         if (!ending && (now - liveAt < SCRUB_MIN_MS || sock.bufferedAmount > MAX_BUFFERED)) return
         liveAt = now
-        sock.send(snapshotJson())
+        hub.setMuted(sock, false)
+        sendCurrent(sock)
       }
     })
     sock.on('close', () => {
@@ -467,7 +495,16 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
   })
 
   // ── poll pump ──
-  const sceneFrames = makeSceneRelay()
+  const sceneFrames = scenesAt(db, mirror.state().tick)
+  const currentFrames = (): string[] => [
+    snapshotJson(),
+    ...sceneFrames.snapshot().map((frame) => JSON.stringify(frame)),
+    ...sceneFrames.transcripts(mirror.state().tick).map((frame) => JSON.stringify(frame)),
+    ...[directorJson, boardJson, threadsJson].filter((frame): frame is string => frame !== null),
+  ]
+  const sendCurrent = (sock: WebSocket): void => {
+    for (const frame of currentFrames()) sock.send(frame)
+  }
   // What the camera is on, folded off the same groups the deltas ride. Read-only on the world:
   // the names and the partnerships come out of the mirror's own state.
   const threads = makeThreads()
@@ -567,7 +604,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       if (now < cur.nextAtMs || sock.bufferedAmount > MAX_BUFFERED) continue
       if (cur.tick >= mirror.state().tick) {
         endReplay(sock)
-        sock.send(snapshotJson())
+        sendCurrent(sock)
         continue
       }
       // The bucket a scrub drains, and it is the whole town's: with it empty every replay holds
@@ -578,7 +615,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
       for (const g of mirror.eventsBetween(cur.tick, next)) {
         const seq = g.events[g.events.length - 1]!.seq
         sock.send(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
-        for (const frame of cur.scenes(g.events)) sock.send(JSON.stringify(frame))
+        for (const frame of cur.scenes.fold(g.events)) sock.send(JSON.stringify(frame))
       }
       cur.tick = next
       cur.nextAtMs = Math.max(now, cur.nextAtMs + replayMsPerTick)
@@ -603,7 +640,7 @@ export async function createGateway(opts: GatewayOpts): Promise<Gateway> {
     for (const g of groups) {
       const seq = g.events[g.events.length - 1]?.seq ?? mirror.seq()
       hub.broadcast(JSON.stringify({ t: 'tick', tick: g.tick, seq, events: g.events }))
-      for (const frame of sceneFrames(g.events)) hub.broadcast(JSON.stringify(frame))
+      for (const frame of sceneFrames.fold(g.events)) hub.broadcast(JSON.stringify(frame))
       // The ribbon is stepped tick by tick through the poll, before and after each tick's own
       // payments. A gateway that fell behind then hands the ribbon over where a replay does.
       threads.frame(g.tick - 1)

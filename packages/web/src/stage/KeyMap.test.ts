@@ -63,7 +63,7 @@ describe('the key map — heuristic 10 used to score zero', () => {
 
   it('★ every key it claims is a key something actually binds', () => {
     const stage = KEY_MAP.filter((r) => r.keys.length === 1 && /^[A-Z]$/.test(r.keys[0] ?? ''))
-    expect(stage.map((r) => r.keys[0])).toEqual(['S', 'F', 'D', 'T', 'A'])
+    expect(stage.map((r) => r.keys[0])).toEqual(['S', 'F', 'D', 'T'])
     for (const r of stage) expect(stageKeyFor(r.keys[0]!), r.keys[0]).not.toBeNull()
     for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '-', 'Home'])
       expect(cameraActionFor(key), key).not.toBeNull()
@@ -94,7 +94,38 @@ describe('the key map — heuristic 10 used to score zero', () => {
 
   it('is a dialog with a name, and takes focus when it comes up', () => {
     expect(open).toContain('role="dialog"')
-    expect(open).toContain('aria-label="What the town answers to"')
+    expect(open).toContain('aria-label="Controls"')
     expect(open).toContain('tabindex="-1"')
+  })
+
+  it.each([
+    '<dialog open></dialog>',
+    '<section class="paper" data-open="yes" aria-modal="true"></section>',
+    '<div id="first-frame"></div>',
+  ])('does not open through an input-blocking surface: %s', async (markup) => {
+    const { asked } = await stage()
+    document.body.insertAdjacentHTML('beforeend', markup)
+    await press(KEY_MAP_KEY)
+    expect(asked).toEqual([])
+  })
+
+  it('closes existing Controls when the mobile journal takes input', async () => {
+    const onOpenChange = vi.fn()
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(KeyMap, { open: true, onOpenChange }))
+    })
+    expect(onOpenChange).not.toHaveBeenCalled()
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<section class="paper" data-open="yes" aria-modal="true"></section>',
+    )
+    await act(async () => {
+      root.render(createElement(KeyMap, { open: true, onOpenChange }))
+    })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 })

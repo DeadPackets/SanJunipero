@@ -70,9 +70,9 @@ export type Scene = {
   /** How much larger than the reader's size a world caption is drawn — 1 for a person at a
    *  desk, `BROADCAST_TEXT_SCALE` for the frame a stream viewer sees at a quarter scale. */
   textScale: number
-  /** The chrome's bands over the top and bottom of the canvas, in screen px: the sky bar and
-   *  the stamp above, the cue and the lower third below. No label is placed under them. */
-  safeInsets?: { top: number; bottom: number }
+  /** Chrome over the canvas, in screen px: top and bottom bands, plus the desktop Journal
+   *  dock on the right. */
+  safeInsets?: { top: number; bottom: number; right?: number }
   /** What the viewer has picked, so a label layer can stand down for the one thing that already
    *  wears a nameplate. Written onto the handle rather than passed as a prop, the way
    *  `textScale` is: the layers live in a Pixi closure React never re-renders. */
@@ -200,7 +200,7 @@ export async function createScene(
   const world = new Container()
   // One table decides what is over what (layers.ts). Every layer but `entities` is event-inert,
   // so a label can never steal a click from the building it names.
-  const { layers, graded, attention } = createLayers(world)
+  const { layers, graded, attention, reading } = createLayers(world)
 
   // The ground is a grid of chunk sprites now, not one sprite the size of the map. `layers.ground`
   // is their only parent, so nothing else in the scene had to learn that the bake was cut up.
@@ -208,6 +208,7 @@ export async function createScene(
   layers.ground.addChild(groundChunkRoot)
   app.stage.addChild(world)
   const screen = createScreenLayers(app.stage)
+  app.stage.addChild(reading)
 
   const viewRect = (): { x: number; y: number; w: number; h: number } => {
     const k = world.scale.x || 1
@@ -258,12 +259,14 @@ export async function createScene(
     reachable: () => bounds,
     town: () => townBounds,
   })
-  // After the rig's own ticks, before the render: the lights land on the frame's camera.
-  const mirrorLights = (): void => {
+  // Reading stays above screen effects while following the picture's camera.
+  const mirrorWorld = (): void => {
     screen.lights.position.copyFrom(world.position)
     screen.lights.scale.copyFrom(world.scale)
+    reading.position.copyFrom(world.position)
+    reading.scale.copyFrom(world.scale)
   }
-  app.ticker.add(mirrorLights)
+  app.ticker.add(mirrorWorld)
 
   // bake on first snapshot and whenever the terrain array identity changes
   let bakedTerrain: TileId[][] | null = null
@@ -390,7 +393,7 @@ export async function createScene(
       ro.disconnect()
       rig.destroy()
       app.ticker.remove(bakeTick)
-      app.ticker.remove(mirrorLights)
+      app.ticker.remove(mirrorWorld)
       app.ticker.remove(ringTick)
       app.ticker.remove(postTick)
       attend.destroy()

@@ -103,6 +103,7 @@ beforeAll(async () => {
   pending = [{ id: 1, ruleId: 7, recipeId: 'weave', tick: 40 }]
   ops = {
     opsDb: ledger,
+    mindStatus: () => 'active',
     caps: { dailyUsd: 3, lifetimeUsd: 50 },
     alert: () => {},
     rulings: {

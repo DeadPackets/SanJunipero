@@ -1,9 +1,13 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { MINUTES_PER_DAY } from '@sj/shared'
 import {
   UNWEIGHED_IMPORTANCE,
   ensureObserverTables,
+  observerRunId,
   latestMoods,
   maxMindId,
   mindsSince,
@@ -148,4 +152,28 @@ describe('observer mind feed', () => {
     expect(count()).toBe(1)
     db.close()
   })
+})
+
+it('keeps run identity across database reopen and gives a new world a different identity', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sj-run-id-'))
+  const path = join(dir, 'world.db')
+  try {
+    const first = new Database(path)
+    expect(observerRunId(first)).toBeUndefined()
+    ensureObserverTables(first)
+    const id = observerRunId(first)
+    expect(id).toMatch(/^[0-9a-f-]{36}$/)
+    ensureObserverTables(first)
+    expect(observerRunId(first)).toBe(id)
+    first.close()
+    const reopened = new Database(path, { readonly: true })
+    expect(observerRunId(reopened)).toBe(id)
+    reopened.close()
+    const fresh = new Database(':memory:')
+    ensureObserverTables(fresh)
+    expect(observerRunId(fresh)).not.toBe(id)
+    fresh.close()
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

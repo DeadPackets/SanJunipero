@@ -352,9 +352,7 @@ export async function startDevWorld(
     // ★ A live cast keeps the town on tick 1 and the world systems; the patrols and top-ups go.
     minds: opts.cast !== undefined,
   })
-  const cast = opts.cast === undefined ? null : await opts.cast()
-  handler =
-    cast === null ? scriptedOnTick : cast.attach({ loop, store, config, db, world: scriptedOnTick })
+  let cast: LiveCast | null = null
 
   // The same dial POST /admin/speed turns, so an idle town and an operator never fight over
   // two clocks. The beat below re-reads `loop.speed` each arm, so nothing else need know.
@@ -362,6 +360,11 @@ export async function startDevWorld(
 
   let gateway: Gateway
   try {
+    cast = opts.cast === undefined ? null : await opts.cast()
+    handler =
+      cast === null
+        ? scriptedOnTick
+        : cast.attach({ loop, store, config, db, world: scriptedOnTick })
     gateway = await createGateway({
       dbPath,
       port: opts.port ?? DEV_PORT,
@@ -369,6 +372,11 @@ export async function startDevWorld(
       config,
       db,
       paused: () => loop.paused,
+      usageSource: () => ({
+        live: opts.cast !== undefined,
+        db: cast?.ops?.opsDb ?? null,
+        mindStatus: cast?.ops?.mindStatus() ?? (opts.cast === undefined ? 'disabled' : 'delayed'),
+      }),
       onViewers: (n) => {
         pacing.viewers(n)
       },
@@ -378,6 +386,7 @@ export async function startDevWorld(
     })
   } catch (e) {
     // Nothing outside this function has a handle to stop the cast or close the db it opened.
+    pacing.stop()
     await cast?.stop()
     store.close()
     db.close()

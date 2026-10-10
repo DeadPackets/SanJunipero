@@ -418,7 +418,7 @@ export function Standing({ store, onSubject }: PageProps) {
         threads,
         entries: record.data,
         chapter,
-        lastVisit: lastVisitTick(),
+        lastVisit: lastVisitTick(store.runId()),
         firsts: firsts.data,
         laws: laws.data,
         bonds: bonds.data?.bonds ?? NO_BONDS,

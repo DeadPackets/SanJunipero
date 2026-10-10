@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import type { SimConfig } from '@sj/shared'
+import type { SimConfig, MindStatus } from '@sj/shared'
 import type { EventStore, openDb } from '@sj/engine/store'
 import type { TickHandler, TickLoop } from '@sj/engine'
 
@@ -21,6 +21,7 @@ type RulingsAdmin = {
 export type LiveOps = {
   /** `_ops.db` — `llm_calls` and `alerts`, open for as long as the cast is. */
   opsDb: Database.Database
+  mindStatus(): MindStatus
   caps: { dailyUsd: number; lifetimeUsd: number }
   rulings: RulingsAdmin | null
   /** One row on the ops surface, for a host that must not import the ledger's own package. */

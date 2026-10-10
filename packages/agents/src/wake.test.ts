@@ -233,8 +233,8 @@ describe('decideWake — priority and floor', () => {
     ).toBe('plan_blocked')
   })
 
-  it('idle floor blocks plan_done and reconsider until idleGapTicks elapse', () => {
-    expect(decideWake(cfg, pkt(), clk(), 5, pln({ lastResult: 'done' }))).toBe(null)
+  it('completed plans reconsider promptly while time-only reminders respect the idle floor', () => {
+    expect(decideWake(cfg, pkt(), clk(), 5, pln({ lastResult: 'done' }))).toBe('plan_done')
     expect(decideWake(cfg, pkt(), clk({ reconsiderAtTick: 3 }), 5, pln())).toBe(null)
   })
 

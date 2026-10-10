@@ -75,6 +75,7 @@ export function makeNarratorLlm(
       scenes: SceneDigest[],
       cast: readonly CastMember[] = [],
       priorTitles: readonly string[] = [],
+      priorEvents: readonly PublicRecord[] = [],
     ): Promise<ChapterSummary> {
       const { value } = await client.object({
         system: NARRATOR_CANON,
@@ -91,6 +92,9 @@ export function makeNarratorLlm(
             `${CHAPTER_MOMENTS}\n` +
             'Cite only ledger numbers listed; each citation is the number of an event you summarize.\n' +
             `${FOOTNOTE_RULE}\n` +
+            'A spoken intention or claimed resolution is not proof of completion. Shared cast does not prove that two promises concern the same thing. ' +
+            "Use prior events only as dated context for today, never as something that happened today. A callback must cite both the relevant prior event and today's evidence. " +
+            `Earlier public events: ${JSON.stringify(priorEvents)}\n` +
             JSON.stringify(scenes),
         ),
         schema: ChapterSummarySchema,

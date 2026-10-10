@@ -7,6 +7,7 @@ import {
   type ServerMsg,
   type ServerScene,
   type ServerThreads,
+  type ServerTranscript,
   type SimConfig,
   type SimEvent,
 } from '@sj/shared'
@@ -49,6 +50,7 @@ export type WorldStore = {
   /** The operator has stopped the world clock. The town is still served; it is not moving. */
   getPaused: () => boolean
   getTick: () => number
+  viewSeq: () => number
   /** the furthest tick the LIVE town has reached — scrubbing back must not walk it in */
   liveEdge: () => number
   latestThought: (agentId: string) => { tick: number; text: string } | null
@@ -61,6 +63,7 @@ export type WorldStore = {
   recentEvents: () => SimEvent[]
   /** The scene the town holds under this id, open or standing on the summary its closing frame
    *  carried. The town runs many at once, so nobody may ask it for "the scene". */
+  transcript: (id: string) => ServerTranscript | null
   sceneById: (id: string) => TownScene | null
   /** Every scene open right now, in the order the town opened them. */
   openScenes: () => readonly TownScene[]
@@ -82,6 +85,7 @@ export type WorldStore = {
   /** Who is thinking right now, and as of when. Dropped on a scrub and a replay with the
    *  director and the board, for the same reason: it is about the live minute. */
   minds: () => ReadonlyMap<string, { state: MindState; tick: number }>
+  assetsReady: () => boolean
   assetsSeq: () => number
   assetRecords: () => AssetRecord[]
   /** Has the reveal happened? A bust is a whole 400 KB character sheet on the wire, so none may
@@ -90,6 +94,7 @@ export type WorldStore = {
   setDressed: () => void
   /** The world log's head as the server last reported it — the signal a read model refetches on,
    *  instead of on a wall-clock timer. */
+  runId: () => string | null
   logSeq: () => number
   getConfig: () => SimConfig | null
   getLaws: () => Record<string, unknown>
@@ -106,8 +111,10 @@ export function createWorldStore(): WorldStore {
   let paused = false
   let liveEdge = 0
   let assetsSeq = 0
+  let assetsReady = false
   let dressed = false
   let thoughtsSeq = 0
+  let runId: string | null = null
   let logSeq = 0
   const records: AssetRecord[] = []
   const thoughts: Thought[] = []
@@ -115,6 +122,21 @@ export function createWorldStore(): WorldStore {
   const moods = new Map<string, string>()
   const events: SimEvent[] = []
   const scenes = new Map<string, TownScene>()
+  const transcripts = new Map<string, ServerTranscript>()
+  const holdTranscript = (next: ServerTranscript): void => {
+    const previous = transcripts.get(next.sceneId)
+    const merged = new Map((previous?.lines ?? []).map((line) => [line.seq, line]))
+    for (const line of next.lines) merged.set(line.seq, line)
+    const lines = [...merged.values()].sort((a, b) => a.seq - b.seq)
+    transcripts.delete(next.sceneId)
+    transcripts.set(next.sceneId, {
+      ...next,
+      atTick: Math.max(previous?.atTick ?? 0, next.atTick),
+      lines: lines.slice(-100),
+      truncated: next.truncated || previous?.truncated === true || lines.length > 100,
+    })
+    if (transcripts.size > 8) transcripts.delete(transcripts.keys().next().value!)
+  }
   let openList: readonly TownScene[] = NO_SCENES
   let director: ServerDirector | null = null
   let threads: ServerThreads | null = null
@@ -136,9 +158,12 @@ export function createWorldStore(): WorldStore {
     return () => eventSubs.delete(fn)
   }
   const tension = createTension({ onEvents })
+  let viewSeq = 0
   let shotSceneId: string | null = null
   const forgetScenes = (): void => {
+    viewSeq++
     scenes.clear()
+    transcripts.clear()
     openList = NO_SCENES
     shotSceneId = null
     tension.forget()
@@ -173,6 +198,7 @@ export function createWorldStore(): WorldStore {
     thoughtsLog: () => thoughts,
     thoughtsSeq: () => thoughtsSeq,
     recentEvents: () => events,
+    transcript: (id) => transcripts.get(id) ?? null,
     sceneById: (id) => scenes.get(id) ?? null,
     openScenes: () => openList,
     // The director owns this, because a viewer's own pin is client state the wire never carries.
@@ -183,13 +209,16 @@ export function createWorldStore(): WorldStore {
       shotSceneId = id
       for (const fn of subs) fn()
     },
+    viewSeq: () => viewSeq,
     shotScene: () => (shotSceneId === null ? null : (scenes.get(shotSceneId) ?? null)),
     tension,
     getDirector: () => director,
     threads: () => threads,
     board: () => board,
     minds: () => minds,
+    assetsReady: () => assetsReady,
     assetsSeq: () => assetsSeq,
+    runId: () => runId,
     logSeq: () => logSeq,
     assetRecords: () => records,
     dressed: () => dressed,
@@ -209,12 +238,17 @@ export function createWorldStore(): WorldStore {
           // across a config change cannot — only a reload fetches a bundle that can.
           const carried = SimConfigSchema.safeParse(msg.config)
           if (!carried.success) return 'reload'
+          runId = msg.runId ?? null
           logSeq = msg.seq
           config = carried.data
           state = msg.state as WorldState
           laws = msg.laws
           paused = msg.paused ?? false
           mode = { live: true }
+          forgetScenes()
+          director = null
+          board = null
+          threads = null
           break
         }
         case 'paused':
@@ -249,6 +283,18 @@ export function createWorldStore(): WorldStore {
             for (const ev of msg.events) if (isNarratable(ev)) events.push(ev)
             if (events.length > RECENT_EVENTS_CAP)
               events.splice(0, events.length - RECENT_EVENTS_CAP)
+            for (const ev of msg.events) {
+              if (ev.type !== 'scene_line') continue
+              const p = ev.payload as { id: string; agentId: string; text: string }
+              holdTranscript({
+                t: 'transcript',
+                sceneId: p.id,
+                atTick: ev.tick,
+                catchup: true,
+                truncated: false,
+                lines: [{ seq: ev.seq, tick: ev.tick, agentId: p.agentId, text: p.text }],
+              })
+            }
             for (const fn of eventSubs) fn(msg.events)
           }
           break
@@ -293,8 +339,12 @@ export function createWorldStore(): WorldStore {
           setMind(msg.agentId, 'idle', msg.tick)
           break
         case 'assets':
+          assetsReady = true
           records.push(...msg.records)
           assetsSeq += msg.records.length
+          break
+        case 'transcript':
+          if (msg.atTick <= (mode.live ? (state?.tick ?? 0) : mode.tick)) holdTranscript(msg)
           break
         case 'scene':
           // Only the newest close is ever on screen, so an older one goes rather than sit here

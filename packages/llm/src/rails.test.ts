@@ -1,10 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from 'better-sqlite3'
 import { mockModel } from './testutil/mockModel.js'
-import { insertLlmCall, migrateLlmTables, makeBudgetGuard } from './callLog.js'
+import {
+  configureSpendLimits,
+  insertLlmCall,
+  migrateLlmTables,
+  makeBudgetGuard,
+} from './callLog.js'
 import { BudgetExceededError, CallerRailError, LlmClient } from './client.js'
 import { callSettingsFor, PINNED_CALLERS, RAIL_FLOOR_USD } from './pins.js'
-import { clearRails, RAIL_WINDOW_MS } from './rails.js'
+import { clearRails, heldCallers, RAIL_WINDOW_MS } from './rails.js'
 
 function openDb(): Database.Database {
   const db = new Database(':memory:')
@@ -69,6 +74,36 @@ describe('★ a caller cannot spend the whole town’s day', () => {
     await expect(ask(paper)).resolves.toBeDefined()
   })
 
+  it('keeps caller rails inside the shared town day', () => {
+    const db = openDb()
+    configureSpendLimits(db, { lifetimeUsd: 10, rollingDayUsd: 1 })
+    spend(db, 'turn', 0.7)
+    const guard = makeBudgetGuard(db, 'narrator')
+    expect(guard.reserve(0.4, null, { usd: 2, sinceMs: Date.now() - RAIL_WINDOW_MS })).toEqual({
+      held: 'budget',
+      spentUsd: 0.7,
+    })
+    expect(guard.reserve(0.2, null, { usd: 0.1, sinceMs: Date.now() - RAIL_WINDOW_MS })).toEqual({
+      held: 'rail',
+      spentUsd: 0,
+    })
+    db.close()
+  })
+
+  it('does not carry one town rail hold into another town', async () => {
+    const first = openDb()
+    const second = openDb()
+    spend(first, 'arbiter', callSettingsFor('arbiter').dailyUsd!)
+    await expect(
+      ask(new LlmClient({ db: first, caller: 'arbiter', model: mockModel([]) })),
+    ).rejects.toBeInstanceOf(CallerRailError)
+    await expect(
+      ask(new LlmClient({ db: second, caller: 'arbiter', model: mockModel([{ text: 'hello' }]) })),
+    ).resolves.toMatchObject({ text: 'hello' })
+    first.close()
+    second.close()
+  })
+
   it('writes the operator one line per trip, however many calls are refused', async () => {
     const db = openDb()
     spend(db, 'arbiter', callSettingsFor('arbiter').dailyUsd!)
@@ -102,6 +137,46 @@ describe('★ a caller cannot spend the whole town’s day', () => {
     const until = (err as CallerRailError).untilMs
     expect(until - Date.now()).toBeGreaterThan(0)
     expect(until - Date.now()).toBeLessThan(RAIL_WINDOW_MS)
+  })
+
+  it('rechecks the same caller after its rail window rolls out', async () => {
+    vi.useFakeTimers()
+    const db = openDb()
+    try {
+      spend(db, 'arbiter', callSettingsFor('arbiter').dailyUsd!)
+      const client = new LlmClient({ db, caller: 'arbiter', model: mockModel([{ text: 'hello' }]) })
+      await expect(ask(client)).rejects.toBeInstanceOf(CallerRailError)
+      vi.setSystemTime(Date.now() + RAIL_WINDOW_MS + 1)
+      await expect(ask(client)).resolves.toMatchObject({ text: 'hello' })
+    } finally {
+      db.close()
+      vi.useRealTimers()
+    }
+  })
+
+  it('clears the health hold after a periodic recheck admits the caller', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    const db = openDb()
+    try {
+      const guard = makeBudgetGuard(db, 'arbiter')
+      const reservation = guard.reserve(callSettingsFor('arbiter').dailyUsd!, null, null)
+      if (!('id' in reservation)) throw new Error('first reservation refused')
+      const client = new LlmClient({
+        db,
+        caller: 'arbiter',
+        model: mockModel([{ text: 'hello' }, { text: 'again' }]),
+      })
+      await expect(ask(client)).rejects.toBeInstanceOf(CallerRailError)
+      expect(heldCallers(db, Date.now())).toEqual(['arbiter'])
+      guard.release(reservation.id)
+      vi.setSystemTime(Date.now() + 60_001)
+      await expect(ask(client)).resolves.toMatchObject({ text: 'hello' })
+      expect(heldCallers(db, Date.now())).toEqual([])
+      await expect(ask(client)).resolves.toMatchObject({ text: 'again' })
+    } finally {
+      db.close()
+      vi.useRealTimers()
+    }
   })
 
   it('leaves an old bill out of the day it is no longer part of', async () => {

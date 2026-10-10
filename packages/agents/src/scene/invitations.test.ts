@@ -105,8 +105,26 @@ describe('the ties a relationship leaves', () => {
   })
 
   it('a leaving settles the kin both ways and opens the grudge on the one left', () => {
-    const deltas = tiesFor({ type: 'partnership_dissolved', aId: A, bId: B, byId: B })
-    expect(deltas.filter((d) => d.settled === true).map((d) => d.agentId)).toEqual([A, B])
+    const deltas = tiesFor(
+      { type: 'partnership_dissolved', aId: A, bId: B, byId: B },
+      {
+        tiesOf: (id) => [
+          {
+            id: 1,
+            personId: id === A ? B : A,
+            kind: 'kin',
+            text: 'your partner',
+            tick: 0,
+            settledTick: null,
+            source: 'relationship',
+            resolution: null,
+            evidenceSeqs: [],
+            remindAtTick: null,
+          },
+        ],
+      },
+    )
+    expect(deltas.filter((d) => d.resolution === 'released').map((d) => d.agentId)).toEqual([A, B])
     expect(deltas.find((d) => d.kind === 'grudge')).toEqual({
       agentId: A,
       personId: B,

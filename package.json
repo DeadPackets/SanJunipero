@@ -22,6 +22,7 @@
     "@sj/agents": "workspace:*",
     "@sj/llm": "workspace:*",
     "@sj/shared": "workspace:*",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.0.0",
     "better-sqlite3": "^13.0.0",
     "eslint": "10.9.1",

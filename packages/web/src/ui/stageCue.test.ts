@@ -183,6 +183,12 @@ describe('★ the moment stands for six seconds, then the slot goes back to nami
     expect(queuedCues(both, [ev('tick_advanced', {})], state)).toBe(both)
   })
 
+  it('keeps a founding roof out of the stage and Keepsake queue', () => {
+    const seeded = ev('structure_completed', { id: 'seeded_house', seeded: true })
+    expect(cueFor(seeded, town())).toBeNull()
+    expect(queuedCues([], [seeded], town())).toEqual([])
+  })
+
   it('★ drops the middle of a burst rather than the line a viewer is reading', () => {
     const state = town()
     const burst = Array.from({ length: CUE_QUEUE_MAX + 3 }, (_, i) =>

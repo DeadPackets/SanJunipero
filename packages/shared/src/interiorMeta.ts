@@ -58,3 +58,92 @@ export const FURNISHING_KIND_ALIASES: Record<string, string> = { tools: 'anvil' 
 export function resolveFurnishingKind(kind: string): string {
   return FURNISHING_KIND_ALIASES[kind] ?? kind
 }
+
+export const BuildingAppearanceRecipeSchema = z
+  .object({
+    version: z.literal('v1-building-appearance'),
+    use: z.enum(['personal-home', 'public-shop', 'public-meeting', 'generic']),
+    facade: z.enum(['plaster', 'timber', 'stone']),
+    roof: z.enum(['gable', 'hip']),
+    door: z.literal('front-entry'),
+    windows: z.enum(['domestic', 'shopfront', 'assembly', 'paired']),
+  })
+  .strict()
+export type BuildingAppearanceRecipe = z.infer<typeof BuildingAppearanceRecipeSchema>
+
+const appearance = (recipe: BuildingAppearanceRecipe): BuildingAppearanceRecipe =>
+  BuildingAppearanceRecipeSchema.parse(recipe)
+
+export const BUILDING_APPEARANCE_PROTOTYPES = {
+  home: appearance({
+    version: 'v1-building-appearance',
+    use: 'personal-home',
+    facade: 'plaster',
+    roof: 'gable',
+    door: 'front-entry',
+    windows: 'domestic',
+  }),
+  shop: appearance({
+    version: 'v1-building-appearance',
+    use: 'public-shop',
+    facade: 'timber',
+    roof: 'gable',
+    door: 'front-entry',
+    windows: 'shopfront',
+  }),
+  meeting: appearance({
+    version: 'v1-building-appearance',
+    use: 'public-meeting',
+    facade: 'stone',
+    roof: 'hip',
+    door: 'front-entry',
+    windows: 'assembly',
+  }),
+} as const
+
+export const FALLBACK_BUILDING_APPEARANCE = appearance({
+  version: 'v1-building-appearance',
+  use: 'generic',
+  facade: 'plaster',
+  roof: 'gable',
+  door: 'front-entry',
+  windows: 'paired',
+})
+
+const HOME_KINDS = new Set(['house', 'cottage', 'cabin', 'farmhouse'])
+const SHOP_KINDS = new Set(['bakery', 'smithy', 'storehouse', 'tavern', 'shop'])
+const MEETING_KINDS = new Set(['civic_hall', 'town_hall', 'church', 'school', 'meeting_hall'])
+
+export function buildingAppearanceFor(kind: string): BuildingAppearanceRecipe {
+  if (HOME_KINDS.has(kind)) return BUILDING_APPEARANCE_PROTOTYPES.home
+  if (SHOP_KINDS.has(kind)) return BUILDING_APPEARANCE_PROTOTYPES.shop
+  if (MEETING_KINDS.has(kind)) return BUILDING_APPEARANCE_PROTOTYPES.meeting
+  return FALLBACK_BUILDING_APPEARANCE
+}
+
+export const BUILDING_WINDOW_FRACTIONS = {
+  domestic: { front: [0.22, 0.76], side: [0.5] },
+  shopfront: { front: [0.16, 0.84], side: [0.5] },
+  assembly: { front: [0.13, 0.38, 0.62, 0.87], side: [0.28, 0.72] },
+  paired: { front: [0.24, 0.76], side: [0.5] },
+} as const
+
+export function frontDoorFraction(faceSpan: number): number {
+  if (!Number.isFinite(faceSpan) || faceSpan <= 0) return 0.5
+  return (Math.floor((faceSpan - 1) / 2) + 0.5) / faceSpan
+}
+
+export function buildingWindowMask(
+  recipe: BuildingAppearanceRecipe,
+  faceSpan: number,
+  mirroredDoor: boolean,
+) {
+  const pattern = BUILDING_WINDOW_FRACTIONS[recipe.windows]
+  const lane = frontDoorFraction(faceSpan)
+  const door = mirroredDoor ? 1 - lane : lane
+  const clearance = 0.45 / Math.max(1, faceSpan)
+  return {
+    front: pattern.front.filter((fraction) => Math.abs(fraction - door) > clearance),
+    side: [...pattern.side],
+  }
+}

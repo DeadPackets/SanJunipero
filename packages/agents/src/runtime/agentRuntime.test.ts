@@ -1,37 +1,53 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import type Database from 'better-sqlite3'
-import { MockLanguageModelV4 } from 'ai/test'
-import type { LanguageModel } from 'ai'
-import { EventStore, openDb } from '@sj/engine/store'
 import {
   ACT_SET_DOWN,
   createWorldTick,
   fold,
   genesisState,
-  replayFromGenesis,
-  registerVerb,
   RngStreams,
-  TickLoop,
-  unregisterVerb,
+  registerVerb,
+  replayFromGenesis,
   type TickHandler,
+  TickLoop,
   type TileId,
+  unregisterVerb,
 } from '@sj/engine'
+import { EventStore, openDb } from '@sj/engine/store'
+import { LlmClient, migrateLlmTables } from '@sj/llm'
+import { FakeEmbedder } from '@sj/llm/testutil'
 import {
+  DAYS_PER_YEAR,
+  type DiscoveryCredit,
   DURATION_TICKS,
   NO_PARAMS,
   REFLECTION_SETTLE_MS,
+  type RosterEntry,
+  type SimConfig,
   SimConfigSchema,
   stateHash,
   TICK_REAL_MS,
-  type DiscoveryCredit,
-  type RosterEntry,
-  type SimConfig,
 } from '@sj/shared'
-import { EngineBridge } from './bridge.js'
+import type { LanguageModel } from 'ai'
+import { MockLanguageModelV4 } from 'ai/test'
+import type Database from 'better-sqlite3'
+import { afterEach, describe, expect, it } from 'vitest'
+import type { DreamLlm } from '../dream.js'
+import { GIST_MIN_CHARS } from '../memory/gist.js'
+import { openAgentDb } from '../memory/schema.js'
+import { type MemoryRow, MemoryStore } from '../memory/store.js'
+import { TIE_LET_GO_TICKS, TieStore } from '../memory/ties.js'
+import { type PersonalityDoc, PersonalityStore } from '../personality.js'
+import { splitSentences } from '../prompt/assemble.js'
+import { ROSTER_HEAD, SPEECH_RULES } from '../prompt/rulesOfBeing.js'
+import type { ReflectionLlm } from '../reflection.js'
+import { openScene } from '../scene/scene.js'
+import { makeSceneLlm } from '../scene/sceneLlm.js'
+import { tamarIdentity } from '../testutil/fixtures.js'
+import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
+import type { MindConfig, WakeReason } from '../wake.js'
 import {
+  AgentRuntime,
   actImportance,
   actionMemoryText,
-  AgentRuntime,
   asMinted,
   BODY_WOULD_NOT_GO_ON,
   brokeOffLine,
@@ -39,28 +55,14 @@ import {
   CRAFT_HINT,
   OPAQUE_REFUSAL,
   PLANNING_WAKES,
-  reflectionOffsetTicks,
   REFUSAL_MEMORY_TICKS,
+  reflectionOffsetTicks,
   refusalMemoryText,
   TRIED_FREEFORM,
   wantedWater,
 } from './agentRuntime.js'
-import { wireArbiter, type Adjudicator, type AgentCtx, type SeamArbiter } from './arbiterSeam.js'
-import { StrictTurnSchema, TURN_FIELDS } from '../turn.js'
-import { openAgentDb } from '../memory/schema.js'
-import { MemoryStore, type MemoryRow } from '../memory/store.js'
-import { TieStore, TIE_LET_GO_TICKS } from '../memory/ties.js'
-import { GIST_MIN_CHARS } from '../memory/gist.js'
-import { PersonalityStore, type PersonalityDoc } from '../personality.js'
-import { migrateLlmTables, LlmClient } from '@sj/llm'
-import { FakeEmbedder } from '@sj/llm/testutil'
-import { splitSentences } from '../prompt/assemble.js'
-import { ROSTER_HEAD, SPEECH_RULES } from '../prompt/rulesOfBeing.js'
-import { tamarIdentity } from '../testutil/fixtures.js'
-import type { ReflectionLlm } from '../reflection.js'
-import type { DreamLlm } from '../dream.js'
-
-import type { MindConfig, WakeReason } from '../wake.js'
+import { type Adjudicator, type AgentCtx, type SeamArbiter, wireArbiter } from './arbiterSeam.js'
+import { EngineBridge } from './bridge.js'
 
 const AGENT = 'tamar'
 const BREAD_ID = 'item_1'
@@ -128,6 +130,7 @@ function buildWorld(
   hearths = 0,
   ownRoof = false,
   roofOwner = AGENT,
+  breadOutside = false,
 ) {
   const config = simConfig ?? fastSimConfig()
   const terrain: TileId[][] = Array.from({ length: 24 }, () =>
@@ -159,7 +162,7 @@ function buildWorld(
     id: BREAD_ID,
     kind: 'bread',
     qty: 6,
-    loc: { t: 'structure', id: STRUCTURE_ID },
+    loc: breadOutside ? { t: 'tile', x: 5, y: 6 } : { t: 'structure', id: STRUCTURE_ID },
   })
   if (ownRoof) {
     emit('structure_planned', {
@@ -387,6 +390,7 @@ class ScriptedReflectionLlm implements ReflectionLlm {
       title: 'First day',
       text: 'A first day at the meadow.',
       standing: ['Keep the fire in.'],
+      revisions: [],
     }
   }
   async updateLedger() {
@@ -410,9 +414,9 @@ class ScriptedReflectionLlm implements ReflectionLlm {
 /** The same reflection, held at its first call so a checkpoint can be taken mid-night. */
 class GatedReflectionLlm extends ScriptedReflectionLlm {
   gate: Promise<void> = Promise.resolve()
-  override async extractFacts(dayMemories: MemoryRow[]) {
+  override async summarizeScenes(dayMemories: MemoryRow[]) {
     await this.gate
-    return super.extractFacts(dayMemories)
+    return super.summarizeScenes(dayMemories)
   }
 }
 
@@ -444,6 +448,7 @@ async function setup(opts: {
   hearths?: number
   ownRoof?: boolean
   roofOwner?: string
+  breadOutside?: boolean
 }) {
   const world = buildWorld(
     opts.simConfig,
@@ -451,6 +456,7 @@ async function setup(opts: {
     opts.hearths,
     opts.ownRoof,
     opts.roofOwner,
+    opts.breadOutside,
   )
   const worldTick = createWorldTick(world.config, world.rng)
   let handler: TickHandler = () => {}
@@ -596,6 +602,7 @@ function alertDetails(db: Database.Database, kind: string): string[] {
 describe('EngineBridge + AgentRuntime against the real engine', () => {
   it('executes a plan queue end-to-end through the frozen submitIntent', async () => {
     const { world, loop } = await setup({
+      breadOutside: true,
       model: turnModel([
         {
           thought: 'I should fetch and eat some bread.',
@@ -618,6 +625,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   // a refused head drops the whole queue: the steps after the pause were never reached.
   it('carries a plan past a wait written into the middle of it', async () => {
     const { world, loop } = await setup({
+      breadOutside: true,
       model: turnModel([
         {
           thought: 'Walk over, sit a moment, then take the bread.',
@@ -639,6 +647,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   // are not, and each of them used to take the rest of the plan down with it.
   it('spends a step on a word for standing still and carries the plan on past it', async () => {
     const { world, loop } = await setup({
+      breadOutside: true,
       model: turnModel([
         {
           thought: 'Walk over, rest a moment, then take the bread.',
@@ -841,6 +850,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
   // nothing to add, and the queue drains whether it speaks up or not.
   it('carries a running plan on through a turn that names nothing, and books it as such', async () => {
     const { world, loop, agentDb } = await setup({
+      breadOutside: true,
       model: turnModel(
         [
           {
@@ -907,7 +917,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       },
       { thought: 'I let my hands work.', importance: 2 },
     ])
-    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND })
+    const { loop, runtime } = await setup({ model, mindConfig: FAST_MIND, breadOutside: true })
     await stepUntil(loop, () => runtime.stats().turns >= 2, 200)
     const first = prompts[0]!.map((m) => m.text).join('\n')
     const second = prompts[1]!.map((m) => m.text).join('\n')
@@ -1268,7 +1278,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // refusal behind it. The two acts that landed are remembered as acts.
     expect(refusalMemories(agentDb)).toEqual([])
     expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
-      'You have walked.',
+      'You have arrived at (12, 12).',
       'You have slept.',
     ])
   })
@@ -1339,9 +1349,9 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
       release = r
     })
     class GatedReflectionLlm extends ScriptedReflectionLlm {
-      override async extractFacts(dayMemories: MemoryRow[]) {
+      override async summarizeScenes(dayMemories: MemoryRow[]) {
         await gate
-        return super.extractFacts(dayMemories)
+        return super.summarizeScenes(dayMemories)
       }
     }
     const reflection = new GatedReflectionLlm()
@@ -1473,7 +1483,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     })
     await stepUntil(loop, () => memoriesOfKind(agentDb, 'action').length >= 2, 200)
     const acts = memoriesOfKind(agentDb, 'action')
-    expect(acts.map((m) => m.text)).toEqual(['You have walked.', 'You have slept.'])
+    expect(acts.map((m) => m.text)).toEqual(['You have arrived at (4, 3).', 'You have slept.'])
     // Not one flat constant: a walk is worth less than the refusal a walk earns.
     expect(acts.map((m) => m.importance)).toEqual([actImportance('walk'), actImportance('sleep')])
     expect(actImportance('walk')).toBeLessThan(actImportance('build'))
@@ -1553,6 +1563,7 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
 
   it('submits a plan head only after a busy agent finishes its action', async () => {
     const { world, loop, agentDb } = await setup({
+      breadOutside: true,
       model: turnModel([
         {
           thought: 'Walk over, then eat.',
@@ -1571,10 +1582,138 @@ describe('EngineBridge + AgentRuntime against the real engine', () => {
     // Nothing was refused, and each of the three acts left the mind a trace of itself.
     expect(refusalMemories(agentDb)).toEqual([])
     expect(memoriesOfKind(agentDb, 'action').map((m) => m.text)).toEqual([
-      'You have walked.',
-      'You have taken.',
+      'You have arrived at (5, 6).',
+      'You have taken item_1. It is now in your hands.',
       'You have eaten.',
     ])
+  })
+
+  it('uses current body age in ordinary and scene prompts through adulthood and restart', async () => {
+    const { model, prompts } = capturingModel([BENIGN_TURN])
+    const shared = await setup({ model, mindConfig: FAST_MIND, simConfig: SLOW_BODY })
+    const { loop, bridge } = shared
+    const ageTo = (years: number) => {
+      const days = years * DAYS_PER_YEAR - loop.state.agents[AGENT]!.ageDays
+      loop.commitEvents(
+        Array.from({ length: days }, () => ({ type: 'agent_aged', payload: { agentId: AGENT } })),
+      )
+    }
+    const scenePrompts: string[] = []
+    const sceneClient = new LlmClient({
+      db: shared.agentDb,
+      caller: 'scene',
+      agentId: AGENT,
+      maxRetries: 0,
+      model: new MockLanguageModelV4({
+        doGenerate: async (options) => {
+          scenePrompts.push(
+            options.prompt
+              .map((part) =>
+                typeof part.content === 'string'
+                  ? part.content
+                  : part.content.map((piece) => ('text' in piece ? piece.text : '')).join(''),
+              )
+              .join('\n'),
+          )
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify({
+                  thought: 'I remember.',
+                  speech: null,
+                  to: null,
+                  gesture: null,
+                  move: 'none',
+                  stance: null,
+                  answer: null,
+                  ask: null,
+                  reconvene: null,
+                  leave: false,
+                  importance: 1,
+                  mood: null,
+                  plan: null,
+                  reconsider_at: null,
+                }),
+              },
+            ],
+            finishReason: { unified: 'stop' as const, raw: undefined },
+            usage: ZERO_USAGE,
+            warnings: [],
+          }
+        },
+      }),
+    })
+    const checkScene = async (runtime: AgentRuntime, age: number) => {
+      const voice = makeSceneLlm(sceneClient, {
+        identity: tamarIdentity,
+        currentIdentity: () => runtime.currentIdentity(),
+        personality: () => ({ doc: shared.personality.current().doc, autobiography: [] }),
+        livingCast: () => [{ id: AGENT, name: 'Tamar' }],
+      })
+      await voice.line({
+        scene: openScene({
+          openedTick: loop.tick,
+          participants: [AGENT, 'yusuf'],
+          opener: AGENT,
+          topic: 'home',
+          stakes: 2,
+        }),
+        agentId: AGENT,
+        cast: [
+          { id: AGENT, name: 'Tamar' },
+          { id: 'yusuf', name: 'Yusuf' },
+        ],
+        audience: [],
+        ties: [],
+        thread: [],
+        recent: [],
+        wrapUp: false,
+        tick: loop.tick,
+        mood: '',
+        energy: 80,
+      })
+      expect(scenePrompts.at(-1)).toContain(`Age: ${age}\n`)
+      expect(runtime.currentIdentity().backstory).toEqual(tamarIdentity.backstory)
+    }
+    ageTo(12)
+    await stepUntil(loop, () => shared.runtime.stats().turns >= 1, 30)
+    expect(prompts[0]!.map((part) => part.text).join('\n')).toContain('Age: 12\n')
+    await checkScene(shared.runtime, 12)
+    const adultAge = shared.world.config.aging.childUntilYears
+    ageTo(adultAge)
+    await stepUntil(loop, () => shared.runtime.stats().turns >= 2, 30)
+    expect(
+      prompts
+        .at(-1)!
+        .map((part) => part.text)
+        .join('\n'),
+    ).toContain(`Age: ${adultAge}\n`)
+    await checkScene(shared.runtime, adultAge)
+    const saved = shared.runtime.snapshot()
+    shared.runtime.stop()
+    const resumed = new AgentRuntime({
+      db: shared.agentDb,
+      llm: shared.llm,
+      embedder: shared.embedder,
+      identity: tamarIdentity,
+      personality: shared.personality,
+      bridge,
+      config: FAST_MIND,
+    })
+    resumed.start(AGENT)
+    resumed.restore(saved)
+    const before = prompts.length
+    await stepUntil(loop, () => prompts.length > before, 30)
+    expect(
+      prompts
+        .at(-1)!
+        .map((part) => part.text)
+        .join('\n'),
+    ).toContain(`Age: ${adultAge}\n`)
+    await checkScene(resumed, adultAge)
+    expect(tamarIdentity.age).toBe(34)
+    resumed.stop()
   })
 
   it('retrieves ambient memories before inserting the current perception (finding 9)', async () => {
@@ -3100,6 +3239,275 @@ describe('★ the morning line names what this mind wants', () => {
   })
 })
 
+describe('completion reaches the next decision', () => {
+  it('reconsiders a single-step arrival without waiting out the idle gap', async () => {
+    const { model, prompts } = capturingModel([
+      {
+        thought: 'I will walk over.',
+        action: { verb: 'walk', params: { x: 4, y: 3 } },
+        importance: 3,
+      },
+      BENIGN_TURN,
+    ])
+    const { runtime, loop } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, idleGapTicks: 100, boredomTicks: 1000 },
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 50)
+    expect(prompts, JSON.stringify(runtime.snapshot())).toHaveLength(2)
+    expect(loop.tick).toBeLessThan(50)
+    expect(saidOn(prompts, 1)).toContain('You have arrived at (4, 3).')
+    runtime.stop()
+  })
+
+  it('carries a real take/stow completion into the next prompt without repeating the move', async () => {
+    const { model, prompts } = capturingModel([
+      {
+        thought: 'I will put the bread away.',
+        plan: [
+          { verb: 'walk', params: { x: 5, y: 6 } },
+          { verb: 'enter', params: { structureId: STRUCTURE_ID } },
+          { verb: 'take', params: { itemId: BREAD_ID } },
+          { verb: 'stow', params: { itemId: BREAD_ID, structureId: STRUCTURE_ID } },
+        ],
+        importance: 4,
+      },
+      BENIGN_TURN,
+    ])
+    const { runtime, loop, world } = await setup({
+      model,
+      mindConfig: { ...FAST_MIND, idleGapTicks: 100, boredomTicks: 1000 },
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => prompts.length >= 2, 120)
+    runtime.stop()
+    expect(prompts).toHaveLength(2)
+    expect(saidOn(prompts, 1)).toContain(
+      `You have stowed ${BREAD_ID} in ${STRUCTURE_ID}. It is stored there, not in your hands.`,
+    )
+    expect(startedVerbs(world.engineDb).filter((v) => v === 'take')).toHaveLength(1)
+    expect(startedVerbs(world.engineDb).filter((v) => v === 'stow')).toHaveLength(1)
+  })
+
+  it('keeps a completion that arrives while an earlier ordinary answer is pending', async () => {
+    const gate = gatedModel()
+    const { runtime, loop, bridge } = await setup({
+      model: gate.model,
+      mindConfig: FAST_MIND,
+      simConfig: SLOW_BODY,
+    })
+    await stepUntil(loop, () => gate.calls.count === 1, 20)
+    const moving = bridge.submit(AGENT, { verb: 'walk', params: { x: 4, y: 3 } })
+    loop.step()
+    await moving
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity === null, 20)
+    expect(runtime.snapshot().lastOutcome).toBe('You have arrived at (4, 3).')
+    gate.resolve(JSON.stringify(askedShape(BENIGN_TURN)))
+    await flush()
+    await flush()
+    expect(runtime.snapshot().lastOutcome).toBe('You have arrived at (4, 3).')
+    runtime.stop()
+  })
+
+  it('grounds a deposit in its item and destination instead of leaving a stale take intention', () => {
+    const result = actionMemoryText({
+      seq: 10,
+      verb: 'stow',
+      settled: false,
+      params: { itemId: 'item_75', structureId: 'storehouse' },
+    })
+    expect(result).toContain('stowed item_75 in storehouse')
+    expect(result).toContain('stored there, not in your hands')
+  })
+})
+
+describe('a chosen scene exit uses the ordinary plan', () => {
+  it('continues one selected exit plan after restart without duplicating the walk', async () => {
+    const shared = await setup({ model: turnModel([BENIGN_TURN]), simConfig: SLOW_BODY })
+    const { runtime, loop, bridge, agentDb, personality, embedder, llm } = shared
+    runtime.commitSceneExit(
+      { plan: [{ verb: 'walk', params: { x: 5, y: 3 } }], reconsider_at: '15:00' },
+      loop.tick,
+    )
+    const checkpoint = runtime.snapshot()
+    runtime.stop()
+    const resumed = new AgentRuntime({
+      db: agentDb,
+      llm,
+      embedder,
+      personality,
+      identity: tamarIdentity,
+      bridge,
+    })
+    resumed.start(AGENT)
+    resumed.restore(checkpoint)
+    expect(resumed.snapshot().clock.reconsiderAtTick).toBe(checkpoint.clock.reconsiderAtTick)
+    await stepUntil(
+      loop,
+      () => loop.state.agents[AGENT]!.x === 5 && loop.state.agents[AGENT]!.activity === null,
+      100,
+    )
+    resumed.stop()
+    const starts = startedVerbs(shared.world.engineDb).filter((verb) => verb === 'walk')
+    expect(starts).toHaveLength(1)
+  })
+
+  it('restores a plan head already running in the body without replaying it', async () => {
+    const shared = await setup({ model: turnModel([BENIGN_TURN]), simConfig: SLOW_BODY })
+    const { runtime, loop, bridge, agentDb, personality, embedder, llm } = shared
+    runtime.commitSceneExit({ plan: [{ verb: 'walk', params: { x: 12, y: 3 } }] }, loop.tick)
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity?.verb === 'walk', 30)
+    const checkpoint = runtime.snapshot()
+    runtime.stop()
+    const resumed = new AgentRuntime({
+      db: agentDb,
+      llm,
+      embedder,
+      personality,
+      identity: tamarIdentity,
+      bridge,
+    })
+    resumed.start(AGENT)
+    resumed.restore(checkpoint)
+    await stepUntil(loop, () => resumed.snapshot().plan.queue.length === 0, 40)
+    resumed.stop()
+    expect(startedVerbs(shared.world.engineDb).filter((verb) => verb === 'walk')).toHaveLength(1)
+  })
+
+  it('does not replay a head completed after its last persisted checkpoint', async () => {
+    const shared = await setup({ model: turnModel([BENIGN_TURN]), simConfig: SLOW_BODY })
+    const { runtime, loop, bridge, agentDb, personality, embedder, llm } = shared
+    runtime.commitSceneExit({ plan: [{ verb: 'walk', params: { x: 8, y: 3 } }] }, loop.tick)
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity?.verb === 'walk', 30)
+    const checkpoint = runtime.snapshot()
+    runtime.stop()
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity === null, 60)
+    for (let i = 0; i < 60; i++) loop.step()
+    const resumed = new AgentRuntime({
+      db: agentDb,
+      llm,
+      embedder,
+      personality,
+      identity: tamarIdentity,
+      bridge,
+    })
+    resumed.start(AGENT)
+    resumed.restore(checkpoint)
+    await stepUntil(loop, () => resumed.snapshot().plan.queue.length === 0, 20)
+    resumed.stop()
+    expect(startedVerbs(shared.world.engineDb).filter((verb) => verb === 'walk')).toHaveLength(1)
+    expect(resumed.snapshot().lastOutcome).toContain('arrived at (8, 3)')
+  })
+
+  it('consumes several completed checkpoint steps and preserves the next running one', async () => {
+    const shared = await setup({ model: turnModel([BENIGN_TURN]), simConfig: SLOW_BODY })
+    const { runtime, loop, bridge, agentDb, personality, embedder, llm } = shared
+    runtime.commitSceneExit(
+      {
+        plan: [
+          { verb: 'walk', params: { x: 8, y: 3 } },
+          { verb: 'walk', params: { x: 12, y: 3 } },
+          { verb: 'walk', params: { x: 18, y: 3 } },
+        ],
+      },
+      loop.tick,
+    )
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity?.verb === 'walk', 30)
+    const checkpoint = runtime.snapshot()
+    await stepUntil(
+      loop,
+      () => startedVerbs(shared.world.engineDb).filter((verb) => verb === 'walk').length === 3,
+      100,
+    )
+    runtime.stop()
+    const resumed = new AgentRuntime({
+      db: agentDb,
+      llm,
+      embedder,
+      personality,
+      identity: tamarIdentity,
+      bridge,
+    })
+    resumed.start(AGENT)
+    resumed.restore(checkpoint)
+    expect(resumed.snapshot().plan.queue).toEqual([{ verb: 'walk', params: { x: 18, y: 3 } }])
+    expect(resumed.snapshot().planHeadInFlight).toBe(true)
+    await stepUntil(loop, () => resumed.snapshot().plan.queue.length === 0, 50)
+    resumed.stop()
+    expect(startedVerbs(shared.world.engineDb).filter((verb) => verb === 'walk')).toHaveLength(3)
+  })
+
+  it('restores a walk-first take and its following step without taking twice', async () => {
+    const shared = await setup({
+      model: turnModel([BENIGN_TURN]),
+      simConfig: SLOW_BODY,
+      breadOutside: true,
+    })
+    const { runtime, loop, bridge, agentDb, personality, embedder, llm } = shared
+    loop.commitEvents([
+      { type: 'item_moved', payload: { id: BREAD_ID, loc: { t: 'tile', x: 18, y: 16 } } },
+    ])
+    runtime.commitSceneExit(
+      {
+        plan: [
+          { verb: 'take', params: { itemId: BREAD_ID } },
+          { verb: 'walk', params: { x: 8, y: 3 } },
+        ],
+      },
+      loop.tick,
+    )
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity?.then?.verb === 'take', 30)
+    expect(loop.state.agents[AGENT]!.activity?.then?.verb).toBe('take')
+    const checkpoint = runtime.snapshot()
+    runtime.stop()
+    const resumed = new AgentRuntime({
+      db: agentDb,
+      llm,
+      embedder,
+      personality,
+      identity: tamarIdentity,
+      bridge,
+    })
+    resumed.start(AGENT)
+    resumed.restore(checkpoint)
+    expect(resumed.snapshot().planHeadInFlight).toBe(true)
+    await stepUntil(loop, () => resumed.snapshot().plan.queue.length === 0, 60)
+    resumed.stop()
+    expect(startedVerbs(shared.world.engineDb).filter((verb) => verb === 'take')).toHaveLength(1)
+    expect(loop.state.items[BREAD_ID]!.loc).toEqual({ t: 'agent', id: AGENT })
+    expect(loop.state.agents[AGENT]!.x).toBe(8)
+  })
+
+  it('declining a new plan preserves work, while an empty plan clears queued steps only', async () => {
+    const { runtime, loop } = await setup({ model: turnModel([BENIGN_TURN]), simConfig: SLOW_BODY })
+    runtime.commitSceneExit({ plan: [{ verb: 'walk', params: { x: 8, y: 3 } }] }, loop.tick)
+    const queued = runtime.snapshot().plan.queue
+    runtime.commitSceneExit({ plan: null }, loop.tick)
+    expect(runtime.snapshot().plan.queue).toEqual(queued)
+    await stepUntil(loop, () => loop.state.agents[AGENT]!.activity !== null, 20)
+    runtime.commitSceneExit({ plan: [] }, loop.tick)
+    expect(runtime.snapshot().plan.queue).toEqual([])
+    expect(loop.state.agents[AGENT]!.activity).not.toBeNull()
+    runtime.stop()
+  })
+
+  it('an invalid exit target fails through the ordinary engine with a concrete refusal', async () => {
+    const { runtime, loop, agentDb } = await setup({
+      model: turnModel([BENIGN_TURN]),
+      simConfig: SLOW_BODY,
+    })
+    runtime.commitSceneExit(
+      { plan: [{ verb: 'take', params: { itemId: 'missing_item' } }] },
+      loop.tick,
+    )
+    await stepUntil(loop, () => refusalMemories(agentDb).length > 0, 20)
+    expect(refusalMemories(agentDb).length).toBeGreaterThan(0)
+    expect(runtime.snapshot().plan.queue).toEqual([])
+    runtime.stop()
+  })
+})
+
 describe('shutdown checkpoints', () => {
   it('does not speak or replace its plan after stopping during a thought memory write', async () => {
     const base = await FakeEmbedder.create()
@@ -3233,7 +3641,7 @@ describe('shutdown checkpoints', () => {
       withTies: true,
     })
     ties!.apply(
-      [{ agentId: AGENT, personId: 'other', kind: 'debt', text: 'A loaf owed.' }],
+      [{ agentId: AGENT, personId: 'other', kind: 'grudge', text: 'An old slight.' }],
       -TIE_LET_GO_TICKS,
     )
     try {

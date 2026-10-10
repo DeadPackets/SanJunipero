@@ -70,11 +70,11 @@ describe('★ a first is a plate, and the plate keeps no score', () => {
     expect(isNew({ tick: 900 }, null)).toBe(false)
   })
 
-  it('★ reads the watermark BEFORE the socket walks it forward', () => {
-    // socket.ts writes sj:lastSeenTick on the first snapshot, so anything asking what the viewer
-    // missed has to have captured it at module load
-    expect(src('./storage.ts')).toContain('const VISIT_WATERMARK')
-    expect(src('../net/socket.ts')).toContain("const LAST_SEEN_KEY = 'sj:lastSeenTick'")
+  it('★ captures the visit cursor before the socket records the next visit', () => {
+    expect(src('./storage.ts')).toContain('const VISIT_CURSOR = readVisitCursor()')
+    expect(src('../net/socket.ts')).toContain(
+      'rememberVisit({ runId: opts.store.runId(), seq: opts.store.logSeq(), tick })',
+    )
   })
 
   it('builds the whole plate off one row, with the naming quoted only where there is one', () => {

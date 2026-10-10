@@ -1,0 +1,284 @@
+[
+  {
+    "seq": 1523,
+    "tick": 402,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "I\u2019ve got wood, no iron. Are there boards or scrap metal here, or do I need to find them myself?",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 1567,
+    "tick": 409,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Yes, child. I know of no loose boards or scrap iron. The wood I tried to take is already claimed. You\u2019ll need to find materials yourself, or devise a wooden latch.",
+      "x": 60,
+      "y": 47
+    }
+  },
+  {
+    "seq": 1599,
+    "tick": 414,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Then I\u2019ll find iron, or carve a latch that doesn\u2019t need it. I\u2019m not sleeping in a passage forever.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 1636,
+    "tick": 419,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Then carve the latch. Waiting for iron that may never turn up is poor husbandry. When it holds, tell me, and I\u2019ll mark the day.",
+      "x": 60,
+      "y": 47
+    }
+  },
+  {
+    "seq": 1677,
+    "tick": 425,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "I\u2019m making a wooden latch. No iron, no waiting.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 1693,
+    "tick": 427,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Dilara, set one piece down for me, will you? I need to make a plank.",
+      "x": 60,
+      "y": 47
+    }
+  },
+  {
+    "seq": 1724,
+    "tick": 429,
+    "type": "action_completed",
+    "payload": {
+      "agentId": "halim",
+      "verb": "enter"
+    }
+  },
+  {
+    "seq": 1910,
+    "tick": 451,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "One piece. What size plank are you making? I need the rest for the door.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 1944,
+    "tick": 455,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "A narrow piece, about an arm\u2019s length and two fingers wide. If that costs you the latch, keep it. I can manage with less.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 1990,
+    "tick": 459,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Take it, then. The remainder is mine, and I\u2019m carving the latch tonight.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2025,
+    "tick": 463,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Good. I\u2019ll mark the day when it holds. Do you want me to test the door afterward, or shall I practise being merely your father?",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2040,
+    "tick": 465,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "yusuf",
+      "text": "I\u2019ll start the bridge here.",
+      "x": 38,
+      "y": 44
+    }
+  },
+  {
+    "seq": 2070,
+    "tick": 468,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Test it. If it sticks, will you tell me before I trust it with the door?",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2104,
+    "tick": 472,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "I will. I\u2019ll test it gently, then tell you whether the fault is in the latch, the door, or my optimism.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2114,
+    "tick": 473,
+    "type": "action_completed",
+    "payload": {
+      "agentId": "dilara",
+      "verb": "recipe:wooden_latch"
+    }
+  },
+  {
+    "seq": 2115,
+    "tick": 473,
+    "type": "item_spawned",
+    "payload": {
+      "id": "item_77",
+      "kind": "wooden_latch",
+      "qty": 1,
+      "loc": {
+        "t": "agent",
+        "id": "dilara"
+      },
+      "owner": "dilara",
+      "durability": 20
+    }
+  },
+  {
+    "seq": 2136,
+    "tick": 477,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Tell me straight if it fails. Have you looked at the spare-room frame, or are we blaming the latch first?",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2172,
+    "tick": 481,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "No, child, I haven't. The frame gets first attention. A sound latch cannot cure a crooked doorway. I'll inspect it, then give you the plain result.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2212,
+    "tick": 486,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Good. Start with the frame, then. I want the truth about both pieces, not kindness.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2242,
+    "tick": 490,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Fair enough. I\u2019ll examine the frame before I touch the latch, and report what I find, even if the answer makes my optimism look foolish.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2287,
+    "tick": 494,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Then inspect the frame. If it\u2019s sound, test the latch. I want the fault named plainly.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2369,
+    "tick": 502,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Well now, that is a proper order of work. I\u2019ll look at the frame first and give you an honest account, not a father\u2019s reassurance.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2399,
+    "tick": 506,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "dilara",
+      "text": "Check the hinges too. A sound frame is no use if the door hangs crooked.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  },
+  {
+    "seq": 2415,
+    "tick": 510,
+    "type": "agent_spoke",
+    "payload": {
+      "agentId": "halim",
+      "text": "Yes, the hinges belong in the same account. I\u2019ll check their pins, the frame around them, and whether the door has dropped. Then I\u2019ll tell you what holds.",
+      "x": 60,
+      "y": 47,
+      "insideId": "structure_cottage_59_44"
+    }
+  }
+]

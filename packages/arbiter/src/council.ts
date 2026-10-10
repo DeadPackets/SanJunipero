@@ -54,9 +54,9 @@ export const COMPILE_INSTRUCTION = `You are the physics judge of San Junipero. A
 
 Answer "predicate" as exactly one of five shapes:
 forbid: nobody may do a named act. "verb" is the act. Narrow it only where the rule narrows it: "when" night, day, weekend or a day of the week (Monday to Sunday), "where" square, house or field, "whose" other when the rule is about somebody else's things. Nothing stops a forbidden act. Everyone standing there sees it done, and the town does the rest.
-require_before: a named act may not be done until another named act has been done that day. "verb" is the act held back, "before" the act that frees it.
-common: a kind of thing kept in a named building is one to a person: whoever already holds one may not take another. "itemKind" is the thing, "structureId" the building.
-tithe: a kind of thing may not be taken out of a named building until the taker has put one in, this day or this week. "itemKind" the thing, "qty" how many, "to" the building, "every" day or week.
+require_before: doing a named act before another named act that day breaks the rule. "verb" is the later act, "before" the expected act.
+common: taking another thing of a kind from a named building while already holding one breaks the rule. "itemKind" is the thing, "structureId" the building.
+tithe: taking a kind of thing from a named building before putting one in that day or week breaks the rule. "itemKind" the thing, "qty" how many, "to" the building, "every" day or week.
 none: the world can hold them to nothing here. Most rules a town agrees are this: a promise, a manner, a courtesy, a thing owed between two people. It is not a failure, and the town still holds each other to it.
 
 "why": one sentence a villager could read, saying how you read their words. Plain speech. Never a number, never the machinery, never a word about how any of this is written down.

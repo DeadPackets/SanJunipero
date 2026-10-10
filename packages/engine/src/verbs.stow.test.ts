@@ -73,8 +73,8 @@ const MOVED = {
 }
 
 describe('verb: stow', () => {
-  it('shelves a held thing from just outside the wall', () => {
-    const s = withHolder(world(), 4, 2)
+  it('shelves a held thing at an open-air structure', () => {
+    const s = withHolder(world('complete', 'standing_stone'), 4, 2)
     expect(
       submitIntent(s, DEFAULT_CONFIG, 'a1', 'stow', {
         itemId: 'item_1',
@@ -112,7 +112,7 @@ describe('verb: stow', () => {
   })
 
   it('leaves ownership exactly where it was — a shelf is not a transfer', () => {
-    const s = withHolder(world(), 4, 2, 'a2')
+    const s = goInside(withHolder(world(), 4, 2, 'a2'))
     const after = VERBS.stow!.onComplete(
       s,
       DEFAULT_CONFIG,
@@ -138,10 +138,16 @@ describe('verb: stow', () => {
 
   it('refuses out of reach, and refuses what you are not holding', () => {
     expect(
-      submitIntent(withHolder(world(), 6, 5), DEFAULT_CONFIG, 'a1', 'stow', {
-        itemId: 'item_1',
-        structureId: 'structure_1',
-      }),
+      submitIntent(
+        withHolder(world('complete', 'standing_stone'), 6, 5),
+        DEFAULT_CONFIG,
+        'a1',
+        'stow',
+        {
+          itemId: 'item_1',
+          structureId: 'structure_1',
+        },
+      ),
     ).toMatchObject({ ok: false, reason: 'not close enough to put anything down there' })
 
     let s = withHolder(world(), 4, 2)
@@ -201,8 +207,7 @@ describe('verb: stow', () => {
   })
 })
 
-// A shelf across the square is a walk away, not a refusal — the settle policy `fill` and `fish`
-// already ride. The store a mind names is the store its legs are sent to.
+// An open-air shelf across the square is a walk away. A roof requires entry first.
 describe('verb: stow, from across the square', () => {
   const worldTickFor = (seed: string) => createWorldTick(DEFAULT_CONFIG, new RngStreams(seed))
 
@@ -221,20 +226,25 @@ describe('verb: stow, from across the square', () => {
   }
 
   it('walks to a store it has been shown and shelves the thing there', () => {
-    let s = withHolder(world(), 6, 5)
+    let s = withHolder(world('complete', 'standing_stone'), 6, 5)
     s = fold(s, ev('places_seen', { agentId: 'a1', structureIds: ['structure_1'] }))
     expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
   })
 
-  it('walks to its own roof named by id, shown to it or not', () => {
+  it('does not shelve into its own roof before entry', () => {
     const s = withHolder(world('complete', 'house', 'a1'), 6, 5)
     expect(s.agents.a1!.knownPlaces ?? []).toEqual([])
-    expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
+    expect(
+      submitIntent(s, DEFAULT_CONFIG, 'a1', 'stow', {
+        itemId: 'item_1',
+        structureId: 'structure_1',
+      }),
+    ).toMatchObject({ ok: false, reason: 'a wall is in the way' })
   })
 
   // A couple's house carries one partner's name; the other partner still lives there, which the
   // world knows because their kit is in it.
-  it('walks to the roof it lives under, whoever the walls belong to', () => {
+  it('does not shelve into a partner’s roof before entry', () => {
     let s = withHolder(world('complete', 'house', 'a2'), 6, 5)
     s = fold(
       s,
@@ -247,6 +257,11 @@ describe('verb: stow, from across the square', () => {
       }),
     )
     expect(s.agents.a1!.knownPlaces ?? []).toEqual([])
-    expect(walkAndStow(s).items.item_1!.loc).toEqual({ t: 'structure', id: 'structure_1' })
+    expect(
+      submitIntent(s, DEFAULT_CONFIG, 'a1', 'stow', {
+        itemId: 'item_1',
+        structureId: 'structure_1',
+      }),
+    ).toMatchObject({ ok: false, reason: 'a wall is in the way' })
   })
 })

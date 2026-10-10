@@ -29,7 +29,7 @@ const { bigTown } = await import('./__fixtures__/bigTown.js')
 describe('createLayers', () => {
   it('adds exactly the eight layers, in the order they paint', () => {
     const world = new MockContainer()
-    const { layers: set, graded, attention } = createLayers(world)
+    const { layers: set, graded, attention, reading } = createLayers(world)
     expect(LAYERS).toEqual([
       'ground',
       'groundDecal',
@@ -40,8 +40,7 @@ describe('createLayers', () => {
       'bubbles',
       'overlay',
     ])
-    // the picture layers sit inside `graded`, the word layers beside it: one paint order
-    const painted = [...graded.children, ...world.children.slice(1)]
+    const painted = [...graded.children, ...reading.children]
     expect(world.children[0]).toBe(attention)
     expect(attention.children).toEqual([graded])
     expect(LAYERS.map((n) => set[n])).toEqual(painted)
@@ -89,6 +88,18 @@ describe('createLayers', () => {
 })
 
 describe('createScreenLayers — the stack over the world', () => {
+  it('keeps readable labels outside the picture so they paint after all atmosphere', () => {
+    const stage = new MockContainer()
+    const world = new MockContainer()
+    const { layers, reading } = createLayers(world)
+    stage.addChild(world)
+    const screen = createScreenLayers(stage)
+    stage.addChild(reading)
+    expect(reading.children).toEqual([layers.worldText, layers.bubbles, layers.overlay])
+    expect(world.children).not.toContain(reading)
+    expect(stage.children.indexOf(reading)).toBeGreaterThan(stage.children.indexOf(screen.bloom))
+  })
+
   it('paints the flash and the weather under the lights', () => {
     expect(SCREEN_LAYERS).toEqual(['flash', 'weather', 'lights', 'bloom'])
     const stage = new MockContainer()

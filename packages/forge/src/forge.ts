@@ -41,6 +41,7 @@ export function createForge(deps: {
   judge: VisionJudgeFn
   codex: AssetCodex
   refs: Buffer[]
+  signal?: AbortSignal
 }): Forge {
   const config: ForgeConfig = loadForgeConfig()
 
@@ -50,6 +51,7 @@ export function createForge(deps: {
     klass: AssetClass,
     kind: string,
   ): Promise<AssetRecord> {
+    deps.signal?.throwIfAborted()
     const material = klass === 'building' && /^material:[a-z][a-z0-9_]*:(wood|roof)$/.test(kind)
     const target = material ? { w: 256, h: 256 } : targetSize(klass, footprint)
     const requireAlpha = !material && klass !== 'terrain' && klass !== 'portrait'
@@ -76,6 +78,7 @@ export function createForge(deps: {
       model: string
     }> {
       for (let t = 0; t < DRAW_TRIES; t++) {
+        deps.signal?.throwIfAborted()
         let cand: Candidate | undefined
         try {
           const out = await deps.client.generateCandidates(prompt, deps.refs, 1)
@@ -115,13 +118,16 @@ export function createForge(deps: {
       return null
     })
 
+    deps.signal?.throwIfAborted()
     if (material && res?.status === 'pass') {
+      const maps = await buildingSurfaceMaps(res.sprite)
+      deps.signal?.throwIfAborted()
       return registerMaterialSet(
         deps.codex,
         {
           class: 'building',
           kind: kind.slice('material:'.length),
-          maps: await buildingSurfaceMaps(res.sprite),
+          maps,
         },
         { costUsd: ledger.totalFor(assetId), attempts: res.attempts },
       )
@@ -131,6 +137,7 @@ export function createForge(deps: {
       res?.status === 'pass'
         ? await encodePng(res.sprite)
         : await encodePng(makePlaceholder(klass, target))
+    deps.signal?.throwIfAborted()
     return deps.codex.register({
       class: klass,
       desc,

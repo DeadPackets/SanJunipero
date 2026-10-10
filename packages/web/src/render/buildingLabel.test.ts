@@ -42,12 +42,38 @@ describe('approved building labels', () => {
   it('clears the hover label and treats names as text', () => {
     const root = document.createElement('div')
     const label = createBuildingLabel(root)
-    label.show({ ...house, name: '<img src=x>' }, DEFAULT_CONFIG, 100, 100, 390, 844)
+    label.show({ ...house, name: '<img src=x>' }, DEFAULT_CONFIG, 100, 100, 390, 844, {
+      top: 0,
+      right: 0,
+      bottom: 0,
+    })
     expect(root.querySelector('img')).toBeNull()
     expect(root.textContent).toBe('<img src=x>')
     label.hide()
     expect(root.querySelector<HTMLElement>('.building-hover-label')?.hidden).toBe(true)
     label.destroy()
     expect(root.childElementCount).toBe(0)
+  })
+  it('keeps the building hover label inside the measured safe view', () => {
+    const root = document.createElement('div')
+    const label = createBuildingLabel(root)
+    const node = root.firstElementChild as HTMLElement
+    Object.defineProperty(node, 'offsetWidth', { configurable: true, value: 120 })
+    Object.defineProperty(node, 'offsetHeight', { configurable: true, value: 40 })
+    label.show(house, DEFAULT_CONFIG, 590, 10, 600, 400, { top: 70, right: 200, bottom: 90 })
+    expect(node.style.left).toBe('272px')
+    expect(node.style.top).toBe('78px')
+    label.show(house, DEFAULT_CONFIG, 200, 390, 600, 400, { top: 70, right: 200, bottom: 90 })
+    expect(node.style.top).toBe('262px')
+    expect(node.hidden).toBe(false)
+  })
+  it('hides the building hover label when the safe view cannot fit it', () => {
+    const root = document.createElement('div')
+    const label = createBuildingLabel(root)
+    const node = root.firstElementChild as HTMLElement
+    Object.defineProperty(node, 'offsetWidth', { configurable: true, value: 120 })
+    Object.defineProperty(node, 'offsetHeight', { configurable: true, value: 40 })
+    label.show(house, DEFAULT_CONFIG, 200, 100, 300, 200, { top: 100, right: 200, bottom: 80 })
+    expect(node.hidden).toBe(true)
   })
 })

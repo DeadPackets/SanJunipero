@@ -610,3 +610,33 @@ describe('the ribbon is stepped by the tick, never by the poll', () => {
     for (const every of [4, 20, 200, 600]) expect(ribbon(every)).toBe(ribbon(1))
   })
 })
+
+it('carries scene provenance with prose when observed groups merge', () => {
+  const t = town()
+  const ending = closed(2, 'other', 'They discussed the second promise.')
+  t.fold([
+    opened(0, 'first', 'talk', ['amara', 'yusuf'], 5),
+    opened(1, 'other', 'talk', ['nadia', 'omar'], 5),
+    ending,
+    opened(3, 'together', 'gathering', ['amara', 'yusuf', 'nadia', 'omar'], 5),
+  ])
+  const row = t.threads.frame(3).threads.find((r) => r.state !== 'closed')!
+  expect(row.proseSceneId).toBe('other')
+  expect(row.summary).toBe('They discussed the second promise.')
+  expect(row.sourceEventSeqs).toContain(ending.seq)
+  expect(row.basis).toBe('observed-overlap')
+})
+
+it('does not give a previous scene beat the new summary provenance', () => {
+  const t = town()
+  t.fold([
+    opened(0, 'first', 'talk', ['amara', 'yusuf'], 5),
+    closed(1, 'first', 'They discussed the bridge.', 'Amara agreed to help.'),
+    opened(2, 'second', 'talk', ['amara', 'yusuf'], 5),
+    closed(3, 'second', 'They discussed dinner.'),
+  ])
+  const row = t.threads.frame(3).threads.find((r) => r.state !== 'closed')!
+  expect(row.proseSceneId).toBe('second')
+  expect(row.summary).toBe('They discussed dinner.')
+  expect(row.beat).toBeUndefined()
+})

@@ -47,6 +47,8 @@ import {
   checkActRate,
   checkProviderMix,
   checkSpend,
+  configureSpendLimits,
+  heldCallers,
   insertAlert,
   migrateLlmTables,
   projectCallRate,
@@ -95,7 +97,21 @@ const LIVE_SPEND_CHECK_TICKS = 10
 const LIVE_RUNTIME_SAVE_TICKS = 48
 /** The only event types `detectCandidates` reads. `events(type)` is indexed, so four narrow
  *  reads beat one full-log read whose rows the recognizer then drops. */
-const RECOGNIZER_EVENTS = ['agent_moved', 'agent_spoke', 'agent_expressed', 'item_taken']
+const RECOGNIZER_EVENTS = [
+  'agent_moved',
+  'agent_spoke',
+  'agent_expressed',
+  'item_taken',
+  'item_moved',
+  'agent_spawned',
+  'agent_entered',
+  'agent_exited',
+  'agent_departed',
+  'scene_opened',
+  'scene_turned',
+  'scene_line',
+  'scene_closed',
+]
 /** How many of a day's words the tier-2.5 pass is shown. A very loud day must not build an
  *  unbounded prompt; the most recent words are the ones a first is most likely to be in. */
 const SEMANTIC_RECORD_CAP = 300
@@ -434,9 +450,26 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   mkdirSync(opts.agentDbDir, { recursive: true })
 
   const opsDb = openAgentDb(join(opts.agentDbDir, LIVE_OPS_DB))
-  migrateLlmTables(opsDb)
-  opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts)')
-  opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_agent ON llm_calls(agent_id)')
+  try {
+    migrateLlmTables(opsDb)
+    configureSpendLimits(opsDb, { lifetimeUsd: cap > 0 ? cap : null, rollingDayUsd: dailyBudget })
+    opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_ts ON llm_calls(ts)')
+    opsDb.exec('CREATE INDEX IF NOT EXISTS idx_llm_calls_agent ON llm_calls(agent_id)')
+  } catch (error) {
+    opsDb.close()
+    throw error
+  }
+  const startupAlertId = (
+    opsDb.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM alerts').get() as {
+      id: number
+    }
+  ).id
+  const budgetRefusal = (): { spentUsd: number; limitUsd: number } | undefined =>
+    opsDb
+      .prepare(`SELECT json_extract(detail, '$.spentUsd') AS spentUsd,
+      json_extract(detail, '$.limitUsd') AS limitUsd FROM alerts
+      WHERE id > ? AND kind = 'town_budget_refused' ORDER BY id LIMIT 1`)
+      .get(startupAlertId) as { spentUsd: number; limitUsd: number } | undefined
   const spentToday = (): number => ledgerTotalUsd(opsDb, Date.now() - SPEND_DAY_MS)
 
   // Before the pre-flight, because the pre-flight spends and a town that is already over either
@@ -481,6 +514,11 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   }
 
   let stopped = false
+  let budgetStopped = false
+  const artAbort = new AbortController()
+  let settleArt: (() => Promise<void>) | null = null
+  let artSettling = false
+  let artRetryTimer: ReturnType<typeof setInterval> | null = null
   const clients = new Set<LlmClient>()
   const makeClient = (caller: string, agentId?: string, audience?: 'mind' | 'ops'): LlmClient => {
     const client =
@@ -492,43 +530,63 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
             ...(agentId === undefined ? {} : { agentId }),
             ...(audience === undefined ? {} : { audience }),
             allowProviderFallbacks: LIVE_ALLOW_PROVIDER_FALLBACKS,
-            ...(cap > 0 ? { budgetUsd: cap } : {}),
           })
     clients.add(client)
     if (stopped) client.abort()
     return client
   }
 
-  if (opts.preflight !== false) {
-    if (!process.env.OPENROUTER_API_KEY) {
-      throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
+  let openedNarratorDb: Database.Database | null = null
+  let openedArbiterDb: Database.Database | null = null
+  let embedder: NonNullable<LiveCastOpts['embedder']>
+  const wantsArbiter = opts.useArbiter !== false
+  try {
+    if (opts.preflight !== false) {
+      if (!process.env.OPENROUTER_API_KEY) {
+        throw new Error('SJ_LIVE=1 needs OPENROUTER_API_KEY — run with node --env-file=<repo>/.env')
+      }
+      const startedAt = Date.now()
+      const result = await runPreflight({
+        llm: makeClient('preflight'),
+        provider: 'default',
+        hardAllowList: !LIVE_ALLOW_PROVIDER_FALLBACKS,
+        model: MIND_MODEL,
+        identity: founders[0]?.identity,
+        personality: founders[0]?.personality,
+        rounds: PREFLIGHT_ROUNDS,
+        costUsd: () => preflightCostUsd(opsDb, startedAt),
+      })
+      log(
+        `stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}` +
+          ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};` +
+          ` this town has spent $${spentToday().toFixed(4)} of today's $${dailyBudget.toFixed(2)}`,
+      )
+      if (!result.passed) throw new Error(preflightRefusal(result))
     }
-    const startedAt = Date.now()
-    const result = await runPreflight({
-      llm: makeClient('preflight'),
-      provider: 'default',
-      hardAllowList: !LIVE_ALLOW_PROVIDER_FALLBACKS,
-      model: MIND_MODEL,
-      identity: founders[0]?.identity,
-      personality: founders[0]?.personality,
-      rounds: PREFLIGHT_ROUNDS,
-      costUsd: () => preflightCostUsd(opsDb, startedAt),
-    })
-    log(
-      `stream: pre-flight — action ${result.actions}/${result.calls} over ${result.roundsRun}` +
-        ` round(s), ${result.roundsPassed} passed, $${result.costUsd.toFixed(6)};` +
-        ` this town has spent $${spentToday().toFixed(4)} of today's $${dailyBudget.toFixed(2)}`,
-    )
-    if (!result.passed) throw new Error(preflightRefusal(result))
-  }
 
-  // Opened before the gateway, which reads this same file and will not create it.
-  const narratorDb = opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
+    openedNarratorDb =
+      opts.narratorDbPath === undefined ? null : openNarratorDb(opts.narratorDbPath)
+    embedder = opts.embedder ?? (await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR))
+    openedArbiterDb =
+      wantsArbiter && opts.arbiter === undefined
+        ? openArbiterDb(join(opts.agentDbDir, ARBITER_DB_FILE))
+        : null
+    if (openedArbiterDb !== null) {
+      const codex = new CodexStore(openedArbiterDb)
+      if (codex.known().length === 0) for (const entry of GENESIS_CODEX) codex.insert(entry)
+    }
+  } catch (error) {
+    for (const client of clients) client.abort()
+    openedArbiterDb?.close()
+    openedNarratorDb?.close()
+    opsDb.close()
+    throw error
+  }
+  const narratorDb = openedNarratorDb
+  const arbiterDb = openedArbiterDb
   const narratorStore = narratorDb === null ? null : new NarratorStore(narratorDb)
   let narrating = false
   let recognizing = false
-
-  const embedder = opts.embedder ?? (await Embedder.create(opts.modelsDir ?? DEFAULT_MODELS_DIR))
 
   const mindDbs = new Map<string, Database.Database>()
   const dbFor = (id: string): Database.Database => {
@@ -539,20 +597,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       mindDbs.set(id, db)
     }
     return db
-  }
-
-  // Opened here rather than in `attach` so a failure to open it refuses the run instead of
-  // taking down a world that is already ticking.
-  const wantsArbiter = opts.useArbiter !== false
-  const arbiterDb =
-    wantsArbiter && opts.arbiter === undefined
-      ? openArbiterDb(join(opts.agentDbDir, ARBITER_DB_FILE))
-      : null
-  if (arbiterDb !== null) {
-    // Seeded once per TOWN, not once per boot. Emptiness is the test because it is the only
-    // state that can mean "this town has never had a codex".
-    const codex = new CodexStore(arbiterDb)
-    if (codex.known().length === 0) for (const entry of GENESIS_CODEX) codex.insert(entry)
   }
 
   let booted: BootedMinds | null = null
@@ -572,9 +616,18 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       })
   }
 
-  const stopMinds = (): void => {
+  const stopMinds = (reason: 'budget' | 'disabled' = 'disabled'): void => {
     if (stopped) return
+    budgetStopped = reason === 'budget'
     stopped = true
+    if (artRetryTimer !== null) clearInterval(artRetryTimer)
+    artAbort.abort()
+    if (settleArt !== null) {
+      artSettling = true
+      void settleArt().finally(() => {
+        artSettling = false
+      })
+    }
     if (stopBirths !== null) trackPopulation(stopBirths())
     if (stopArrivals !== null) trackPopulation(stopArrivals())
     booted?.stop()
@@ -586,6 +639,31 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
   const ops: LiveOps = {
     opsDb,
     caps: { dailyUsd: dailyBudget, lifetimeUsd: cap },
+    mindStatus() {
+      if (stopped) return budgetStopped ? 'budget-stopped' : 'disabled'
+      if (budgetRefusal() !== undefined) return 'budget-stopped'
+      const latest = opsDb
+        .prepare(`SELECT ok FROM llm_calls
+        WHERE caller IN ('turn', 'turn.compact', 'reflection', 'reflection.edit', 'dream', 'scene')
+        ORDER BY id DESC LIMIT 1`)
+        .get() as { ok: number } | undefined
+      const now = Date.now()
+      if (
+        heldCallers(opsDb, now).some((caller) =>
+          ['turn', 'turn.compact', 'reflection', 'reflection.edit', 'dream', 'scene'].includes(
+            caller,
+          ),
+        )
+      )
+        return 'delayed'
+      if (latest === undefined || latest.ok === 0) return 'delayed'
+      const pending = opsDb
+        .prepare(`SELECT MIN(ts) AS ts FROM llm_reservations
+        WHERE status IN ('held', 'uncertain') AND caller IN
+        ('turn', 'turn.compact', 'reflection', 'reflection.edit', 'dream', 'scene')`)
+        .get() as { ts: number | null }
+      return pending.ts !== null && now - pending.ts >= 60_000 ? 'delayed' : 'active'
+    },
     rulings: arbiterDb === null ? null : new ReviewStore(arbiterDb),
     alert: (kind, detail) => {
       insertAlert(opsDb, { agentId: null, kind, detail })
@@ -616,6 +694,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       }
 
       bridge = new EngineBridge({ loop, store, simConfig: config })
+      bridge.onTick(() => {
+        const refusal = stopped ? undefined : budgetRefusal()
+        if (refusal === undefined) return
+        log(
+          `stream: town budget refused admission at $${refusal.spentUsd.toFixed(6)}` +
+            ` of $${refusal.limitUsd.toFixed(2)}`,
+        )
+        stopMinds('budget')
+        opts.onSpendStop?.(refusal.spentUsd, refusal.limitUsd)
+      })
       // The ceiling as a world law, not a runtime opinion: the engine refuses a conception at
       // it, and a replay of this log reaches the same town. Announced only when it moved.
       if (loop.state.laws?.['population.maxMinds'] !== maxMinds)
@@ -635,11 +723,10 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
       const art = createDiscoveryArt({
         codex: new AssetCodex(db),
         opsDb,
-        spendableUsd: () =>
-          Math.min(
-            dailyBudget - spentToday(),
-            cap > 0 ? cap - ledgerTotalUsd(opsDb) : Number.POSITIVE_INFINITY,
-          ),
+        ...(process.env.SJ_ART_DAILY_USD === undefined
+          ? {}
+          : { artDailyUsd: Number(process.env.SJ_ART_DAILY_USD) }),
+        signal: artAbort.signal,
         apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
         onError: (kind, err) => {
           log(`stream: no art for ${kind} — ${String(err)}`)
@@ -653,15 +740,15 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         if (typeof recipe.w === 'number' && typeof recipe.h === 'number')
           art.onDiscovery({ name: kind, makes: [], raises: [{ kind, w: recipe.w, h: recipe.h }] })
       }
+      for (const event of store.readTypeFrom(0, DISCOVERY_EVENT)) {
+        const discovery = event.payload as { name: string; makes: string[] }
+        art.onDiscovery(discovery)
+      }
       // A face for anybody the town makes. Same wallet as the objects, its own day's share.
       const faces = createCastArt({
         codex: new AssetCodex(db),
         opsDb,
-        spendableUsd: () =>
-          Math.min(
-            dailyBudget - spentToday(),
-            cap > 0 ? cap - ledgerTotalUsd(opsDb) : Number.POSITIVE_INFINITY,
-          ),
+        signal: artAbort.signal,
         apiKey: process.env.OPENROUTER_API_KEY, // absent ⇒ draws nothing
         ...(process.env.SJ_ART_DAILY_USD === undefined
           ? {}
@@ -670,6 +757,16 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           log(`stream: no face for ${id} — ${String(err)}`)
         },
       })
+
+      settleArt = async () => {
+        await Promise.all([art.settle(), faces.settle()])
+      }
+      artRetryTimer = setInterval(() => {
+        if (stopped) return
+        art.retry()
+        faces.retry()
+      }, 60_000)
+      artRetryTimer.unref()
 
       // Not built in `createLiveCast`: `makeArbiter` needs the tick and `onCodified` the bridge.
       // `makeClient` points at `opsDb` — an arbiter on its own db spends outside the anomaly stop.
@@ -685,18 +782,27 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
                 ...STREAM_VOCABULARY,
                 buildableKinds: makeables(config).builds.map((b) => b.kind),
               },
-              // A codification is a world fact, so it goes in the world's log. The verb is
-              // already minted by the time this runs, so nothing here can fail it.
               onCodified: (d: Codified) => {
-                bridge?.announce(DISCOVERY_EVENT, {
-                  recipeId: d.recipeId,
-                  name: d.name,
-                  kind: d.kind,
-                  byId: d.credit.agentId,
-                  intent: d.credit.intent,
-                  ...(d.credit.saying ? { saying: d.credit.saying } : {}),
-                  makes: d.makes,
-                })
+                const published = db
+                  .prepare(
+                    "SELECT 1 FROM events WHERE type = ? AND json_extract(payload, '$.recipeId') = ? LIMIT 1",
+                  )
+                  .get(DISCOVERY_EVENT, d.recipeId)
+                if (published === undefined)
+                  loop.commitEvents([
+                    {
+                      type: DISCOVERY_EVENT,
+                      payload: {
+                        recipeId: d.recipeId,
+                        name: d.name,
+                        kind: d.kind,
+                        byId: d.credit.agentId,
+                        intent: d.credit.intent,
+                        ...(d.credit.saying ? { saying: d.credit.saying } : {}),
+                        makes: d.makes,
+                      },
+                    },
+                  ])
                 art.onDiscovery({ name: d.name, makes: d.makes, raises: d.raises })
               },
             })
@@ -708,8 +814,6 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
               adjudicate: (...args) => built.adjudicate(...args),
               codify: (attempt, credit) => built.codify(attempt as AttemptVerdict, credit),
               roster: () => built.roster(),
-              customs: () => built.customs(),
-              habits: () => built.habits(),
               frontier: () => built.frontier(),
               compileLaw: (ask) => built.compileLaw(ask),
             })
@@ -1113,14 +1217,14 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
         const spent = ledgerTotalUsd(opsDb)
         if (cap > 0 && spent >= cap) {
           console.error(spendStopMessage(spent, cap))
-          stopMinds()
+          stopMinds('budget')
           opts.onSpendStop?.(spent, cap)
           return
         }
         const today = spentToday()
         if (today >= dailyBudget) {
           console.error(dailyStopMessage(today, dailyBudget))
-          stopMinds()
+          stopMinds('budget')
           // The day's figures, not the lifetime pair: this is the line that was crossed.
           opts.onSpendStop?.(today, dailyBudget)
           return
@@ -1166,7 +1270,8 @@ export async function createLiveCast(opts: LiveCastOpts): Promise<LiveCast> {
           booted?.busy() === true ||
           narrating ||
           recognizing ||
-          populationPending > 0,
+          populationPending > 0 ||
+          artSettling,
         REFLECTION_SETTLE_MS,
       )
       if (!settled)

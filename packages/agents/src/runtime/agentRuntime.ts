@@ -1,4 +1,6 @@
+import type { CallBill, LlmClient } from '@sj/llm'
 import {
+  ageYearsFromDays,
   BOND_VALENCE,
   dayPhaseFromTick,
   decayWarmth,
@@ -18,10 +20,22 @@ import {
 } from '@sj/shared'
 import { NoObjectGeneratedError } from 'ai'
 import type Database from 'better-sqlite3'
-import type { CallBill, LlmClient } from '@sj/llm'
+import { type DreamLlm, rollDream } from '../dream.js'
+import { promptText } from '../memory/gist.js'
+import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
+import { MemoryStore, type MemoryTags } from '../memory/store.js'
+import { TIE_PHRASE, type Tie, type TieStore } from '../memory/ties.js'
+import {
+  occasionsInPacket,
+  WANT_PRESSING,
+  type WantBias,
+  type WantOccasion,
+  WantStore,
+} from '../memory/wants.js'
+import { PersonalityStore } from '../personality.js'
 import type {
-  IdentityCore,
   AssembledPrompt,
+  IdentityCore,
   PromptBlocks,
   Recalled,
   Underway,
@@ -34,92 +48,79 @@ import {
   OWN_WORDS_SHOWN,
 } from '../prompt/assemble.js'
 import {
+  absenceLine,
+  bedtimeLine,
+  type Company,
+  doorstepLine,
+  gatheringLine,
   heardKey,
   heardProse,
+  inTalkLine,
   makeablesLine,
-  projectLine,
-  roadLine,
-  doorstepLine,
+  PARTNER_GONE_DAYS,
+  type PerceptionPacket,
+  type ProseWorld,
+  perceptionMemoryText,
   perceptionToProse,
   placesKnownLine,
-  valleyExtentLine,
-  walkTargetsLine,
-  roadOutLine,
-  PARTNER_GONE_DAYS,
+  projectLine,
   RESTLESS_DAYS,
+  type RoadCause,
+  repeatedActLine,
+  roadLine,
+  roadOutLine,
   SHUNNED_BREACHES,
   SHUNNED_DAYS,
-  type RoadCause,
-  absenceLine,
-  type Company,
-  gatheringLine,
-  inTalkLine,
-  type ProseWorld,
-  type WalkMark,
-  standingWallsLine,
-  repeatedActLine,
+  type Stillness,
   silentTurnsLine,
+  standingWallsLine,
   stasisLine,
-  TIMES_SAID,
-  type WordToTheAir,
-  wordToTheAirLine,
-  bedtimeLine,
   stillnessAt,
   stockLine,
+  TIMES_SAID,
   usefulLine,
+  valleyExtentLine,
   WANT_SAID,
+  type WalkMark,
+  type WordToTheAir,
+  walkTargetsLine,
   wantLine,
-  type Stillness,
+  wordToTheAirLine,
   worldDay,
-  type PerceptionPacket,
-  perceptionMemoryText,
 } from '../prompt/prose.js'
 import { RULES_OF_BEING } from '../prompt/rulesOfBeing.js'
-import { PersonalityStore } from '../personality.js'
-import { MemoryStore, type MemoryTags } from '../memory/store.js'
-import { TIE_PHRASE, type TieStore } from '../memory/ties.js'
-import {
-  occasionsInPacket,
-  WANT_PRESSING,
-  WantStore,
-  type WantBias,
-  type WantOccasion,
-} from '../memory/wants.js'
-import { keywords, retrieveAmbient, retrieveRecall, type SceneCues } from '../memory/retrieve.js'
-import { promptText } from '../memory/gist.js'
+import { type ReflectionLlm, runSleepReflection } from '../reflection.js'
+import type { SceneCoordinator } from '../scene/coordinator.js'
+import { addressedIn, type Scene, type SceneExit, SceneExitSchema } from '../scene/scene.js'
 import {
   BODY_NOOPS,
   isBlankAnswer,
   parseTurnWithRepair,
-  StrictTurnSchema,
   reconsiderTick,
-  turnSpeaks,
+  StrictTurnSchema,
   TURN_FIELDS,
   type Turn,
+  turnSpeaks,
 } from '../turn.js'
 import {
-  wakeReasons,
-  disarmBodyAlarm,
-  rearmBodyAlarm,
   DEFAULT_MIND_CONFIG,
+  disarmBodyAlarm,
   type MindClock,
   type MindConfig,
   type PlanState,
+  rearmBodyAlarm,
   type WakeReason,
+  wakeReasons,
 } from '../wake.js'
-import type { SceneCoordinator } from '../scene/coordinator.js'
-import { addressedIn, type Scene } from '../scene/scene.js'
-import { runSleepReflection, type ReflectionLlm } from '../reflection.js'
-import { rollDream, type DreamLlm } from '../dream.js'
-import type { EngineBridge, FinishedAct, Intent, SubmitResult } from './bridge.js'
 import {
+  type Adjudicator,
   aimedAt,
   buildAgentCtx,
-  humanizeIntent,
-  type Adjudicator,
   type Codifier,
+  humanizeIntent,
   type SeamArbiter,
 } from './arbiterSeam.js'
+import type { EngineBridge, FinishedAct, Intent, SubmitResult } from './bridge.js'
 
 const COMPACTION_SYSTEM = 'Your mind wanders back over the day…'
 
@@ -165,6 +166,7 @@ const LET_GO_IMPORTANCE = 4
 /** Two ties a person, on the turn that pays full price. What a pair holds past two is a scene's
  *  to read, and the scene already shows all of it. */
 const TIES_SHOWN_PER_PERSON = 2
+const COMMITMENTS_SHOWN = 3
 
 // Rendered at prose time and never written back into a stored ruling. Only a skill deficit
 // earns it: a thing nobody can do teaches no one a false path.
@@ -223,6 +225,21 @@ export function actionMemoryText(done: FinishedAct, mintedName?: string, runsTod
     const again =
       runsToday < 2 ? '' : ` That makes ${TIMES_SAID[runsToday] ?? `${runsToday} times`} today.`
     return `You have carried out "${mintedName}".${again}`
+  }
+  const params = done.params ?? {}
+  if (
+    done.verb === 'stow' &&
+    typeof params.itemId === 'string' &&
+    typeof params.structureId === 'string'
+  )
+    return `You have stowed ${params.itemId} in ${params.structureId}. It is stored there, not in your hands.`
+  if (done.verb === 'take' && typeof params.itemId === 'string')
+    return `You have taken ${params.itemId}. It is now in your hands.`
+  if (done.verb === 'walk') {
+    const target = params.structureId ?? params.targetId ?? params.itemId
+    if (typeof target === 'string') return `You have arrived within reach of ${target}.`
+    if (typeof params.x === 'number' && typeof params.y === 'number')
+      return `You have arrived at (${params.x}, ${params.y}).`
   }
   const past = verbPhrasePast(done.verb)
   if (!GATHERING_VERBS.has(done.verb)) return `You have ${past}.`
@@ -371,6 +388,8 @@ export const PLANNING_WAKES: ReadonlySet<WakeReason> = new Set<WakeReason>([
 export type RuntimeSnapshot = {
   clock: MindClock
   plan: PlanState
+  planHeadInFlight?: boolean
+  lastActSeq?: number
   stats: { turns: number; dozes: number; reflections: number }
   dayLog: string[]
   reflectedNight: number | null
@@ -440,8 +459,6 @@ export class AgentRuntime {
   #adjudicator: Adjudicator | null
   #codify: Codifier | null = null
   #roster: (() => RosterEntry[]) | null = null
-  #customs: (() => readonly string[]) | null = null
-  #habits: (() => readonly string[]) | null = null
   #frontier: (() => readonly string[]) | null = null
 
   #agentId = ''
@@ -634,6 +651,8 @@ export class AgentRuntime {
         lastResult: this.#plan.lastResult,
         size: this.#plan.size,
       },
+      planHeadInFlight: this.#planHeadInFlight,
+      lastActSeq: this.#lastActSeq,
       stats: { ...this.#stats },
       dayLog: [...this.#dayLog],
       reflectedNight: this.#nightWritten,
@@ -664,6 +683,31 @@ export class AgentRuntime {
       lastResult: s.plan.lastResult,
       size: s.plan.size,
     }
+    const recovered =
+      s.lastActSeq === undefined
+        ? []
+        : this.#bridge.completedSince(this.#agentId, s.lastActSeq, true)
+    const matchesHead = (act: { verb: string; params?: Record<string, unknown> }): boolean => {
+      const head = this.#plan.queue[0]
+      const params = act.params
+      return (
+        head?.verb === act.verb &&
+        params !== undefined &&
+        Object.entries(head.params).every(([key, value]) => params[key] === value)
+      )
+    }
+    if (s.planHeadInFlight === true) {
+      for (const completed of recovered) {
+        if (matchesHead(completed)) this.#plan.queue.shift()
+      }
+      if (this.#plan.queue.length === 0) this.#plan.lastResult = 'done'
+    }
+    const active = this.#bridge.currentAction(this.#agentId)
+    this.#planHeadInFlight =
+      s.planHeadInFlight === true &&
+      this.#plan.queue[0]?.verb !== STOP &&
+      active !== null &&
+      (matchesHead(active) || (active.then !== undefined && matchesHead(active.then)))
     this.#stats = { ...s.stats }
     this.#dayLog = [...s.dayLog]
     this.#reflectedNight = s.reflectedNight
@@ -681,6 +725,10 @@ export class AgentRuntime {
     this.#heardTold = new Set(s.heardTold ?? [])
     this.#doorstepSaidTick = s.doorstepSaidTick ?? null
     this.#scenes?.adopt(s.scene)
+    if (s.lastActSeq !== undefined) {
+      this.#lastActSeq = s.lastActSeq
+      this.#noteFinishedActs(recovered)
+    }
   }
 
   // Post-construction wiring: the supervisor builds the arbiter after
@@ -689,9 +737,31 @@ export class AgentRuntime {
     this.#adjudicator = arbiter.adjudicate
     this.#codify = arbiter.codify
     this.#roster = arbiter.roster ?? null
-    this.#customs = arbiter.customs ?? null
-    this.#habits = arbiter.habits ?? null
     this.#frontier = arbiter.frontier ?? null
+  }
+
+  commitSceneExit(choice: SceneExit, tick: number): void {
+    if (!this.#started) return
+    const accepted = SceneExitSchema.parse(choice)
+    if (accepted.plan != null) this.#setPlan(accepted.plan)
+    if (accepted.reconsider_at != null)
+      this.#clock.reconsiderAtTick = reconsiderTick(tick, accepted.reconsider_at)
+  }
+
+  actionContext(): string {
+    const plan =
+      this.#plan.queue.length === 0
+        ? 'No physical steps are queued.'
+        : `Your committed physical steps, not yet completed: ${JSON.stringify(this.#plan.queue)}.`
+    return [plan, this.#lastOutcome ?? ''].filter(Boolean).join(' ')
+  }
+
+  #setPlan(plan: NonNullable<Turn['plan']>): void {
+    this.#plan.queue = plan.map((step) => asMinted(step, this.#roster?.() ?? []))
+    this.#plan.size = plan.length
+    this.#plan.lastResult = plan.length > 0 ? 'running' : 'idle'
+    this.#planHeadInFlight = false
+    this.#planSettled = 0
   }
 
   stop(): void {
@@ -773,6 +843,12 @@ export class AgentRuntime {
     // thing that reads it.
     const belonging =
       dayPhaseFromTick(tick) === 'dusk' ? (this.#wants?.levelOf('belonging', tick) ?? 0) : 0
+    const reminder = this.#ties?.store.nextReminderAfter(this.#clock.lastTurnTick ?? -1) ?? null
+    if (
+      reminder !== null &&
+      (this.#clock.reconsiderAtTick === null || reminder < this.#clock.reconsiderAtTick)
+    )
+      this.#clock.reconsiderAtTick = reminder
     const wake = wakeReasons(this.#config, packet, this.#clock, tick, this.#plan, floor, belonging)
     const reason = wake[0] ?? null
     if (reason === 'reconsider') this.#clock.reconsiderAtTick = null
@@ -1218,8 +1294,8 @@ export class AgentRuntime {
 
   // Every act the world finished for this body since the last look. The refusals were always
   // written; this is the other half, so a mind holds a trace of what worked.
-  #noteFinishedActs(): void {
-    for (const done of this.#bridge.completedSince(this.#agentId, this.#lastActSeq)) {
+  #noteFinishedActs(finished = this.#bridge.completedSince(this.#agentId, this.#lastActSeq)): void {
+    for (const done of finished) {
       this.#lastActSeq = done.seq
       // Being taught from is the plainest way a mind is relied on, and the teacher is the only
       // one of the two who can see it happen.
@@ -1229,10 +1305,18 @@ export class AgentRuntime {
         ? this.#roster?.().find((r) => r.id === done.verb)?.name
         : undefined
       const runs = minted === undefined ? 1 : this.#countRecipeRun(done.verb, minted)
-      void this.#writeActionMemory(
-        actionMemoryText(done, minted, runs),
-        actImportance(done.verb),
-      ).catch(this.#sink('memory_write_failed'))
+      const outcome = actionMemoryText(done, minted, runs)
+      if (done.verb !== 'speak') this.#lastOutcome = outcome
+      if (
+        !done.settled &&
+        done.verb !== 'speak' &&
+        this.#plan.lastResult === 'idle' &&
+        this.#plan.queue.length === 0
+      )
+        this.#plan.lastResult = 'done'
+      void this.#writeActionMemory(outcome, actImportance(done.verb)).catch(
+        this.#sink('memory_write_failed'),
+      )
     }
   }
 
@@ -1278,7 +1362,7 @@ export class AgentRuntime {
       )
       return
     }
-    this.#recordRefusal(head.verb, res.reason)
+    this.#recordRefusal(humanizeIntent(head.verb, head.params), res.reason)
   }
 
   // Every refusal goes both ways at once: into the mind's own history, and into the very next
@@ -1399,6 +1483,7 @@ export class AgentRuntime {
     const nowProse = [
       this.moodWord().length === 0 ? '' : `How you are right now: ${this.moodWord()}.`,
       prose,
+      this.#commitmentsLine(packet, tick),
       doorstep,
       stasisLine(this.#still, tick),
       silentTurnsLine(this.#silentTurns),
@@ -1453,12 +1538,10 @@ export class AgentRuntime {
     const blocks: PromptBlocks = {
       rulesOfBeing: RULES_OF_BEING,
       ...(this.#roster === null ? {} : { roster: this.#roster() }),
-      ...(this.#customs === null ? {} : { customs: this.#customs() }),
-      ...(this.#habits === null ? {} : { habits: this.#habits() }),
       laws: this.#bridge.lawTexts(),
       tabled: this.#bridge.tabledLines(),
       ...(this.#frontier === null ? {} : { frontier: this.#frontier() }),
-      identity: this.#withHands(),
+      identity: this.currentIdentity(),
       personality: {
         doc: this.#personality.current().doc,
         autobiography: this.#mem!.autobiography(),
@@ -1478,6 +1561,7 @@ export class AgentRuntime {
     // Steps still queued from the plan this call may be about to replace: what a paid call
     // throws away is only visible against what was already running.
     const priorStepsLeft = this.#plan.queue.length
+    const lastActSeqAtAsk = this.#lastActSeq
 
     let turn: Turn
     try {
@@ -1546,13 +1630,14 @@ export class AgentRuntime {
     // Read once: a cast back that has been answered is not answered again next turn, and a
     // refusal the mind has now been told about is not told twice.
     this.#pendingRecall = null
-    this.#lastOutcome = null
+    if (this.#lastActSeq === lastActSeqAtAsk) this.#lastOutcome = null
     // The body died while the provider was thinking. The call is paid for and booked; a corpse
     // still acts on nothing, thinks out loud to nobody and writes in no book.
     if (!this.#started) return
     await this.#applyTurn(turn, tick, day)
     if (
       (turn.plan ?? undefined) === undefined &&
+      this.#lastActSeq === lastActSeqAtAsk &&
       (this.#plan.lastResult === 'done' || this.#plan.lastResult === 'blocked')
     ) {
       this.#plan.lastResult = 'idle'
@@ -1688,12 +1773,7 @@ export class AgentRuntime {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- stop() can run during the action await.
     if (!this.#started) return
     if (turn.plan) {
-      const roster = this.#roster?.() ?? []
-      this.#plan.queue = turn.plan.map((step) => asMinted(step, roster))
-      this.#plan.size = turn.plan.length
-      this.#plan.lastResult = turn.plan.length > 0 ? 'running' : 'done'
-      this.#planHeadInFlight = false
-      this.#planSettled = 0
+      this.#setPlan(turn.plan)
       this.#pumpPlan(this.#bridge.perception(this.#agentId).self.activity)
     }
 
@@ -1714,8 +1794,7 @@ export class AgentRuntime {
     }
   }
 
-  /** A tie nothing has fed for seven sim-days closes, and the mind remembers letting it go. It
-   *  costs no call, so a night with no reflection in it still lets go. */
+  /** Unrefreshed affect fades; durable commitments need an explicit decision. */
   async #letGoOfStaleTies(): Promise<void> {
     const ties = this.#ties
     if (ties === null) return
@@ -1723,8 +1802,6 @@ export class AgentRuntime {
     try {
       for (const t of ties.store.letGo(tick)) {
         const who = this.#bridge.agentFacts(t.personId)?.name ?? t.personId
-        // Witnessed, folded to nothing: the bond graph reads it off the log, and a promise
-        // nobody ever settled is the only producer `promise_broken` has.
         this.#bridge.announce('tie_let_go', {
           agentId: this.#agentId,
           personId: t.personId,
@@ -1804,14 +1881,54 @@ export class AgentRuntime {
     if (ties === null) return new Map()
     const nameOf = new Map(ties.cast().map((p) => [p.id, p.name]))
     const held = new Map<string, string[]>()
-    for (const t of ties.store.open()) {
-      const name = nameOf.get(t.personId)
+    const open = ties.store.open()
+    for (const person of new Set(open.map((t) => t.personId))) {
+      const name = nameOf.get(person)
       if (name === undefined) continue
-      const rows = held.get(name) ?? []
-      if (rows.length < TIES_SHOWN_PER_PERSON) rows.push(`${TIE_PHRASE[t.kind]}: ${t.text}`)
-      held.set(name, rows)
+      const rows = open.filter((t) => t.personId === person)
+      const kin = rows.filter((t) => t.kind === 'kin')
+      const other = this.#prioritizeTies(
+        rows.filter((t) => t.kind !== 'kin'),
+        this.#bridge.currentTick(),
+      )
+      held.set(
+        name,
+        [...kin, ...other.slice(0, TIES_SHOWN_PER_PERSON)].map(
+          (t) => `${TIE_PHRASE[t.kind]}: ${t.text}`,
+        ),
+      )
     }
     return new Map([...held].map(([name, rows]) => [name, `Between you: ${rows.join(' | ')}.`]))
+  }
+
+  #prioritizeTies(ties: readonly Tie[], tick: number): Tie[] {
+    const due = (t: Tie): boolean => t.remindAtTick !== null && t.remindAtTick <= tick
+    const obligation = (t: Tie): boolean => t.kind === 'promise' || t.kind === 'debt'
+    return [...ties].sort(
+      (a, b) =>
+        Number(due(b)) - Number(due(a)) ||
+        Number(obligation(b)) - Number(obligation(a)) ||
+        b.tick - a.tick ||
+        a.id - b.id,
+    )
+  }
+
+  #commitmentsLine(packet: PerceptionPacket, tick: number): string {
+    if (this.#ties === null) return ''
+    const names = new Map(this.#ties.cast().map((p) => [p.id, p.name]))
+    const visible = new Set(packet.visible.agents.map((p) => p.id))
+    const rows = this.#prioritizeTies(
+      this.#ties.store
+        .open()
+        .filter(
+          (t) =>
+            (t.kind === 'promise' || t.kind === 'debt') &&
+            (!visible.has(t.personId) || (t.remindAtTick !== null && t.remindAtTick <= tick)),
+        ),
+      tick,
+    ).slice(0, COMMITMENTS_SHOWN)
+    if (rows.length === 0) return ''
+    return `Still pending: ${rows.map((t) => `${names.get(t.personId) ?? t.personId}: ${t.text}${t.remindAtTick !== null && t.remindAtTick <= tick ? ' (the time you noted has come)' : ''}`).join(' | ')}. These are intentions, not completed acts. You may act, defer, or reconsider.`
   }
 
   #buildLedgers(people: string[], packet: PerceptionPacket): PromptBlocks['scene']['ledgers'] {
@@ -1833,9 +1950,11 @@ export class AgentRuntime {
 
   // Read off the world every turn and rendered in buckets: what changes is the number, and the
   // words only turn over when a bucket does, so the identity block stays cached.
-  #withHands(): IdentityCore {
-    const skills = this.#bridge.agentFacts(this.#agentId)?.skills
-    return skills === undefined ? this.#identity : { ...this.#identity, skills }
+  currentIdentity(): IdentityCore {
+    const body = this.#bridge.agentFacts(this.#agentId)
+    return body === null
+      ? this.#identity
+      : { ...this.#identity, age: ageYearsFromDays(body.ageDays), skills: body.skills }
   }
 
   /** Bookkeeping around a turn the town has already been billed for. A method the client never

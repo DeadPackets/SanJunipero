@@ -62,7 +62,14 @@ import {
   siteAt,
   type PendingEvent,
 } from './common.js'
-import { buildTicks, buildableRecipe, craftRoutes, shortOf, type SeedRecipe } from './craft.js'
+import {
+  CRAFT_TAKES,
+  buildTicks,
+  buildableRecipe,
+  craftRoutes,
+  shortOf,
+  type SeedRecipe,
+} from './craft.js'
 import { bindObjectParam, unbindObjectParam } from './objectParam.js'
 import {
   CITY_HEARTH_KIND,
@@ -872,11 +879,16 @@ export function mealRestore(
 
 // In the hands, or close enough to put there in the same motion: once the hunger line started
 // saying where the loaf was, `eat: not holding that` rose 2 → 18. Reaching for supper is not a turn.
-function mealInHand(state: WorldState, agentId: string, itemId: string): Item | undefined {
+function mealInHand(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  itemId: string,
+): Item | undefined {
   const item = state.items[itemId]
   if (!item) return undefined
   if (item.loc.t === 'agent') return item.loc.id === agentId ? item : undefined
-  return itemWithinReach(state, agentId, item) ? item : undefined
+  return itemWithinReach(state, config, agentId, item) ? item : undefined
 }
 
 /** What a mouth does to a meal, wherever the meal came from: the poison it may carry, the
@@ -973,7 +985,7 @@ const eat: VerbDef = makeVerb({
     const item = state.items[p.data.itemId]
     if (!item) return 'not holding that'
     if (item.loc.t === 'agent' && item.loc.id !== agentId) return 'someone is holding that'
-    if (mealInHand(state, agentId, p.data.itemId) === undefined) {
+    if (mealInHand(state, config, agentId, p.data.itemId) === undefined) {
       return 'not holding that, go and stand beside it first'
     }
     if (!isFoodKind(config, item.kind)) return `${item.kind} is not food`
@@ -987,13 +999,13 @@ const eat: VerbDef = makeVerb({
   // recorded before the belly fills, so the meal in hand counts toward its own variety.
   results(state, _config, agentId, params) {
     const p = EatParams.safeParse(params)
-    const item = p.success ? mealInHand(state, agentId, p.data.itemId) : undefined
+    const item = p.success ? mealInHand(state, _config, agentId, p.data.itemId) : undefined
     return item === undefined ? {} : { kind: item.kind }
   },
   rngStream: 'illness',
   onComplete(state, config, agentId, params, rng) {
     const p = EatParams.parse(params)
-    const item = mealInHand(state, agentId, p.itemId)
+    const item = mealInHand(state, config, agentId, p.itemId)
     if (item === undefined) return []
     return [
       // The hand closes before the mouth opens, and it closes exactly as `take` closes it.
@@ -1976,7 +1988,7 @@ const craft: VerbDef = makeVerb({
   kind: 'craft',
   params: CraftParams,
   needsLight: true,
-  takes: 'half_hour',
+  takes: CRAFT_TAKES,
   validate(state, config, agentId, params) {
     const p = CraftParams.safeParse(params)
     if (!p.success) return 'crafting needs the thing to shape named'
@@ -2247,6 +2259,7 @@ const give: VerbDef = makeVerb({
       far: 'not adjacent to give',
     })
     if (bad) return bad
+    if (!sameInterior(state, agentId, p.data.targetId)) return 'a wall is in the way'
     const item = state.items[p.data.itemId]
     if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return 'not holding that'
     return null
@@ -2255,10 +2268,9 @@ const give: VerbDef = makeVerb({
   rngStream: 'illness',
   onComplete(state, config, agentId, params, rng) {
     const p = GiveParams.parse(params)
-    const item = state.items[p.itemId]
-    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
-    const target = state.agents[p.targetId]
-    if (!target?.alive) return []
+    if (give.validate(state, config, agentId, params) !== null) return []
+    const item = state.items[p.itemId]!
+    const target = state.agents[p.targetId]!
     // A body on the ground cannot close its hand around a loaf. Food held out to one is fed to
     // it, which is the whole of the rescue: the fold stands it up the moment it has eaten enough.
     if (target.collapsedSinceTick !== null && isFoodKind(config, item.kind)) {
@@ -2276,11 +2288,32 @@ const give: VerbDef = makeVerb({
 
 // Close enough to close a hand around. The one reach test `take` has always used, so a thing
 // another verb reaches for is exactly the thing `take` would have handed it.
-export function itemWithinReach(state: WorldState, agentId: string, item: Item): boolean {
+function structureWithinReach(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  s: Structure,
+): boolean {
+  const insideId = state.agents[agentId]!.insideId
+  return isRoofedKind(config, s.kind)
+    ? insideId === s.id
+    : insideId === undefined && nearRect(state, agentId, s.x, s.y, s.w, s.h)
+}
+
+export function itemWithinReach(
+  state: WorldState,
+  config: SimConfig,
+  agentId: string,
+  item: Item,
+): boolean {
   if (item.loc.t === 'agent') return false
-  if (item.loc.t === 'tile') return withinReach(state, agentId, item.loc.x, item.loc.y)
+  if (item.loc.t === 'tile')
+    return (
+      state.agents[agentId]!.insideId === undefined &&
+      withinReach(state, agentId, item.loc.x, item.loc.y)
+    )
   const s = state.structures[item.loc.id]
-  return s !== undefined && nearRect(state, agentId, s.x, s.y, s.w, s.h)
+  return s !== undefined && structureWithinReach(state, config, agentId, s)
 }
 
 // The lifting itself, so every verb that folds a taking into itself lifts the same way — the
@@ -2292,7 +2325,7 @@ function liftEvents(
   itemId: string,
 ): PendingEvent[] {
   const item = state.items[itemId]
-  if (!item || item.loc.t === 'agent') return []
+  if (!item || item.loc.t === 'agent' || !itemWithinReach(state, config, agentId, item)) return []
   const moved = { type: 'item_moved', payload: { id: itemId, loc: { t: 'agent', id: agentId } } }
   if (!config.ownership.enabled || item.owner === agentId) return [moved]
   // Unowned things are claimed by the hand that lifts them; owned things are not.
@@ -2316,14 +2349,14 @@ const take: VerbDef = makeVerb({
   kind: 'take',
   params: TakeParams,
   takes: 'moment',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = TakeParams.safeParse(params)
     if (!p.success) return 'taking needs the thing to lift'
     const item = state.items[p.data.itemId]
     if (!item) return 'no such item'
     if (item.loc.t === 'agent')
       return item.loc.id === agentId ? 'already holding that' : 'someone is holding that'
-    return itemWithinReach(state, agentId, item) ? null : 'not close enough to take'
+    return itemWithinReach(state, config, agentId, item) ? null : 'not close enough to take'
   },
   settled(state, _config, agentId, params) {
     const p = TakeParams.safeParse(params)
@@ -2384,7 +2417,7 @@ const stow: VerbDef = makeVerb({
   kind: 'stow',
   params: StowParams,
   takes: 'moment',
-  validate(state, _config, agentId, params) {
+  validate(state, config, agentId, params) {
     const p = StowParams.safeParse(params)
     if (!p.success) return 'stowing needs the thing and the store to leave it in'
     const item = state.items[p.data.itemId]
@@ -2392,11 +2425,10 @@ const stow: VerbDef = makeVerb({
     const s = state.structures[p.data.structureId]
     if (!s) return 'there is nothing there to put it in'
     if (s.stage !== 'complete') return 'it is not finished'
+    if (structureWithinReach(state, config, agentId, s)) return null
     const a = state.agents[agentId]!
-    if (a.insideId !== undefined) return a.insideId === s.id ? null : 'a wall is in the way'
-    if (!nearRect(state, agentId, s.x, s.y, s.w, s.h))
-      return 'not close enough to put anything down there'
-    return null
+    if (a.insideId !== undefined || isRoofedKind(config, s.kind)) return 'a wall is in the way'
+    return 'not close enough to put anything down there'
   },
   settled(state, _config, _agentId, params) {
     const p = StowParams.safeParse(params)
@@ -2404,10 +2436,9 @@ const stow: VerbDef = makeVerb({
     const loc = state.items[p.data.itemId]?.loc
     return loc?.t === 'structure' && loc.id === p.data.structureId
   },
-  onComplete(state, _config, agentId, params) {
+  onComplete(state, config, agentId, params) {
     const p = StowParams.parse(params)
-    const item = state.items[p.itemId]
-    if (item?.loc.t !== 'agent' || item.loc.id !== agentId) return []
+    if (stow.validate(state, config, agentId, params) !== null) return []
     // A shelf is not a transfer: the owner is unchanged, wherever the thing sits.
     return [
       { type: 'item_moved', payload: { id: p.itemId, loc: { t: 'structure', id: p.structureId } } },

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_CONFIG } from '@sj/shared'
 import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
-import { migrateLlmTables } from '@sj/llm'
+import { configureSpendLimits, makeBudgetGuard, migrateLlmTables, sumReserved } from '@sj/llm'
 import { AssetCodex, encodePng, openForgeDb, type RawImage } from '@sj/forge'
 import {
   CRITERIA,
@@ -90,15 +90,16 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
       .prepare('SELECT model, cost_usd FROM llm_calls WHERE caller = ? ORDER BY id')
       .all(FORGE_CALLER) as { model: string; cost_usd: number }[]
 
-  const artFor = (budgetUsd: number) =>
-    createDiscoveryArt({
+  const artFor = (budgetUsd: number) => {
+    configureSpendLimits(opsDb, { lifetimeUsd: budgetUsd, rollingDayUsd: budgetUsd })
+    return createDiscoveryArt({
       codex,
       opsDb,
-      spendableUsd: () => budgetUsd - ledgerTotalUsd(opsDb),
       apiKey: 'not-a-key',
       fetchFn: fakeFetch,
       judge,
     })
+  }
 
   beforeEach(async () => {
     png = await generationPng()
@@ -117,6 +118,7 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     }).step()
     opsDb = new Database(':memory:')
     migrateLlmTables(opsDb)
+    configureSpendLimits(opsDb, { lifetimeUsd: 3, rollingDayUsd: 3 })
   })
   afterEach(() => {
     refsFail.value = false
@@ -152,6 +154,114 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     } finally {
       await gw.close()
     }
+  }, 30_000)
+
+  it('holds an in-flight image and its reviewer against concurrent text allowance', async () => {
+    configureSpendLimits(opsDb, { lifetimeUsd: 1, rollingDayUsd: 1 })
+    let release!: () => void
+    let entered!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      apiKey: 'not-a-key',
+      judge,
+      fetchFn: async (...args) => {
+        entered()
+        await gate
+        return fakeFetch(...args)
+      },
+    })
+    art.onDiscovery(WATERSKIN)
+    await waiting
+    try {
+      expect(sumReserved(opsDb)).toBeCloseTo(0.0505, 6)
+      expect(makeBudgetGuard(opsDb, 'turn').reserve(0.75, null, null)).toHaveProperty('id')
+      expect(makeBudgetGuard(opsDb, 'narrator').reserve(0.75, null, null)).toHaveProperty(
+        'held',
+        'budget',
+      )
+    } finally {
+      release()
+      await art.settle()
+    }
+    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(0.0505, 6)
+  }, 30_000)
+
+  it('retains an interrupted image allowance and releases its unused reviewer allowance', async () => {
+    const cancellation = new AbortController()
+    let entered!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      apiKey: 'not-a-key',
+      judge,
+      signal: cancellation.signal,
+      fetchFn: async (_url, init) =>
+        new Promise((_resolve, reject) => {
+          entered()
+          init!.signal!.addEventListener(
+            'abort',
+            () => {
+              reject(init!.signal!.reason as Error)
+            },
+            {
+              once: true,
+            },
+          )
+        }),
+    })
+    art.onDiscovery(WATERSKIN)
+    await waiting
+    expect(sumReserved(opsDb)).toBeCloseTo(0.0505, 6)
+    cancellation.abort()
+    await art.settle()
+    expect(sumReserved(opsDb)).toBe(0.045)
+    expect(ledgerTotalUsd(opsDb)).toBe(0)
+  }, 30_000)
+
+  it('books an abort-ignoring provider once and refuses late asset writes', async () => {
+    const cancellation = new AbortController()
+    let release!: () => void
+    let entered!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let requests = 0
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
+      apiKey: 'not-a-key',
+      judge,
+      signal: cancellation.signal,
+      fetchFn: async (...args) => {
+        requests++
+        entered()
+        await gate
+        return fakeFetch(...args)
+      },
+    })
+    art.onDiscovery(WATERSKIN)
+    await waiting
+    cancellation.abort()
+    art.onDiscovery({ name: 'late', makes: ['cord'] })
+    release()
+    await art.settle()
+    expect(requests).toBe(1)
+    expect(ledgerTotalUsd(opsDb)).toBeCloseTo(0.045, 6)
+    expect(sumReserved(opsDb)).toBe(0)
+    expect(codex.listSince(0)).toEqual([])
   }, 30_000)
 
   it('★ once per TOWN: a restarted watcher reads the kind off the codex and pays nothing', async () => {
@@ -203,7 +313,6 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     const art = createDiscoveryArt({
       codex,
       opsDb,
-      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
       apiKey: 'not-a-key',
       fetchFn: noImage,
       judge,
@@ -217,13 +326,30 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(ledgerTotalUsd(opsDb)).toBeCloseTo(images * IMAGE_USD, 6)
   }, 30_000)
 
-  it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
-    const refused: string[] = []
-    let budgetUsd = 0
+  it('does not attempt global admission when discovery art is disabled', async () => {
+    configureSpendLimits(opsDb, { lifetimeUsd: 0, rollingDayUsd: 0 })
     const art = createDiscoveryArt({
       codex,
       opsDb,
-      spendableUsd: () => budgetUsd - ledgerTotalUsd(opsDb),
+      artDailyUsd: 0,
+      apiKey: 'not-a-key',
+      fetchFn: fakeFetch,
+      judge,
+    })
+    art.onDiscovery(WATERSKIN)
+    await art.settle()
+    expect(calls).toEqual([])
+    expect(
+      opsDb.prepare("SELECT COUNT(*) AS n FROM alerts WHERE kind = 'town_budget_refused'").get(),
+    ).toEqual({ n: 0 })
+  })
+
+  it('★ a spent day draws nothing, spends nothing, and leaves the kind for tomorrow', async () => {
+    const refused: string[] = []
+    configureSpendLimits(opsDb, { lifetimeUsd: 0, rollingDayUsd: 0 })
+    const art = createDiscoveryArt({
+      codex,
+      opsDb,
       apiKey: 'not-a-key',
       fetchFn: fakeFetch,
       judge,
@@ -238,9 +364,16 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(refused).toEqual(['waterskin'])
 
     // The refusal is not a verdict on the kind: the window rolls, and the next discovery draws it.
-    budgetUsd = 3
-    art.onDiscovery(WATERSKIN)
-    await art.settle()
+    configureSpendLimits(opsDb, { lifetimeUsd: 3, rollingDayUsd: 3 })
+    const tomorrow = createDiscoveryArt({
+      codex,
+      opsDb,
+      apiKey: 'not-a-key',
+      fetchFn: fakeFetch,
+      judge,
+    })
+    tomorrow.onDiscovery(WATERSKIN)
+    await tomorrow.settle()
     expect(codex.listSince(0).map((r) => r.kind)).toEqual(['waterskin'])
   }, 30_000)
 
@@ -250,7 +383,6 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     const art = createDiscoveryArt({
       codex,
       opsDb,
-      spendableUsd: () => 3 - ledgerTotalUsd(opsDb),
       apiKey: 'not-a-key',
       fetchFn: fakeFetch,
       judge,
@@ -262,13 +394,16 @@ describe('★ a discovery is drawn, once, out of the minds’ own wallet', () =>
     expect(codex.listSince(0)).toEqual([])
 
     refsFail.value = false
-    art.onDiscovery(WATERSKIN)
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 60_001)
+    art.retry()
     await art.settle()
+    clock.mockRestore()
     expect(codex.listSince(0).map((r) => [r.kind, r.status])).toEqual([['waterskin', 'ready']])
   }, 30_000)
 
   it('a run with no API key draws nothing at all', () => {
-    const art = createDiscoveryArt({ codex, opsDb, spendableUsd: () => 3, apiKey: undefined })
+    const art = createDiscoveryArt({ codex, opsDb, apiKey: undefined })
     art.onDiscovery(WATERSKIN)
     expect(calls).toEqual([])
     expect(codex.listSince(0)).toEqual([])
@@ -305,7 +440,8 @@ describe('the commission path is live-only, and it IS wired', () => {
       join(dirname(fileURLToPath(import.meta.url)), 'discoveryCommission.ts'),
       'utf8',
     )
-    expect(src).toMatch(/makeVisionJudge\(\{[^}]*config: loadForgeConfig\(\)/)
+    expect(src).toContain('const config = loadForgeConfig()')
+    expect(src).toMatch(/makeVisionJudge\(\{[^}]*\bconfig,/)
   })
 
   it('liveWorld commissions on the codification', () => {

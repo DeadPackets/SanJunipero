@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { kindWords } from './places.js'
 import { verbPhrase } from './verbs.js'
-import type { SimEvent } from './events.js'
+import { isSeededStructureEvent, type SimEvent } from './events.js'
 
 // What the town would remember. The weight is editorial, not a score the town can win:
 // it decides what surfaces in a curated feed, and nothing else reads it.
@@ -132,6 +132,7 @@ export const NOT_CHRONICLED: ReadonlySet<string> = new Set([
   'scene_opened',
   'scene_turned',
   'scene_line',
+  'scene_ended',
   // The mind already remembers letting go; the feed does not need to watch it happen.
   'tie_let_go',
   // Superseded by the mortality events above, which say the same things better.
@@ -351,6 +352,7 @@ function clipSaying(saying: string): string {
 // Human-framed, one sentence, never mechanics. null means "this type has no line yet",
 // which is how a future event type stays harmless.
 export function chronicleLine(ev: SimEvent, look: ChronicleLookup): string | null {
+  if (isSeededStructureEvent(ev)) return null
   const p = ev.payload as Record<string, unknown>
   const str = (v: unknown): string => (typeof v === 'string' ? v : '')
   switch (ev.type) {

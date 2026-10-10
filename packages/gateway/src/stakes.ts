@@ -18,7 +18,6 @@ import {
   SUMMARY_HOLD_TICKS,
   TIE_TERMS,
   tieActOf,
-  tieActOfLetGo,
   whyOf,
   type SceneKind,
   type ServerDirector,
@@ -114,6 +113,7 @@ type SceneEntry = Entry & {
   presses: number
   /** Held for `SUMMARY_HOLD_TICKS` after the close, so the shot stays through the summary. */
   closedAt: number | null
+  ended: boolean
 }
 
 type BodyEntry = Entry & { score: number; atTick: number }
@@ -220,7 +220,11 @@ export function makeDirector(
     const id = key.slice(2)
     if (key.startsWith('s:')) {
       const e = scenes.get(id)
-      return e === undefined || (e.cast.length < 2 && e.closedAt === null) ? -1 : sceneScore(e)
+      return e === undefined ||
+        (e.ended && e.closedAt === null) ||
+        (e.cast.length < 2 && e.closedAt === null)
+        ? -1
+        : sceneScore(e)
     }
     const e = bodies.get(id)
     return e === undefined ? -1 : decayed(e, tick)
@@ -262,6 +266,7 @@ export function makeDirector(
         ratified: 0,
         presses: 0,
         closedAt: null,
+        ended: false,
       }
       scenes.set(id, e)
     } else {
@@ -270,6 +275,7 @@ export function makeDirector(
     }
     e.kind = kind
     e.closedAt = null
+    e.ended = false
     e.base = stakes * SCENE_STAKES_X + (kind === 'council' ? COUNCIL_IN_SESSION : 0)
     e.firstToday += firstOf(kind)
     markTerm(e.terms, kind, e.base)
@@ -327,12 +333,17 @@ export function makeDirector(
 
   const closeScene = (id: string, deltas: readonly unknown[], tick: number): void => {
     for (const raw of deltas) {
-      const d = raw as { agentId?: unknown; personId?: unknown; kind?: unknown; settled?: unknown }
+      const d = raw as {
+        agentId?: unknown
+        personId?: unknown
+        kind?: unknown
+        resolution?: unknown
+      }
       const a = str(d.agentId)
       const b = str(d.personId)
       const kind = str(d.kind)
       if (a === null || b === null || kind === null) continue
-      const act = tieActOf(kind, d.settled === true)
+      const act = tieActOf(kind, str(d.resolution) ?? undefined)
       if (act === 'slight') {
         payEvent([a, b], 'slight', tick, id)
         if (partnerOf(a) === b) payEvent([a, b], 'partnership_strained', tick, id)
@@ -374,6 +385,11 @@ export function makeDirector(
           pay(e.cast, 'give_way', GIVE_WAY, ev.tick, e.sceneId)
           rewhy(e)
         }
+        return
+      }
+      case 'scene_ended': {
+        const e = scenes.get(str(p.id) ?? '')
+        if (e !== undefined) e.ended = true
         return
       }
       case 'scene_closed': {
@@ -433,11 +449,6 @@ export function makeDirector(
         payEvent([str(p.byId) ?? '', str(p.agentId) ?? ''], 'invitation_refused_seen', ev.tick)
         return
       }
-      case 'tie_let_go': {
-        if (tieActOfLetGo(str(p.kind) ?? '') !== 'promise_broken') return
-        payEvent([str(p.agentId) ?? '', str(p.personId) ?? ''], 'promise_broken', ev.tick)
-        return
-      }
       default:
     }
   }
@@ -456,6 +467,7 @@ export function makeDirector(
         scenes.delete(id)
         continue
       }
+      if (e.ended && e.closedAt === null) continue
       // A talk somebody walked out of is one body standing there: not a shot until it closes
       // with its summary, or somebody else joins.
       if (e.cast.length < 2 && e.closedAt === null) continue
@@ -551,7 +563,7 @@ export function makeDirector(
       const scenes = db
         .prepare(
           `SELECT seq, tick, type, payload FROM events
-            WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_closed')
+            WHERE type IN ('scene_opened', 'scene_turned', 'scene_line', 'scene_ended', 'scene_closed')
               AND tick >= ? AND tick <= ? ORDER BY seq`,
         )
         .all(dayStart, tick) as { seq: number; tick: number; type: string; payload: string }[]

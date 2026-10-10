@@ -1,4 +1,5 @@
 import {
+  APICallError,
   generateText,
   NoObjectGeneratedError,
   NoOutputGeneratedError,
@@ -24,7 +25,7 @@ import {
   type BudgetGuard,
   type LlmCallInsert,
 } from './callLog.js'
-import { railHold, tripRail, RAIL_WINDOW_MS } from './rails.js'
+import { clearRail, railHold, tripRail, RAIL_WINDOW_MS } from './rails.js'
 import { bookCostUsd, computeCostUsd } from './pricing.js'
 import {
   FALLBACK_MODELS,
@@ -32,6 +33,7 @@ import {
   PROVIDER_ORDER,
   callSettingsFor,
   requestTimeoutMsFor,
+  reservationPricesFor,
   type ReasoningSetting,
 } from './pins.js'
 import { jsonOrNothing, repairToSchema } from './repair.js'
@@ -134,7 +136,7 @@ const EMPTY_USAGE: LanguageModelUsage = {
   outputTokenDetails: { textTokens: 0, reasoningTokens: 0 },
 }
 
-const strictChecked = new Set<string>()
+const strictChecked = new WeakSet<z.ZodType>()
 
 /** What one caller sends OpenRouter over and above the prompt: which models may answer, which
  *  back ends may serve, and which mind is asking. */
@@ -223,7 +225,7 @@ export type LlmClientOpts = {
   budgetUsd?: number
   maxOutputTokens?: number
   temperature?: number
-  // Pre-booked per call while it is in flight. ~3x the observed mean call.
+  // Explicit allowance override. Otherwise reserve the prompt bytes and output token ceiling.
   expectedCallCostUsd?: number
   // Experiment lever: 'tool' moves the schema through the tools API instead of response_format.
   transport?: 'response_format' | 'tool'
@@ -249,7 +251,7 @@ function tokensOf(raw: LanguageModelUsage | undefined): CallTokens {
   }
 }
 
-const DEFAULT_EXPECTED_CALL_COST_USD = 0.005
+const DEFAULT_MAX_OUTPUT_TOKENS = 7500
 
 // One retry after the abort, then the call fails loudly. A third attempt only spends the
 // stall again.
@@ -310,11 +312,11 @@ export class LlmClient {
   private readonly limiter: AdaptiveLimiter
   private readonly budgetUsd: number | undefined
   private readonly dailyUsd: number | undefined
-  private readonly maxOutputTokens: number | undefined
+  private readonly maxOutputTokens: number
   private readonly temperature: number | undefined
   private readonly transport: 'response_format' | 'tool'
   private readonly toolChoice: 'named' | 'auto'
-  private readonly expectedCallCostUsd: number
+  private readonly expectedCallCostUsd: number | undefined
   private readonly audience: 'mind' | 'ops'
   private readonly guard: BudgetGuard
   private readonly opts: LlmClientOpts
@@ -345,11 +347,12 @@ export class LlmClient {
     this.limiter = limiterFor(this.providerOrder.join(','))
     this.budgetUsd = opts.budgetUsd
     this.dailyUsd = pinned.dailyUsd
-    this.maxOutputTokens = opts.maxOutputTokens ?? pinned.maxOutputTokens
+    this.maxOutputTokens =
+      opts.maxOutputTokens ?? pinned.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS
     this.temperature = opts.temperature ?? pinned.temperature
     this.transport = opts.transport ?? 'response_format'
     this.toolChoice = opts.toolChoice ?? 'named'
-    this.expectedCallCostUsd = opts.expectedCallCostUsd ?? DEFAULT_EXPECTED_CALL_COST_USD
+    this.expectedCallCostUsd = opts.expectedCallCostUsd
     this.audience = opts.audience ?? 'mind'
     this.guard = makeBudgetGuard(opts.db, opts.caller)
     this.model = opts.model
@@ -401,83 +404,90 @@ export class LlmClient {
     bill: CallBill,
   ): Promise<{ value: T; usage: LlmUsage }> {
     // OpenAI's decoder refuses a shape rather than bending it; say which, once, before the bill.
-    if (this.modelId.startsWith('openai/') && !strictChecked.has(this.caller)) {
-      strictChecked.add(this.caller)
+    if (this.modelId.startsWith('openai/') && !strictChecked.has(schema)) {
       const faults = strictSchemaFaults(schema)
-      if (faults.length > 0)
-        this.alert('schema_not_strict', `${this.caller}: ${faults.slice(0, 3).join('; ')}`)
+      if (faults.length > 0) {
+        const detail = `${this.caller}: ${faults.slice(0, 3).join('; ')}`
+        this.alert('schema_not_strict', detail)
+        throw new Error(`Invalid strict response schema: ${detail}`)
+      }
+      strictChecked.add(schema)
     }
-    return this.invoke(async (model, note) => {
-      if (this.transport === 'tool') {
-        const r = await generateText({
-          model,
-          system,
-          messages: toModelMessages(messages),
-          maxRetries: 0,
-          ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
-          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-          abortSignal: AbortSignal.any([
-            this.cancellation.signal,
-            AbortSignal.timeout(this.requestTimeoutMs),
-          ]),
-          tools: {
-            turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }),
-          },
-          toolChoice: this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
-        })
-        note(stepFacts(r))
-        const call = r.toolCalls[0]
-        const parsed = schema.safeParse(call?.input)
-        if (parsed.success) return parsed.data
-        // A turn the model wrote as prose instead of calling the tool is in the text channel;
-        // stringifying the call it never made throws that answer away.
-        const answer = call === undefined ? r.text : JSON.stringify(call.input)
-        const repaired = repairToSchema(answer, schema)
-        if (repaired !== undefined) {
+    return this.invoke(
+      async (model, note) => {
+        if (this.transport === 'tool') {
+          const r = await generateText({
+            model,
+            system,
+            messages: toModelMessages(messages),
+            maxRetries: 0,
+            maxOutputTokens: this.maxOutputTokens,
+            ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
+            abortSignal: AbortSignal.any([
+              this.cancellation.signal,
+              AbortSignal.timeout(this.requestTimeoutMs),
+            ]),
+            tools: {
+              turn: tool({ description: 'Your turn, as structured data.', inputSchema: schema }),
+            },
+            toolChoice: this.toolChoice === 'named' ? { type: 'tool', toolName: 'turn' } : 'auto',
+          })
+          note(stepFacts(r))
+          const call = r.toolCalls[0]
+          const parsed = schema.safeParse(call?.input)
+          if (parsed.success) return parsed.data
+          // A turn the model wrote as prose instead of calling the tool is in the text channel;
+          // stringifying the call it never made throws that answer away.
+          const answer = call === undefined ? r.text : JSON.stringify(call.input)
+          const repaired = repairToSchema(answer, schema)
+          if (repaired !== undefined) {
+            this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
+            return repaired.value
+          }
+          // The same class the response_format path throws: an off-schema answer is a wrong
+          // answer, and the loop must not bill an identical second ask for it.
+          throw new NoObjectGeneratedError({
+            message: `tool transport: ${call === undefined ? 'no tool call' : z.prettifyError(parsed.error)}`,
+            text: answer,
+            response: r.finalStep.response,
+            usage: r.usage,
+            finishReason: r.finishReason,
+          })
+        }
+        try {
+          const r = await generateText({
+            model,
+            system,
+            messages: toModelMessages(messages),
+            maxRetries: 0,
+            maxOutputTokens: this.maxOutputTokens,
+            ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
+            abortSignal: AbortSignal.any([
+              this.cancellation.signal,
+              AbortSignal.timeout(this.requestTimeoutMs),
+            ]),
+            output: Output.object({ schema }),
+          })
+          note(stepFacts(r))
+          return r.output
+        } catch (err) {
+          // Re-frames the provider's own bytes against the schema; never re-asks, never invents.
+          if (!NoObjectGeneratedError.isInstance(err)) throw err
+          const repaired = repairToSchema(err.text ?? '', schema)
+          if (repaired === undefined) throw err
           this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
+          note({
+            usage: err.usage ?? EMPTY_USAGE,
+            servedModel: err.response?.modelId,
+            provider: servedProvider(err.response, undefined),
+            finishReason: err.finishReason,
+          })
           return repaired.value
         }
-        // The same class the response_format path throws: an off-schema answer is a wrong
-        // answer, and the loop must not bill an identical second ask for it.
-        throw new NoObjectGeneratedError({
-          message: `tool transport: ${call === undefined ? 'no tool call' : z.prettifyError(parsed.error)}`,
-          text: answer,
-          response: r.finalStep.response,
-          usage: r.usage,
-          finishReason: r.finishReason,
-        })
-      }
-      try {
-        const r = await generateText({
-          model,
-          system,
-          messages: toModelMessages(messages),
-          maxRetries: 0,
-          ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
-          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-          abortSignal: AbortSignal.any([
-            this.cancellation.signal,
-            AbortSignal.timeout(this.requestTimeoutMs),
-          ]),
-          output: Output.object({ schema }),
-        })
-        note(stepFacts(r))
-        return r.output
-      } catch (err) {
-        // Re-frames the provider's own bytes against the schema; never re-asks, never invents.
-        if (!NoObjectGeneratedError.isInstance(err)) throw err
-        const repaired = repairToSchema(err.text ?? '', schema)
-        if (repaired === undefined) throw err
-        this.alert('decode_repaired', `${this.caller}: ${repaired.how}`)
-        note({
-          usage: err.usage ?? EMPTY_USAGE,
-          servedModel: err.response?.modelId,
-          provider: servedProvider(err.response, undefined),
-          finishReason: err.finishReason,
-        })
-        return repaired.value
-      }
-    }, bill)
+      },
+      bill,
+      this.allowanceFor(system, messages, schema),
+    )
   }
 
   async text(opts: {
@@ -487,22 +497,26 @@ export class LlmClient {
     this.cancellation.signal.throwIfAborted()
     const system = opts.system === undefined ? undefined : this.seal(opts.system)
     const messages = this.sealAll(opts.messages)
-    const { value, usage } = await this.invoke(async (model, note) => {
-      const r = await generateText({
-        model,
-        ...(system === undefined ? {} : { system }),
-        messages: toModelMessages(messages),
-        maxRetries: 0,
-        ...(this.maxOutputTokens === undefined ? {} : { maxOutputTokens: this.maxOutputTokens }),
-        ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
-        abortSignal: AbortSignal.any([
-          this.cancellation.signal,
-          AbortSignal.timeout(this.requestTimeoutMs),
-        ]),
-      })
-      note(stepFacts(r))
-      return r.text
-    })
+    const { value, usage } = await this.invoke(
+      async (model, note) => {
+        const r = await generateText({
+          model,
+          ...(system === undefined ? {} : { system }),
+          messages: toModelMessages(messages),
+          maxRetries: 0,
+          maxOutputTokens: this.maxOutputTokens,
+          ...(this.temperature === undefined ? {} : { temperature: this.temperature }),
+          abortSignal: AbortSignal.any([
+            this.cancellation.signal,
+            AbortSignal.timeout(this.requestTimeoutMs),
+          ]),
+        })
+        note(stepFacts(r))
+        return r.text
+      },
+      {},
+      this.allowanceFor(system ?? '', messages),
+    )
     return { text: value, usage }
   }
 
@@ -556,7 +570,7 @@ export class LlmClient {
     if (finishReason !== 'length') return
     this.alert(
       'llm_output_truncated',
-      `${this.caller}: the answer stopped at the ${this.maxOutputTokens ?? 'endpoint'} output ` +
+      `${this.caller}: the answer stopped at the ${this.maxOutputTokens} output ` +
         'token ceiling — raise it or the answer is a fragment',
     )
   }
@@ -576,17 +590,44 @@ export class LlmClient {
 
   private async invoke<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
-    bill: CallBill = {},
+    bill: CallBill,
+    expectedUsd: number,
   ): Promise<{ value: T; usage: LlmUsage }> {
     this.cancellation.signal.throwIfAborted()
-    if (this.budgetUsd !== undefined && this.totalCostUsd() >= this.budgetUsd) {
-      throw new BudgetExceededError(
-        `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} of $${this.budgetUsd.toFixed(6)}`,
-      )
-    }
+    return this.invokeReserved(exec, bill, expectedUsd)
+  }
+
+  private allowanceFor(system: string, messages: LlmMessage[], schema?: z.ZodType): number {
+    if (this.expectedCallCostUsd !== undefined) return this.expectedCallCostUsd
+    const input =
+      Buffer.byteLength(
+        JSON.stringify({
+          system,
+          messages,
+          ...(schema === undefined
+            ? {}
+            : { schema: z.toJSONSchema(schema, { unrepresentable: 'any' }) }),
+        }),
+        'utf8',
+      ) + 1024
+    const providers = this.allowProviderFallbacks
+      ? [...this.providerOrder, null]
+      : this.providerOrder
+    return Math.max(
+      ...[this.modelId, ...FALLBACK_MODELS].flatMap((model) =>
+        providers.map((provider) => {
+          const prices = reservationPricesFor(model, provider)
+          return (input * prices.input + this.maxOutputTokens * prices.output) / 1e6
+        }),
+      ),
+    )
+  }
+
+  private reserveAttempt(expectedUsd: number): number {
+    this.cancellation.signal.throwIfAborted()
     const now = Date.now()
     // Already held: the map is the answer, so a held caller costs no SQL on the tick thread.
-    const standing = this.dailyUsd === undefined ? null : railHold(this.caller, now)
+    const standing = this.dailyUsd === undefined ? null : railHold(this.db, this.caller, now)
     if (standing !== null) {
       throw new CallerRailError(this.caller, standing.spentUsd, standing.railUsd, standing.untilMs)
     }
@@ -594,20 +635,17 @@ export class LlmClient {
     // all read the same headroom and all spend it.
     const rail =
       this.dailyUsd === undefined ? null : { usd: this.dailyUsd, sinceMs: now - RAIL_WINDOW_MS }
-    const reservation = this.guard.reserve(this.expectedCallCostUsd, this.budgetUsd ?? null, rail)
+    const reservation = this.guard.reserve(expectedUsd, this.budgetUsd ?? null, rail)
     if ('held' in reservation) {
       if (reservation.held === 'budget') {
         throw new BudgetExceededError(
-          `LLM budget exceeded for caller '${this.caller}': spent $${this.totalCostUsd().toFixed(6)} plus $${this.guard.sumReserved().toFixed(6)} in flight of $${(this.budgetUsd ?? 0).toFixed(6)}`,
+          `Town budget exceeded for '${this.caller}': recorded $${reservation.spentUsd.toFixed(6)}`,
         )
       }
       throw this.holdOnRail(reservation.spentUsd, rail!, now)
     }
-    try {
-      return await this.invokeReserved(exec, bill)
-    } finally {
-      this.guard.release(reservation.id)
-    }
+    clearRail(this.db, this.caller)
+    return reservation.id
   }
 
   /** Records the trip, writes the operator one line for it, and hands back the refusal. The
@@ -620,7 +658,7 @@ export class LlmClient {
     const oldest = oldestCallTsSince(this.db, this.caller, rail.sinceMs) ?? now
     const untilMs = oldest + RAIL_WINDOW_MS
     const hold = { caller: this.caller, untilMs, spentUsd, railUsd: rail.usd }
-    if (tripRail(hold, now)) {
+    if (tripRail(this.db, hold, now)) {
       this.alert(
         'caller_rail_tripped',
         `${this.caller} has spent $${spentUsd.toFixed(4)} of its $${rail.usd.toFixed(2)} for` +
@@ -634,6 +672,7 @@ export class LlmClient {
   private async invokeReserved<T>(
     exec: (model: LanguageModel, note: Note) => Promise<T>,
     bill: CallBill,
+    expectedUsd: number,
   ): Promise<{ value: T; usage: LlmUsage }> {
     let model = this.resolveModel()
     let modelName = typeof model === 'string' ? model : model.modelId
@@ -648,10 +687,20 @@ export class LlmClient {
     // full would multiply the two waits together.
     const queueUntil = Date.now() + this.maxQueueWaitMs
     for (;;) {
+      let reservationId = this.reserveAttempt(expectedUsd)
+      let dispatched = false
       sends += 1
       try {
         return await this.limiter.run(
-          () => this.attemptOnce(model, modelName, exec, bill),
+          async () => {
+            if (dispatched) reservationId = this.reserveAttempt(expectedUsd)
+            dispatched = true
+            try {
+              return await this.attemptOnce(model, modelName, exec, bill, reservationId)
+            } finally {
+              this.guard.release(reservationId)
+            }
+          },
           Math.max(sends === 1 ? 0 : MIN_QUEUE_WAIT_MS, queueUntil - Date.now()),
           this.cancellation.signal,
         )
@@ -686,6 +735,7 @@ export class LlmClient {
         if (wait > this.requestTimeoutMs) break
         if (wait > 0) await sleep(wait, this.cancellation.signal)
       } finally {
+        this.guard.release(reservationId)
         const pinned = this.limiter.pinnedAlert()
         if (pinned !== null) this.alert('llm_rate_pinned', pinned)
       }
@@ -705,6 +755,7 @@ export class LlmClient {
     modelName: string,
     exec: (model: LanguageModel, note: Note) => Promise<T>,
     bill: CallBill,
+    reservationId: number,
   ): Promise<{ value: T; usage: LlmUsage }> {
     const start = performance.now()
     let facts: StepFacts = {}
@@ -726,8 +777,8 @@ export class LlmClient {
         served,
         provider,
       })
-      this.lastCallId = insertLlmCall(
-        this.db,
+      this.lastCallId = this.guard.reconcile(
+        reservationId,
         this.llmCallRow({
           model: served,
           provider,
@@ -761,8 +812,22 @@ export class LlmClient {
         served,
         provider,
       ).costUsd
-      this.lastCallId = insertLlmCall(
-        this.db,
+      const knownRefusal =
+        APICallError.isInstance(err) &&
+        err.statusCode !== undefined &&
+        err.statusCode >= 400 &&
+        err.statusCode < 500 &&
+        err.statusCode !== 408 &&
+        err.statusCode !== 499
+      const uncertain =
+        dead?.usage === undefined &&
+        facts.usage === undefined &&
+        facts.reportedCostUsd == null &&
+        !knownRefusal
+      if (uncertain) this.guard.retainUncertain(reservationId)
+      const book = (call: LlmCallInsert) =>
+        uncertain ? insertLlmCall(this.db, call) : this.guard.reconcile(reservationId, call)
+      this.lastCallId = book(
         this.llmCallRow({
           model: served,
           provider,
@@ -770,9 +835,9 @@ export class LlmClient {
           // without this the 3 rows r13 booked at the ceiling had no id to ask OpenRouter about.
           generationId: dead?.response?.id ?? facts.generationId ?? null,
           ...tokens,
-          costUsd: deadCost,
+          costUsd: facts.reportedCostUsd ?? deadCost,
           estimatedCostUsd: deadCost,
-          reportedCostUsd: null,
+          reportedCostUsd: facts.reportedCostUsd ?? null,
           latencyMs: performance.now() - start,
           finishReason,
           error: err instanceof Error ? err.message : String(err),

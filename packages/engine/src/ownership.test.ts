@@ -158,6 +158,8 @@ describe('taking', () => {
         builderId: 'a2',
       }),
     )
+    s = fold(s, ev('structure_completed', { id: 'structure_1' }))
+    s = fold(s, ev('agent_entered', { agentId: 'a1', structureId: 'structure_1' }))
     s = fold(
       s,
       ev('item_spawned', {

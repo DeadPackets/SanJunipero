@@ -26,32 +26,27 @@ export function cueChip(source: SoundSource): string {
 /** How long a ratified law's bell rings for, tail included. */
 export const BELL_MS = 2400
 
-/** The whole mix goes through this. The loudest world sums to 0.96 before it, so nothing the
- *  town can do reaches the clipping point. */
+/** Master headroom. The combined source gain is bounded below one in the mix tests. */
 export const SOUND_MASTER = 0.55
 
-// Gains, chosen so the loudest possible world — a storm, at night, over a fire, in a scene —
-// sums to under one. Every number here is a measured budget, not a taste.
-const WIND_BASE = 0.12
+// Conservative gain limits. A scene or bell ducks the weather bed below.
+const WIND_BASE = 0.06
 const WIND_LEAN: Readonly<Record<string, number>> = {
-  storm: 0.16,
-  rain: 0.1,
-  cloudy: 0.06,
-  snow: 0.06,
+  storm: 0.1,
+  rain: 0.05,
+  cloudy: 0.025,
+  snow: 0.025,
 }
-/** How much of the wind is the gust the canopies lean to. The rest is the air that is always
- *  there, so the one voice with no single source still answers to something on screen. */
-const WIND_GUST = 0.45
-const RAIN_GAIN: Readonly<Record<string, number>> = { rain: 0.24, storm: 0.34 }
-const FIRE_BASE = 0.09,
-  FIRE_STEP = 0.045,
-  FIRE_MAX = 0.2
+const RAIN_GAIN: Readonly<Record<string, number>> = { rain: 0.16, storm: 0.24 }
+const FIRE_BASE = 0.07,
+  FIRE_STEP = 0.025,
+  FIRE_MAX = 0.12
 /** A tone in the ear's own octave. At 0.2 it was the loudest thing the town ever did, and it
  *  did it all night. */
-const CRICKET_MAX = 0.06
-const MURMUR_BASE = 0.06,
-  MURMUR_STEP = 0.03,
-  MURMUR_MAX = 0.14
+const CRICKET_MAX = 0.03
+const MURMUR_BASE = 0.045,
+  MURMUR_STEP = 0.015,
+  MURMUR_MAX = 0.09
 /** One strike, budgeted in the same table as everything else rather than inside the synth. */
 const BELL_GAIN = 0.34
 
@@ -99,8 +94,8 @@ const cue = (source: SoundSource, gain: number, pan = 0, strike = 0): SoundCue =
 export function soundCues(s: SoundScene): SoundCue[] {
   const out: SoundCue[] = []
   const gust = Math.min(1, Math.max(0, s.gust ?? 1))
-  const air = WIND_BASE + (WIND_LEAN[s.weatherKind] ?? 0)
-  out.push(cue('wind', air * (1 - WIND_GUST + WIND_GUST * gust)))
+  const air = WIND_BASE * gust ** 2 + (WIND_LEAN[s.weatherKind] ?? 0)
+  if (air > 0.002) out.push(cue('wind', air))
   const rain = RAIN_GAIN[s.weatherKind]
   if (rain !== undefined) out.push(cue('rain', rain))
   // the same clear night the swarm is out on, and the swarm is what the viewer can see of it
@@ -275,12 +270,18 @@ const BURST_MIN_S = 1.2,
 const AHEAD_S = 0.6,
   PUMP_MS = 220
 
-/** Two seconds of white noise, generated once and looped: the material wind, rain, fire and a
- *  murmur are all cut from, each through its own filter. */
+/** Independent, gently swelling noise beds. The filters below bound their audible bands. */
 function noiseBuffer(ctx: AudioContext): AudioBuffer {
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 8, ctx.sampleRate)
   const data = buf.getChannelData(0)
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
+  const phase = Math.random() * Math.PI * 2
+  const fade = Math.round(ctx.sampleRate * 0.02)
+  for (let i = 0; i < data.length; i++) {
+    const turn = (i / data.length) * Math.PI * 2
+    const swell = 0.55 + 0.3 * Math.sin(turn + phase) + 0.15 * Math.sin(turn * 3 + phase)
+    const edge = Math.min(1, i / fade, (data.length - 1 - i) / fade)
+    data[i] = (Math.random() * 2 - 1) * swell * edge
+  }
   return buf
 }
 
@@ -304,18 +305,17 @@ function createSoundscape(): Soundscape {
   let pumping: ReturnType<typeof setInterval> | null = null
   let nap: ReturnType<typeof setTimeout> | null = null
 
-  /** One filtered tap off the shared noise loop. Built once, per source, on the first unmute. */
+  /** Built once on unmute. A low-pass ceiling prevents the rain and fire from becoming hiss. */
   const noiseVoice = (
     c: AudioContext,
     out: AudioNode,
-    buffer: AudioBuffer,
     type: BiquadFilterType,
     hz: number,
     q: number,
     placed: boolean,
   ): Voice => {
     const src = c.createBufferSource()
-    src.buffer = buffer
+    src.buffer = noiseBuffer(c)
     src.loop = true
     const filter = c.createBiquadFilter()
     filter.type = type
@@ -324,7 +324,11 @@ function createSoundscape(): Soundscape {
     const gain = c.createGain()
     gain.gain.value = 0
     const pan = placed ? c.createStereoPanner() : null
-    src.connect(filter).connect(gain)
+    const ceiling = c.createBiquadFilter()
+    ceiling.type = 'lowpass'
+    ceiling.frequency.value = type === 'highpass' ? 2400 : 1400
+    ceiling.Q.value = 0.5
+    src.connect(filter).connect(ceiling).connect(gain)
     if (pan === null) gain.connect(out)
     else gain.connect(pan).connect(out)
     src.start()
@@ -347,11 +351,10 @@ function createSoundscape(): Soundscape {
   }
 
   const build = (c: AudioContext, out: AudioNode): void => {
-    const noise = noiseBuffer(c)
-    voices.set('wind', noiseVoice(c, out, noise, 'lowpass', 420, 0.7, false))
-    voices.set('rain', noiseVoice(c, out, noise, 'highpass', 1300, 0.6, false))
-    voices.set('fire', noiseVoice(c, out, noise, 'bandpass', 680, 0.8, true))
-    voices.set('murmur', noiseVoice(c, out, noise, 'bandpass', 480, 3.2, true))
+    voices.set('wind', noiseVoice(c, out, 'lowpass', 420, 0.7, false))
+    voices.set('rain', noiseVoice(c, out, 'highpass', 180, 0.6, false))
+    voices.set('fire', noiseVoice(c, out, 'bandpass', 680, 0.8, true))
+    voices.set('murmur', noiseVoice(c, out, 'bandpass', 480, 1.2, true))
     voices.set('crickets', cricketVoice(c, out))
   }
 

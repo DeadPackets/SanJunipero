@@ -80,7 +80,7 @@ describe('buildAgentCtx', () => {
       agentId: AGENT,
       name: 'Tamar',
       skills: { carpentry: 5 },
-      inventory: [{ kind: 'wood', qty: 3 }],
+      inventory: [{ id: 'item_1', kind: 'wood', qty: 3 }],
       position: { x: 7, y: 4 },
       people: [],
       visible: { structures: [], ground: ['grass'] },
@@ -91,7 +91,9 @@ describe('buildAgentCtx', () => {
   // five minds drank from one, and overturned its own precedent to do it. It could not see.
   it('shows the arbiter what stands in front of the asker', () => {
     const { bridge } = world({ well: true })
-    expect(buildAgentCtx(bridge, AGENT).visible.structures).toEqual([{ kind: 'well', x: 9, y: 4 }])
+    expect(buildAgentCtx(bridge, AGENT).visible.structures).toEqual([
+      { id: 'structure_1', kind: 'well', x: 9, y: 4 },
+    ])
   })
 
   it('names the ground within sight, in the words a recipe may ask for', () => {

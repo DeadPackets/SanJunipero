@@ -16,7 +16,7 @@ import { EventStore, openDb } from '@sj/engine/store'
 import { RngStreams, TickLoop, genesisState, type TileId } from '@sj/engine'
 import { AssetCodex, openForgeDb } from '@sj/forge'
 import { createGateway, type Gateway } from './server.js'
-import { ensureObserverTables, publishMind, publishThought } from './observer.js'
+import { ensureObserverTables, observerRunId, publishMind, publishThought } from './observer.js'
 import { WorldMirror } from './worldMirror.js'
 import { frameText } from './http.js'
 import { connect, nextFrame as nextRaw, until } from './testutil.js'
@@ -64,6 +64,156 @@ describe('gateway server', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('broadcasts a scene ending before its summary and omits it from late catchup', async () => {
+    const dbPath = join(dir, 'scene-ending.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('scene-ending'),
+      onTick: ({ tick, emit }) => {
+        if (tick === 2)
+          emit('scene_opened', {
+            id: 'ending',
+            kind: 'talk',
+            participants: ['a', 'b'],
+            topic: 'The gate',
+            stakes: 2,
+          })
+        if (tick === 3)
+          emit('scene_ended', { id: 'ending', closeReason: 'left', participants: ['a', 'b'] })
+        if (tick === 5)
+          emit('scene_closed', {
+            id: 'ending',
+            summary: 'B left the gate.',
+            deltas: [],
+            closeReason: 'left',
+          })
+      },
+    })
+    loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    await hello(sock)
+    loop.step()
+    gw.pump()
+    await until(() => frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene'), 2000)
+    frames.length = 0
+    loop.step()
+    gw.pump()
+    await until(
+      () =>
+        frames.some((f) => {
+          const m = ServerMsg.parse(JSON.parse(f))
+          return m.t === 'scene' && !m.scene.open
+        }),
+      2000,
+    )
+    const late = await connect(gw.port)
+    open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(30)
+    expect(lateFrames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+    frames.length = 0
+    loop.step()
+    loop.step()
+    gw.pump()
+    await until(
+      () =>
+        frames.some((f) => {
+          const m = ServerMsg.parse(JSON.parse(f))
+          return m.t === 'scene' && m.scene.summary === 'B left the gate.'
+        }),
+      2000,
+    )
+  })
+
+  it('restores active scenes on startup, replay entry, reconnect and return to live', async () => {
+    const dbPath = join(dir, 'scene-catchup.db')
+    const db = openDb(dbPath)
+    const loop = new TickLoop({
+      store: new EventStore(db),
+      state: genesisState(DEFAULT_CONFIG, GRASS),
+      rng: new RngStreams('scene-catchup'),
+      snapshotEveryTicks: 5,
+      onTick: ({ tick, emit }) => {
+        if (tick === 2)
+          emit('scene_opened', {
+            id: 'active',
+            kind: 'talk',
+            participants: ['a', 'b'],
+            topic: 'The garden',
+            stakes: 2,
+          })
+        if (tick === 4)
+          emit('scene_turned', {
+            id: 'active',
+            kind: 'quarrel',
+            participants: ['a', 'b', 'c'],
+            stakes: 5,
+          })
+        if (tick === 3 || tick === 5)
+          emit('scene_line', { id: 'active', agentId: 'a', text: `Line at ${tick}`, move: 'tell' })
+        if (tick === 8)
+          emit('scene_closed', {
+            id: 'active',
+            summary: 'They leave.',
+            deltas: [],
+            closeReason: 'ended',
+          })
+      },
+    })
+    for (let i = 0; i < 5; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    const currentScene = () =>
+      frames.map((f) => ServerMsg.parse(JSON.parse(f))).find((f) => f.t === 'scene')
+    await hello(sock)
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.participants).toEqual(['a', 'b', 'c'])
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'replay', from: 3, reqId: 1 }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.participants).toEqual(['a', 'b'])
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'live' }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.kind).toBe('quarrel')
+    const transcriptResponse = await fetch(
+      `http://127.0.0.1:${gw.port}/api/scenes/active/transcript?atTick=3`,
+    )
+    expect(await transcriptResponse.json()).toMatchObject({
+      catchup: true,
+      lines: [{ text: 'Line at 3' }],
+    })
+    frames.length = 0
+    sock.send(JSON.stringify({ t: 'scrub', tick: 3, reqId: 2 }))
+    await until(() => currentScene() !== undefined, 2000)
+    expect(currentScene()?.scene.kind).toBe('talk')
+    frames.length = 0
+    for (let i = 0; i < 3; i++) loop.step()
+    gw.pump()
+    await wait(30)
+    expect(frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+    const late = await connect(gw.port)
+    open.push(late)
+    const lateFrames: string[] = []
+    collect(late, lateFrames)
+    await hello(late)
+    await wait(30)
+    expect(lateFrames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'scene')).toBe(false)
+  })
+
   it('speaks the observatory protocol end to end', async () => {
     const dbPath = join(dir, 'world.db')
     openForgeDb(dbPath).close() // forge tables share the world db in this fixture
@@ -73,13 +223,25 @@ describe('gateway server', () => {
     const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
     open.push(gw)
     expect(gw.port).toBeGreaterThan(0)
+    const usage = await fetch(`http://127.0.0.1:${gw.port}/api/usage`)
+    expect(usage.status).toBe(200)
+    expect(usage.headers.get('cache-control')).toBe('public, max-age=10')
+    expect(await usage.json()).toMatchObject({ mode: 'unavailable', total: null, last24h: null })
 
     // hello → snapshot, live, matching hash
     const a = await connect(gw.port)
     open.push(a)
+    const initialFrames: string[] = []
+    collect(a, initialFrames)
     const snapRaw = await hello(a)
+    await wait(20)
+    expect(initialFrames.map((frame) => ServerMsg.parse(JSON.parse(frame)))).toContainEqual({
+      t: 'assets',
+      records: [],
+    })
     const snap = ServerMsg.parse(JSON.parse(snapRaw))
     if (snap.t !== 'snapshot') throw new Error('expected snapshot')
+    expect(snap.runId).toBe(observerRunId(db))
     expect(snap.live).toBe(true)
     expect(snap.tick).toBe(loop.state.tick)
     expect(stateHash(snap.state)).toBe(stateHash(JSON.parse(JSON.stringify(loop.state))))
@@ -247,6 +409,33 @@ describe('what a stranger cannot do to the town', () => {
       else await o.close()
     }
     rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('returns live inside the rate floor and cancels a queued scrub', async () => {
+    const dbPath = join(dir, 'scrub-cancel.db')
+    const { db, loop } = makeWorld(dbPath)
+    for (let i = 0; i < 10; i++) loop.step()
+    const gw = await createGateway({ dbPath, port: 0, terrain: GRASS, pollMs: 3_600_000, db })
+    open.push(gw)
+    const sock = await connect(gw.port)
+    open.push(sock)
+    await hello(sock)
+    const frames: string[] = []
+    collect(sock, frames)
+    for (const message of [
+      { t: 'live' },
+      { t: 'scrub', tick: 2, reqId: 1 },
+      { t: 'scrub', tick: 3, reqId: 2 },
+      { t: 'live' },
+    ])
+      sock.send(JSON.stringify(message))
+    await wait(150)
+    const parsed = frames.map((f) => ServerMsg.parse(JSON.parse(f)))
+    expect(parsed.filter((f) => f.t === 'snapshot')).toHaveLength(2)
+    expect(parsed.filter((f) => f.t === 'scrubbed').map((f) => f.reqId)).toEqual([1])
+    loop.step()
+    gw.pump()
+    await until(() => frames.some((f) => ServerMsg.parse(JSON.parse(f)).t === 'tick'), 2000)
   })
 
   it('★ answers a request target `URL` refuses with 400, and keeps serving', async () => {

@@ -1,3 +1,4 @@
+import { prepareTownAssets } from './bootAssets.js'
 import { useEffect, useRef } from 'react'
 import type { WorldStore } from '../state/worldStore.js'
 import { parseRoute, routeToPath } from '../ui/route.js'
@@ -6,10 +7,11 @@ import { cameraActionFor, stepZoom } from './cameraNav.js'
 import { createScene, type Scene } from './scene.js'
 import { createThreeWorld } from './three/world.js'
 import { installFaces } from './textFaces.js'
-import { TextureBook } from './textures.js'
+import { TextureBook, whenDressed } from './textures.js'
 import { syncEntities, type WorldPick } from './entities.js'
 import { createCharacterLayer, type CharacterLayer } from './characters.js'
 import { createPixelBubbles } from './pixelBubbles.js'
+import { createConversationPresence } from './conversationPresence.js'
 import { createResidentTokens } from './residentTokens.js'
 import { createBubbleLayer, type BubbleLayer } from './bubbles.js'
 import { createActLayer, type ActLayer } from './acts.js'
@@ -97,12 +99,14 @@ export function StageMount({
     const spatial = new URLSearchParams(location.search).get('renderer') !== 'pixi'
     let scene: Scene | null = null
     let disposed = false
+    const boot = new AbortController()
     let published = false
     let offSync: (() => void) | null = null
     let chars: CharacterLayer | null = null
     let bubbles: BubbleLayer | null = null
     let acts: ActLayer | null = null
     let residentTokens: ReturnType<typeof createResidentTokens> | null = null
+    let conversation: ReturnType<typeof createConversationPresence> | null = null
     let moments: MomentEmoteLayer | null = null
     let atmosphere: Atmosphere | null = null
     let weather: WeatherLayer | null = null
@@ -142,6 +146,7 @@ export function StageMount({
       bubbles?.destroy()
       acts?.destroy()
       residentTokens?.destroy()
+      conversation?.destroy()
       moments?.destroy()
       ambient?.destroy()
       lightPools?.destroy()
@@ -156,7 +161,8 @@ export function StageMount({
     }
     // Faces install before the scene exists so the first label drawn is already a bitmap
     // glyph; installFaces resolves even when the webfonts never do.
-    void installFaces(document)
+    void prepareTownAssets(store, boot.signal)
+      .then(() => installFaces(document))
       .then(() => createScene(rootEl, store, spatial))
       .then((s) => {
         if (disposed) {
@@ -208,7 +214,10 @@ export function StageMount({
         bubbles = spatial ? createPixelBubbles(s, store) : createBubbleLayer(s, store)
         s.bubbles = bubbles
         acts = createActLayer(s, store)
-        if (spatial) residentTokens = createResidentTokens(s, store, acts)
+        if (spatial) {
+          residentTokens = createResidentTokens(s, store, acts)
+          conversation = createConversationPresence(s, store)
+        }
         moments = createMomentEmotes(s, store, book)
         if (!spatial) atmosphere = createAtmosphere(s)
         if (atmosphere) s.atmosphere = atmosphere
@@ -278,6 +287,7 @@ export function StageMount({
             weather?.setKind(state.weather.kind)
           }
           three?.tick(dt)
+          conversation?.tick(now)
           residentTokens?.tick()
           // Counted, not indexed: the log is a capped ring, so its indices are reused.
           const said = store.thoughtsSeq()
@@ -293,6 +303,7 @@ export function StageMount({
         s.app.ticker.add(tickFn)
         published = true
         onScene?.(s)
+        if (!spatial) void whenDressed().then(store.setDressed)
       })
       .catch(() => {
         // No WebGL, no WebGPU, or a context lost mid-build.
@@ -302,6 +313,7 @@ export function StageMount({
       })
     return () => {
       disposed = true
+      boot.abort()
       // Fast Refresh remounts this component and the effect below destroys the scene; without
       // this line the chrome upstream keeps the dead one and throws on its next ticker call.
       if (published) onScene?.(null)

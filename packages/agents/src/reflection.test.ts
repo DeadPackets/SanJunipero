@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import { NoObjectGeneratedError } from 'ai'
+import { MockLanguageModelV4 } from 'ai/test'
 import { openAgentDb } from './memory/schema.js'
 import { MemoryStore, type MemoryKind, type MemoryRow, type MemoryTags } from './memory/store.js'
 import { GIST_MIN_CHARS } from './memory/gist.js'
@@ -24,6 +25,7 @@ import {
   autobiographyPrompt,
   proposeEditPrompt,
   ProposeEditSchema,
+  DAY_SUMMARY_SCHEMA,
   editFromAnswer,
   FALLBACK_AUTOBIOGRAPHY,
   FALLBACK_DAY_TITLE,
@@ -116,14 +118,28 @@ const LISTED_TIES: Awaited<ReturnType<ReflectionLlm['listTies']>> = [
     about: 'Nadia',
     kind: 'promise',
     text: 'She mends the storehouse door with me.',
-    settled: false,
+    tieId: null,
+    resolution: null,
+    evidenceSeqs: [],
+    remindAtTick: null,
   },
-  { about: 'Omar', kind: 'debt', text: 'Three firewood, and he brought them.', settled: true },
+  {
+    about: 'Omar',
+    kind: 'debt',
+    text: 'Three firewood, and he brought them.',
+    tieId: 1,
+    resolution: 'fulfilled',
+    evidenceSeqs: [],
+    remindAtTick: null,
+  },
   {
     about: 'Kestrel',
     kind: 'grudge',
     text: 'Nobody of that name has ever lived here.',
-    settled: false,
+    tieId: null,
+    resolution: null,
+    evidenceSeqs: [],
+    remindAtTick: null,
   },
 ]
 
@@ -170,12 +186,16 @@ class ScriptedReflectionLlm implements ReflectionLlm {
     ]
   }
 
-  async summarizeDay() {
+  async summarizeDay(
+    _scenes: { title: string; text: string }[],
+    _previous: readonly string[],
+  ): ReturnType<ReflectionLlm['summarizeDay']> {
     this.calls.push('summarizeDay')
     return {
       title: 'Trade and promises',
       text: 'The day was full of deals.',
       standing: ['Omar owes me three firewood by tomorrow.'],
+      revisions: [],
     }
   }
 
@@ -200,7 +220,106 @@ class ScriptedReflectionLlm implements ReflectionLlm {
   }
 }
 
+describe('intentions survive a quiet night', () => {
+  it('retains omitted goals over multiple nights and after reopening the store', async () => {
+    const { db, mem, personality } = await makeStores()
+    personality.updateCurrent({ mood: 'ok', worries: [], goals: ['Build a reading room.'] })
+    const llm = new ScriptedReflectionLlm(null)
+    const previousSeen: string[][] = []
+    llm.extractFacts = async () => []
+    llm.summarizeScenes = async () => []
+    llm.summarizeDay = async (_scenes, previous) => {
+      previousSeen.push([...previous])
+      return { title: 'Quiet', text: 'No progress today.', standing: [], revisions: [] }
+    }
+    for (const day of [DAY, DAY + 1]) await runSleepReflection({ mem, personality, llm, day })
+    const reopened = new PersonalityStore(db, AGENT)
+    expect(reopened.current().doc.current.goals).toEqual(['Build a reading room.'])
+    expect(previousSeen).toEqual([['Build a reading room.'], ['Build a reading room.']])
+  })
+  it('updates only named goals, records deliberate release and leaves an omitted project pending', async () => {
+    const { mem, personality } = await makeStores()
+    personality.updateCurrent({
+      mood: 'ok',
+      worries: [],
+      goals: ['Read at the well.', 'Finish the roof.', 'Plant an orchard.'],
+    })
+    const llm = new ScriptedReflectionLlm(null)
+    llm.extractFacts = async () => []
+    llm.summarizeScenes = async () => []
+    llm.summarizeDay = async () => ({
+      title: 'A change of mind',
+      text: 'I changed my plans.',
+      standing: ['Learn weaving.', 'Another task.'],
+      revisions: [
+        { previous: 'Read at the well.', decision: 'update', text: 'Read with Nadia.' },
+        {
+          previous: 'Plant an orchard.',
+          decision: 'resolve',
+          reason: 'I no longer want an orchard.',
+          evidenceSeqs: [],
+        },
+      ],
+    })
+    await runSleepReflection({ mem, personality, llm, day: DAY })
+    expect(personality.current().doc.current.goals).toEqual([
+      'Read with Nadia.',
+      'Finish the roof.',
+      'Learn weaving.',
+    ])
+    expect(
+      mem.memoriesOfDay(DAY).some((m) => m.text.includes('I no longer want an orchard.')),
+    ).toBe(true)
+  })
+
+  it('rejects unknown or duplicated references and preserves goals when the provider fails', async () => {
+    for (const revisions of [
+      [{ previous: 'Someone else’s goal', decision: 'resolve', reason: 'Done', evidenceSeqs: [] }],
+      [
+        { previous: 'Finish the roof.', decision: 'retain' },
+        { previous: 'Finish the roof.', decision: 'retain' },
+      ],
+      null,
+    ]) {
+      const { mem, personality } = await makeStores()
+      personality.updateCurrent({ mood: 'ok', worries: [], goals: ['Finish the roof.'] })
+      const llm = new ScriptedReflectionLlm(null)
+      llm.extractFacts = async () => []
+      llm.summarizeScenes = async () => []
+      llm.summarizeDay = async () => {
+        if (revisions === null) throw new Error('Provider unavailable')
+        return { title: 'Quiet', text: 'Nothing changed.', standing: [], revisions } as Awaited<
+          ReturnType<ReflectionLlm['summarizeDay']>
+        >
+      }
+      const result = await runSleepReflection({ mem, personality, llm, day: DAY })
+      expect(result.fallback).toBe(true)
+      expect(personality.current().doc.current.goals).toEqual(['Finish the roof.'])
+    }
+  })
+})
+
 describe('runSleepReflection pipeline', () => {
+  it('does not pay to extract unused facts and preserves existing source rows', async () => {
+    const { mem, personality } = await makeStores()
+    const rows = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
+    mem.insertFact({
+      day: DAY,
+      subject: 'Nadia',
+      predicate: 'promised',
+      object: 'help',
+      srcMemoryId: rows[0]!.id,
+    })
+    const llm = new ScriptedReflectionLlm(null)
+    llm.extractFacts = async () => {
+      throw new Error('Unused paid pass must not run')
+    }
+    const result = await runSleepReflection({ mem, personality, llm, day: DAY })
+    expect(result.fallback).toBe(false)
+    expect(result.factCount).toBe(0)
+    expect(mem.factsAbout('Nadia')).toHaveLength(1)
+  })
+
   it('the night gists the day’s long rows and pins what the mind is about', async () => {
     const { mem, personality } = await makeStores()
     const long = `Omar promised three planks. ${'The meadow is wide and quiet. '.repeat(30)}`
@@ -218,33 +337,24 @@ describe('runSleepReflection pipeline', () => {
     ])
   })
 
-  it('runs steps in spec order: facts strictly before any summarize', async () => {
+  it('summarizes source memories without an unused extracted-facts pass', async () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, [...SINGLE_PERSON_DAY, A_MAKING])
     const llm = new ScriptedReflectionLlm(null)
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
     expect(llm.calls).toEqual([
-      'extractFacts',
       'summarizeScenes',
       'summarizeDay',
       'updateLedger',
       'autobiographyParagraph',
       'proposeEdit',
     ])
-    expect(llm.calls.indexOf('extractFacts')).toBeLessThan(llm.calls.indexOf('summarizeScenes'))
-    expect(res.factCount).toBe(2)
+    expect(llm.calls).not.toContain('extractFacts')
+    expect(res.factCount).toBe(0)
     expect(res.sceneCount).toBe(2)
 
-    // facts rows inserted with srcMemoryId provenance
-    const nadiaFacts = mem.factsAbout('Nadia')
-    expect(nadiaFacts).toHaveLength(2)
-    expect(nadiaFacts.map((f) => f.srcMemoryId)).toEqual([memories[0]!.id, memories[1]!.id])
-    expect(nadiaFacts[0]).toMatchObject({
-      subject: 'Nadia',
-      predicate: 'traded',
-      object: 'grain for firewood',
-    })
+    expect(mem.factsAbout('Nadia')).toEqual([])
 
     // day node's childIds equal the scene node ids
     const scenes = mem.summaryNodes('scene', DAY)
@@ -271,7 +381,7 @@ describe('runSleepReflection pipeline', () => {
 
   // ★ A prefix only stays warm for the call right behind it: r13 put the day summary and every
   // ledger between the second dump and the third, and 70% of night calls read no cache at all.
-  it('★ the three night dumps go out back to back, before anything else is asked', async () => {
+  it('the remaining source-memory passes stay adjacent', async () => {
     const { db, mem, personality } = await makeStores()
     await seedDay(mem, DAY, TWO_PERSON_DAY)
     const llm = new ScriptedReflectionLlm(null)
@@ -283,7 +393,7 @@ describe('runSleepReflection pipeline', () => {
       ties: { store: new TieStore(db, AGENT), cast: CAST, tick: DAY * TICKS_PER_DAY },
     })
 
-    expect(llm.calls.slice(0, 3)).toEqual(['extractFacts', 'summarizeScenes', 'listTies'])
+    expect(llm.calls.slice(0, 2)).toEqual(['summarizeScenes', 'listTies'])
   })
 
   it('updates the ledger once per distinct person seen that day, and only those', async () => {
@@ -387,6 +497,19 @@ describe('runSleepReflection pipeline', () => {
 
   // A quarrel is the one signal the ties carry that the act table cannot: nothing was made,
   // and the mind still has something new to be about.
+  it('a consequential witnessed loss can invite an edit without forcing one', async () => {
+    const { mem, personality } = await makeStores()
+    await seedDay(mem, DAY, [
+      { text: 'I witnessed Nadia’s death.', people: ['Nadia'], importance: 9, kind: 'perception' },
+      ...SINGLE_PERSON_DAY,
+    ])
+    const llm = new ScriptedReflectionLlm(null)
+    const result = await runSleepReflection({ mem, personality, llm, day: DAY })
+    expect(llm.calls).toContain('proposeEdit')
+    expect(result.editApplied).toBe(false)
+    expect(personality.current().version).toBe(1)
+  })
+
   it('★ a quarrel the day opened is enough to ask', async () => {
     const { db, mem, personality } = await makeStores()
     await seedDay(mem, DAY, TWO_PERSON_DAY)
@@ -394,7 +517,15 @@ describe('runSleepReflection pipeline', () => {
     llm.listTies = async () => {
       llm.calls.push('listTies')
       return [
-        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+        {
+          about: 'Omar',
+          kind: 'grudge' as const,
+          text: 'He let the door rot.',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
       ]
     }
     await runSleepReflection({
@@ -441,7 +572,15 @@ describe('runSleepReflection pipeline', () => {
     llm.listTies = async () => {
       llm.calls.push('listTies')
       return [
-        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+        {
+          about: 'Omar',
+          kind: 'grudge' as const,
+          text: 'He let the door rot.',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
       ]
     }
     await runSleepReflection({
@@ -475,7 +614,15 @@ describe('runSleepReflection pipeline', () => {
     llm.listTies = async () => {
       llm.calls.push('listTies')
       return [
-        { about: 'Omar', kind: 'grudge' as const, text: 'He let the door rot.', settled: false },
+        {
+          about: 'Omar',
+          kind: 'grudge' as const,
+          text: 'He let the door rot.',
+          tieId: null,
+          resolution: null,
+          evidenceSeqs: [],
+          remindAtTick: null,
+        },
       ]
     }
     const alerts: string[] = []
@@ -503,30 +650,6 @@ describe('runSleepReflection pipeline', () => {
     expect(res.editApplied).toBe(false)
     expect(personality.current().version).toBe(1)
   })
-  it("skips facts whose srcMemoryId is not one of today's memories", async () => {
-    const { mem, personality } = await makeStores()
-    const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
-    const llm = new ScriptedReflectionLlm(null)
-    llm.extractFacts = async () => {
-      llm.calls.push('extractFacts')
-      return [
-        {
-          subject: 'Nadia',
-          predicate: 'traded',
-          object: 'grain for firewood',
-          srcMemoryId: memories[0]!.id,
-        },
-        { subject: 'Ghost', predicate: 'did', object: 'nothing', srcMemoryId: 999_999 },
-      ]
-    }
-    const res = await runSleepReflection({ mem, personality, llm, day: DAY })
-
-    expect(res.factCount).toBe(1)
-    expect(mem.factsAbout('Ghost')).toHaveLength(0)
-    expect(mem.factsAbout('Nadia')).toHaveLength(1)
-    // pipeline completed through autobiography — the bad src id did not abort mid-write
-    expect(mem.autobiography()).toHaveLength(1)
-  })
 })
 
 describe('runSleepReflection survives an exhausted budget (T22)', () => {
@@ -535,7 +658,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     await seedDay(mem, DAY, SINGLE_PERSON_DAY)
     const controller = new AbortController()
     const llm = Object.assign(new ScriptedReflectionLlm(null), { signal: controller.signal })
-    llm.extractFacts = async () => {
+    llm.summarizeScenes = async () => {
       controller.abort(new DOMException('Stopped', 'AbortError'))
       throw new DOMException('Stopped', 'AbortError')
     }
@@ -570,8 +693,8 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
     const llm = new ScriptedReflectionLlm(null)
-    llm.extractFacts = async () => {
-      llm.calls.push('extractFacts')
+    llm.summarizeScenes = async () => {
+      llm.calls.push('summarizeScenes')
       throw new BudgetExceededError('no headroom')
     }
     const sink = alertSink()
@@ -585,7 +708,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     expect(res.editApplied).toBe(false)
 
     // Not one LLM step past the refusal was attempted.
-    expect(llm.calls).toEqual(['extractFacts'])
+    expect(llm.calls).toEqual(['summarizeScenes'])
 
     const days = mem.summaryNodes('day', DAY)
     expect(days).toHaveLength(1)
@@ -617,9 +740,9 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
 
     expect(res.fallback).toBe(true)
-    expect(res.factCount).toBe(2)
-    expect(mem.factsAbout('Nadia')).toHaveLength(2)
-    expect(llm.calls).toEqual(['extractFacts', 'summarizeScenes'])
+    expect(res.factCount).toBe(0)
+    expect(mem.factsAbout('Nadia')).toHaveLength(0)
+    expect(llm.calls).toEqual(['summarizeScenes'])
     expect(mem.summaryNodes('day', DAY)[0]!.title).toBe(FALLBACK_DAY_TITLE)
     expect(mem.autobiography()).toEqual([FALLBACK_AUTOBIOGRAPHY])
     expect(sink.alerts.map((a) => a.kind)).toEqual(['reflection_fallback'])
@@ -653,8 +776,8 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
       const { mem, personality } = await makeStores()
       const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
       const llm = new ScriptedReflectionLlm(null)
-      llm.extractFacts = async () => {
-        llm.calls.push('extractFacts')
+      llm.summarizeScenes = async () => {
+        llm.calls.push('summarizeScenes')
         const err = new Error('The operation was aborted due to timeout')
         err.name = name
         throw err
@@ -664,7 +787,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
       const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
 
       expect(res.fallback, name).toBe(true)
-      expect(llm.calls, name).toEqual(['extractFacts'])
+      expect(llm.calls, name).toEqual(['summarizeScenes'])
       const days = mem.summaryNodes('day', DAY)
       expect(days, name).toHaveLength(1)
       for (const m of memories) expect(days[0]!.text, name).toContain(m.text)
@@ -682,8 +805,8 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const { mem, personality } = await makeStores()
     const memories = await seedDay(mem, DAY, SINGLE_PERSON_DAY)
     const llm = new ScriptedReflectionLlm(null)
-    llm.extractFacts = async () => {
-      llm.calls.push('extractFacts')
+    llm.summarizeScenes = async () => {
+      llm.calls.push('summarizeScenes')
       const err = new Error('the provider is on fire')
       err.name = 'AI_APICallError'
       throw err
@@ -693,7 +816,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
 
     expect(res.fallback).toBe(true)
-    expect(llm.calls).toEqual(['extractFacts'])
+    expect(llm.calls).toEqual(['summarizeScenes'])
     const days = mem.summaryNodes('day', DAY)
     expect(days).toHaveLength(1)
     for (const m of memories) expect(days[0]!.text).toContain(m.text)
@@ -712,7 +835,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     }))
     await seedDay(mem, DAY, long)
     const llm = new ScriptedReflectionLlm(null)
-    llm.extractFacts = async () => {
+    llm.summarizeScenes = async () => {
       throw new BudgetExceededError('no headroom')
     }
     const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: () => {} })
@@ -726,7 +849,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     // An agent who lived no recorded moment still gets a night, not a crash.
     const empty = await makeStores()
     const quiet = new ScriptedReflectionLlm(null)
-    quiet.extractFacts = async () => {
+    quiet.summarizeScenes = async () => {
       throw new BudgetExceededError('no headroom')
     }
     const res2 = await runSleepReflection({
@@ -770,7 +893,7 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const res = await runSleepReflection({ mem, personality, llm, day: DAY, alert: sink.alert })
 
     expect(res.fallback).toBe(true)
-    expect(llm.calls).toEqual(['extractFacts', 'summarizeScenes', 'gist'])
+    expect(llm.calls).toEqual(['summarizeScenes', 'gist'])
     expect(res.gistsWritten).toBe(1)
     expect(mem.memoriesOfDay(DAY)[0]!.gist).toBe(`gist: ${LONG_ROW.slice(0, 20).trim()}`)
     expect(sink.alerts.map((a) => a.kind)).toEqual(['reflection_fallback'])
@@ -803,14 +926,14 @@ describe('runSleepReflection survives an exhausted budget (T22)', () => {
     const { mem, personality } = await makeStores()
     const rows = await longDay(mem)
     const llm = new ScriptedReflectionLlm(null)
-    llm.extractFacts = async () => {
-      llm.calls.push('extractFacts')
+    llm.summarizeScenes = async () => {
+      llm.calls.push('summarizeScenes')
       throw new BudgetExceededError('no headroom')
     }
 
     const res = await runSleepReflection({ mem, personality, llm, day: DAY })
 
-    expect(llm.calls).toEqual(['extractFacts'])
+    expect(llm.calls).toEqual(['summarizeScenes'])
     expect(res.gistsWritten).toBe(0)
     // Still ungisted, so tomorrow's batch takes it off the backlog.
     expect(mem.ungistedMemories(GIST_MIN_CHARS, 10).map((m) => m.id)).toEqual([rows[0]!.id])
@@ -881,9 +1004,9 @@ describe('makeReflectionLlm prompts', () => {
     const llm = makeReflectionLlm(client)
     await llm.extractFacts(memories)
     await llm.summarizeScenes(memories)
-    await llm.summarizeDay([{ title: 'Trade', text: 'The day was full of deals.' }])
+    await llm.summarizeDay([{ title: 'Trade', text: 'The day was full of deals.' }], [])
     await llm.updateLedger('Nadia', null, memories)
-    await llm.listTies(memories, ['Nadia'])
+    await llm.listTies(memories, ['Nadia'], [])
     await llm.autobiographyParagraph('The day was full of deals.', doc)
     await llm.proposeEdit('The day was full of deals.', doc, memories, ['values', 'beliefs'])
     await llm.gist('A very long moment that the night sets down in short.')
@@ -1199,4 +1322,54 @@ describe('★ what reaches the page is said plainly', () => {
     expect(namesSelf(undefined, 'Farida')).toBe(false)
     expect(namesSelf('anything at all', undefined)).toBe(false)
   })
+})
+
+it('sends provider-supported goal revisions without oneOf in the actual response schema', async () => {
+  const db = new Sqlite(':memory:')
+  migrateLlmTables(db)
+  const answer = {
+    title: 'The roof waits',
+    text: 'I will finish the roof.',
+    standing: [],
+    revisions: [{ previous: 'Finish the roof.', decision: 'retain' }],
+  }
+  let responseFormat: unknown
+  const model = new MockLanguageModelV4({
+    doGenerate: async (options) => {
+      responseFormat = options.responseFormat
+      return {
+        content: [{ type: 'text', text: JSON.stringify(answer) }],
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: {
+          inputTokens: { total: 0, noCache: 0, cacheRead: 0, cacheWrite: undefined },
+          outputTokens: { total: 0, text: 0, reasoning: 0 },
+        },
+        warnings: [],
+      }
+    },
+  })
+  try {
+    const llm = makeReflectionLlm(
+      new LlmClient({ model, db, caller: 'reflection', agentId: AGENT, maxRetries: 0 }),
+    )
+    expect(await llm.summarizeDay([], ['Finish the roof.'])).toEqual(answer)
+    const serialized = JSON.stringify(responseFormat)
+    expect(serialized).toContain('"anyOf"')
+    expect(serialized).not.toContain('"oneOf"')
+    expect(serialized).toContain('"additionalProperties":false')
+    expect(
+      DAY_SUMMARY_SCHEMA.safeParse({
+        ...answer,
+        revisions: [{ previous: 'Finish the roof.', decision: 'update' }],
+      }).success,
+    ).toBe(false)
+    expect(
+      DAY_SUMMARY_SCHEMA.safeParse({
+        ...answer,
+        revisions: [{ previous: 'Finish the roof.', decision: 'resolve' }],
+      }).success,
+    ).toBe(false)
+  } finally {
+    db.close()
+  }
 })

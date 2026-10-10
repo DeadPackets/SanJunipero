@@ -45,6 +45,8 @@ const line = (tick: number, id: string, agentId: string, text: string, move: str
   ev(tick, 'scene_line', { id, agentId, text, move })
 const closed = (tick: number, id: string, deltas: unknown[] = []): SimEvent =>
   ev(tick, 'scene_closed', { id, summary: 'It ended.', deltas, closeReason: 'ended' })
+const ended = (tick: number, id: string): SimEvent =>
+  ev(tick, 'scene_ended', { id, closeReason: 'ended', participants: ['nadia', 'yusuf'] })
 
 /** The design's own flow: a talk that becomes a quarrel, beside a harvest that scores nothing. */
 function theQuarrel(d: Director, at = 1000): void {
@@ -98,6 +100,19 @@ describe('the director follows the stakes', () => {
 })
 
 describe('the quiet beat after a peak', () => {
+  it('drops an ended talk from the shot until its later summary is ready', () => {
+    const d = director()
+    theQuarrel(d)
+    const score = d.frame(1010).cut?.score
+    d.fold([ended(1011, QUARREL)])
+    expect(d.frame(1011).cut).toBeNull()
+    expect(d.frame(1011 + SUMMARY_HOLD_TICKS + 1).cut).toBeNull()
+    d.fold([closed(1020, QUARREL)])
+    expect(d.frame(1020).cut?.sceneId).toBe(QUARREL)
+    expect(d.frame(1020).cut?.score).toBe(score)
+    expect(d.frame(1020 + SUMMARY_HOLD_TICKS).cut).toBeNull()
+  })
+
   it('holds the shot for the whole beat, then lets the better scene take it', () => {
     const d = director({ nadia: 'yusuf', yusuf: 'nadia' })
     theQuarrel(d)
@@ -303,6 +318,26 @@ describe('a talk somebody walked out of', () => {
 })
 
 describe('a resumed town', () => {
+  it('does not put a scene back on camera while its close summary is pending', async () => {
+    const { default: Database } = await import('better-sqlite3')
+    const db = new Database(':memory:')
+    db.exec(
+      'CREATE TABLE events (seq INTEGER PRIMARY KEY AUTOINCREMENT, tick INTEGER, type TEXT, payload TEXT)',
+    )
+    const put = db.prepare('INSERT INTO events (tick, type, payload) VALUES (?, ?, ?)')
+    for (const row of [
+      opened(1000, QUARREL, 'quarrel', ['nadia', 'yusuf'], 8),
+      ended(1001, QUARREL),
+    ])
+      put.run(row.tick, row.type, JSON.stringify(row.payload))
+    const d = director()
+    d.prime(db, 1002)
+    expect(d.frame(1002).cut).toBeNull()
+    d.fold([closed(1010, QUARREL)])
+    expect(d.frame(1010).cut?.sceneId).toBe(QUARREL)
+    db.close()
+  })
+
   it('does not stamp ACT I on a day that already had its scenes', async () => {
     const { default: Database } = await import('better-sqlite3')
     const db = new Database(':memory:')

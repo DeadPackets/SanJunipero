@@ -1,3 +1,4 @@
+import { artRetries } from './artRetry.js'
 import { buildingMaterialPrompt, type AssetCodex, type Forge } from '@sj/forge'
 
 // Commissioning writes the `assets` table — not the event log, not folded — so it runs off the
@@ -23,69 +24,75 @@ export type DiscoveryArtWatcher = {
   }): void
   /** Awaits everything in flight. Tests only — the live run never waits on art. */
   settle(): Promise<void>
+  retry(): void
 }
 
 export function watchDiscoveryArt(deps: {
   forge: Pick<Forge, 'commission'>
   codex: Pick<AssetCodex, 'listSince' | 'onAssetReady'>
   onError?: (kind: string, err: unknown) => void
+  signal?: AbortSignal
 }): DiscoveryArtWatcher {
+  const retries = artRetries(deps.signal)
   const known = new Set<string>()
   for (const rec of deps.codex.listSince(0))
     if (rec.kind !== null && rec.status === 'ready') known.add(rec.kind)
   deps.codex.onAssetReady((rec) => {
-    if (rec.kind !== null && rec.status === 'ready') known.add(rec.kind)
+    if (rec.kind !== null && rec.status === 'ready') {
+      known.add(rec.kind)
+      retries.forget(rec.kind)
+    }
   })
 
   const inFlight = new Set<Promise<unknown>>()
 
+  const commission = (...args: Parameters<Forge['commission']>): void => {
+    const kind = args[3]
+    if (deps.signal?.aborted || known.has(kind)) return
+    known.add(kind)
+    const defer = () => {
+      known.delete(kind)
+      retries.defer(kind, () => {
+        commission(...args)
+      })
+    }
+    const pending = deps.forge
+      .commission(...args)
+      .then((record) => {
+        if (record.status === 'ready') retries.forget(kind)
+        else {
+          defer()
+          if (args[2] === 'building')
+            deps.onError?.(
+              kind,
+              new Error('material generation left the existing surface in place'),
+            )
+        }
+      })
+      .catch((err: unknown) => {
+        defer()
+        deps.onError?.(kind, err)
+      })
+      .finally(() => {
+        inFlight.delete(pending)
+      })
+    inFlight.add(pending)
+  }
+
   return {
+    retry: retries.retry,
     onDiscovery(d) {
+      if (deps.signal?.aborted) return
       for (const b of d.raises ?? []) {
         for (const slot of ['wood', 'roof'] as const) {
           const kind = `material:${b.kind}:${slot}`
-          if (known.has(kind)) continue
-          known.add(kind)
-          const q: Promise<unknown> = deps.forge
-            .commission(buildingMaterialPrompt(b.kind, slot), { w: b.w, h: b.h }, 'building', kind)
-            .then((record) => {
-              if (record.status !== 'ready') {
-                known.delete(kind)
-                deps.onError?.(
-                  kind,
-                  new Error('material generation left the existing surface in place'),
-                )
-              }
-            })
-            .catch((err: unknown) => {
-              known.delete(kind)
-              deps.onError?.(kind, err)
-            })
-            .finally(() => {
-              inFlight.delete(q)
-            })
-          inFlight.add(q)
+          if (!retries.has(kind))
+            commission(buildingMaterialPrompt(b.kind, slot), { w: b.w, h: b.h }, 'building', kind)
         }
       }
       for (const kind of artNeededFor(d.makes, known)) {
-        // Claimed BEFORE the await, so a second discovery naming the same kind in the same
-        // breath does not pay for it twice.
-        known.add(kind)
-        const p: Promise<unknown> = deps.forge
-          .commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item', kind)
-          .then((record) => {
-            if (record.status !== 'ready') known.delete(kind)
-          })
-          .catch((err: unknown) => {
-            // commission() contracts never to reject; if it somehow does, the kind goes back
-            // so a later discovery can try again, and the run does not stop for a picture.
-            known.delete(kind)
-            deps.onError?.(kind, err)
-          })
-          .finally(() => {
-            inFlight.delete(p)
-          })
-        inFlight.add(p)
+        if (!retries.has(kind))
+          commission(itemCommissionText(kind, d.name), { w: 1, h: 1 }, 'item', kind)
       }
     },
     async settle() {
@@ -97,6 +104,9 @@ export function watchDiscoveryArt(deps: {
 /** A watcher that draws nothing: a run with no image budget must still record every discovery. */
 export function noDiscoveryArt(): DiscoveryArtWatcher {
   return {
+    retry() {
+      /* no deferred discoveries */
+    },
     onDiscovery() {
       /* the record is already in the world log; a picture is not owed */
     },

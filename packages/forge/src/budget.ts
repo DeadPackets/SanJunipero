@@ -24,3 +24,12 @@ export class BudgetGuard {
     return this.#total
   }
 }
+
+export type ReserveCharge = (
+  model: string,
+  expectedUsd: number,
+) => {
+  settle(costUsd: number): void
+  retainUncertain(): void
+  release(): void
+}

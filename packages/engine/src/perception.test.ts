@@ -1466,8 +1466,7 @@ describe('★ composePerception: one packet, every channel, byte for byte', () =
        },
        "reach": {
         "atHand": [
-         "item_2",
-         "item_3"
+         "item_2"
         ],
         "noFooting": [
          {

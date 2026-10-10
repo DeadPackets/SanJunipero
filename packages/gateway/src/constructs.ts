@@ -29,6 +29,7 @@ function toRecord(r: ConstructRow): ConstructRecord {
     firstDay: Math.floor(r.first_tick / MINUTES_PER_DAY),
     gatherings: parse<unknown[]>(r.recurrences, []).length + 1,
     anchor: typeof anchor === 'object' ? anchor : null,
+    place: typeof anchor === 'string' ? anchor : null,
     quote: provenance?.quote ?? null,
     saidBy: provenance?.byId ?? null,
   }
