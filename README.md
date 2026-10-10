@@ -7,7 +7,7 @@
 <p align="center"><em>LLM simulated life.</em></p>
 
 <p align="center">
-  <a href="https://sanjunipero.deadpackets.pw"><img src="https://img.shields.io/badge/town-LIVE-2ea44f?style=flat-square" alt="live town"></a>
+  <img src="https://img.shields.io/badge/status-archived-lightgrey?style=flat-square" alt="archived">
   <img src="https://img.shields.io/badge/tests-7710-blue?style=flat-square" alt="tests">
   <img src="https://img.shields.io/badge/engine-deterministic-8a2be2?style=flat-square" alt="deterministic">
   <img src="https://img.shields.io/badge/default_run-%240.00-success?style=flat-square" alt="free by default">
@@ -18,8 +18,28 @@ that replays byte-for-byte. Five authored founders walk the showcase as scripted
 free, no key, no network, and a valley of twelve becomes live LLM minds when you ask
 (`SJ_LIVE=1`). The design law is **physics, never outcomes**: the engine defines what wood,
 rain, hunger and walls *do*, and never what anybody should do about them. The minds noticed
-the cold and started building houses anyway. Watch it run at
-**[sanjunipero.deadpackets.pw](https://sanjunipero.deadpackets.pw)**.
+the cold and started building houses anyway.
+
+## Archived: a failed experiment
+
+This project was archived on 10 October 2026. The engine, the viewer and the minds worked.
+Keeping a live town running did not.
+
+**Cost.** Twelve live minds measured $0.70 to $0.87 per sim-day. A sim-day passes every 72
+real minutes, so one real day of a live town cost about $14 to $17, or near $500 a month.
+That is before the town grows: births and arrivals add minds, and each mind adds to the bill.
+A town is only worth watching if it runs all the time, and at that price it could not.
+
+**Environment.** A long-lived simulation of LLM minds needs a better environment and harness
+than one server, one container and a set of spending guards. Too much of the work went into
+keeping a run alive and honest: a clock that froze while the server still answered 200,
+shutdowns that left mind checkpoints behind the world, and retries that did not drain. A
+second attempt should start from a runtime built to supervise long agent simulations, not
+build that runtime around the town.
+
+`main` holds the last release candidate. The last work, a v3 viewer and continuity pass that
+never shipped, is on the `codex/sanjunipero-v3` branch. Branches under `archive/` keep
+experiments that never merged. The scripted town still runs free with `pnpm stream`.
 
 ## The town
 
@@ -225,10 +245,9 @@ is.
 - **Scaling:** don't add a replica — each container ticks its own world, so a second
   replica is a second town. One core saturates near 120 viewers at ×8 speed, ~1,000 at ×1.
 
-Issues and PRs are welcome; run `pnpm check` before either. If your change touches a line
-with a `★` on it, the comment is the reason the line is shaped that way.
+The repository is read-only. If you fork it and change a line with a `★` on it, the comment
+is the reason the line is shaped that way.
 
 ## License
 
-Not yet chosen. Until a license lands here, all rights reserved — open an issue if that
-blocks something you want to do.
+MIT. See [LICENSE](LICENSE).
