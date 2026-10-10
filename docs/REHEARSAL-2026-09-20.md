@@ -71,7 +71,7 @@ GitHub reported 13 dependency alerts on the first release push, including seven 
 
 ## Launch prerequisites
 
-- Confirm the daily spending limit and lifetime ceiling.
-- Supply an off-server backup bucket and credentials, then verify an actual remote restore. The server currently has neither Litestream bucket nor backup credentials configured.
+- The existing server settings were checked on 21 September 2026: $1,000 per rolling 24 hours, $1,000 lifetime and $1.25 per rolling day for new-resident art. No server setting was changed.
+- The owner removed the off-server backup requirement on 21 September 2026. Leave the backup profile disabled.
 - Resolve the production ledger source. Existing repository world files have no adjacent mind directory. The two located `_ops.db` files belong to old rehearsals and must not be mistaken for the production ledger.
 - Approve the concrete deployment after the rehearsal and recovery results are reviewed. No production service has been started or changed.

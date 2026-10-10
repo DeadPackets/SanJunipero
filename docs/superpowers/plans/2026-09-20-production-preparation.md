@@ -39,3 +39,5 @@ The overnight run completed at tick 2100, with all 12 reflected minds saved at t
 Final verification: 8,671 tests passed across 516 files in 187.04 seconds. Runtime `e018c0dc` builds as `sj-release:e018c0dc`; the local preview runs this code. The final archive restores tick 2100 with all 15 mind/operations hashes unchanged.
 
 The first push exposed 13 GitHub dependency advisories. Patched xmldom, adm-zip and Vitest, then repeated the full suite and built the final Linux image. The package audit now reports zero known vulnerabilities.
+
+Owner update, 21 September 2026: an off-server backup bucket is not a launch requirement. The backup profile remains disabled. Server settings were read without displaying credentials: daily AI limit $1,000, lifetime ceiling $1,000 and new-resident art limit $1.25. No server setting was changed.
