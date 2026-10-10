@@ -37,8 +37,8 @@ shutdowns that left mind checkpoints behind the world, and retries that did not 
 second attempt should start from a runtime built to supervise long agent simulations, not
 build that runtime around the town.
 
-`main` holds the last release candidate. The last work, a v3 viewer and continuity pass that
-never shipped, is on the `codex/sanjunipero-v3` branch. Branches under `archive/` keep
+`main` holds all the finished work, including a v3 viewer and continuity pass that passed the
+full gate but never ran in production. `main` is the only branch. Tags under `archive/` keep
 experiments that never merged. The scripted town still runs free with `pnpm stream`.
 
 ## The town
